@@ -1,0 +1,29 @@
+<div class="row">
+    {% for book in books %}
+    <div class="col-lg-2-4 col-md-3 col-sm-4 col-6 mb-3">
+        <div class="card h-100">
+            <a href="{% url 'book_detail' book.id %}" class="text-decoration-none d-flex flex-column">
+                <div class="card-body p-2" style="min-height: 85px; max-height: 85px; overflow: hidden;">
+                    <h6 class="card-title text-dark">{{ book.clean_title }}</h6>
+                    <p class="card-text text-muted small mb-0">{{ book.author }}</p>
+                </div>
+                {% if book.get_cover_image_path.exists %}
+                <img src="{% url 'book_cover' book.id %}" 
+                     class="card-img-top" 
+                     alt="{{ book.title }}">
+                {% else %}
+                <div class="card-img-top bg-secondary d-flex align-items-center justify-content-center">
+                    <span class="text-white" style="font-size: 0.7rem;">No Cover</span>
+                </div>
+                {% endif %}
+            </a>
+        </div>
+    </div>
+    {% empty %}
+    <div class="col">
+        <p class="text-muted">No books found.</p>
+    </div>
+    {% endfor %}
+</div>
+
+

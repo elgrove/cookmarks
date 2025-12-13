@@ -1,0 +1,98 @@
+{% extends "core/base.html" %}
+
+{% block content %}
+<div class="mb-4">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="{% url 'books' %}" class="text-decoration-none text-muted">Books</a></li>
+            <li class="breadcrumb-item active text-dark" aria-current="page">{{ book.clean_title|truncatechars:40 }}</li>
+        </ol>
+    </nav>
+</div>
+
+<div class="row g-4 g-lg-5">
+    <div class="col-lg-4">
+        <div class="position-sticky" style="top: 1rem;">
+            {% if book.get_cover_image_path.exists %}
+            <img src="{% url 'book_cover' book.id %}" 
+                 class="img-fluid rounded shadow" 
+                 alt="{{ book.title }}"
+                 style="width: 100%;">
+            {% else %}
+            <div class="bg-light d-flex align-items-center justify-content-center rounded shadow" 
+                 style="width: 100%; aspect-ratio: 2/3;">
+                <span class="text-muted">No Cover</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="col-lg-8">
+        <h1 class="mb-3" style="font-size: 2rem;">{{ book.clean_title }}</h1>
+        
+        <p class="text-muted mb-4">
+            <span>by {{ book.author }}</span>
+            {% if book.pubdate %}<span class="ms-2">· {{ book.pubdate|date:"Y" }}</span>{% endif %}
+        </p>
+        
+        {% if book.description %}
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body">
+                <h6 class="text-uppercase text-muted mb-3" style="font-size: 0.8rem; letter-spacing: 0.05em;">About This Book</h6>
+                {% if book.isbn %}
+                <p class="text-muted mb-3" style="font-size: 0.875rem;">ISBN {{ book.isbn }}</p>
+                {% endif %}
+                <div style="line-height: 1.7; color: #495057;">
+                    <div id="bookDescriptionPreview" style="display: -webkit-box; -webkit-line-clamp: 8; -webkit-box-orient: vertical; overflow: hidden;">{{ book.description|safe }}</div>
+                    <div id="bookDescriptionFull" class="collapse">{{ book.description|safe }}</div>
+                    <a class="btn btn-link text-decoration-none p-0 mt-2" data-bs-toggle="collapse" href="#bookDescriptionFull" role="button" aria-expanded="false" onclick="document.getElementById('bookDescriptionPreview').classList.toggle('d-none')">
+                        <small>
+                            <span class="when-collapsed">Show more</span>
+                            <span class="when-expanded d-none">Show less</span>
+                        </small>
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+            <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="text-uppercase text-muted mb-0" style="font-size: 0.8rem; letter-spacing: 0.05em;">Recipes ({{ recipes.count }})</h6>
+                    <div class="d-flex gap-2">
+                        <a href="{% url 'recipes' %}?book={{ book.id }}" class="btn btn-outline-secondary btn-sm">View All Recipes</a>
+                        <form method="post" action="{% url 'queue_book_for_recipe_extraction' book.id %}" class="d-inline">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-outline-secondary btn-sm">Extract Recipes</button>
+                        </form>
+                    </div>
+                </div>
+                
+                {% if recipes.count > 0 %}
+                <ul class="list-unstyled mb-0">
+                    {% for recipe in sample_recipes %}
+                    <li class="py-2 {% if not forloop.last %}border-bottom{% endif %}">
+                        <a href="{% url 'recipe_detail' recipe.id %}" class="text-decoration-none text-dark d-flex justify-content-between align-items-center">
+                            <span>{{ recipe.name }}</span>
+                            <small class="text-muted">→</small>
+                        </a>
+                    </li>
+                    {% endfor %}
+                </ul>
+                
+                {% if recipes.count > 6 %}
+                <div class="text-center pt-3 border-top mt-3">
+                    <a href="{% url 'recipes' %}?book={{ book.id }}" class="text-muted text-decoration-none">
+                        <small>+ {{ recipes.count|add:"-6" }} more recipe{{ recipes.count|add:"-6"|pluralize }}</small>
+                    </a>
+                </div>
+                {% endif %}
+                {% else %}
+                <p class="text-muted mb-0">No recipes extracted yet.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

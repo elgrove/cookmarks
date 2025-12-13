@@ -1,0 +1,142 @@
+{% extends "core/base.html" %}
+
+{% block content %}
+
+<div class="row mb-4 justify-content-center">
+    <div class="col-lg-10 col-md-11">
+        <form method="get" action="{% url 'books' %}" id="filterForm">
+            <!-- Main filter bar -->
+            <div class="d-flex gap-2 align-items-center flex-wrap mb-2">
+                <select class="form-select" name="sort" style="max-width: 180px;">
+                    <option value="random" {% if sort_by == 'random' %}selected{% endif %}>Sort by Random</option>
+                    <option value="title" {% if sort_by == 'title' %}selected{% endif %}>Sort by Title</option>
+                    <option value="author" {% if sort_by == 'author' %}selected{% endif %}>Sort by Author</option>
+                    <option value="recipes" {% if sort_by == 'recipes' %}selected{% endif %}>Sort by Recipes</option>
+                </select>
+
+                <input type="text" class="form-control" name="search" placeholder="Search" value="{{ search }}"
+                       style="max-width: 200px;">
+
+
+
+                <button type="button" class="btn btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#authorFilter">
+                    Author {% if selected_authors|length > 0 %}<span class="badge bg-dark">{{ selected_authors|length }}</span>{% endif %}
+                </button>
+
+                <button type="button" class="btn btn-outline-secondary{% if has_recipes %} active{% endif %}" id="hasRecipesToggle">
+                    Recipes {% if has_recipes %}<span class="badge bg-dark">✓</span>{% endif %}
+                </button>
+
+                <button type="submit" class="btn btn-dark">Filter</button>
+                <a href="{% url 'books' %}" class="btn btn-secondary">Clear</a>
+
+                <input type="hidden" name="has_recipes" value="{% if has_recipes %}1{% endif %}" id="hasRecipesInput">
+
+                <span class="text-muted ms-auto">{{ page_obj.paginator.count }} book{{ page_obj.paginator.count|pluralize }}</span>
+            </div>
+
+            <!-- Active filter pills -->
+            {% if selected_authors %}
+            <div class="d-flex gap-1 flex-wrap mb-2">
+                {% for author in selected_authors %}
+                <span class="badge bg-secondary d-flex align-items-center gap-1">
+                    {{ author }}
+                    <button type="button" class="btn-close btn-close-white" style="font-size: 0.5rem;"
+                            onclick="document.querySelector('input[value=\'{{ author }}\'].author-checkbox').checked = false; document.getElementById('filterForm').submit();"></button>
+                </span>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- Author filter panel -->
+            <div class="collapse mb-3" id="authorFilter">
+                <div class="card card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <input type="text" class="form-control form-control-sm me-2" id="authorSearch" placeholder="Search authors..." style="max-width: 200px;">
+                        <div class="form-check form-check-inline mb-0">
+                            <input class="form-check-input" type="checkbox" id="selectAllAuthors">
+                            <label class="form-check-label small" for="selectAllAuthors">Select all visible</label>
+                        </div>
+                    </div>
+                    <div class="row" style="max-height: 200px; overflow-y: auto;">
+                        {% for a in authors %}
+                        <div class="col-md-4 col-lg-3 author-item">
+                            <div class="form-check">
+                                <input class="form-check-input author-checkbox" type="checkbox" name="selected_authors[]" 
+                                       value="{{ a }}" id="author_{{ forloop.counter }}"
+                                       {% if a in selected_authors %}checked{% endif %}>
+                                <label class="form-check-label small" for="author_{{ forloop.counter }}">
+                                    {{ a }}
+                                </label>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-10 col-md-11">
+        {% include "core/books_grid.html" %}
+
+        {% if page_obj.has_other_pages %}
+        <nav aria-label="Book pagination" class="mt-4">
+            <ul class="pagination justify-content-center">
+                {% if page_obj.has_previous %}
+                <li class="page-item">
+                    <a class="page-link" href="?page=1{% if search %}&search={{ search }}{% endif %}{% for author in selected_authors %}&selected_authors[]={{ author }}{% endfor %}{% if has_recipes %}&has_recipes=1{% endif %}{% if sort_by %}&sort={{ sort_by }}{% endif %}">First</a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search %}&search={{ search }}{% endif %}{% for author in selected_authors %}&selected_authors[]={{ author }}{% endfor %}{% if has_recipes %}&has_recipes=1{% endif %}{% if sort_by %}&sort={{ sort_by }}{% endif %}">Previous</a>
+                </li>
+                {% endif %}
+
+                <li class="page-item disabled">
+                    <span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+                </li>
+
+                {% if page_obj.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search %}&search={{ search }}{% endif %}{% for author in selected_authors %}&selected_authors[]={{ author }}{% endfor %}{% if has_recipes %}&has_recipes=1{% endif %}{% if sort_by %}&sort={{ sort_by }}{% endif %}">Next</a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if search %}&search={{ search }}{% endif %}{% for author in selected_authors %}&selected_authors[]={{ author }}{% endfor %}{% if has_recipes %}&has_recipes=1{% endif %}{% if sort_by %}&sort={{ sort_by }}{% endif %}">Last</a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+document.getElementById('authorSearch').addEventListener('input', function(e) {
+    const searchTerm = e.target.value.toLowerCase();
+    document.querySelectorAll('.author-item').forEach(item => {
+        const label = item.querySelector('label').textContent.toLowerCase();
+        item.style.display = label.includes(searchTerm) ? '' : 'none';
+    });
+});
+
+document.getElementById('selectAllAuthors').addEventListener('change', function(e) {
+    document.querySelectorAll('.author-checkbox').forEach(checkbox => {
+        if (checkbox.closest('.author-item').style.display !== 'none') {
+            checkbox.checked = e.target.checked;
+        }
+    });
+});
+
+document.querySelector('select[name="sort"]').addEventListener('change', function() {
+    document.getElementById('filterForm').submit();
+});
+
+document.getElementById('hasRecipesToggle').addEventListener('click', function() {
+    const hasRecipesInput = document.getElementById('hasRecipesInput');
+    hasRecipesInput.value = hasRecipesInput.value === '1' ? '' : '1';
+    document.getElementById('filterForm').submit();
+});
+</script>
+{% endblock %}

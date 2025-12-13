@@ -1,0 +1,96 @@
+{% extends "core/base.html" %}
+
+{% block title %}Extraction Reports{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">Extraction Reports</h1>
+
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Total Books</h5>
+                    <p class="card-text fs-4">{{ total_books }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Processed Books</h5>
+                    <p class="card-text fs-4">{{ processed_books }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Total Recipes</h5>
+                    <p class="card-text fs-4">{{ total_recipes }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <h2>Extraction Report History</h2>
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Book</th>
+                    <th>Status</th>
+                    <th>Recipes Found</th>
+                    <th>Started</th>
+                    <th>Completed</th>
+                    <th>Errors</th>
+                    {% if config.ai_provider == 'OPENROUTER' %}
+                    <th>Cost</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for extraction_report in extraction_reports %}
+                <tr>
+                    <td><a href="{% url 'book_detail' extraction_report.book.id %}">{{ extraction_report.book.title }}</a></td>
+                    <td>
+                        {% if extraction_report.completed_at %}
+                            <span class="badge bg-success">Completed</span>
+                        {% elif extraction_report.started_at %}
+                            <span class="badge bg-info">In Progress</span>
+                        {% else %}
+                            <span class="badge bg-secondary">Queued</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ extraction_report.recipes_found }}</td>
+                    <td>{{ extraction_report.started_at|date:"Y-m-d H:i"|default:"-" }}</td>
+                    <td>{{ extraction_report.completed_at|date:"Y-m-d H:i"|default:"-" }}</td>
+                    <td>
+                        {% if extraction_report.errors %}
+                            {{ extraction_report.errors|length }}
+                        {% else %}
+                            0
+                        {% endif %}
+                    </td>
+                    {% if config.ai_provider == 'OPENROUTER' %}
+                    <td>
+                        {% if extraction_report.cost_usd %}
+                        ${{ extraction_report.cost_usd|floatformat:2 }}
+                        {% else %}
+                        -
+                        {% endif %}
+                    </td>
+                    {% endif %}
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="{% if config.ai_provider == 'OPENROUTER' %}7{% else %}6{% endif %}" class="text-center">No extraction
+                        reports found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+

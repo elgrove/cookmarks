@@ -1,0 +1,116 @@
+{% extends "core/base.html" %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h1>Tasks</h1>
+        <p class="text-muted">Manage your cookbook data and run maintenance tasks.</p>
+    </div>
+</div>
+
+<div class="row row-cols-1 row-cols-md-2 g-4">
+    <div class="col mb-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">Load Books from Calibre</h5>
+                <p class="card-text">Import book metadata from your Calibre library. This will add new books and update existing ones with the latest information from Calibre.</p>
+                <form method="post" action="{% url 'load_books_from_calibre' %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-dark">Load Books</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col mb-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">Extract Recipes from Book</h5>
+                <p class="card-text">Extract recipes from a specific book using AI. Select a book below to start the extraction process.</p>
+                <form id="extractForm">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <select class="form-select" name="book_id" id="bookSelect" required>
+                            <option value="">Select a book...</option>
+                            {% for book in books %}
+                            <option value="{{ book.id }}">{{ book.clean_title }} - {{ book.author }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="button" class="btn btn-dark" onclick="extractRecipes()">Extract Recipes</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col mb-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">Queue Random Books for Extraction</h5>
+                <p class="card-text">Queue a random selection of books for recipe extraction. Specify how many books you want to queue (default 10).</p>
+                <form method="post" action="{% url 'queue_random_books_for_extraction' %}">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <input type="number" class="form-control" name="count" id="randomCount" min="1" max="1000" value="10" />
+                    </div>
+                    <button type="submit" class="btn btn-dark">Queue Random Books</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col mb-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">Deduplicate Keywords</h5>
+                <p class="card-text">Use AI to identify and merge similar keywords across all recipes. This helps maintain consistent tagging.</p>
+                <button type="button" class="btn btn-dark" disabled title="Coming soon">Deduplicate Keywords</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="col mb-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">Queue all Books for Extraction</h5>
+                <p class="card-text">Queue extraction jobs for ALL books in your database. Books will be queued in descending Calibre id order (newest first).</p>
+                <form method="post" action="{% url 'queue_all_books_for_extraction' %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-dark" id="queueAllBtn">Queue All Books</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function extractRecipes() {
+    const select = document.getElementById('bookSelect');
+    const bookId = select.value;
+    
+    if (!bookId) {
+        alert('Please select a book first.');
+        return;
+    }
+    
+    const bookTitle = select.options[select.selectedIndex].text;
+    
+    // submit directly, do not ask for confirmation
+    const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/book/${bookId}/extract/`;
+        
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+        if (csrfToken) {
+            const csrfInput = document.createElement('input');
+            csrfInput.type = 'hidden';
+            csrfInput.name = 'csrfmiddlewaretoken';
+            csrfInput.value = csrfToken.value;
+            form.appendChild(csrfInput);
+        }
+        
+        document.body.appendChild(form);
+        form.submit();
+    }
+</script>
+{% endblock %}

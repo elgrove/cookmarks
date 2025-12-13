@@ -1,0 +1,8 @@
+{% if recipe.image %}
+<div class="position-sticky" style="top: 1rem;">
+    <img src="{% url 'recipe_image' book_id=recipe.book.id image_path=recipe.image %}" 
+         class="img-fluid rounded shadow" 
+         alt="{{ recipe.name }}"
+         style="width: 100%; max-height: 70vh; object-fit: cover;">
+</div>
+{% endif %}

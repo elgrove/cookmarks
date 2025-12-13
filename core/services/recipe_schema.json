@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Recipes",
+  "description": "An array of recipes from a cookbook, based on a subset of schema.org/Recipe.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "name": {"description": "The name of the recipe", "type": "string"},
+      "description": {"description": "A short description or introduction of the recipe, if one exists.", "type": "string"},
+      "recipeIngredients": {"description": "An ordered list of ingredients and quantities used in the recipe.", "type": "array", "items": {"type": "string"}},
+      "recipeInstructions": {"description": "An ordered list of the steps required to produce the final dish.", "type": "array", "items": {"type": "string"}},
+      "recipeYield": {"description": "The quantity produced by the recipe e.g. number of people served, number of items, if stated by the author. If regarding people served, prefix with the word 'Serves' if needed.", "type": "string"},
+      "image": {"description": "A reference to an image of the dish (as indicated by a caption or tag) in the EPUB file structure, if one exists. e.g. '../images/p026.jpg'", "type":"string"},
+      "keywords": {"description": "An array of tags describing the recipe. Should include the cuisine type (prefer narrow like 'Japanese', 'Italian' or if the dish is not so specific then broad like 'Middle Eastern', 'South East Asian') and dish type (e.g. 'Dessert', 'Main', 'Side'). Take account of cooking methods (e.g. 'Braise', 'Deep Fry'), then add some descriptive tags as appropriate (e.g. 'Soup', 'Salad', 'Summer', 'Quick', 'Vegetarian', 'Curry'). Always use UK English terms.", "type": "array", "items": {"type": "string"}}
+    },
+    "required": ["name", "recipeIngredients", "recipeInstructions"]
+  }
+}

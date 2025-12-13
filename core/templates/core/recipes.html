@@ -1,0 +1,235 @@
+{% extends "core/base.html" %}
+
+{% block content %}
+
+<div class="row mb-4 justify-content-center">
+    <div class="col-lg-10 col-md-11">
+        <form method="get" action="{% url 'recipes' %}" id="filterForm">
+            <!-- Main filter bar -->
+            <div class="d-flex gap-2 align-items-center flex-wrap mb-2">
+                <select class="form-select" name="sort" style="max-width: 200px;">
+                    <option value="random" {% if sort_by == 'random' %}selected{% endif %}>Sort by Random</option>
+                    <option value="author" {% if sort_by == 'author' %}selected{% endif %}>Sort by Author</option>
+                    <option value="book" {% if sort_by == 'book' %}selected{% endif %}>Sort by Book</option>
+                    <option value="name" {% if sort_by == 'name' %}selected{% endif %}>Sort by Name</option>
+                    <option value="order" {% if sort_by == 'order' %}selected{% endif %}>Sort by Book Order</option>
+                </select>
+
+                <input type="text" class="form-control" name="search" placeholder="Search" value="{{ search }}"
+                       style="max-width: 200px;">
+
+                <button type="button" class="btn btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#bookFilter">
+                    Book {% if selected_books|length > 0 %}<span class="badge bg-dark">{{ selected_books|length }}</span>{% endif %}
+                </button>
+
+                <button type="button" class="btn btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#authorFilter">
+                    Author {% if selected_authors|length > 0 %}<span class="badge bg-dark">{{ selected_authors|length }}</span>{% endif %}
+                </button>
+
+                <button type="button" class="btn btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#keywordFilter">
+                    Keyword {% if selected_keywords|length > 0 %}<span class="badge bg-dark">{{ selected_keywords|length }}</span>{% endif %}
+                </button>
+
+                <button type="submit" class="btn btn-dark">Filter</button>
+                <a href="{% url 'recipes' %}" class="btn btn-secondary">Clear</a>
+                <span class="text-muted ms-auto">{{ page_obj.paginator.count }} recipe{{ page_obj.paginator.count|pluralize }}</span>
+            </div>
+
+            <!-- Active filter pills -->
+            {% if selected_books or selected_authors or selected_keywords %}
+            <div class="d-flex gap-1 flex-wrap mb-2">
+                {% for book in all_books %}
+                    {% if book.id|stringformat:"s" in selected_books %}
+                    <span class="badge bg-secondary d-flex align-items-center gap-1">
+                        {{ book.clean_title|truncatechars:30 }}
+                        <button type="button" class="btn-close btn-close-white" style="font-size: 0.5rem;" 
+                                onclick="document.getElementById('book_{{ book.id }}').checked = false; document.getElementById('filterForm').submit();"></button>
+                    </span>
+                    {% endif %}
+                {% endfor %}
+                {% for author in selected_authors %}
+                <span class="badge bg-secondary d-flex align-items-center gap-1">
+                    {{ author }}
+                    <button type="button" class="btn-close btn-close-white" style="font-size: 0.5rem;"
+                            onclick="document.querySelector('input[value=\'{{ author }}\'].author-checkbox').checked = false; document.getElementById('filterForm').submit();"></button>
+                </span>
+                {% endfor %}
+                {% for keyword in selected_keywords %}
+                <span class="badge bg-secondary d-flex align-items-center gap-1">
+                    {{ keyword }}
+                    <button type="button" class="btn-close btn-close-white" style="font-size: 0.5rem;"
+                            onclick="document.querySelector('input[value=\'{{ keyword }}\'].keyword-checkbox').checked = false; document.getElementById('filterForm').submit();"></button>
+                </span>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- Book filter panel -->
+            <div class="collapse mb-2" id="bookFilter">
+                <div class="card card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <input type="text" class="form-control form-control-sm me-2" id="bookSearch" placeholder="Search books..." style="max-width: 200px;">
+                        <div class="form-check form-check-inline mb-0">
+                            <input class="form-check-input" type="checkbox" id="selectAllBooks">
+                            <label class="form-check-label small" for="selectAllBooks">Select all visible</label>
+                        </div>
+                    </div>
+                    <div class="row" style="max-height: 200px; overflow-y: auto;">
+                        {% for book in all_books %}
+                        <div class="col-md-6 col-lg-4 book-item">
+                            <div class="form-check">
+                                <input class="form-check-input book-checkbox" type="checkbox" name="selected_books[]" 
+                                       value="{{ book.id }}" id="book_{{ book.id }}"
+                                       {% if book.id|stringformat:"s" in selected_books %}checked{% endif %}>
+                                <label class="form-check-label small" for="book_{{ book.id }}">
+                                    {{ book.clean_title|truncatechars:40 }}
+                                </label>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Author filter panel -->
+            <div class="collapse mb-2" id="authorFilter">
+                <div class="card card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <input type="text" class="form-control form-control-sm me-2" id="authorSearch" placeholder="Search authors..." style="max-width: 200px;">
+                        <div class="form-check form-check-inline mb-0">
+                            <input class="form-check-input" type="checkbox" id="selectAllAuthors">
+                            <label class="form-check-label small" for="selectAllAuthors">Select all visible</label>
+                        </div>
+                    </div>
+                    <div class="row" style="max-height: 200px; overflow-y: auto;">
+                        {% for author in all_authors %}
+                        <div class="col-md-4 col-lg-3 author-item">
+                            <div class="form-check">
+                                <input class="form-check-input author-checkbox" type="checkbox" name="selected_authors[]" 
+                                       value="{{ author }}" id="author_{{ forloop.counter }}"
+                                       {% if author in selected_authors %}checked{% endif %}>
+                                <label class="form-check-label small" for="author_{{ forloop.counter }}">
+                                    {{ author }}
+                                </label>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Keyword filter panel -->
+            <div class="collapse mb-2" id="keywordFilter">
+                <div class="card card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <input type="text" class="form-control form-control-sm me-2" id="keywordSearch" placeholder="Search keywords..." style="max-width: 200px;">
+                        <div class="form-check form-check-inline mb-0">
+                            <input class="form-check-input" type="checkbox" id="selectAllKeywords">
+                            <label class="form-check-label small" for="selectAllKeywords">Select all visible</label>
+                        </div>
+                    </div>
+                    <div class="row" style="max-height: 200px; overflow-y: auto;">
+                        {% for keyword in all_keywords %}
+                        <div class="col-md-4 col-lg-3 keyword-item">
+                            <div class="form-check">
+                                <input class="form-check-input keyword-checkbox" type="checkbox" name="selected_keywords[]" 
+                                       value="{{ keyword.name }}" id="keyword_{{ forloop.counter }}"
+                                       {% if keyword.name in selected_keywords %}checked{% endif %}>
+                                <label class="form-check-label small" for="keyword_{{ forloop.counter }}">
+                                    {{ keyword.name }}
+                                </label>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-10 col-md-11">
+        <div class="list-group">
+            {% for recipe in recipes %}
+            <a href="{% url 'recipe_detail' recipe.id %}" class="list-group-item list-group-item-action ps-lg-4">
+                <h5 class="mb-1">{{ recipe.name }}</h5>
+                <p class="mb-0 text-muted small">
+                    <strong>{{ recipe.book.author }}</strong>
+                </p>
+                <p class="mb-1 text-muted small">
+                    {{ recipe.book.clean_title }}
+                </p>
+            </a>
+            {% empty %}
+            <div class="alert alert-info" role="alert">
+                No recipes found. Try adjusting your filters.
+            </div>
+            {% endfor %}
+        </div>
+
+        {% if page_obj.has_other_pages %}
+        <nav aria-label="Recipe pagination" class="mt-4">
+            <ul class="pagination justify-content-center">
+                {% if page_obj.has_previous %}
+                <li class="page-item">
+                    <a class="page-link" href="?page=1{% if search %}&search={{ search }}{% endif %}{% for book in selected_books %}&selected_books[]={{ book }}{% endfor %}{% for author in selected_authors %}&selected_authors[]={{ author }}{% endfor %}{% for keyword in selected_keywords %}&selected_keywords[]={{ keyword }}{% endfor %}{% if sort_by %}&sort={{ sort_by }}{% endif %}">First</a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search %}&search={{ search }}{% endif %}{% for book in selected_books %}&selected_books[]={{ book }}{% endfor %}{% for author in selected_authors %}&selected_authors[]={{ author }}{% endfor %}{% for keyword in selected_keywords %}&selected_keywords[]={{ keyword }}{% endfor %}{% if sort_by %}&sort={{ sort_by }}{% endif %}">Previous</a>
+                </li>
+                {% endif %}
+
+                <li class="page-item disabled">
+                    <span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+                </li>
+
+                {% if page_obj.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search %}&search={{ search }}{% endif %}{% for book in selected_books %}&selected_books[]={{ book }}{% endfor %}{% for author in selected_authors %}&selected_authors[]={{ author }}{% endfor %}{% for keyword in selected_keywords %}&selected_keywords[]={{ keyword }}{% endfor %}{% if sort_by %}&sort={{ sort_by }}{% endif %}">Next</a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if search %}&search={{ search }}{% endif %}{% for book in selected_books %}&selected_books[]={{ book }}{% endfor %}{% for author in selected_authors %}&selected_authors[]={{ author }}{% endfor %}{% for keyword in selected_keywords %}&selected_keywords[]={{ keyword }}{% endfor %}{% if sort_by %}&sort={{ sort_by }}{% endif %}">Last</a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+function setupFilterPanel(searchId, itemClass, checkboxClass, selectAllId) {
+    const searchInput = document.getElementById(searchId);
+    const selectAll = document.getElementById(selectAllId);
+    
+    if (searchInput) {
+        searchInput.addEventListener('input', function(e) {
+            const searchTerm = e.target.value.toLowerCase();
+            document.querySelectorAll('.' + itemClass).forEach(item => {
+                const label = item.querySelector('label').textContent.toLowerCase();
+                item.style.display = label.includes(searchTerm) ? '' : 'none';
+            });
+        });
+    }
+    
+    if (selectAll) {
+        selectAll.addEventListener('change', function(e) {
+            document.querySelectorAll('.' + checkboxClass).forEach(checkbox => {
+                if (checkbox.closest('.' + itemClass).style.display !== 'none') {
+                    checkbox.checked = e.target.checked;
+                }
+            });
+        });
+    }
+}
+
+setupFilterPanel('bookSearch', 'book-item', 'book-checkbox', 'selectAllBooks');
+setupFilterPanel('authorSearch', 'author-item', 'author-checkbox', 'selectAllAuthors');
+setupFilterPanel('keywordSearch', 'keyword-item', 'keyword-checkbox', 'selectAllKeywords');
+
+document.querySelector('select[name="sort"]').addEventListener('change', function() {
+    document.getElementById('filterForm').submit();
+});
+</script>
+{% endblock %}
