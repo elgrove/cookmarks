@@ -17,7 +17,6 @@ EVAL_DIR = settings.BASE_DIR / "_eval"
 
 @dataclass
 class EvalBook:
-    """Represents a book in the eval set with its expected extraction parameters."""
     name: str
     folder_name: str
     author: str
@@ -59,31 +58,24 @@ EVAL_BOOKS = [
 
 
 def load_gold_recipes(book_folder: str) -> list[dict]:
-    """Load the gold standard recipes JSON for a book."""
     recipes_path = EVAL_DIR / book_folder / "_cookmarks" / "recipes.json"
     with open(recipes_path) as f:
         return json.load(f)
 
 
 def load_gold_report(book_folder: str) -> dict:
-    """Load the gold standard report JSON for a book."""
     report_path = EVAL_DIR / book_folder / "_cookmarks" / "report.json"
     with open(report_path) as f:
         return json.load(f)
 
 
 def get_epub_path(book_folder: str) -> Path:
-    """Get the epub file path for a book."""
     book_path = EVAL_DIR / book_folder
     epub_files = list(book_path.glob("*.epub"))
     return epub_files[0] if epub_files else None
 
 
 def split_recipes_for_api_calls(recipes: list[dict], num_calls: int) -> list[str]:
-    """
-    Split recipes into chunks matching the expected number of API calls.
-    Returns a list of JSON strings, one per expected API call.
-    """
     if num_calls <= 0:
         return []
     
@@ -101,10 +93,6 @@ def split_recipes_for_api_calls(recipes: list[dict], num_calls: int) -> list[str
 
 
 def calculate_expected_api_calls(epub_path: Path, extraction_method: str) -> int:
-    """
-    Calculate the expected number of API calls based on the epub structure
-    and extraction method.
-    """
     chapter_files = get_chapterlike_files_from_epub(epub_path)
     
     if extraction_method == "block":
@@ -115,7 +103,6 @@ def calculate_expected_api_calls(epub_path: Path, extraction_method: str) -> int
 
 @pytest.fixture
 def configured_app(db):
-    """Configure the app with test settings."""
     Config.objects.update_or_create(
         pk=1,
         defaults={
@@ -127,7 +114,6 @@ def configured_app(db):
 
 
 def mock_openrouter_response(response_content: str):
-    """Add a mocked OpenRouter API response."""
     responses.add(
         responses.POST,
         "https://openrouter.ai/api/v1/chat/completions",
@@ -145,26 +131,10 @@ def mock_openrouter_response(response_content: str):
 
 @pytest.mark.django_db(transaction=True)
 class TestExtractRecipeDataFromBook:
-    """
-    Tests for the extract_recipe_data_from_book function.
-    Tests against all 3 eval books to cover extraction logic diversity:
-    - Different chapter counts (16, 273, 125)
-    - Different extraction methods (file vs block)
-    - Different image handling (same chapter vs separate chapters)
-    """
 
     @responses.activate
     @pytest.mark.parametrize("eval_book", EVAL_BOOKS, ids=[b.name for b in EVAL_BOOKS])
     def test_extract_function_on_eval_books(self, configured_app, eval_book: EvalBook):
-        """
-        Comprehensive test of extract_recipe_data_from_book function.
-        Validates:
-        - Correct extraction method selection (file vs block)
-        - Correct number of API calls made
-        - Recipes returned with correct structure
-        - ExtractionReport populated correctly
-        - Image matching logic for books with separate image chapters
-        """
         book_path = EVAL_DIR / eval_book.folder_name
         if not book_path.exists():
             pytest.skip(f"Eval book not found: {eval_book.folder_name}")
@@ -175,7 +145,6 @@ class TestExtractRecipeDataFromBook:
         
         # Load gold standard data
         gold_recipes = load_gold_recipes(eval_book.folder_name)
-        gold_report = load_gold_report(eval_book.folder_name)
         
         # Calculate expected API calls
         expected_api_calls = calculate_expected_api_calls(
@@ -241,7 +210,6 @@ class TestExtractRecipeDataFromBook:
 
     @responses.activate
     def test_extract_function_handles_empty_response(self, configured_app):
-        """Test that the function handles AI returning no recipes."""
         eval_book = EVAL_BOOKS[0]  # Craveable - simplest case
         book_path = EVAL_DIR / eval_book.folder_name
         
