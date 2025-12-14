@@ -386,6 +386,19 @@ def queue_load_books_from_calibre(request):
     return redirect('tasks')
 
 
+def queue_deduplicate_keywords(request):
+    if request.method == 'POST':
+        try:
+            async_task('core.tasks.deduplicate_keywords_task')
+            messages.success(request, 'Deduplicate keywords task has been queued successfully.')
+        except Exception as e:
+            messages.error(request, f'Error queuing deduplicate keywords task: {str(e)}')
+        
+        return redirect('tasks')
+    
+    return redirect('tasks')
+
+
 def queue_all_books_for_recipe_extraction(request):
     if request.method == 'POST':
         extraction_method = request.POST.get('extraction_method', None)

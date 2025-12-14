@@ -60,13 +60,30 @@ Cookbook Content:
 Return ONLY a JSON array of recipe objects. No other text."""
 
 DEDUPLICATE_KEYWORDS_PROMPT = """You are tasked with deduplicating a list of keywords. These are keywords/tags of recipes extracted from cookbooks.
-Analyze the provided list and identify keywords that are variations of each other (e.g., different capitalization, pluralization, or hyphenation), or are very similar and serve the same purpose as tags/keywords.
+We already have the ability to search through ingredients in our application. We want to make searching/filtering with keywords effective.
+Analyse the provided list and identify keywords that are variations of each other (e.g., different capitalisation, pluralisation, or hyphenation), or are very similar and serve the same purpose as tags/keywords.
 
 Respond with a JSON object where:
 - The keys are the duplicate keywords.
 - The values are the single, canonical keyword to replace them with.
 
 Choose the most common or sensible form as the canonical version. For example, if you have "Stir Fry", "Stir-Fry", and "stir-fry", you might choose "Stir-fry" as the canonical form.
+Always prefer UK English terms, never Americanisms, for example use 'starter' but never 'appetizer', 'grill' never 'broil', 'aubergine' never 'eggplant', 'mince' never 'ground meat', etc.
+
+Good replacements:
+Merged 'Sticky rice' into 'Rice' -- useful condensation of categories
+Merged 'Ramen Topping' into 'Ramen' -- useful condensation of categories
+Merged 'Shrimp' into 'Prawn' -- replaced Americanism with Britishism
+Merged 'Pan Fry' into 'Pan-fry'/Merged 'Pan-fried' into 'Pan-fry'/Merged 'Pan‑fry' into 'Pan-fry' -- homogenised to one term
+Merged 'Keralan' into 'Kerala' -- merged duplicates
+Merged 'Eggs' into 'Egg' -- merged duplicates
+Merged 'Dry Roast' into 'Dry roast' -- merged duplicates
+Merged 'Umeboshi' into 'Pickle' -- Umeboshi too narrow, only umeboshi would have this tag, pickle is more useful
+
+Bad replacements:
+Merged 'Vietnamese' into 'Asian' -- Asian is too broad, national and subnational cuisines are useful keywords
+Merged 'Scone' into 'Biscuit' -- replaced Britishism with Americanism
+Merged 'Wasabi' into 'Spice' -- doesn't even make sense
 
 Here is the list of keywords:
 {keywords}

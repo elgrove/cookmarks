@@ -64,7 +64,10 @@
             <div class="card-body">
                 <h5 class="card-title">Deduplicate Keywords</h5>
                 <p class="card-text">Use AI to identify and merge similar keywords across all recipes. This helps maintain consistent tagging.</p>
-                <button type="button" class="btn btn-dark" disabled title="Coming soon">Deduplicate Keywords</button>
+                <form method="post" action="{% url 'deduplicate_keywords' %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-dark">Deduplicate Keywords</button>
+                </form>
             </div>
         </div>
     </div>

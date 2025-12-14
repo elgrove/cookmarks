@@ -147,7 +147,7 @@ class OpenRouterProvider(AIProvider):
     EXTRACT_MANY_PER_FILE_MODEL = "google/gemini-2.5-flash"
     EXTRACT_ONE_PER_FILE_MODEL = "openai/gpt-oss-120b"
     EXTRACT_BLOCKS_MODEL = "google/gemini-2.5-flash"
-    DEDUPLICATE_MODEL = "google/gemini-2.5-flash-lite"
+    DEDUPLICATE_MODEL = "google/gemini-2.5-flash"
 
     def _get_completion(self, prompt, model, schema=None, temp=0):
         payload = {
@@ -221,7 +221,7 @@ class GeminiProvider(AIProvider):
     EXTRACT_MANY_PER_FILE_MODEL = "gemini-2.5-flash"
     EXTRACT_ONE_PER_FILE_MODEL = "gemini-2.5-flash-lite"
     EXTRACT_BLOCKS_MODEL = "gemini-2.5-flash"
-    DEDUPLICATE_MODEL = "gemini-2.5-flash-lite"
+    DEDUPLICATE_MODEL = "gemini-2.5-flash"
 
     def __init__(self) -> None:
         super().__init__()
