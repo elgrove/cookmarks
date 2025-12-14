@@ -16,3 +16,4 @@ _django_secret_key.txt
 .env
 _eval
 _books
+_test_calibre
