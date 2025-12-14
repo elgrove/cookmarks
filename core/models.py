@@ -22,6 +22,7 @@ class Book(BaseModel):
     title = models.CharField(max_length=500)
     author = models.CharField(max_length=500)
     pubdate = models.DateField(null=True, blank=True)
+    calibre_added_at = models.DateTimeField(null=True, blank=True)
     path = models.CharField(max_length=1000)
     isbn = models.CharField(max_length=50, blank=True)
     description = models.TextField(blank=True)

@@ -5,7 +5,7 @@ from datetime import date, timedelta
 from django.conf import settings
 from django.contrib import messages
 from django.core.paginator import Paginator
-from django.db.models import Count
+from django.db.models import Case, Count, Value, When
 from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.timezone import now
@@ -69,10 +69,16 @@ def books(request):
         books = books.order_by('author', 'title')
     elif sort_by == 'recipes':
         books = books.order_by('-recipe_count', 'title')
+    elif sort_by == 'recent':
+        books = books.order_by('-calibre_added_at', 'title')
     elif sort_by == 'random':
-        books = books.order_by('?')
+        has_recipes_order = Case(
+            When(recipe_count__gte=1, then=Value(0)),
+            default=Value(1),
+        )
+        books = books.order_by(has_recipes_order, '?')
     else:
-        books = books.order_by('-calibre_id')
+        books = books.order_by('-calibre_added_at', 'title')
     
     authors = Book.objects.values_list('author', flat=True).distinct().order_by('author')
     

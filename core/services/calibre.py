@@ -26,6 +26,7 @@ def load_books_from_calibre(calibre_path: Path):
             b.title,
             b.path,
             b.pubdate,
+            b.timestamp,
             (SELECT val FROM identifiers WHERE book = b.id AND type = 'isbn' LIMIT 1) as isbn,
             (SELECT name FROM data WHERE book = b.id AND format = 'EPUB' LIMIT 1) as epub_name,
             (SELECT GROUP_CONCAT(a.name, ' & ') 
@@ -54,6 +55,7 @@ def load_books_from_calibre(calibre_path: Path):
         author = row['authors'] or ''
         path = row['path']
         pubdate_str = row['pubdate']
+        timestamp_str = row['timestamp']
         isbn = row['isbn'] or ''
         description = row['description'] or ''
 
@@ -64,12 +66,20 @@ def load_books_from_calibre(calibre_path: Path):
             except (ValueError, IndexError):
                 logger.warning(f'Could not parse pubdate for book {calibre_id}: {pubdate_str}')
 
+        calibre_added_at = None
+        if timestamp_str:
+            try:
+                calibre_added_at = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+            except (ValueError, IndexError):
+                logger.warning(f'Could not parse timestamp for book {calibre_id}: {timestamp_str}')
+
         _, created = Book.objects.update_or_create(
             calibre_id=calibre_id,
             defaults={
                 'title': title,
                 'author': author,
                 'pubdate': pubdate,
+                'calibre_added_at': calibre_added_at,
                 'isbn': isbn,
                 'description': description,
                 'path': str(calibre_path / path),

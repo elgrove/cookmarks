@@ -9,6 +9,7 @@
             <div class="d-flex gap-2 align-items-center flex-wrap mb-2">
                 <select class="form-select" name="sort" style="max-width: 180px;">
                     <option value="random" {% if sort_by == 'random' %}selected{% endif %}>Sort by Random</option>
+                    <option value="recent" {% if sort_by == 'recent' %}selected{% endif %}>Sort by Calibre Added</option>
                     <option value="title" {% if sort_by == 'title' %}selected{% endif %}>Sort by Title</option>
                     <option value="author" {% if sort_by == 'author' %}selected{% endif %}>Sort by Author</option>
                     <option value="recipes" {% if sort_by == 'recipes' %}selected{% endif %}>Sort by Recipes</option>
