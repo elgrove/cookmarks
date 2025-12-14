@@ -61,6 +61,7 @@ class Book(BaseModel):
 
 class ExtractionReport(BaseModel):
     book = models.ForeignKey(Book, on_delete=models.CASCADE, related_name='extraction_reports')
+    provider_name = models.CharField(max_length=50, null=True)
     model_name = models.CharField(max_length=200, null=True)
     queued_at = models.DateTimeField(auto_now_add=True, null=False)
     started_at = models.DateTimeField(null=True)

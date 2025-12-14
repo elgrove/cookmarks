@@ -26,9 +26,10 @@ def extract_recipes_from_book(book_id: str, extraction_id: str | None = None):
                 extraction = None
 
         if extraction is None:
+            config = get_config()
             extraction = ExtractionReport.objects.create(
                 book=book,
-                model_name='unknown',
+                provider_name=config.ai_provider,
                 extraction_method="file",
             )
 
