@@ -19,6 +19,7 @@ urlpatterns = [
     path('recipe/<uuid:recipe_id>/remove-from-list/<uuid:list_id>/', views.remove_recipe_from_list, name='remove_recipe_from_list'),
     path('tasks/', views.tasks, name='tasks'),
     path('tasks/queue-load-books/', views.queue_load_books_from_calibre, name='load_books_from_calibre'),
+    path('tasks/queue-deduplicate-keywords/', views.queue_deduplicate_keywords, name='deduplicate_keywords'),
     path('tasks/queue-all-extractions/', views.queue_all_books_for_recipe_extraction, name='queue_all_books_for_extraction'),
     path('tasks/queue-random-extractions/', views.queue_random_books_for_recipe_extraction, name='queue_random_books_for_extraction'),
     path('config/', views.config, name='config'),
