@@ -85,6 +85,7 @@ def _extract_in_files(epub_path: Path, chapter_files: list[str], report: Extract
     is_many_per_file = len(chapter_files) <= MANY_RECIPES_PER_FILE_THRESHOLD
     extraction_method = ExtractionMethod.MANY_RECIPES_PER_FILE if is_many_per_file else ExtractionMethod.ONE_RECIPE_PER_FILE
     model = provider._get_model_for_extraction_method(extraction_method)
+    report.model_name = model
     logger.info(f"Using extraction method: {extraction_method.value} ({len(chapter_files)} chapters)")
     logger.info(f"Extracting recipes using provider={provider.NAME}, model={model}")
     
@@ -141,6 +142,7 @@ def _extract_in_blocks_of_files(epub_path: Path, chapter_files: list[str], repor
     config = get_config()
     provider = GeminiProvider() if config.ai_provider == 'GEMINI' else OpenRouterProvider()
     model = provider._get_model_for_extraction_method(ExtractionMethod.BLOCKS_OF_FILES)
+    report.model_name = model
     logger.info(f"Extracting recipes using provider={provider.NAME}, model={model}, method={ExtractionMethod.BLOCKS_OF_FILES.value}")
     rate_limiter = RateLimitedExecutor(
         max_workers=settings.EXTRACTION_THREADS,
@@ -215,7 +217,7 @@ def extract_recipe_data_from_book(book: Book, report: ExtractionReport | None = 
     if report is None:
         report = ExtractionReport(
             book=book,
-            model_name=config.ai_provider,
+            provider_name=config.ai_provider,
             total_chapters=0,
             chapters_processed=[],
             recipes_found=0,

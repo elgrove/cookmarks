@@ -137,7 +137,7 @@ def queue_book_for_recipe_extraction(request, book_id):
         if not existing:
             extraction = ExtractionReport.objects.create(
                 book=book,
-                model_name=config.ai_provider,
+                provider_name=config.ai_provider,
                 extraction_method=extraction_method,
             )
             async_task('core.tasks.extract_recipes_from_book', book.id, str(extraction.id))
@@ -392,7 +392,7 @@ def queue_all_books_for_recipe_extraction(request):
             if not existing:
                 extraction = ExtractionReport.objects.create(
                     book=book,
-                    model_name=config.ai_provider,
+                    provider_name=config.ai_provider,
                     extraction_method=extraction_method,
                 )
                 async_task('core.tasks.extract_recipes_from_book', book.id, str(extraction.id), group='queue_all_extractions')
@@ -434,7 +434,7 @@ def queue_random_books_for_recipe_extraction(request):
             if not existing:
                 extraction = ExtractionReport.objects.create(
                     book=book,
-                    model_name=config.ai_provider,
+                    provider_name=config.ai_provider,
                     extraction_method=extraction_method,
                 )
                 async_task('core.tasks.extract_recipes_from_book', book.id, str(extraction.id), group='queue_random_extractions')
