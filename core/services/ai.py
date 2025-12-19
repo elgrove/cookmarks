@@ -2,6 +2,7 @@ import abc
 import json
 import logging
 import time
+from decimal import Decimal
 from enum import Enum
 from pathlib import Path
 
@@ -204,8 +205,9 @@ class OpenRouterProvider(AIProvider):
                 response.raise_for_status()
                 response_content = result["choices"][0]["message"]["content"]
                 usage_data = result.get("usage", {})
+                raw_cost = usage_data.get("cost")
                 usage_metadata = {
-                    "cost_usd": usage_data.get("cost") or None,
+                    "cost_usd": Decimal(str(raw_cost)) if raw_cost else None,
                     "input_tokens": usage_data.get("prompt_tokens") or None,
                     "output_tokens": usage_data.get("completion_tokens") or None,
                 }
@@ -248,16 +250,16 @@ class GeminiProvider(AIProvider):
             }
         )
 
-    def _calculate_cost(self, model: str, input_tokens: int, output_tokens: int) -> float:
+    def _calculate_cost(self, model: str, input_tokens: int, output_tokens: int) -> Decimal:
         pricing = {
             "gemini-3-flash": (0.50, 3.00),
-            "gemini-2.5-flash": (0.10, 0.40),
+            "gemini-2.5-flash": (0.30, 2.50),
             "gemini-2.5-flash-lite": (0.10, 0.40),
             "gemini-2.0-flash-lite": (0.075, 0.30),
         }
         input_rate, output_rate = pricing[model]
         cost_usd = (input_tokens / 1_000_000) * input_rate + (output_tokens / 1_000_000) * output_rate
-        return cost_usd
+        return Decimal(str(cost_usd))
 
     def _get_completion(self, prompt, model, schema=None, temp=0):
         config = {

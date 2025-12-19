@@ -12,3 +12,6 @@ push:
 	docker push ghcr.io/elgrove/cookmarks:$(TAG)
 
 publish: build tag push
+
+test:
+	uv run pytest
