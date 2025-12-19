@@ -277,8 +277,9 @@ class GeminiProvider(AIProvider):
 
         usage_metadata = {}
         if response.usage_metadata:
-            input_tokens = response.usage_metadata.prompt_token_count
-            output_tokens = response.usage_metadata.candidates_token_count
+            input_tokens = getattr(response.usage_metadata, 'prompt_token_count', 0) or 0
+            total_tokens = getattr(response.usage_metadata, 'total_token_count', 0) or 0
+            output_tokens = total_tokens - input_tokens
             cost = self._calculate_cost(model, input_tokens, output_tokens)
 
             usage_metadata = {
