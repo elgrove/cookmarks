@@ -159,37 +159,49 @@ class OpenRouterProvider(AIProvider):
         if model == "openai/gpt-oss-120b":
             payload['max_tokens'] = 110_000
 
-        max_retries = 3
-        backoff_factor = 1
+        max_retries = 5
+        backoff_factor = 2
+
+        response_content = None
+        usage_metadata = {}
 
         for attempt in range(1, max_retries + 1):
-            response = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json",
-                },
-                json=payload,
-                timeout=MAX_TIMEOUT,
-            )
-            response.raise_for_status()
-            result = response.json()
+            try:
+                response = requests.post(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {self.api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json=payload,
+                    timeout=MAX_TIMEOUT,
+                )
+                
+                try:
+                    result = response.json()
+                except json.JSONDecodeError:
+                    result = {}
 
-            if "error" in result:
-                error_code = result.get("error", {}).get("code")
+                error_data = result.get("error", {})
+                error_code = error_data.get("code")
 
-                if error_code in (500, 429) and attempt < max_retries:
+                is_retryable = (
+                    response.status_code in (429, 500, 502, 503, 504) or
+                    error_code in (429, 500)
+                )
+
+                if is_retryable and attempt < max_retries:
                     sleep_time = backoff_factor * (2 ** (attempt - 1))
                     logger.warning(
-                        f"OpenRouter returned error {error_code}: (attempt {attempt}/{max_retries}). Retrying in {sleep_time}s..."
+                        f"OpenRouter returned retryable error (HTTP {response.status_code}, code {error_code}): attempt {attempt}/{max_retries}. Retrying in {sleep_time}s..."
                     )
                     time.sleep(sleep_time)
                     continue
-                else:
-                    raise ValueError(
-                        f"OpenRouter API error: {result.get('error')}"
-                    )
-            try:
+
+                if error_data:
+                    raise ValueError(f"OpenRouter API error: {error_data}")
+                
+                response.raise_for_status()
                 response_content = result["choices"][0]["message"]["content"]
                 usage_data = result.get("usage", {})
                 usage_metadata = {
@@ -198,18 +210,19 @@ class OpenRouterProvider(AIProvider):
                     "output_tokens": usage_data.get("completion_tokens") or None,
                 }
                 break
-            except KeyError as e:
+
+            except (requests.exceptions.RequestException, KeyError) as e:
                 if attempt < max_retries:
                     sleep_time = backoff_factor * (2 ** (attempt - 1))
                     logger.warning(
-                        f"Unexpected response format from OpenRouter (attempt {attempt}/{max_retries}). Retrying in {sleep_time}s... Error: {e}. Response: {result}"
+                        f"OpenRouter request failed ({type(e).__name__}): {e}. Attempt {attempt}/{max_retries}. Retrying in {sleep_time}s..."
                     )
                     time.sleep(sleep_time)
                     continue
                 else:
-                    raise ValueError(
-                        f"Unexpected response format from OpenRouter API: {e}. Response: {result}"
-                    )
+                    if isinstance(e, KeyError):
+                        raise ValueError(f"Unexpected response format from OpenRouter API: {e}. Response: {result}")
+                    raise
 
         return response_content or "", usage_metadata
 
@@ -225,7 +238,26 @@ class GeminiProvider(AIProvider):
 
     def __init__(self) -> None:
         super().__init__()
-        self.client = genai.Client(api_key=self.api_key)
+        self.client = genai.Client(
+            api_key=self.api_key,
+            http_options={
+                "retry_options": {
+                    "attempts": 5,
+                    "http_status_codes": [429, 500, 502, 503, 504],
+                }
+            }
+        )
+
+    def _calculate_cost(self, model: str, input_tokens: int, output_tokens: int) -> float:
+        pricing = {
+            "gemini-3-flash": (0.50, 3.00),
+            "gemini-2.5-flash": (0.10, 0.40),
+            "gemini-2.5-flash-lite": (0.10, 0.40),
+            "gemini-2.0-flash-lite": (0.075, 0.30),
+        }
+        input_rate, output_rate = pricing[model]
+        cost_usd = (input_tokens / 1_000_000) * input_rate + (output_tokens / 1_000_000) * output_rate
+        return cost_usd
 
     def _get_completion(self, prompt, model, schema=None, temp=0):
         config = {
@@ -240,7 +272,19 @@ class GeminiProvider(AIProvider):
             contents=prompt,
             config=config,
         )
+
         usage_metadata = {}
+        if response.usage_metadata:
+            input_tokens = response.usage_metadata.prompt_token_count
+            output_tokens = response.usage_metadata.candidates_token_count
+            cost = self._calculate_cost(model, input_tokens, output_tokens)
+
+            usage_metadata = {
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+                "cost_usd": cost,
+            }
+
         return response.text or "", usage_metadata
 
 

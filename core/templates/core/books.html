@@ -1,127 +1,311 @@
 {% extends "core/base.html" %}
+{% load query_params %}
+
+{% block title %}Books - Cookmarks{% endblock %}
 
 {% block content %}
+<style>
+    /* Books page specific styles */
+    .books-grid {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        gap: 1.25rem;
+    }
+    
+    @media (max-width: 1400px) {
+        .books-grid {
+            grid-template-columns: repeat(5, 1fr);
+        }
+    }
+    
+    @media (max-width: 1200px) {
+        .books-grid {
+            grid-template-columns: repeat(4, 1fr);
+        }
+    }
+    
+    @media (max-width: 992px) {
+        .books-grid {
+            grid-template-columns: repeat(3, 1fr);
+        }
+    }
+    
+    @media (max-width: 576px) {
+        .books-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.75rem;
+        }
+    }
+    
+    /* Book card */
+    .book-card {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        text-decoration: none;
+        color: inherit;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        border-radius: 8px;
+    }
+    
+    .book-card:hover {
+        transform: translateY(-4px);
+    }
+    
+    .book-card:hover .book-cover {
+        box-shadow: 0 12px 24px rgba(0,0,0,0.15);
+    }
+    
+    .book-cover {
+        width: 100%;
+        aspect-ratio: 2/3;
+        object-fit: cover;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        transition: box-shadow 0.2s ease;
+    }
+    
+    .book-cover-placeholder {
+        width: 100%;
+        aspect-ratio: 2/3;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    
+    .book-cover-placeholder span {
+        color: #adb5bd;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    
+    .book-info {
+        padding: 0.75rem 0.25rem 0.25rem;
+    }
+    
+    .book-title {
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: #212529;
+        margin: 0 0 0.25rem;
+        line-height: 1.3;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+    
+    .book-author {
+        font-size: 0.75rem;
+        color: #6c757d;
+        margin: 0;
+        display: -webkit-box;
+        -webkit-line-clamp: 1;
+        line-clamp: 1;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+    
+    .book-recipe-count {
+        position: absolute;
+        top: 0.5rem;
+        right: 0.5rem;
+        background: rgba(33, 37, 41, 0.9);
+        color: white;
+        font-size: 0.65rem;
+        font-weight: 600;
+        width: 1.5rem;
+        height: 1.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        backdrop-filter: blur(4px);
+    }
+</style>
 
-<div class="row mb-4 justify-content-center">
-    <div class="col-lg-10 col-md-11">
-        <form method="get" action="{% url 'books' %}" id="filterForm">
-            <!-- Main filter bar -->
-            <div class="d-flex gap-2 align-items-center flex-wrap mb-2">
-                <select class="form-select" name="sort" style="max-width: 180px;">
-                    <option value="random" {% if sort_by == 'random' %}selected{% endif %}>Sort by Random</option>
-                    <option value="recent" {% if sort_by == 'recent' %}selected{% endif %}>Sort by Calibre Added</option>
-                    <option value="title" {% if sort_by == 'title' %}selected{% endif %}>Sort by Title</option>
-                    <option value="author" {% if sort_by == 'author' %}selected{% endif %}>Sort by Author</option>
-                    <option value="recipes" {% if sort_by == 'recipes' %}selected{% endif %}>Sort by Recipes</option>
-                </select>
+<!-- Page Header -->
+<div class="page-header">
+    <h1 class="page-title">Books</h1>
+</div>
 
-                <input type="text" class="form-control" name="search" placeholder="Search" value="{{ search }}"
-                       style="max-width: 200px;">
-
-
-
-                <button type="button" class="btn btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#authorFilter">
-                    Author {% if selected_authors|length > 0 %}<span class="badge bg-dark">{{ selected_authors|length }}</span>{% endif %}
-                </button>
-
-                <button type="button" class="btn btn-outline-secondary{% if has_recipes %} active{% endif %}" id="hasRecipesToggle">
-                    Recipes {% if has_recipes %}<span class="badge bg-dark">✓</span>{% endif %}
-                </button>
-
-                <button type="submit" class="btn btn-dark">Filter</button>
-                <a href="{% url 'books' %}" class="btn btn-secondary">Clear</a>
-
-                <input type="hidden" name="has_recipes" value="{% if has_recipes %}1{% endif %}" id="hasRecipesInput">
-
-                <span class="text-muted ms-auto">{{ page_obj.paginator.count }} book{{ page_obj.paginator.count|pluralize }}</span>
+<!-- Filter Form -->
+<form method="get" action="{% url 'books' %}" id="filterForm" data-loading>
+    <!-- Main Filter Bar -->
+    <div class="filter-bar">
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            <!-- Sort -->
+            <select class="form-select" name="sort" style="width: auto; min-width: 160px;" id="sortSelect">
+                <option value="random" {% if sort_by == 'random' %}selected{% endif %}>Random</option>
+                <option value="recent" {% if sort_by == 'recent' %}selected{% endif %}>Recently Added</option>
+                <option value="title" {% if sort_by == 'title' %}selected{% endif %}>Title A-Z</option>
+                <option value="author" {% if sort_by == 'author' %}selected{% endif %}>Author A-Z</option>
+                <option value="recipes" {% if sort_by == 'recipes' %}selected{% endif %}>Most Recipes</option>
+            </select>
+            
+            <!-- Search -->
+            <div class="flex-grow-1" style="max-width: 280px; min-width: 150px;">
+                <input type="text" class="form-control" name="search" placeholder="Search books..." value="{{ search }}">
             </div>
-
-            <!-- Active filter pills -->
-            {% if selected_authors %}
-            <div class="d-flex gap-1 flex-wrap mb-2">
-                {% for author in selected_authors %}
-                <span class="badge bg-secondary d-flex align-items-center gap-1">
-                    {{ author }}
-                    <button type="button" class="btn-close btn-close-white" style="font-size: 0.5rem;"
-                            onclick="document.querySelector('input[value=\'{{ author }}\'].author-checkbox').checked = false; document.getElementById('filterForm').submit();"></button>
-                </span>
-                {% endfor %}
+            
+            <!-- Author Filter Toggle -->
+            <button type="button" class="btn filter-btn filter-btn-secondary" 
+                    data-bs-toggle="collapse" data-bs-target="#authorFilterPanel"
+                    aria-label="Filter by author">
+                Author
+                {% if selected_authors|length > 0 %}
+                <span class="filter-badge">{{ selected_authors|length }}</span>
+                {% endif %}
+            </button>
+            
+            <!-- Has Recipes Toggle -->
+            <button type="button" class="btn filter-btn filter-btn-secondary {% if has_recipes %}active{% endif %}" 
+                    id="hasRecipesToggle"
+                    aria-label="Toggle has recipes filter">
+                Has Recipes
+                {% if has_recipes %}
+                <span class="filter-badge">✓</span>
+                {% endif %}
+            </button>
+            
+            <!-- Hidden input for has_recipes -->
+            <input type="hidden" name="has_recipes" value="{% if has_recipes %}1{% endif %}" id="hasRecipesInput">
+            
+            <!-- Actions -->
+            <div class="ms-auto d-flex gap-2 align-items-center">
+                <span class="filter-count d-none d-md-inline">{{ page_obj.paginator.count }} book{{ page_obj.paginator.count|pluralize }}</span>
+                <button type="submit" class="btn filter-btn filter-btn-primary">Apply</button>
+                <a href="{% url 'books' %}" class="btn filter-btn filter-btn-secondary">Clear</a>
             </div>
-            {% endif %}
-
-            <!-- Author filter panel -->
-            <div class="collapse mb-3" id="authorFilter">
-                <div class="card card-body">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <input type="text" class="form-control form-control-sm me-2" id="authorSearch" placeholder="Search authors..." style="max-width: 200px;">
-                        <div class="form-check form-check-inline mb-0">
-                            <input class="form-check-input" type="checkbox" id="selectAllAuthors">
-                            <label class="form-check-label small" for="selectAllAuthors">Select all visible</label>
-                        </div>
-                    </div>
-                    <div class="row" style="max-height: 200px; overflow-y: auto;">
-                        {% for a in authors %}
-                        <div class="col-md-4 col-lg-3 author-item">
-                            <div class="form-check">
-                                <input class="form-check-input author-checkbox" type="checkbox" name="selected_authors[]" 
-                                       value="{{ a }}" id="author_{{ forloop.counter }}"
-                                       {% if a in selected_authors %}checked{% endif %}>
-                                <label class="form-check-label small" for="author_{{ forloop.counter }}">
-                                    {{ a }}
-                                </label>
-                            </div>
-                        </div>
-                        {% endfor %}
-                    </div>
+        </div>
+    </div>
+    
+    <!-- Active Filters Pills -->
+    {% if selected_authors %}
+    <div class="active-filters">
+        {% for author in selected_authors %}
+        <span class="filter-pill">
+            {{ author }}
+            <button type="button" class="filter-pill-close" 
+                    onclick="document.querySelector('input[value=\'{{ author }}\'].author-checkbox').checked = false; document.getElementById('filterForm').submit();"
+                    aria-label="Remove {{ author }} filter">
+                ×
+            </button>
+        </span>
+        {% endfor %}
+    </div>
+    {% endif %}
+    
+    <!-- Author Filter Panel -->
+    <div class="collapse" id="authorFilterPanel">
+        <div class="filter-dropdown">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <span class="filter-dropdown-title">Filter by Author</span>
+                <div class="d-flex gap-3 align-items-center">
+                    <input type="text" class="form-control form-control-sm" id="authorSearch" 
+                           placeholder="Search authors..." style="max-width: 180px; font-size: 0.8rem;">
+                    <label class="form-check-label d-flex align-items-center gap-2" style="font-size: 0.8rem; cursor: pointer;">
+                        <input class="form-check-input" type="checkbox" id="selectAllAuthors" style="margin: 0;">
+                        Select visible
+                    </label>
                 </div>
             </div>
-        </form>
+            <div class="filter-grid">
+                {% for a in authors %}
+                <label class="filter-checkbox-label author-item">
+                    <input class="form-check-input author-checkbox" type="checkbox" name="selected_authors[]" 
+                           value="{{ a }}" {% if a in selected_authors %}checked{% endif %}>
+                    <span class="filter-name">{{ a }}</span>
+                </label>
+                {% endfor %}
+            </div>
+        </div>
     </div>
+</form>
+
+<!-- Book Count (Mobile) -->
+<div class="d-md-none text-center mb-3">
+    <span class="filter-count">{{ page_obj.paginator.count }} book{{ page_obj.paginator.count|pluralize }}</span>
 </div>
 
-<div class="row justify-content-center">
-    <div class="col-lg-10 col-md-11">
-        {% include "core/books_grid.html" %}
-
-        {% if page_obj.has_other_pages %}
-        <nav aria-label="Book pagination" class="mt-4">
-            <ul class="pagination justify-content-center">
-                {% if page_obj.has_previous %}
-                <li class="page-item">
-                    <a class="page-link" href="?page=1{% if search %}&search={{ search }}{% endif %}{% for author in selected_authors %}&selected_authors[]={{ author }}{% endfor %}{% if has_recipes %}&has_recipes=1{% endif %}{% if sort_by %}&sort={{ sort_by }}{% endif %}">First</a>
-                </li>
-                <li class="page-item">
-                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search %}&search={{ search }}{% endif %}{% for author in selected_authors %}&selected_authors[]={{ author }}{% endfor %}{% if has_recipes %}&has_recipes=1{% endif %}{% if sort_by %}&sort={{ sort_by }}{% endif %}">Previous</a>
-                </li>
-                {% endif %}
-
-                <li class="page-item disabled">
-                    <span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
-                </li>
-
-                {% if page_obj.has_next %}
-                <li class="page-item">
-                    <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search %}&search={{ search }}{% endif %}{% for author in selected_authors %}&selected_authors[]={{ author }}{% endfor %}{% if has_recipes %}&has_recipes=1{% endif %}{% if sort_by %}&sort={{ sort_by }}{% endif %}">Next</a>
-                </li>
-                <li class="page-item">
-                    <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if search %}&search={{ search }}{% endif %}{% for author in selected_authors %}&selected_authors[]={{ author }}{% endfor %}{% if has_recipes %}&has_recipes=1{% endif %}{% if sort_by %}&sort={{ sort_by }}{% endif %}">Last</a>
-                </li>
-                {% endif %}
-            </ul>
-        </nav>
+<!-- Books Grid -->
+<div class="books-grid">
+    {% for book in books %}
+    <a href="{% url 'book_detail' book.id %}" class="book-card">
+        {% if book.recipe_count and book.recipe_count > 0 %}
+        <span class="book-recipe-count">{{ book.recipe_count }}</span>
         {% endif %}
+        
+        {% if book.get_cover_image_path.exists %}
+        <img src="{% url 'book_cover' book.id %}" class="book-cover" alt="{{ book.title|default:'Book cover' }}" loading="lazy">
+        {% else %}
+        <div class="book-cover-placeholder">
+            <span>No Cover</span>
+        </div>
+        {% endif %}
+        
+        <div class="book-info">
+            <h3 class="book-title">{{ book.clean_title }}</h3>
+            <p class="book-author">{{ book.author }}</p>
+        </div>
+    </a>
+    {% empty %}
+    <div class="empty-state" style="grid-column: 1 / -1;">
+        <div class="empty-state-icon">📚</div>
+        <div class="empty-state-title">No books found</div>
+        <p>Try adjusting your filters or search terms.</p>
     </div>
+    {% endfor %}
 </div>
+
+<!-- Pagination -->
+{% if page_obj.has_other_pages %}
+<nav class="page-pagination" aria-label="Book pagination">
+    {% if page_obj.has_previous %}
+    <a href="{% preserve_query_params page=1 %}" class="pagination-btn" title="First page">
+        ««
+    </a>
+    <a href="{% preserve_query_params page=page_obj.previous_page_number %}" class="pagination-btn" title="Previous page">
+        ‹
+    </a>
+    {% endif %}
+    
+    <span class="pagination-info">
+        Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+    </span>
+    
+    {% if page_obj.has_next %}
+    <a href="{% preserve_query_params page=page_obj.next_page_number %}" class="pagination-btn" title="Next page">
+        ›
+    </a>
+    <a href="{% preserve_query_params page=page_obj.paginator.num_pages %}" class="pagination-btn" title="Last page">
+        »»
+    </a>
+    {% endif %}
+</nav>
+{% endif %}
 
 <script>
+// Sort dropdown auto-submit
+document.getElementById('sortSelect').addEventListener('change', function() {
+    document.getElementById('filterForm').submit();
+});
+
+// Author search filter
 document.getElementById('authorSearch').addEventListener('input', function(e) {
     const searchTerm = e.target.value.toLowerCase();
     document.querySelectorAll('.author-item').forEach(item => {
-        const label = item.querySelector('label').textContent.toLowerCase();
+        const label = item.querySelector('.filter-name').textContent.toLowerCase();
         item.style.display = label.includes(searchTerm) ? '' : 'none';
     });
 });
 
+// Select all visible authors
 document.getElementById('selectAllAuthors').addEventListener('change', function(e) {
     document.querySelectorAll('.author-checkbox').forEach(checkbox => {
         if (checkbox.closest('.author-item').style.display !== 'none') {
@@ -130,14 +314,11 @@ document.getElementById('selectAllAuthors').addEventListener('change', function(
     });
 });
 
-document.querySelector('select[name="sort"]').addEventListener('change', function() {
-    document.getElementById('filterForm').submit();
-});
-
+// Has recipes toggle
 document.getElementById('hasRecipesToggle').addEventListener('click', function() {
     const hasRecipesInput = document.getElementById('hasRecipesInput');
     hasRecipesInput.value = hasRecipesInput.value === '1' ? '' : '1';
     document.getElementById('filterForm').submit();
 });
 </script>
-{% endblock %}
+{% endblock %}  

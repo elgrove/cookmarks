@@ -191,4 +191,4 @@ if dir := os.environ.get('CALIBRE_ROOT'):
     CALIBRE_ROOT = Path(dir)
 
 # Threads for executor making AI requests
-EXTRACTION_THREADS = int(os.environ.get("EXTRACTION_THREADS") or 8)
+EXTRACTION_THREADS = int(os.environ.get("EXTRACTION_THREADS") or 16)

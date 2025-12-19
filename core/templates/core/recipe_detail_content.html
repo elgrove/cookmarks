@@ -1,0 +1,342 @@
+<style>
+    .keyword-link:hover {
+        background-color: #212529 !important;
+        color: white !important;
+        border-color: #212529 !important;
+    }
+</style>
+
+<!-- Navigation -->
+<nav class="recipe-nav mb-4 py-3 border-bottom">
+    <div class="d-flex justify-content-between align-items-center">
+        {% if previous_recipe %}
+        <a href="{% url 'recipe_detail' previous_recipe.id %}"
+            hx-get="{% url 'recipe_detail' previous_recipe.id %}"
+            hx-target="#recipe-content"
+            hx-swap="innerHTML"
+            hx-push-url="true"
+            data-recipe-nav="prev"
+            class="text-decoration-none text-dark d-flex align-items-center recipe-nav-link">
+            <span class="me-2">←</span>
+            <span class="d-none d-md-inline text-truncate" style="max-width: 250px;">{{ previous_recipe.name }}</span>
+            <span class="d-md-none">Previous</span>
+        </a>
+        {% else %}
+        <span class="text-muted d-flex align-items-center">
+            <span class="me-2">←</span>
+            <span class="d-none d-md-inline">No previous</span>
+        </span>
+        {% endif %}
+        <nav aria-label="breadcrumb" class="d-none d-lg-block">
+            <ol class="breadcrumb mb-0 small">
+                <li class="breadcrumb-item"><a href="{% url 'books' %}" class="text-decoration-none text-muted">Books</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'books' %}?selected_authors[]={{ book.author|urlencode }}" class="text-decoration-none text-muted">{{ book.author|truncatechars:20 }}</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'book_detail' book.id %}" class="text-decoration-none text-muted">{{ book.clean_title|truncatechars:30 }}</a></li>
+                <li class="breadcrumb-item active text-dark" aria-current="page">{{ recipe.name|truncatechars:30 }}</li>
+            </ol>
+        </nav>
+        {% if next_recipe %}
+        <a href="{% url 'recipe_detail' next_recipe.id %}"
+            hx-get="{% url 'recipe_detail' next_recipe.id %}"
+            hx-target="#recipe-content"
+            hx-swap="innerHTML"
+            hx-push-url="true"
+            data-recipe-nav="next"
+            class="text-decoration-none text-dark d-flex align-items-center recipe-nav-link">
+            <span class="d-none d-md-inline text-truncate text-end" style="max-width: 250px;">{{ next_recipe.name }}</span>
+            <span class="d-md-none">Next</span>
+            <span class="ms-2">→</span>
+        </a>
+        {% else %}
+        <span class="text-muted d-flex align-items-center">
+            <span class="d-none d-md-inline">No next</span>
+            <span class="ms-2">→</span>
+        </span>
+        {% endif %}
+        </div>
+        </nav>
+<!-- Mobile breadcrumb -->
+<nav aria-label="breadcrumb" class="d-lg-none mb-4">
+    <ol class="breadcrumb mb-0 small">
+        <li class="breadcrumb-item"><a href="{% url 'books' %}" class="text-decoration-none text-muted">Books</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'books' %}?selected_authors[]={{ book.author|urlencode }}" class="text-decoration-none text-muted">{{ book.author|truncatechars:15 }}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'book_detail' book.id %}" class="text-decoration-none text-muted">{{ 
+                book.clean_title|truncatechars:20 }}</a></li>
+        <li class="breadcrumb-item active text-dark" aria-current="page">{{ recipe.name|truncatechars:20 }}</li>
+    </ol>
+</nav>
+
+<!-- Main Content -->
+<div class="row">
+    <div class="col-12">
+        <!-- Header & Description with Image Column -->
+        <div class="d-flex gap-5 mb-4 pb-4 border-bottom">
+            <!-- Left Column: Title, Meta, and Description -->
+            <div style="flex: 2; min-width: 0; padding-right: 2rem; max-width: 70%;">
+                <!-- Title & Meta -->
+                <header class="mb-4">
+                    <h1 class="display-6 fw-normal mb-3">{{ recipe.name }}</h1>
+
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                        <div class="d-flex flex-wrap align-items-center gap-3 text-muted">
+                            {% if recipe.yields %}
+                            <span class="d-flex align-items-center">
+                                {{ recipe.yields }}
+                            </span>
+                            {% endif %}
+
+                            {% if recipe.keywords.all %}
+                            <span class="d-flex align-items-center flex-wrap gap-1">
+                                {% for keyword in recipe.keywords.all %}
+                                <a href="{% url 'recipes' %}?selected_keywords[]={{ keyword.name|urlencode }}" class="badge bg-light text-dark border text-decoration-none keyword-link" style="cursor: pointer; transition: all 0.15s ease;">{{ keyword.name }}</a>
+                                {% endfor %}
+                            </span>
+                            {% endif %}
+                        </div>
+                        
+
+                    </div>
+                </header>
+                
+                <!-- Description -->
+                {% if recipe.description %}
+                <div class="description-container">
+                    <p class="lead mb-0 description-preview"
+                        style="font-size: 1.1rem; line-height: 1.8; color: #495057; display: -webkit-box; -webkit-line-clamp: 7; line-clamp: 7; -webkit-box-orient: vertical; overflow: hidden;">
+                        {{ recipe.description }}
+                    </p>
+                    <p class="lead mb-0 description-full"
+                        style="font-size: 1.1rem; line-height: 1.8; color: #495057; display: none;">
+                        {{ recipe.description }}
+                    </p>
+                    <button type="button" class="btn btn-link text-muted text-decoration-none p-0 mt-2 description-toggle"
+                        style="font-size: 0.9rem;">
+                        Read more
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+        
+            <!-- Right Column: Image (spans from title to description) -->
+            {% if recipe.image %}
+            <div style="flex: 0 0 auto; min-width: 180px; max-width: 280px;" class="d-none d-md-flex flex-column">
+                <a href="#" data-bs-toggle="modal" data-bs-target="#imageModal" class="d-block recipe-image-thumb flex-grow-1 d-flex flex-column">
+                    <img src="{% url 'recipe_image' book_id=recipe.book.id image_path=recipe.image %}"
+                        class="img-fluid rounded shadow-sm flex-grow-1" alt="{{ recipe.name|default:'Recipe image' }}"
+                        style="object-fit: cover; width: 100%; cursor: pointer;" loading="lazy">
+                </a>
+            </div>
+            {% endif %}
+        </div>
+        
+        <!-- Mobile image (full width, below header section) -->
+        {% if recipe.image %}
+        <div class="d-md-none mb-4">
+            <a href="#" data-bs-toggle="modal" data-bs-target="#imageModal" class="d-block recipe-image-thumb">
+                <img src="{% url 'recipe_image' book_id=recipe.book.id image_path=recipe.image %}"
+                    class="img-fluid rounded shadow-sm" alt="{{ recipe.name|default:'Recipe image' }}"
+                    style="max-height: 250px; width: auto; cursor: pointer;" loading="lazy">
+            </a>
+        </div>
+        {% endif %}
+        
+        <!-- Ingredients & Method -->
+        <div class="row g-4 g-lg-5">
+            <!-- Ingredients -->
+            <div class="col-lg-5">
+                <div class="position-lg-sticky" style="top: 1rem;">
+                    <h2 class="h6 text-uppercase text-muted mb-3" style="font-size: 0.75rem; letter-spacing: 0.1em;">Ingredients</h2>
+                    <ul class="list-unstyled mb-0">
+                        {% for ingredient in recipe.ingredients %}
+                        <li class="py-2 {% if not forloop.last %}border-bottom{% endif %} ingredient-item">
+                            <span class="text-muted me-2">•</span>
+                            <span>{{ ingredient }}</span>
+                        </li>
+                        {% empty %}
+                        <li class="text-muted">No ingredients listed</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- Method -->
+            <div class="col-lg-7">
+                <h2 class="h6 text-uppercase text-muted mb-3" style="font-size: 0.75rem; letter-spacing: 0.1em;">Method</h2>
+                <ol class="list-unstyled mb-0">
+                    {% for step in recipe.instructions %}
+                    <li class="py-3 {% if not forloop.last %}border-bottom{% endif %} method-step">
+                        <div class="d-flex">
+                            <span class="fw-bold text-muted me-3" style="min-width: 1.5rem;">{{ forloop.counter }}.</span>
+                            <span style="line-height: 1.7;">{{ step }}</span>
+                        </div>
+                    </li>
+                    {% empty %}
+                    <li class="text-muted">No instructions listed</li>
+                    {% endfor %}
+                </ol>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Image Modal -->
+{% if recipe.image %}
+<div class="modal fade" id="imageModal" tabindex="-1" aria-labelledby="imageModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content bg-transparent border-0">
+            <div class="modal-header border-0 pb-0">
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center p-0">
+                <img src="{% url 'recipe_image' book_id=recipe.book.id image_path=recipe.image %}"
+                    class="img-fluid rounded shadow" alt="{{ recipe.name|default:'Recipe image' }}" style="max-height: 85vh;">
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Footer Section: Lists, Book -->
+<div class="row mt-5 pt-4 border-top g-4">
+    <!-- Lists -->
+    <div class="col-12 col-md-6">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h3 class="h6 text-uppercase text-muted mb-0" style="font-size: 0.75rem; letter-spacing: 0.1em;">Lists</h3>
+            {% if available_lists %}
+            <div class="dropdown">
+                <button class="btn btn-sm btn-link text-muted text-decoration-none p-0 dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    Add to List
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    {% for list in available_lists %}
+                    <li>
+                        <form method="post" action="{% url 'add_recipe_to_list' recipe.id list.id %}" class="px-3 py-1">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-link text-decoration-none text-dark p-0 w-100 text-start">
+                                {{ list.name }}
+                            </button>
+                        </form>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+        </div>
+        {% if recipe_lists %}
+        <div class="d-flex flex-wrap gap-2">
+            {% for list in recipe_lists %}
+            <span class="badge bg-light text-dark border d-inline-flex align-items-center gap-1">
+                <a href="{% url 'recipe_list_detail' list.id %}" class="text-decoration-none text-dark">{{ list.name }}</a>
+                <form method="post" action="{% url 'remove_recipe_from_list' recipe.id list.id %}" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-link text-muted p-0 border-0" style="font-size: 0.75rem; line-height: 1;">×</button>
+                </form>
+            </span>
+            {% endfor %}
+        </div>
+        {% else %}
+        <span class="text-muted small">Not in any lists</span>
+        {% endif %}
+    </div>
+    
+    <!-- Book -->
+    <div class="col-12 col-md-6">
+        <h3 class="h6 text-uppercase text-muted mb-2" style="font-size: 0.75rem; letter-spacing: 0.1em;">From the Book</h3>
+        <a href="{% url 'book_detail' book.id %}" class="text-decoration-none text-dark d-flex align-items-center book-link">
+            {% if book.get_cover_image_path.exists %}
+            <img src="{% url 'book_cover' book.id %}" class="me-3 rounded shadow-sm" style="width: 50px; height: 75px; object-fit: cover;" alt="{{ book.title|default:'Book cover' }}" loading="lazy">
+            {% endif %}
+            <div>
+                <div class="fw-medium">{{ book.clean_title }}</div>
+                <small class="text-muted">by {{ book.author }}</small>
+            </div>
+        </a>
+    </div>
+</div>
+
+<!-- Keywords Edit Modal -->
+<div class="modal fade" id="keywordsModal" tabindex="-1" aria-labelledby="keywordsModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="keywordsModalLabel">Edit Keywords</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="post" action="{% url 'recipe_detail' recipe.id %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <label class="form-label">Keywords (comma-separated)</label>
+                    {{ form.keywords }}
+                    {{ form.keywords.errors }}
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-dark">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    // Keywords edit modal
+    const editBtn = document.getElementById('edit-keywords-btn');
+    const keywordsModal = document.getElementById('keywordsModal');
+    
+    if (editBtn && keywordsModal) {
+        editBtn.addEventListener('click', function () {
+            const modal = new bootstrap.Modal(keywordsModal);
+            modal.show();
+        });
+    }
+
+    // Description read more toggle
+    const descContainer = document.querySelector('.description-container');
+    if (descContainer) {
+        const preview = descContainer.querySelector('.description-preview');
+        const full = descContainer.querySelector('.description-full');
+        const toggleBtn = descContainer.querySelector('.description-toggle');
+
+        // Hide toggle if content doesn't overflow
+        if (preview && preview.scrollHeight <= preview.clientHeight) {
+            if (toggleBtn) toggleBtn.style.display = 'none';
+        }
+
+        if (toggleBtn) {
+            let expanded = false;
+            toggleBtn.addEventListener('click', function () {
+                expanded = !expanded;
+                if (expanded) {
+                    preview.style.display = 'none';
+                    full.style.display = 'block';
+                    toggleBtn.textContent = 'Show less';
+                } else {
+                    preview.style.display = '-webkit-box';
+                    full.style.display = 'none';
+                    toggleBtn.textContent = 'Read more';
+                }
+            });
+        }
+    }
+
+    // Keyboard navigation (left/right arrow keys)
+    function handleKeyNav(e) {
+        // Don't trigger if user is typing in an input/textarea
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+        
+        if (e.key === 'ArrowLeft') {
+            const prevLink = document.querySelector('[data-recipe-nav="prev"]');
+            if (prevLink) prevLink.click();
+        } else if (e.key === 'ArrowRight') {
+            const nextLink = document.querySelector('[data-recipe-nav="next"]');
+            if (nextLink) nextLink.click();
+        }
+    }
+    
+    // Remove any existing listener (in case of HTMX swap) and add new one
+    document.removeEventListener('keydown', window._recipeKeyNavHandler);
+    window._recipeKeyNavHandler = handleKeyNav;
+    document.addEventListener('keydown', handleKeyNav);
+})();
+</script>
