@@ -104,7 +104,11 @@ function extractRecipes() {
     const form = document.createElement('form');
     const urlTemplate = document.getElementById('extractForm').dataset.extractUrlTemplate;
     form.method = 'POST';
+<<<<<<< HEAD
     form.action = urlTemplate.replace('00000000-0000-0000-0000-000000000000', bookId);
+=======
+    form.action = urlTemplate.replace('/0/', '/' + bookId + '/');
+>>>>>>> origin/main
         
         const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
         if (csrfToken) {
