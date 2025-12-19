@@ -29,7 +29,7 @@
             <div class="card-body">
                 <h5 class="card-title">Extract Recipes from Book</h5>
                 <p class="card-text">Extract recipes from a specific book using AI. Select a book below to start the extraction process.</p>
-                <form id="extractForm" data-extract-url-template="{% url 'queue_book_for_recipe_extraction' 0 %}">
+                <form id="extractForm" data-extract-url-template="{% url 'queue_book_for_recipe_extraction' '00000000-0000-0000-0000-000000000000' %}">
                     {% csrf_token %}
                     <div class="mb-3">
                         <select class="form-select" name="book_id" id="bookSelect" required>
@@ -104,7 +104,7 @@ function extractRecipes() {
     const form = document.createElement('form');
     const urlTemplate = document.getElementById('extractForm').dataset.extractUrlTemplate;
     form.method = 'POST';
-    form.action = urlTemplate.replace('/0/', '/' + bookId + '/');
+    form.action = urlTemplate.replace('00000000-0000-0000-0000-000000000000', bookId);
         
         const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
         if (csrfToken) {
