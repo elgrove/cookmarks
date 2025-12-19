@@ -1,5 +1,6 @@
 import string
 import uuid
+import re
 from pathlib import Path
 from typing import Optional
 
@@ -51,7 +52,9 @@ class Book(BaseModel):
 
     @property
     def clean_title(self) -> str:
-        return self.title.split(':')[0].strip()
+        s = self.title.split(':')[0].strip()
+        s = s.split('_')[0].strip()
+        return s
 
     def __str__(self):
         return f"{self.author} - {self.title}"
@@ -86,7 +89,7 @@ class ExtractionReport(BaseModel):
         return f"{self.book.title} - {self.started_at}"
 
     class Meta:
-        ordering = ['-started_at']
+        ordering = ['-completed_at']
 
 
 class Keyword(BaseModel):
@@ -97,6 +100,30 @@ class Keyword(BaseModel):
 
     class Meta:
         ordering = ['name']
+
+class RecipeData(PydanticBase):
+    name: str
+    description: Optional[str] = None
+    ingredients: list[str] = Field(min_length=1, alias='recipeIngredients')
+    instructions: list[str] = Field(min_length=1, alias='recipeInstructions')
+    yields: Optional[str] = Field(None, alias='recipeYield')
+    image: Optional[str] = None
+    keywords: list[str] = Field(default_factory=list)
+    author: Optional[str] = None
+    book_title: Optional[str] = Field(None, alias='bookTitle')
+    book_order: Optional[int] = Field(None, alias='bookOrder')
+
+    class Config:
+        populate_by_name = True
+
+    def model_post_init(self, __context):
+        self.name = string.capwords(self.name)
+        if self.yields:
+            self.yields = (
+                self.yields.capitalize()
+                if self.yields[0].isalpha()
+                else self.yields.lower()
+            )
 
 
 class Recipe(BaseModel):
@@ -114,13 +141,18 @@ class Recipe(BaseModel):
     def __str__(self):
         return f"{self.name} ({self.book.author} - {self.book.title})"
 
+    @property
+    def clean_name(self) -> str:
+        cleaned = re.sub(r"\s*\([^\)]*\)\s*$", "", self.name)
+        return cleaned.strip() or self.name
+
     def get_next_in_book(self):
         return Recipe.objects.filter(book=self.book, order__gt=self.order).order_by('order').first()
 
     def get_previous_in_book(self):
         return Recipe.objects.filter(book=self.book, order__lt=self.order).order_by('-order').first()
 
-    def to_recipe_data(self) -> 'RecipeData':
+    def to_recipe_data(self) -> RecipeData:
         return RecipeData(
             name=self.name,
             description=self.description,
@@ -159,31 +191,6 @@ class RecipeListItem(BaseModel):
     class Meta:
         ordering = ['-created_at']
         unique_together = ['recipe_list', 'recipe']
-
-
-class RecipeData(PydanticBase):
-    name: str
-    description: Optional[str] = None
-    ingredients: list[str] = Field(min_length=1, alias='recipeIngredients')
-    instructions: list[str] = Field(min_length=1, alias='recipeInstructions')
-    yields: Optional[str] = Field(None, alias='recipeYield')
-    image: Optional[str] = None
-    keywords: list[str] = Field(default_factory=list)
-    author: Optional[str] = None
-    book_title: Optional[str] = Field(None, alias='bookTitle')
-    book_order: Optional[int] = Field(None, alias='bookOrder')
-
-    class Config:
-        populate_by_name = True
-
-    def model_post_init(self, __context):
-        self.name = string.capwords(self.name)
-        if self.yields:
-            self.yields = (
-                self.yields.capitalize()
-                if self.yields[0].isalpha()
-                else self.yields.lower()
-            )
 
 
 class Config(models.Model):

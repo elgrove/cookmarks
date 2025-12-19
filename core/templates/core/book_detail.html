@@ -1,81 +1,132 @@
 {% extends "core/base.html" %}
 
-{% block content %}
-<div class="mb-4">
-    <nav aria-label="breadcrumb">
-        <ol class="breadcrumb mb-0">
-            <li class="breadcrumb-item"><a href="{% url 'books' %}" class="text-decoration-none text-muted">Books</a></li>
-            <li class="breadcrumb-item active text-dark" aria-current="page">{{ book.clean_title|truncatechars:40 }}</li>
-        </ol>
-    </nav>
-</div>
+{% block title %}{{ book.clean_title }} - Cookmarks{% endblock %}
 
-<div class="row g-4 g-lg-5">
-    <div class="col-lg-4">
-        <div class="position-sticky" style="top: 1rem;">
+{% block content %}
+<!-- Breadcrumb -->
+<nav aria-label="breadcrumb" class="mb-4 py-3 border-bottom">
+    <ol class="breadcrumb mb-0 small">
+        <li class="breadcrumb-item"><a href="{% url 'books' %}" class="text-decoration-none text-muted">Books</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'books' %}?selected_authors[]={{ book.author|urlencode }}" class="text-decoration-none text-muted">{{ book.author|truncatechars:30 }}</a></li>
+        <li class="breadcrumb-item active text-dark" aria-current="page">{{ book.clean_title|truncatechars:40 }}</li>
+    </ol>
+</nav>
+
+<!-- Main Content -->
+<div class="row">
+    <div class="col-12">
+        <!-- Header & Description with Cover Column -->
+        <div class="d-flex gap-5 mb-4 pb-4 border-bottom">
+            <!-- Left Column: Title, Meta, and Description -->
+            <div style="flex: 2; min-width: 0; padding-right: 2rem; max-width: 70%;">
+                <!-- Title & Meta -->
+                <header class="mb-4">
+                    <h1 class="display-6 fw-normal mb-3">{{ book.clean_title }}</h1>
+
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                        <div class="d-flex flex-wrap align-items-center gap-3 text-muted">
+                            <span class="d-flex align-items-center">
+                                by {{ book.author }}
+                            </span>
+
+                            {% if book.pubdate %}
+                            <span class="d-flex align-items-center">
+                                {{ book.pubdate|date:"Y" }}
+                            </span>
+                            {% endif %}
+
+                            {% if book.isbn %}
+                            <span class="d-flex align-items-center">
+                                <span class="badge bg-light text-dark border">ISBN {{ book.isbn }}</span>
+                            </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </header>
+                
+                <!-- Description -->
+                {% if book.description %}
+                <div class="description-container">
+                    <div class="lead mb-0 description-preview"
+                        style="font-size: 1.1rem; line-height: 1.8; color: #495057; display: -webkit-box; -webkit-line-clamp: 7; line-clamp: 7; -webkit-box-orient: vertical; overflow: hidden;">
+                        {{ book.description|safe }}
+                    </div>
+                    <div class="lead mb-0 description-full"
+                        style="font-size: 1.1rem; line-height: 1.8; color: #495057; display: none;">
+                        {{ book.description|safe }}
+                    </div>
+                    <button type="button" class="btn btn-link text-muted text-decoration-none p-0 mt-2 description-toggle"
+                        style="font-size: 0.9rem;">
+                        Read more
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+        
+            <!-- Right Column: Cover Image -->
             {% if book.get_cover_image_path.exists %}
-            <img src="{% url 'book_cover' book.id %}" 
-                 class="img-fluid rounded shadow" 
-                 alt="{{ book.title }}"
-                 style="width: 100%;">
+            <div style="flex: 0 0 auto; min-width: 180px; max-width: 280px;" class="d-none d-md-flex flex-column">
+                <a href="#" data-bs-toggle="modal" data-bs-target="#coverModal" class="d-block book-cover-thumb flex-grow-1 d-flex flex-column">
+                    <img src="{% url 'book_cover' book.id %}"
+                        class="img-fluid rounded shadow-sm flex-grow-1" alt="{{ book.title|default:'Book cover' }}"
+                        style="object-fit: cover; width: 100%; cursor: pointer;" loading="lazy">
+                </a>
+            </div>
             {% else %}
-            <div class="bg-light d-flex align-items-center justify-content-center rounded shadow" 
-                 style="width: 100%; aspect-ratio: 2/3;">
-                <span class="text-muted">No Cover</span>
+            <div style="flex: 0 0 auto; min-width: 180px; max-width: 280px;" class="d-none d-md-flex flex-column">
+                <div class="bg-light d-flex align-items-center justify-content-center rounded shadow-sm flex-grow-1" 
+                     style="aspect-ratio: 2/3;">
+                    <span class="text-muted">No Cover</span>
+                </div>
             </div>
             {% endif %}
         </div>
-    </div>
-    
-    <div class="col-lg-8">
-        <h1 class="mb-3" style="font-size: 2rem;">{{ book.clean_title }}</h1>
         
-        <p class="text-muted mb-4">
-            <span>by {{ book.author }}</span>
-            {% if book.pubdate %}<span class="ms-2">· {{ book.pubdate|date:"Y" }}</span>{% endif %}
-        </p>
-        
-        {% if book.description %}
-        <div class="card border-0 shadow-sm mb-4">
-            <div class="card-body">
-                <h6 class="text-uppercase text-muted mb-3" style="font-size: 0.8rem; letter-spacing: 0.05em;">About This Book</h6>
-                {% if book.isbn %}
-                <p class="text-muted mb-3" style="font-size: 0.875rem;">ISBN {{ book.isbn }}</p>
-                {% endif %}
-                <div style="line-height: 1.7; color: #495057;">
-                    <div id="bookDescriptionPreview" style="display: -webkit-box; -webkit-line-clamp: 8; -webkit-box-orient: vertical; overflow: hidden;">{{ book.description|safe }}</div>
-                    <div id="bookDescriptionFull" class="collapse">{{ book.description|safe }}</div>
-                    <a class="btn btn-link text-decoration-none p-0 mt-2" data-bs-toggle="collapse" href="#bookDescriptionFull" role="button" aria-expanded="false" onclick="document.getElementById('bookDescriptionPreview').classList.toggle('d-none')">
-                        <small>
-                            <span class="when-collapsed">Show more</span>
-                            <span class="when-expanded d-none">Show less</span>
-                        </small>
-                    </a>
-                </div>
-            </div>
+        <!-- Mobile cover (full width, below header section) -->
+        {% if book.get_cover_image_path.exists %}
+        <div class="d-md-none mb-4">
+            <a href="#" data-bs-toggle="modal" data-bs-target="#coverModal" class="d-block book-cover-thumb">
+                <img src="{% url 'book_cover' book.id %}"
+                    class="img-fluid rounded shadow-sm" alt="{{ book.title|default:'Book cover' }}"
+                    style="max-height: 250px; width: auto; cursor: pointer;" loading="lazy">
+            </a>
         </div>
         {% endif %}
         
-            <div class="card border-0 shadow-sm">
-            <div class="card-body">
+        <!-- Recipes & Actions Section -->
+        <div class="row g-4 g-lg-5">
+            <!-- Recipes -->
+            <div class="col-lg-7">
                 <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h6 class="text-uppercase text-muted mb-0" style="font-size: 0.8rem; letter-spacing: 0.05em;">Recipes ({{ recipes.count }})</h6>
-                    <div class="d-flex gap-2">
-                        <a href="{% url 'recipes' %}?book={{ book.id }}" class="btn btn-outline-secondary btn-sm">View All Recipes</a>
-                        <form method="post" action="{% url 'queue_book_for_recipe_extraction' book.id %}" class="d-inline">
-                            {% csrf_token %}
-                            <button type="submit" class="btn btn-outline-secondary btn-sm">Extract Recipes</button>
-                        </form>
-                    </div>
+                    <h2 class="h6 text-uppercase text-muted mb-0" style="font-size: 0.75rem; letter-spacing: 0.1em;">
+                        Recipes ({{ recipes.count }})
+                    </h2>
+                    {% if recipes.count > 0 %}
+                    <a href="{% url 'recipes' %}?book={{ book.id }}" class="btn btn-link text-muted text-decoration-none p-0" style="font-size: 0.9rem;">
+                        View all →
+                    </a>
+                    {% endif %}
                 </div>
                 
                 {% if recipes.count > 0 %}
                 <ul class="list-unstyled mb-0">
                     {% for recipe in sample_recipes %}
-                    <li class="py-2 {% if not forloop.last %}border-bottom{% endif %}">
-                        <a href="{% url 'recipe_detail' recipe.id %}" class="text-decoration-none text-dark d-flex justify-content-between align-items-center">
-                            <span>{{ recipe.name }}</span>
-                            <small class="text-muted">→</small>
+                    <li class="py-3 {% if not forloop.last %}border-bottom{% endif %} recipe-list-item">
+                        <a href="{% url 'recipe_detail' recipe.id %}" class="text-decoration-none text-dark d-flex justify-content-between align-items-start">
+                            <div>
+                                <span class="fw-medium d-block mb-1">{{ recipe.name }}</span>
+                                {% if recipe.keywords.all %}
+                                <span class="d-flex flex-wrap gap-1">
+                                    {% for keyword in recipe.keywords.all|slice:":4" %}
+                                    <span class="badge bg-light text-muted border" style="font-size: 0.7rem; font-weight: normal;">{{ keyword.name }}</span>
+                                    {% endfor %}
+                                    {% if recipe.keywords.count > 4 %}
+                                    <span class="badge bg-light text-muted border" style="font-size: 0.7rem; font-weight: normal;">+{{ recipe.keywords.count|add:"-4" }}</span>
+                                    {% endif %}
+                                </span>
+                                {% endif %}
+                            </div>
+                            <small class="text-muted ms-3">→</small>
                         </a>
                     </li>
                     {% endfor %}
@@ -89,10 +140,171 @@
                 </div>
                 {% endif %}
                 {% else %}
-                <p class="text-muted mb-0">No recipes extracted yet.</p>
+                <p class="text-muted mb-0">No recipes extracted yet. Use the "Extract Recipes" button to get started.</p>
                 {% endif %}
+            </div>
+            
+            <!-- Actions -->
+            <div class="col-lg-5">
+                <div class="position-lg-sticky" style="top: 1rem;">
+                    <h2 class="h6 text-uppercase text-muted mb-3" style="font-size: 0.75rem; letter-spacing: 0.1em;">Actions</h2>
+                    <div class="d-flex flex-column gap-2">
+                        <form method="post" action="{% url 'queue_book_for_recipe_extraction' book.id %}">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-dark w-100 d-flex align-items-center justify-content-between">
+                                <span>Extract Recipes</span>
+                                <span>→</span>
+                            </button>
+                        </form>
+                        
+                        {% if available_models %}
+                        <button type="button" class="btn btn-outline-dark w-100 d-flex align-items-center justify-content-between" data-bs-toggle="modal" data-bs-target="#extractWithModal">
+                            <span>Extract with...</span>
+                            <span class="text-muted">⚙</span>
+                        </button>
+                        {% endif %}
+                        
+                        <form method="post" action="{% url 'clear_book_images' book.id %}">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-outline-dark w-100 d-flex align-items-center justify-content-between">
+                                <span>Clear All Images</span>
+                                <span class="text-muted">×</span>
+                            </button>
+                        </form>
+                        <form method="post" action="{% url 'clear_book_recipes' book.id %}" onsubmit="return confirm('Are you sure you want to remove all {{ recipes.count }} recipe{{ recipes.count|pluralize }} from this book?');">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-outline-dark w-100 d-flex align-items-center justify-content-between">
+                                <span>Clear All Recipes</span>
+                                <span class="text-muted">×</span>
+                            </button>
+                        </form>
+                        <button type="button" class="btn btn-outline-danger w-100 d-flex align-items-center justify-content-between" data-bs-toggle="modal" data-bs-target="#deleteBookModal">
+                            <span>Delete Book</span>
+                            <span>🗑</span>
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
+
+<!-- Cover Modal -->
+{% if book.get_cover_image_path.exists %}
+<div class="modal fade" id="coverModal" tabindex="-1" aria-labelledby="coverModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content bg-transparent border-0">
+            <div class="modal-header border-0 pb-0">
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                    aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center p-0">
+                <img src="{% url 'book_cover' book.id %}"
+                    class="img-fluid rounded shadow" alt="{{ book.title }}" style="max-height: 85vh;">
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if available_models %}
+<!-- Extract with Custom Model Modal -->
+<div class="modal fade" id="extractWithModal" tabindex="-1" aria-labelledby="extractWithModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="extractWithModalLabel">Extract with Custom Settings</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="post" action="{% url 'queue_book_for_recipe_extraction' book.id %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-4">
+                        <label class="form-label fw-medium">Select Model</label>
+                        <div class="list-group">
+                            {% for model in available_models %}
+                            <label class="list-group-item list-group-item-action d-flex align-items-center gap-2" for="modal_model_{{ forloop.counter }}">
+                                <input class="form-check-input mt-0" type="radio" name="model_name" value="{{ model }}" id="modal_model_{{ forloop.counter }}" {% if forloop.first %}checked{% endif %}>
+                                <span class="small">{{ model }}</span>
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="mb-0">
+                        <label class="form-label fw-medium" for="extraction_method">Extraction Method</label>
+                        <select class="form-select" name="extraction_method" id="extraction_method">
+                            <option value="">Auto</option>
+                            <option value="file">File (one chapter at a time)</option>
+                            <option value="block">Block (batch chapters together)</option>
+                        </select>
+                        <small class="text-muted">Auto will analyse the book structure to choose the best method.</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-dark">Extract Recipes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Delete Book Confirmation Modal -->
+<div class="modal fade" id="deleteBookModal" tabindex="-1" aria-labelledby="deleteBookModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteBookModalLabel">Delete Book</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete <strong>{{ book.clean_title }}</strong>?</p>
+                <p class="text-muted mb-0">This will permanently remove the book and all {{ recipes.count }} associated recipe{{ recipes.count|pluralize }} from the database. This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form method="post" action="{% url 'delete_book' book.id %}" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">Delete Book</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Description read more toggle
+        const descContainer = document.querySelector('.description-container');
+        if (descContainer) {
+            const preview = descContainer.querySelector('.description-preview');
+            const full = descContainer.querySelector('.description-full');
+            const toggleBtn = descContainer.querySelector('.description-toggle');
+
+            // Hide toggle if content doesn't overflow
+            if (preview && preview.scrollHeight <= preview.clientHeight) {
+                if (toggleBtn) toggleBtn.style.display = 'none';
+            }
+
+            if (toggleBtn) {
+                let expanded = false;
+                toggleBtn.addEventListener('click', function () {
+                    expanded = !expanded;
+                    if (expanded) {
+                        preview.style.display = 'none';
+                        full.style.display = 'block';
+                        toggleBtn.textContent = 'Show less';
+                    } else {
+                        preview.style.display = '-webkit-box';
+                        full.style.display = 'none';
+                        toggleBtn.textContent = 'Read more';
+                    }
+                });
+            }
+        }
+    });
+</script>
 {% endblock %}

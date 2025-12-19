@@ -17,3 +17,4 @@ _django_secret_key.txt
 _eval
 _books
 _test_calibre
+staticfiles

@@ -82,7 +82,7 @@ def books(request):
     
     authors = Book.objects.values_list('author', flat=True).distinct().order_by('author')
     
-    paginator = Paginator(books, 30)
+    paginator = Paginator(books, 60)
     page_number = request.GET.get('page', 1)
     page_obj = paginator.get_page(page_number)
     
@@ -111,7 +111,7 @@ def book_cover(request, book_id):
 
 def book_detail(request, book_id):
     book = get_object_or_404(Book, id=book_id)
-    all_recipes = book.recipes.all()
+    all_recipes = book.recipes.prefetch_related('keywords').all()
     
     # Get a random sample of up to 6 recipes
     recipe_ids = list(all_recipes.values_list('id', flat=True))
@@ -123,11 +123,33 @@ def book_detail(request, book_id):
     
     all_lists = RecipeList.objects.all()
     
+    # Get available AI models from the configured provider
+    config = Config.get_solo()
+    available_models = []
+    if config.ai_provider:
+        from core.services.ai import OpenRouterProvider, GeminiProvider
+        provider_map = {
+            'OPENROUTER': OpenRouterProvider,
+            'GEMINI': GeminiProvider,
+        }
+        provider_class = provider_map.get(config.ai_provider)
+        if provider_class:
+            # Get unique models from class variables
+            model_attrs = ['IMAGE_MATCH_MODEL', 'EXTRACT_MANY_PER_FILE_MODEL', 
+                          'EXTRACT_ONE_PER_FILE_MODEL', 'EXTRACT_BLOCKS_MODEL', 'DEDUPLICATE_MODEL']
+            models = set()
+            for attr in model_attrs:
+                model = getattr(provider_class, attr, None)
+                if model and model != NotImplemented:
+                    models.add(model)
+            available_models = sorted(models)
+    
     context = {
         'book': book,
         'recipes': all_recipes,
         'sample_recipes': sample_recipes,
         'all_lists': all_lists,
+        'available_models': available_models,
     }
     
     return render(request, 'core/book_detail.html', context)
@@ -136,7 +158,8 @@ def book_detail(request, book_id):
 def queue_book_for_recipe_extraction(request, book_id):
     if request.method == 'POST':
         book = get_object_or_404(Book, id=book_id)
-        extraction_method = request.POST.get('extraction_method', None)
+        extraction_method = request.POST.get('extraction_method') or None
+        model_name = request.POST.get('model_name') or None
         config = Config.get_solo()
         
         existing = book.extraction_reports.filter(started_at__isnull=True).exists()
@@ -145,6 +168,7 @@ def queue_book_for_recipe_extraction(request, book_id):
                 book=book,
                 provider_name=config.ai_provider,
                 extraction_method=extraction_method,
+                model_name=model_name,
             )
             async_task('core.tasks.extract_recipes_from_book', book.id, str(extraction.id))
         else:
@@ -164,6 +188,44 @@ def queue_book_for_recipe_extraction(request, book_id):
     referer = request.META.get('HTTP_REFERER', '')
     if 'tasks' in referer:
         return redirect('tasks')
+    return redirect('book_detail', book_id=book_id)
+
+
+def clear_book_images(request, book_id):
+    if request.method == 'POST':
+        book = get_object_or_404(Book, id=book_id)
+        updated_count = book.recipes.update(image='')
+        messages.success(request, f'Removed images from {updated_count} recipe{"s" if updated_count != 1 else ""}.')
+    return redirect('book_detail', book_id=book_id)
+
+
+def clear_book_recipes(request, book_id):
+    if request.method == 'POST':
+        book = get_object_or_404(Book, id=book_id)
+        deleted_count, _ = book.recipes.all().delete()
+        messages.success(request, f'Removed {deleted_count} recipe{"s" if deleted_count != 1 else ""} from this book.')
+    return redirect('book_detail', book_id=book_id)
+
+
+def refresh_book_metadata(request, book_id):
+    if request.method == 'POST':
+        book = get_object_or_404(Book, id=book_id)
+        from .services.calibre import refresh_single_book_from_calibre
+        try:
+            refresh_single_book_from_calibre(book)
+            messages.success(request, f'Updated metadata for "{book.clean_title}" from Calibre.')
+        except Exception as e:
+            messages.error(request, f'Failed to update metadata: {str(e)}')
+    return redirect('book_detail', book_id=book_id)
+
+
+def delete_book(request, book_id):
+    if request.method == 'POST':
+        book = get_object_or_404(Book, id=book_id)
+        title = book.clean_title
+        book.delete()
+        messages.success(request, f'Deleted "{title}" and all associated recipes.')
+        return redirect('books')
     return redirect('book_detail', book_id=book_id)
 
 
@@ -210,22 +272,23 @@ def recipes(request):
     all_books = Book.objects.filter(recipes__isnull=False).distinct().order_by('title')
     all_authors = Book.objects.filter(recipes__isnull=False).values_list('author', flat=True).distinct().order_by('author')
     all_keywords = Keyword.objects.all()
-    
-    paginator = Paginator(recipes, 50)
+
+    paginator = Paginator(recipes, 30)
     page_number = request.GET.get('page', 1)
     page_obj = paginator.get_page(page_number)
     
     context = {
-        'recipes': page_obj,
-        'page_obj': page_obj,
-        'search': search,
-        'selected_books': selected_books,
-        'selected_authors': selected_authors,
-        'selected_keywords': selected_keywords,
-        'sort_by': sort_by,
-        'all_books': all_books,
-        'all_authors': all_authors,
-        'all_keywords': all_keywords,
+        "recipes": page_obj,
+        "page_obj": page_obj,
+        "search": search,
+        "book_id": book_id,
+        "selected_books": selected_books,
+        "selected_authors": selected_authors,
+        "selected_keywords": selected_keywords,
+        "sort_by": sort_by,
+        "all_books": all_books,
+        "all_authors": all_authors,
+        "all_keywords": all_keywords,
     }
     
     return render(request, 'core/recipes.html', context)
@@ -252,10 +315,6 @@ def recipe_detail(request, recipe_id):
         keyword_string = ", ".join([k.name for k in recipe.keywords.all()])
         form = RecipeKeywordsForm(initial={'keywords': keyword_string})
     
-    image_on_left = int(recipe.id) % 2 == 0
-    if not recipe.image:
-        image_on_left = False
-
     recipe_lists = recipe.recipe_lists.all()
     all_lists = RecipeList.objects.all()
     available_lists = all_lists.exclude(id__in=recipe_lists.values_list('id', flat=True))
@@ -263,7 +322,6 @@ def recipe_detail(request, recipe_id):
     context = {
         'recipe': recipe,
         'book': recipe.book,
-        'image_on_left': image_on_left,
         'previous_recipe': recipe.get_previous_in_book(),
         'next_recipe': recipe.get_next_in_book(),
         'recipe_lists': recipe_lists,
@@ -271,7 +329,12 @@ def recipe_detail(request, recipe_id):
         'form': form,
     }
     
+    # For HTMX requests, return just the partial content
+    if request.headers.get('HX-Request'):
+        return render(request, 'core/recipe_detail_content.html', context)
+    
     return render(request, 'core/recipe_detail.html', context)
+
 
 
 def recipe_lists(request):
@@ -495,7 +558,20 @@ def extraction_reports(request):
     processed_books = Book.objects.annotate(recipe_count=Count('recipes')).filter(recipe_count__gt=0).count()
 
     fourteen_days_ago = now() - timedelta(days=14)
-    extraction_reports = ExtractionReport.objects.select_related('book').filter(created_at__gte=fourteen_days_ago)[:100]
+    
+    # Annotate extraction reports with image count
+    from django.db.models import Q, Sum
+    extraction_reports = ExtractionReport.objects.select_related('book').filter(
+        created_at__gte=fourteen_days_ago
+    ).annotate(
+        image_count=Count('book__recipes', filter=Q(book__recipes__image__isnull=False) & ~Q(book__recipes__image=''))
+    ).order_by('-completed_at')[:100]
+
+    # Calculate total cost from extraction reports
+    total_cost = ExtractionReport.objects.filter(
+        created_at__gte=fourteen_days_ago,
+        cost_usd__isnull=False
+    ).aggregate(Sum('cost_usd'))['cost_usd__sum'] or 0
 
     config = Config.get_solo()
 
@@ -503,6 +579,7 @@ def extraction_reports(request):
         'total_books': total_books,
         'total_recipes': total_recipes,
         'processed_books': processed_books,
+        'total_cost': round(float(total_cost), 2),
         'extraction_reports': extraction_reports,
         'config': config,
     }

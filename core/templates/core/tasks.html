@@ -1,5 +1,7 @@
 {% extends "core/base.html" %}
 
+{% block title %}Tasks - Cookmarks{% endblock %}
+
 {% block content %}
 <div class="row mb-4">
     <div class="col-12">
@@ -27,7 +29,7 @@
             <div class="card-body">
                 <h5 class="card-title">Extract Recipes from Book</h5>
                 <p class="card-text">Extract recipes from a specific book using AI. Select a book below to start the extraction process.</p>
-                <form id="extractForm">
+                <form id="extractForm" data-extract-url-template="{% url 'queue_book_for_recipe_extraction' 0 %}">
                     {% csrf_token %}
                     <div class="mb-3">
                         <select class="form-select" name="book_id" id="bookSelect" required>
@@ -100,8 +102,9 @@ function extractRecipes() {
     
     // submit directly, do not ask for confirmation
     const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = `/book/${bookId}/extract/`;
+    const urlTemplate = document.getElementById('extractForm').dataset.extractUrlTemplate;
+    form.method = 'POST';
+    form.action = urlTemplate.replace('/0/', '/' + bookId + '/');
         
         const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
         if (csrfToken) {

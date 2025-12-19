@@ -1,10 +1,12 @@
 {% extends "core/base.html" %}
 
+{% block title %}Home - Cookmarks{% endblock %}
+
 {% block content %}
 <div class="row mb-5">
     <div class="col-lg-10 mx-auto text-center">
         <h1 class="mb-2">Cookmarks</h1>
-        <p class="lead text-muted">Extract recipes from your cookbook collection using AI</p>
+        <p class="lead text-muted">Search and browse recipes from your cookbook collection using AI</p>
     </div>
 </div>
 
@@ -79,12 +81,13 @@
                 <div class="col-md-4 d-flex align-items-center">
                     <img src="{% url 'book_cover' book_of_the_day.id %}" 
                          class="img-fluid w-100" 
-                         alt="{{ book_of_the_day.title }}"
-                         style="object-fit: contain;">
+                         alt="{{ book_of_the_day.title|default:'Book cover' }}"
+                         style="object-fit: contain;"
+                         loading="lazy">
                 </div>
                 <div class="col-md-8">
                     <div class="card-body">
-                        <h5 class="card-title">{{ book_of_the_day.title }}</h5>
+                        <h5 class="card-title">{{ book_of_the_day.clean_title }}</h5>
                         <p class="card-text"><small class="text-muted">by {{ book_of_the_day.author }}</small></p>
                         {% if book_of_the_day.description %}
                         <p class="card-text">{{ book_of_the_day.description|truncatechars:800|safe }}</p>

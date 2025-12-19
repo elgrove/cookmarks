@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cookmarks</title>
+    <title>{% block title %}Cookmarks{% endblock %}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <style>
@@ -22,25 +22,6 @@
             object-fit: cover;
             aspect-ratio: 2/3;
             width: 100%;
-        }
-        .list-view-img {
-            width: 80px;
-            height: 120px;
-            object-fit: cover;
-            border-radius: 0;
-            flex-shrink: 0;
-        }
-        .flex-row .card-body {
-            flex: 1;
-            padding: 0.75rem;
-        }
-        .flex-row .card-title {
-            font-size: 1rem;
-            margin-bottom: 0.25rem;
-        }
-        .flex-row .card-text {
-            font-size: 0.875rem;
-            margin-bottom: 0;
         }
         .btn-dark {
             background-color: #212529;
@@ -77,7 +58,379 @@
         .dropdown-menu input[type="search"] {
             border-color: #dee2e6;
         }
+        
+        /* Recipe page styles */
+        .recipe-nav-link {
+            transition: opacity 0.15s ease;
+        }
+        .recipe-nav-link:hover {
+            opacity: 0.7;
+        }
+        .ingredient-item {
+            transition: background-color 0.15s ease;
+        }
+        .ingredient-item:hover {
+            background-color: rgba(0, 0, 0, 0.02);
+        }
+        .method-step {
+            transition: background-color 0.15s ease;
+        }
+        .method-step:hover {
+            background-color: rgba(0, 0, 0, 0.02);
+        }
+        .book-link {
+            transition: opacity 0.15s ease;
+        }
+        .book-link:hover {
+            opacity: 0.8;
+        }
+        @media (min-width: 992px) {
+            .position-lg-sticky {
+                position: sticky !important;
+            }
+        }
+        .recipe-image-thumb img {
+            transition: opacity 0.15s ease, transform 0.15s ease;
+        }
+        .recipe-image-thumb:hover img {
+            opacity: 0.9;
+            transform: scale(1.02);
+        }
+        
+        /* ========================================
+           Shared Filter & Page Styles 
+           ======================================== */
+        
+        /* Page header */
+        .page-header {
+            padding-bottom: 0.75rem;
+            margin-bottom: 1.5rem;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .page-title {
+            font-size: 1.75rem;
+            font-weight: 400;
+            margin-bottom: 0.5rem;
+        }
+        
+        .page-subtitle {
+            color: #6c757d;
+            font-size: 0.95rem;
+            margin-bottom: 0;
+        }
+        
+        /* Filter bar styles */
+        .filter-bar {
+            background: #fff;
+            border-radius: 12px;
+            padding: 1rem 1.25rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            margin-bottom: 1.5rem;
+        }
+        
+        .filter-bar .form-select,
+        .filter-bar .form-control {
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            padding: 0.5rem 0.75rem;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+        
+        .filter-bar .form-select:focus,
+        .filter-bar .form-control:focus {
+            border-color: #212529;
+            box-shadow: 0 0 0 2px rgba(33, 37, 41, 0.1);
+        }
+        
+        .filter-btn {
+            border-radius: 8px;
+            font-size: 0.875rem;
+            padding: 0.5rem 1rem;
+            transition: all 0.15s ease;
+        }
+        
+        .filter-btn-primary {
+            background: #212529;
+            border-color: #212529;
+            color: white;
+        }
+        
+        .filter-btn-primary:hover {
+            background: #343a40;
+            border-color: #343a40;
+        }
+        
+        .filter-btn-secondary {
+            background: transparent;
+            border: 1px solid #dee2e6;
+            color: #495057;
+        }
+        
+        .filter-btn-secondary:hover {
+            background: #f8f9fa;
+            border-color: #ced4da;
+        }
+        
+        .filter-btn-secondary.active {
+            background: #212529;
+            border-color: #212529;
+            color: white;
+        }
+        
+        .filter-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            background: #212529;
+            color: white;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            padding: 0.15rem 0.35rem;
+            margin-left: 0.35rem;
+        }
+        
+        .filter-count {
+            color: #6c757d;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+        
+        /* Active filters pill display */
+        .active-filters {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .filter-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 20px;
+            padding: 0.35rem 0.75rem;
+            font-size: 0.8rem;
+            color: #495057;
+            transition: all 0.15s ease;
+        }
+        
+        .filter-pill:hover {
+            background: #e9ecef;
+        }
+        
+        .filter-pill-close {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #dee2e6;
+            color: #495057;
+            font-size: 0.7rem;
+            border: none;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        
+        .filter-pill-close:hover {
+            background: #dc3545;
+            color: white;
+        }
+        
+        /* Filter dropdown panel */
+        .filter-dropdown {
+            background: #fff;
+            border: 1px solid #e9ecef;
+            border-radius: 12px;
+            padding: 1rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            margin-bottom: 1.5rem;
+        }
+        
+        .filter-dropdown-title {
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #6c757d;
+            margin-bottom: 0.75rem;
+        }
+        
+        .filter-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 0.1rem;
+            max-height: 220px;
+            overflow-y: auto;
+        }
+        
+        .filter-checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.25rem 0.35rem;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.15s ease;
+            font-size: 0.85rem;
+        }
+        
+        .filter-checkbox-label:hover {
+            background: #f8f9fa;
+        }
+        
+        .filter-checkbox-label input {
+            width: 1rem;
+            height: 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        /* Pagination */
+        .page-pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 2rem 0;
+        }
+        
+        .pagination-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 40px;
+            height: 40px;
+            padding: 0 0.75rem;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            background: white;
+            color: #495057;
+            text-decoration: none;
+            font-size: 0.875rem;
+            transition: all 0.15s ease;
+        }
+        
+        .pagination-btn:hover {
+            background: #f8f9fa;
+            border-color: #dee2e6;
+            color: #212529;
+        }
+        
+        .pagination-btn.active,
+        .pagination-btn:disabled {
+            background: #f8f9fa;
+            color: #6c757d;
+            cursor: default;
+        }
+        
+        .pagination-info {
+            color: #6c757d;
+            font-size: 0.875rem;
+            padding: 0 1rem;
+        }
+        
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: #6c757d;
+        }
+        
+        .empty-state-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+        
+        .empty-state-title {
+            font-size: 1.25rem;
+            font-weight: 500;
+            color: #495057;
+            margin-bottom: 0.5rem;
+        }
+        
+        /* ========================================
+           HTMX Loading Indicator Styles 
+           ======================================== */
+        
+        /* Global loading indicator */
+        .htmx-indicator {
+            display: none;
+        }
+        
+        .htmx-request .htmx-indicator,
+        .htmx-request.htmx-indicator {
+            display: inline-block;
+        }
+        
+        /* Button loading state */
+        .btn-loading {
+            position: relative;
+            pointer-events: none;
+        }
+        
+        .btn-loading .btn-text {
+            visibility: hidden;
+        }
+        
+        .btn-loading .btn-spinner {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        
+        /* Spinner animation */
+        .spinner {
+            display: inline-block;
+            width: 1rem;
+            height: 1rem;
+            border: 2px solid currentColor;
+            border-right-color: transparent;
+            border-radius: 50%;
+            animation: spinner-rotate 0.75s linear infinite;
+        }
+        
+        .spinner-sm {
+            width: 0.875rem;
+            height: 0.875rem;
+            border-width: 1.5px;
+        }
+        
+        @keyframes spinner-rotate {
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+        
+        /* Form submission loading */
+        form.is-loading button[type="submit"] {
+            position: relative;
+            pointer-events: none;
+            opacity: 0.7;
+        }
+        
+        form.is-loading button[type="submit"]::after {
+            content: "";
+            position: absolute;
+            top: 50%;
+            right: 0.75rem;
+            width: 1rem;
+            height: 1rem;
+            margin-top: -0.5rem;
+            border: 2px solid currentColor;
+            border-right-color: transparent;
+            border-radius: 50%;
+            animation: spinner-rotate 0.75s linear infinite;
+        }
     </style>
+    {% block extra_css %}{% endblock %}
 </head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-light bg-white">
@@ -145,6 +498,37 @@
                     });
                 }
             });
+            
+            // Form loading states
+            document.querySelectorAll('form[data-loading]').forEach(function(form) {
+                form.addEventListener('submit', function() {
+                    this.classList.add('is-loading');
+                });
+            });
+        });
+        
+        // HTMX loading state for buttons
+        document.body.addEventListener('htmx:beforeRequest', function(evt) {
+            const trigger = evt.detail.elt;
+            if (trigger.tagName === 'BUTTON' || trigger.tagName === 'A') {
+                trigger.classList.add('btn-loading');
+                if (!trigger.querySelector('.btn-spinner')) {
+                    const originalContent = trigger.innerHTML;
+                    trigger.dataset.originalContent = originalContent;
+                    trigger.innerHTML = `<span class="btn-text">${originalContent}</span><span class="btn-spinner"><span class="spinner spinner-sm"></span></span>`;
+                }
+            }
+        });
+        
+        document.body.addEventListener('htmx:afterRequest', function(evt) {
+            const trigger = evt.detail.elt;
+            if (trigger.classList.contains('btn-loading')) {
+                trigger.classList.remove('btn-loading');
+                if (trigger.dataset.originalContent) {
+                    trigger.innerHTML = trigger.dataset.originalContent;
+                    delete trigger.dataset.originalContent;
+                }
+            }
         });
     </script>
     {% block extra_js %}{% endblock %}
