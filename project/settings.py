@@ -156,7 +156,7 @@ Q_CLUSTER = {
     "queue_limit": 500,
     "label": "Django Q",
     "orm": "default",
-    "sync": os.environ.get("DJANGO_Q_SYNC", "False") == "True",
+    "sync": os.environ.get("DJANGO_Q_SYNC", "False").lower() in ("true", "1"),
 }
 
 LOGGING = {

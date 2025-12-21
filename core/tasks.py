@@ -2,6 +2,9 @@ import json
 import logging
 from pathlib import Path
 
+import inflect
+import titlecase
+
 from django.conf import settings
 from django.forms.models import model_to_dict
 from django.utils import timezone
@@ -81,16 +84,46 @@ def extract_recipes_from_book(book_id: str, extraction_id: str | None = None):
         logger.error(f"Error extracting recipes: {e}")
         raise e
 
+def pre_deduplicate_keywords(keywords: list[str]) -> tuple[list[str], dict[str, str]]:
+    p = inflect.engine()
+    merge_map = {}
+    seen = {}
+
+    for kw in keywords:
+        normalized = ' '.join(kw.strip().split())
+        titlecased = titlecase.titlecase(normalized)
+        comparison_key = titlecased.lower()
+
+        if normalized != titlecased:
+            merge_map[normalized] = titlecased
+
+        if comparison_key not in seen:
+            seen[comparison_key] = titlecased
+
+    for comparison_key, canonical in list(seen.items()):
+        singular = p.singular_noun(comparison_key)
+        if singular and singular in seen:
+            merge_map[canonical] = seen[singular]
+            del seen[comparison_key]
+
+    return list(seen.values()), merge_map
+
+
 def deduplicate_keywords_task():
     logger.info("Starting keyword deduplication task.")
-    
+
     all_keywords = list(Keyword.objects.values_list('name', flat=True))
     logger.info(f"Found {len(all_keywords)} keywords to process.")
-    
+
+    deduplicated_keywords, pre_merge_map = pre_deduplicate_keywords(all_keywords)
+    logger.info(f"Pre-deduplication reduced to {len(deduplicated_keywords)} keywords, {len(pre_merge_map)} merges.")
+
     config = get_config()
     provider_map = {'GEMINI': GeminiProvider, "OPENROUTER": OpenRouterProvider}
     provider = provider_map[config.ai_provider]()
-    deduplication_map = provider.deduplicate_keywords(all_keywords)
+    ai_deduplication_map = provider.deduplicate_keywords(deduplicated_keywords)
+
+    deduplication_map = {**pre_merge_map, **ai_deduplication_map}
     
     if not deduplication_map:
         logger.info("No keyword duplications found.")

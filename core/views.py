@@ -500,7 +500,7 @@ def queue_random_books_for_recipe_extraction(request):
 
         extraction_method = request.POST.get('extraction_method', None)
         count = max(1, min(count, 1000))
-        all_books = list(Book.objects.all())
+        all_books = list(Book.objects.annotate(recipe_count=Count('recipes')).filter(recipe_count=0))
         if not all_books:
             messages.warning(request, 'No books found to queue for extraction.')
             return redirect('tasks')

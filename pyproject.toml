@@ -15,4 +15,6 @@ dependencies = [
     "pytest>=9.0.1",
     "pytest-django>=4.11.1",
     "responses>=0.25.8",
+    "inflect>=7.5.0",
+    "titlecase>=2.4.1",
 ]
