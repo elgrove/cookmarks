@@ -172,10 +172,19 @@ class Recipe(BaseModel):
 
 class RecipeList(BaseModel):
     name = models.CharField(max_length=200)
+    is_default = models.BooleanField(default=False)
     recipes = models.ManyToManyField(Recipe, through='RecipeListItem', related_name='recipe_lists', blank=True)
 
     def __str__(self):
         return self.name
+
+    @classmethod
+    def get_favourites(cls):
+        favourites, _ = cls.objects.get_or_create(
+            is_default=True,
+            defaults={'name': 'Favourites'}
+        )
+        return favourites
 
     class Meta:
         ordering = ['name']

@@ -17,4 +17,5 @@ dependencies = [
     "responses>=0.25.8",
     "inflect>=7.5.0",
     "titlecase>=2.4.1",
+    "django-json-widget>=2.1.1",
 ]

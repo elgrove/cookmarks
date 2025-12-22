@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import logging
 import os
 from pathlib import Path
 
@@ -49,6 +50,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django_q",
+    "django_json_widget",
     "core",
 ]
 
@@ -159,12 +161,24 @@ Q_CLUSTER = {
     "sync": os.environ.get("DJANGO_Q_SYNC", "False").lower() in ("true", "1"),
 }
 
+class AFCLogFilter(logging.Filter):
+    """Filter out Google AI SDK 'AFC is enabled' log messages."""
+    def filter(self, record):
+        return not record.getMessage().startswith("AFC is enabled with max remote calls")
+
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
+    "filters": {
+        "afc_filter": {
+            "()": AFCLogFilter,
+        },
+    },
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
+            "filters": ["afc_filter"],
         },
     },
     "root": {

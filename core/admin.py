@@ -1,7 +1,8 @@
 from django.contrib import admin
+from django.db import models
+from django_json_widget.widgets import JSONEditorWidget
 
 from .models import Book, Config, ExtractionReport, Keyword, Recipe, RecipeList, RecipeListItem
-
 
 @admin.register(Book)
 class BookAdmin(admin.ModelAdmin):
@@ -74,6 +75,9 @@ class KeywordAdmin(admin.ModelAdmin):
 
 @admin.register(Recipe)
 class RecipeAdmin(admin.ModelAdmin):
+    formfield_overrides = {
+        models.JSONField: {'widget': JSONEditorWidget},
+    }
     list_display = ['name', 'book', 'order']
     list_filter = ['book', 'keywords']
     search_fields = ['name', 'book__title', 'book__author']

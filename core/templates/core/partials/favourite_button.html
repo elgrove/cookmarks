@@ -1,0 +1,13 @@
+<button id="favourite-btn"
+    class="btn btn-link p-0 border-0 favourite-star {% if is_favourite %}is-favourite{% endif %}"
+    hx-post="{% url 'toggle_favourite' recipe.id %}"
+    hx-target="#favourite-btn"
+    hx-swap="outerHTML"
+    title="{% if is_favourite %}Remove from Favourites{% else %}Add to Favourites{% endif %}"
+    style="font-size: 1.5rem; line-height: 1; transition: transform 0.15s ease;">
+    {% if is_favourite %}
+    <span class="text-warning">★</span>
+    {% else %}
+    <span class="text-muted">☆</span>
+    {% endif %}
+</button>

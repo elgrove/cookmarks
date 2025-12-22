@@ -5,7 +5,7 @@ from datetime import date, timedelta
 from django.conf import settings
 from django.contrib import messages
 from django.core.paginator import Paginator
-from django.db.models import Case, Count, Value, When
+from django.db.models import Case, Count, Q, Value, When
 from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.timezone import now
@@ -234,7 +234,14 @@ def recipes(request):
     
     search = request.GET.get('search', '')
     if search:
-        recipes = recipes.filter(name__icontains=search) | recipes.filter(description__icontains=search)
+        recipes = recipes.filter(
+            Q(name__icontains=search) |
+            Q(ingredients__icontains=search) |
+            Q(instructions__icontains=search) |
+            Q(keywords__name__icontains=search) |
+            Q(book__author__icontains=search) |
+            Q(book__title__icontains=search)
+        ).distinct()
     
     selected_books = request.GET.getlist('selected_books[]')
     if selected_books:
@@ -247,6 +254,15 @@ def recipes(request):
     selected_keywords = request.GET.getlist('selected_keywords[]')
     if selected_keywords:
         recipes = recipes.filter(keywords__name__in=selected_keywords).distinct()
+    
+    # Filter by list(s)
+    selected_lists = request.GET.getlist('selected_lists[]')
+    # Also check for single 'list' param (from direct links)
+    list_id = request.GET.get('list')
+    if list_id and list_id not in selected_lists:
+        selected_lists.append(list_id)
+    if selected_lists:
+        recipes = recipes.filter(recipe_lists__id__in=selected_lists).distinct()
     
     book_id = request.GET.get('book')
     if book_id:
@@ -272,6 +288,7 @@ def recipes(request):
     all_books = Book.objects.filter(recipes__isnull=False).distinct().order_by('title')
     all_authors = Book.objects.filter(recipes__isnull=False).values_list('author', flat=True).distinct().order_by('author')
     all_keywords = Keyword.objects.all()
+    all_lists = RecipeList.objects.all()
 
     paginator = Paginator(recipes, 30)
     page_number = request.GET.get('page', 1)
@@ -282,6 +299,7 @@ def recipes(request):
         "page_obj": page_obj,
         "search": search,
         "book_id": book_id,
+        "selected_lists": selected_lists,
         "selected_books": selected_books,
         "selected_authors": selected_authors,
         "selected_keywords": selected_keywords,
@@ -289,6 +307,7 @@ def recipes(request):
         "all_books": all_books,
         "all_authors": all_authors,
         "all_keywords": all_keywords,
+        "all_lists": all_lists,
     }
     
     return render(request, 'core/recipes.html', context)
@@ -318,6 +337,9 @@ def recipe_detail(request, recipe_id):
     recipe_lists = recipe.recipe_lists.all()
     all_lists = RecipeList.objects.all()
     available_lists = all_lists.exclude(id__in=recipe_lists.values_list('id', flat=True))
+    
+    favourites = RecipeList.get_favourites()
+    is_favourite = RecipeListItem.objects.filter(recipe=recipe, recipe_list=favourites).exists()
 
     context = {
         'recipe': recipe,
@@ -327,14 +349,58 @@ def recipe_detail(request, recipe_id):
         'recipe_lists': recipe_lists,
         'available_lists': available_lists,
         'form': form,
+        'is_favourite': is_favourite,
+        'favourites_list': favourites,
     }
     
-    # For HTMX requests, return just the partial content
     if request.headers.get('HX-Request'):
         return render(request, 'core/recipe_detail_content.html', context)
     
     return render(request, 'core/recipe_detail.html', context)
 
+
+def toggle_favourite(request, recipe_id):
+    if request.method == 'POST':
+        recipe = get_object_or_404(Recipe, id=recipe_id)
+        favourites = RecipeList.get_favourites()
+        
+        existing = RecipeListItem.objects.filter(recipe=recipe, recipe_list=favourites).first()
+        if existing:
+            existing.delete()
+            is_favourite = False
+        else:
+            RecipeListItem.objects.create(recipe=recipe, recipe_list=favourites)
+            is_favourite = True
+        
+        if request.headers.get('HX-Request'):
+            return render(request, 'core/partials/favourite_button.html', {
+                'recipe': recipe,
+                'is_favourite': is_favourite,
+            })
+        
+        return redirect('recipe_detail', recipe_id=recipe_id)
+    
+    return redirect('recipe_detail', recipe_id=recipe_id)
+
+
+def delete_recipe(request, recipe_id):
+    if request.method == 'POST':
+        recipe = get_object_or_404(Recipe, id=recipe_id)
+        book_id = recipe.book.id
+        recipe_name = recipe.name
+        recipe.delete()
+        messages.success(request, f'Deleted recipe "{recipe_name}".')
+        return redirect('book_detail', book_id=book_id)
+    return redirect('recipe_detail', recipe_id=recipe_id)
+
+
+def clear_recipe_image(request, recipe_id):
+    if request.method == 'POST':
+        recipe = get_object_or_404(Recipe, id=recipe_id)
+        recipe.image = ''
+        recipe.save()
+        messages.success(request, 'Image removed from recipe.')
+    return redirect('recipe_detail', recipe_id=recipe_id)
 
 
 def recipe_lists(request):
@@ -353,15 +419,9 @@ def recipe_lists(request):
 
 
 def recipe_list_detail(request, list_id):
-    recipe_list = get_object_or_404(RecipeList, id=list_id)
-    list_items = RecipeListItem.objects.filter(recipe_list=recipe_list).select_related('recipe__book')
-    
-    context = {
-        'recipe_list': recipe_list,
-        'list_items': list_items,
-    }
-    
-    return render(request, 'core/recipe_list_detail.html', context)
+    """Redirect to recipes page filtered by this list."""
+    get_object_or_404(RecipeList, id=list_id)  # Verify list exists
+    return redirect(f"/recipes/?list={list_id}")
 
 
 def create_recipe_list(request):

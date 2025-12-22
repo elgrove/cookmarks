@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 SEPARATE_IMAGE_CHAPTERS_THRESHOLD = 150
 MANY_RECIPES_PER_FILE_THRESHOLD = 20
 IMAGE_MATCHING_SAMPLE_SIZE = 10
-CHAPTER_BLOCK_COUNT = 8
+CHAPTER_BLOCK_COUNT = 16
 
 def get_chapterlike_files_from_epub(epub_path: Path) -> list[str]:
     """
