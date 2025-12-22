@@ -46,7 +46,11 @@
                     </a>
                     <form method="post" action="{% url 'delete_recipe_list' list.id %}" class="flex-fill" onsubmit="return confirm('Are you sure you want to delete this list?');">
                         {% csrf_token %}
+                        {% if list.is_default %}
+                        <button type="button" class="btn btn-sm btn-outline-secondary w-100" disabled>Delete</button>
+                        {% else %}
                         <button type="submit" class="btn btn-sm btn-outline-danger w-100">Delete</button>
+                        {% endif %}
                     </form>
                 </div>
             </div>

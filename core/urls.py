@@ -20,6 +20,7 @@ urlpatterns = [
     path('lists/', views.recipe_lists, name='recipe_lists'),
     path('list/<uuid:list_id>/', views.recipe_list_detail, name='recipe_list_detail'),
     path('lists/create/', views.create_recipe_list, name='create_recipe_list'),
+    path('recipe/<uuid:recipe_id>/create-list-and-add/', views.create_list_and_add_recipe, name='create_list_and_add_recipe'),
     path('list/<uuid:list_id>/delete/', views.delete_recipe_list, name='delete_recipe_list'),
     path('recipe/<uuid:recipe_id>/add-to-list/<uuid:list_id>/', views.add_recipe_to_list, name='add_recipe_to_list'),
     path('recipe/<uuid:recipe_id>/remove-from-list/<uuid:list_id>/', views.remove_recipe_from_list, name='remove_recipe_from_list'),

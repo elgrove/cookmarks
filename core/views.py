@@ -438,6 +438,21 @@ def create_recipe_list(request):
     return redirect('recipe_lists')
 
 
+def create_list_and_add_recipe(request, recipe_id):
+    if request.method == 'POST':
+        recipe = get_object_or_404(Recipe, id=recipe_id)
+        name = request.POST.get('name', '').strip()
+        
+        if name:
+            recipe_list = RecipeList.objects.create(name=name)
+            RecipeListItem.objects.create(recipe=recipe, recipe_list=recipe_list)
+            messages.success(request, f'Created list "{recipe_list.name}" and added "{recipe.name}"')
+        else:
+            messages.error(request, 'List name is required')
+    
+    return redirect(request.META.get('HTTP_REFERER', 'recipe_detail'), recipe_id=recipe_id)
+
+
 def add_recipe_to_list(request, recipe_id, list_id):
     if request.method == 'POST':
         recipe = get_object_or_404(Recipe, id=recipe_id)
