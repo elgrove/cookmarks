@@ -35,8 +35,8 @@
         <!-- Left: Previous recipe -->
         <div class="d-flex justify-content-start">
             {% if previous_recipe %}
-            <a href="{% url 'recipe_detail' previous_recipe.id %}"
-                hx-get="{% url 'recipe_detail' previous_recipe.id %}"
+            <a href="{% url 'recipe_detail' previous_recipe.id %}?{{ context_params }}"
+                hx-get="{% url 'recipe_detail' previous_recipe.id %}?{{ context_params }}"
                 hx-target="#recipe-content"
                 hx-swap="innerHTML"
                 hx-push-url="true"
@@ -46,29 +46,34 @@
                 <span class="d-none d-md-inline text-truncate" style="max-width: 200px;">{{ previous_recipe.name }}</span>
                 <span class="d-md-none">Previous</span>
             </a>
-            {% else %}
-            <span class="text-muted d-flex align-items-center">
-                <span class="me-2">←</span>
-                <span class="d-none d-md-inline">No previous</span>
-            </span>
             {% endif %}
         </div>
         
         <!-- Centre: Breadcrumb (fixed in centre) -->
         <nav aria-label="breadcrumb" class="d-none d-lg-block">
             <ol class="breadcrumb mb-0 small justify-content-center flex-nowrap">
+                {% if breadcrumb_context.type == 'list' %}
+                <li class="breadcrumb-item"><a href="{% url 'recipe_lists' %}" class="text-decoration-none text-muted">Lists</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'recipe_list_detail' breadcrumb_context.list.id %}" class="text-decoration-none text-muted">{{ breadcrumb_context.list.name|truncatechars:30 }}</a></li>
+                <li class="breadcrumb-item active text-dark" aria-current="page">{{ recipe.name|truncatechars:30 }}</li>
+                {% elif breadcrumb_context.type == 'search' %}
+                <li class="breadcrumb-item"><a href="{% url 'recipes' %}" class="text-decoration-none text-muted">Recipes</a></li>
+                <li class="breadcrumb-item"><span class="text-muted">Search</span></li>
+                <li class="breadcrumb-item active text-dark" aria-current="page">{{ recipe.name|truncatechars:30 }}</li>
+                {% else %}
                 <li class="breadcrumb-item"><a href="{% url 'books' %}" class="text-decoration-none text-muted">Books</a></li>
                 <li class="breadcrumb-item"><a href="{% url 'books' %}?selected_authors[]={{ book.author|urlencode }}" class="text-decoration-none text-muted">{{ book.author|truncatechars:20 }}</a></li>
                 <li class="breadcrumb-item"><a href="{% url 'book_detail' book.id %}" class="text-decoration-none text-muted">{{ book.clean_title|truncatechars:30 }}</a></li>
                 <li class="breadcrumb-item active text-dark" aria-current="page">{{ recipe.name|truncatechars:30 }}</li>
+                {% endif %}
             </ol>
         </nav>
         
         <!-- Right: Next recipe -->
         <div class="d-flex justify-content-end">
             {% if next_recipe %}
-            <a href="{% url 'recipe_detail' next_recipe.id %}"
-                hx-get="{% url 'recipe_detail' next_recipe.id %}"
+            <a href="{% url 'recipe_detail' next_recipe.id %}?{{ context_params }}"
+                hx-get="{% url 'recipe_detail' next_recipe.id %}?{{ context_params }}"
                 hx-target="#recipe-content"
                 hx-swap="innerHTML"
                 hx-push-url="true"
@@ -78,11 +83,6 @@
                 <span class="d-md-none">Next</span>
                 <span class="ms-2">→</span>
             </a>
-            {% else %}
-            <span class="text-muted d-flex align-items-center">
-                <span class="d-none d-md-inline">No next</span>
-                <span class="ms-2">→</span>
-            </span>
             {% endif %}
         </div>
     </div>
@@ -90,11 +90,20 @@
 <!-- Mobile breadcrumb -->
 <nav aria-label="breadcrumb" class="d-lg-none mb-4">
     <ol class="breadcrumb mb-0 small">
+        {% if breadcrumb_context.type == 'list' %}
+        <li class="breadcrumb-item"><a href="{% url 'recipe_lists' %}" class="text-decoration-none text-muted">Lists</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'recipe_list_detail' breadcrumb_context.list.id %}" class="text-decoration-none text-muted">{{ breadcrumb_context.list.name|truncatechars:20 }}</a></li>
+        <li class="breadcrumb-item active text-dark" aria-current="page">{{ recipe.name|truncatechars:20 }}</li>
+        {% elif breadcrumb_context.type == 'search' %}
+        <li class="breadcrumb-item"><a href="{% url 'recipes' %}" class="text-decoration-none text-muted">Recipes</a></li>
+        <li class="breadcrumb-item"><span class="text-muted">Search</span></li>
+        <li class="breadcrumb-item active text-dark" aria-current="page">{{ recipe.name|truncatechars:20 }}</li>
+        {% else %}
         <li class="breadcrumb-item"><a href="{% url 'books' %}" class="text-decoration-none text-muted">Books</a></li>
         <li class="breadcrumb-item"><a href="{% url 'books' %}?selected_authors[]={{ book.author|urlencode }}" class="text-decoration-none text-muted">{{ book.author|truncatechars:15 }}</a></li>
-        <li class="breadcrumb-item"><a href="{% url 'book_detail' book.id %}" class="text-decoration-none text-muted">{{ 
-                book.clean_title|truncatechars:20 }}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'book_detail' book.id %}" class="text-decoration-none text-muted">{{ book.clean_title|truncatechars:20 }}</a></li>
         <li class="breadcrumb-item active text-dark" aria-current="page">{{ recipe.name|truncatechars:20 }}</li>
+        {% endif %}
     </ol>
 </nav>
 

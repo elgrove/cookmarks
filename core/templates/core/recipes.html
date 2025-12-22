@@ -135,6 +135,10 @@
         <div class="d-flex flex-wrap gap-2 align-items-center">
             <!-- Sort -->
             <select class="form-select" name="sort" style="width: auto; min-width: 160px;" id="sortSelect">
+                {% if selected_lists|length == 1 %}
+                <option value="list_order" {% if sort_by == 'list_order' %}selected{% endif %}>List Order</option>
+                {% endif %}
+                <option value="recent" {% if sort_by == 'recent' %}selected{% endif %}>Recent</option>
                 <option value="random" {% if sort_by == 'random' %}selected{% endif %}>Random</option>
                 <option value="name" {% if sort_by == 'name' %}selected{% endif %}>Name A-Z</option>
                 <option value="author" {% if sort_by == 'author' %}selected{% endif %}>Author A-Z</option>
@@ -363,7 +367,7 @@
 <!-- Recipe Grid -->
 <div class="recipe-grid">
     {% for recipe in recipes %}
-    <a href="{% url 'recipe_detail' recipe.id %}" class="recipe-card">
+    <a href="{% url 'recipe_detail' recipe.id %}?{{ recipe_context_params }}" class="recipe-card">
         <div class="recipe-card-content">
             <h3 class="recipe-name">{{ recipe.clean_name }}</h3>
             <div class="recipe-meta">
