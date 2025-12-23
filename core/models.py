@@ -1,8 +1,7 @@
+import re
 import string
 import uuid
-import re
 from pathlib import Path
-from typing import Optional
 
 from django.db import models
 from pydantic import BaseModel as PydanticBase
@@ -34,37 +33,37 @@ class Book(BaseModel):
         return epub_files[0]
 
     def get_cover_image_path(self) -> Path:
-        return Path(self.path) / 'cover.jpg'
+        return Path(self.path) / "cover.jpg"
 
     def get_cookmarks_dir(self) -> Path:
-        cookmarks_dir = Path(self.path) / '_cookmarks'
+        cookmarks_dir = Path(self.path) / "_cookmarks"
         cookmarks_dir.mkdir(exist_ok=True)
         return cookmarks_dir
 
     def get_recipes_json_path(self) -> Path:
-        return self.get_cookmarks_dir() / 'recipes.json'
+        return self.get_cookmarks_dir() / "recipes.json"
 
     def get_log_path(self) -> Path:
-        return self.get_cookmarks_dir() / 'extraction.log'
+        return self.get_cookmarks_dir() / "extraction.log"
 
     def get_report_path(self) -> Path:
-        return self.get_cookmarks_dir() / 'report.json'
+        return self.get_cookmarks_dir() / "report.json"
 
     @property
     def clean_title(self) -> str:
-        s = self.title.split(':')[0].strip()
-        s = s.split('_')[0].strip()
+        s = self.title.split(":")[0].strip()
+        s = s.split("_")[0].strip()
         return s
 
     def __str__(self):
         return f"{self.author} - {self.title}"
 
     class Meta:
-        ordering = ['author']
+        ordering = ["author"]
 
 
 class ExtractionReport(BaseModel):
-    book = models.ForeignKey(Book, on_delete=models.CASCADE, related_name='extraction_reports')
+    book = models.ForeignKey(Book, on_delete=models.CASCADE, related_name="extraction_reports")
     provider_name = models.CharField(max_length=50, null=True)
     model_name = models.CharField(max_length=200, null=True)
     queued_at = models.DateTimeField(auto_now_add=True, null=False)
@@ -75,7 +74,7 @@ class ExtractionReport(BaseModel):
     extraction_method = models.CharField(
         max_length=50,
         null=True,
-        choices=[('file', 'File'), ('block', 'Block')],
+        choices=[("file", "File"), ("block", "Block")],
     )
     images_in_separate_chapters = models.BooleanField(null=True)
     images_can_be_matched = models.BooleanField(null=True)
@@ -89,7 +88,7 @@ class ExtractionReport(BaseModel):
         return f"{self.book.title} - {self.started_at}"
 
     class Meta:
-        ordering = ['-completed_at']
+        ordering = ["-completed_at"]
 
 
 class Keyword(BaseModel):
@@ -99,19 +98,20 @@ class Keyword(BaseModel):
         return self.name
 
     class Meta:
-        ordering = ['name']
+        ordering = ["name"]
+
 
 class RecipeData(PydanticBase):
     name: str
-    description: Optional[str] = None
-    ingredients: list[str] = Field(min_length=1, alias='recipeIngredients')
-    instructions: list[str] = Field(min_length=1, alias='recipeInstructions')
-    yields: Optional[str] = Field(None, alias='recipeYield')
-    image: Optional[str] = None
+    description: str | None = None
+    ingredients: list[str] = Field(min_length=1, alias="recipeIngredients")
+    instructions: list[str] = Field(min_length=1, alias="recipeInstructions")
+    yields: str | None = Field(None, alias="recipeYield")
+    image: str | None = None
     keywords: list[str] = Field(default_factory=list)
-    author: Optional[str] = None
-    book_title: Optional[str] = Field(None, alias='bookTitle')
-    book_order: Optional[int] = Field(None, alias='bookOrder')
+    author: str | None = None
+    book_title: str | None = Field(None, alias="bookTitle")
+    book_order: int | None = Field(None, alias="bookOrder")
 
     class Config:
         populate_by_name = True
@@ -120,15 +120,15 @@ class RecipeData(PydanticBase):
         self.name = string.capwords(self.name)
         if self.yields:
             self.yields = (
-                self.yields.capitalize()
-                if self.yields[0].isalpha()
-                else self.yields.lower()
+                self.yields.capitalize() if self.yields[0].isalpha() else self.yields.lower()
             )
 
 
 class Recipe(BaseModel):
-    book = models.ForeignKey(Book, on_delete=models.CASCADE, related_name='recipes')
-    extraction_report = models.ForeignKey(ExtractionReport, on_delete=models.SET_NULL, related_name='recipes', null=True, blank=True)
+    book = models.ForeignKey(Book, on_delete=models.CASCADE, related_name="recipes")
+    extraction_report = models.ForeignKey(
+        ExtractionReport, on_delete=models.SET_NULL, related_name="recipes", null=True, blank=True
+    )
     order = models.PositiveIntegerField()
     name = models.CharField(max_length=500)
     description = models.TextField(blank=True, null=True)
@@ -136,7 +136,7 @@ class Recipe(BaseModel):
     instructions = models.JSONField(null=True)
     yields = models.CharField(max_length=200, blank=True, null=True)
     image = models.TextField(blank=True, null=True)
-    keywords = models.ManyToManyField(Keyword, related_name='recipes', blank=True)
+    keywords = models.ManyToManyField(Keyword, related_name="recipes", blank=True)
 
     def __str__(self):
         return f"{self.name} ({self.book.author} - {self.book.title})"
@@ -147,10 +147,12 @@ class Recipe(BaseModel):
         return cleaned.strip() or self.name
 
     def get_next_in_book(self):
-        return Recipe.objects.filter(book=self.book, order__gt=self.order).order_by('order').first()
+        return Recipe.objects.filter(book=self.book, order__gt=self.order).order_by("order").first()
 
     def get_previous_in_book(self):
-        return Recipe.objects.filter(book=self.book, order__lt=self.order).order_by('-order').first()
+        return (
+            Recipe.objects.filter(book=self.book, order__lt=self.order).order_by("-order").first()
+        )
 
     def to_recipe_data(self) -> RecipeData:
         return RecipeData(
@@ -167,45 +169,44 @@ class Recipe(BaseModel):
         )
 
     class Meta:
-        ordering = ['book', 'order']
+        ordering = ["book", "order"]
 
 
 class RecipeList(BaseModel):
     name = models.CharField(max_length=200)
     is_default = models.BooleanField(default=False)
-    recipes = models.ManyToManyField(Recipe, through='RecipeListItem', related_name='recipe_lists', blank=True)
+    recipes = models.ManyToManyField(
+        Recipe, through="RecipeListItem", related_name="recipe_lists", blank=True
+    )
 
     def __str__(self):
         return self.name
 
     @classmethod
     def get_favourites(cls):
-        favourites, _ = cls.objects.get_or_create(
-            is_default=True,
-            defaults={'name': 'Favourites'}
-        )
+        favourites, _ = cls.objects.get_or_create(is_default=True, defaults={"name": "Favourites"})
         return favourites
 
     class Meta:
-        ordering = ['name']
+        ordering = ["name"]
 
 
 class RecipeListItem(BaseModel):
-    recipe_list = models.ForeignKey(RecipeList, on_delete=models.CASCADE, related_name='items')
-    recipe = models.ForeignKey(Recipe, on_delete=models.CASCADE, related_name='list_items')
+    recipe_list = models.ForeignKey(RecipeList, on_delete=models.CASCADE, related_name="items")
+    recipe = models.ForeignKey(Recipe, on_delete=models.CASCADE, related_name="list_items")
 
     def __str__(self):
         return f"{self.recipe.name} in {self.recipe_list.name}"
 
     class Meta:
-        ordering = ['-created_at']
-        unique_together = ['recipe_list', 'recipe']
+        ordering = ["-created_at"]
+        unique_together = ["recipe_list", "recipe"]
 
 
 class Config(models.Model):
     AI_PROVIDER_CHOICES = [
-        ('GEMINI', 'Google Gemini'),
-        ('OPENROUTER', 'OpenRouter'),
+        ("GEMINI", "Google Gemini"),
+        ("OPENROUTER", "OpenRouter"),
     ]
 
     ai_provider = models.CharField(max_length=20, choices=AI_PROVIDER_CHOICES, blank=True)
@@ -213,11 +214,11 @@ class Config(models.Model):
     extraction_rate_limit_per_minute = models.PositiveIntegerField(default=256)
 
     class Meta:
-        verbose_name = 'Configuration'
-        verbose_name_plural = 'Configuration'
+        verbose_name = "Configuration"
+        verbose_name_plural = "Configuration"
 
     def __str__(self):
-        return 'App Configuration'
+        return "App Configuration"
 
     def save(self, *args, **kwargs):
         self.pk = 1

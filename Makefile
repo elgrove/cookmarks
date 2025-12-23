@@ -1,4 +1,4 @@
-.PHONY: build tag push publish
+.PHONY: build tag push publish test localdocker lint format check fix
 
 TAG ?= latest
 
@@ -18,3 +18,10 @@ test:
 
 localdocker:
 	sudo docker compose -f docker-compose.local.yml up -d
+
+format:
+	uv run ruff format .
+
+fix:
+	-uv run ruff check --fix .
+	uv run ruff format .
