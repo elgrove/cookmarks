@@ -1,8 +1,8 @@
 # cookmarks
 
-A Django app for extracting, storing, browsing and organising recipes from epub cookbooks.
+A Django app for extracting, browsing and organising recipes from digital cookbooks in the EPUB format.
 
-I have a Calibre library with hundreds of EPUB cookbooks, and I got tired of never being able to find that one recipe I vaguely remembered, or having to use certain devices to read them. This app uses LLMs to extract the recipes into a structured format and store them into a searchable database so I can actually find and use them.
+I have a Calibre library with hundreds of EPUB cookbooks, and I got tired of never being able to find that one recipe I vaguely remembered and having to use certain devices to read them. This app uses LLMs to extract the recipes into a structured format and store them into a searchable database so I can actually find and use them.
 
 ## Stack
 

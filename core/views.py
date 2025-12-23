@@ -907,3 +907,130 @@ def get_recipe_image(request, book_id, image_path):
             return HttpResponse(image_data, content_type="image/jpeg")
     except KeyError:
         raise Http404(f"Image '{image_path}' not found in EPUB.")
+
+
+def search(request):
+    recipes = Recipe.objects.select_related("book").prefetch_related("keywords")
+    has_searched = False
+    filters = []
+    group_logic = request.GET.get("group_logic", "or")
+
+    # Quick search (all fields) - fuzzy by default
+    query = request.GET.get("q", "").strip()
+
+    # Build filter groups from form data
+    filter_fields = request.GET.getlist("filter_field[]")
+    filter_ops = request.GET.getlist("filter_op[]")
+    filter_values = request.GET.getlist("filter_value[]")
+    filter_groups = request.GET.getlist("filter_group[]")
+    filter_logics = request.GET.getlist("filter_logic[]")
+
+    if filter_fields and filter_values:
+        groups_dict = {}
+        for field, op, value, group_idx, logic in zip(
+            filter_fields, filter_ops, filter_values, filter_groups, filter_logics, strict=False
+        ):
+            if value.strip():
+                group_key = int(group_idx) if group_idx.isdigit() else 0
+                if group_key not in groups_dict:
+                    groups_dict[group_key] = {"logic": logic, "conditions": []}
+                groups_dict[group_key]["conditions"].append(
+                    {"field": field, "op": op, "value": value.strip()}
+                )
+        filters = [groups_dict[k] for k in sorted(groups_dict.keys())]
+
+    def apply_condition(field, op, value):
+        field_map = {
+            "name": "name",
+            "ingredients": "ingredients",
+            "instructions": "instructions",
+            "keywords": "keywords__name",
+            "author": "book__author",
+            "book": "book__title",
+        }
+        db_field = field_map.get(field, field)
+
+        if op == "contains":
+            return Q(**{f"{db_field}__icontains": value})
+        elif op == "not_contains":
+            return ~Q(**{f"{db_field}__icontains": value})
+        elif op == "equals":
+            return Q(**{f"{db_field}__iexact": value})
+        elif op == "starts":
+            return Q(**{f"{db_field}__istartswith": value})
+        return Q()
+
+    # Start building query
+    combined_q = Q()
+    any_search = False
+
+    # Quick search (fuzzy by default - uses icontains)
+    if query:
+        any_search = True
+        has_searched = True
+        quick_q = (
+            Q(name__icontains=query)
+            | Q(ingredients__icontains=query)
+            | Q(instructions__icontains=query)
+            | Q(keywords__name__icontains=query)
+            | Q(book__author__icontains=query)
+            | Q(book__title__icontains=query)
+        )
+        combined_q &= quick_q
+
+    # Advanced filter groups
+    if filters:
+        has_searched = True
+        any_search = True
+        group_queries = []
+        for group in filters:
+            group_q = Q()
+            for condition in group["conditions"]:
+                cond_q = apply_condition(condition["field"], condition["op"], condition["value"])
+                if group["logic"] == "and":
+                    group_q &= cond_q
+                else:
+                    group_q |= cond_q
+            if group_q:
+                group_queries.append(group_q)
+
+        if group_queries:
+            final_filter_q = group_queries[0]
+            for gq in group_queries[1:]:
+                if group_logic == "and":
+                    final_filter_q &= gq
+                else:
+                    final_filter_q |= gq
+            combined_q &= final_filter_q
+
+    recipes = recipes.filter(combined_q).distinct() if any_search else recipes.none()
+
+    # Sorting
+    sort_by = request.GET.get("sort", "relevance")
+    if sort_by == "name":
+        recipes = recipes.order_by("name")
+    elif sort_by == "recent":
+        recipes = recipes.order_by("-created_at")
+    elif sort_by == "author":
+        recipes = recipes.order_by("book__author", "book__title", "name")
+    elif sort_by == "book":
+        recipes = recipes.order_by("book__title", "order")
+    else:
+        recipes = recipes.order_by("name")
+
+    # Pagination
+    paginator = Paginator(recipes, 30)
+    page_number = request.GET.get("page", 1)
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        "recipes": page_obj,
+        "query": query,
+        "filters": filters,
+        "group_logic": group_logic,
+        "sort_by": sort_by,
+        "has_searched": has_searched,
+    }
+
+    return render(request, "core/search.html", context)
+

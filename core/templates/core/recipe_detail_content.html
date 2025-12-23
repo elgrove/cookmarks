@@ -116,33 +116,37 @@
             <div style="flex: 2; min-width: 0; padding-right: 2rem; max-width: 70%;">
                 <!-- Title & Meta -->
                 <header class="mb-2">
-                    <div class="d-flex align-items-center gap-3 mb-3">
+                    <div class="d-flex align-items-center gap-3">
                         <h1 class="display-6 fw-normal mb-0">{{ recipe.name }}</h1>
                         {% include "core/partials/favourite_button.html" %}
                     </div>
-                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
-                        <div class="d-flex flex-wrap align-items-center gap-3 text-muted">
-                            {% if recipe.yields %}
-                            <span class="d-flex align-items-center">
-                                {{ recipe.yields }}
-                            </span>
-                            {% endif %}
-
-                            {% if recipe.keywords.all %}
-                            <span class="d-flex align-items-center flex-wrap gap-1">
-                                {% for keyword in recipe.keywords.all %}
-                                <a href="{% url 'recipes' %}?selected_keywords[]={{ keyword.name|urlencode }}" class="badge bg-light text-dark border text-decoration-none keyword-link" style="cursor: pointer; transition: all 0.15s ease;">{{ keyword.name }}</a>
-                                {% endfor %}
-                            </span>
-                            {% endif %}
-                        </div>
-                        
-
-                    </div>
                 </header>
                 
+                {% if breadcrumb_context.type == 'search' or breadcrumb_context.type == 'list' %}
+                <p class="text-muted mb-2" style="font-size: 0.95rem;">
+                    by {{ book.author }}, from the book <a href="{% url 'book_detail' book.id %}" class="text-decoration-none text-muted" style="border-bottom: 1px dotted currentColor;">{{ book.clean_title }}</a>
+                </p>
+                {% endif %}
+                
+                <!-- Yield & Keywords -->
+                <div class="d-flex flex-wrap align-items-center gap-3 text-muted mb-2">
+                    {% if recipe.yields %}
+                    <span class="d-flex align-items-center">
+                        {{ recipe.yields }}
+                    </span>
+                    {% endif %}
+
+                    {% if recipe.keywords.all %}
+                    <span class="d-flex align-items-center flex-wrap gap-1">
+                        {% for keyword in recipe.keywords.all %}
+                        <a href="{% url 'recipes' %}?selected_keywords[]={{ keyword.name|urlencode }}" class="badge bg-light text-dark border text-decoration-none keyword-link" style="cursor: pointer; transition: all 0.15s ease;">{{ keyword.name }}</a>
+                        {% endfor %}
+                    </span>
+                    {% endif %}
+                </div>
+                
                 <!-- Action Buttons -->
-                <div class="d-flex flex-wrap align-items-center gap-2 mb-4">
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
                     <!-- Add to List Dropdown -->
                     <div class="dropdown">
                         <button class="btn btn-sm btn-outline-secondary action-btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
