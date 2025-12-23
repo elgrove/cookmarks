@@ -102,7 +102,7 @@ def _extract_in_files(epub_path: Path, chapter_files: list[str], report: Extract
             logger.info(f"Processing chapter {file_path} (size: {len(html_content)} chars)")
             
             with rate_limiter:
-                recipes, usage = provider.extract_recipes(html_content, method=extraction_method)
+                recipes, usage = provider.extract_recipes(html_content, model=model)
             
             logger.info(f"Found {len(recipes)} recipes in {file_path}")
             return (chapter_index, file_path, recipes, usage)
@@ -172,7 +172,7 @@ def _extract_in_blocks_of_files(epub_path: Path, chapter_files: list[str], repor
             return (block_index, block, [], {"cost_usd": None, "input_tokens": None, "output_tokens": None})
         
         with rate_limiter:
-            recipes, usage = provider.extract_recipes(block_content, method=ExtractionMethod.BLOCKS_OF_FILES)
+            recipes, usage = provider.extract_recipes(block_content, model=model)
         
         logger.info(f"Found {len(recipes)} recipes in block {block_index+1}")
         return (block_index, block, recipes, usage)
@@ -264,7 +264,15 @@ def extract_recipe_data_from_book(book: Book, report: ExtractionReport | None = 
                 sample_content = get_sample_chapters_content(epub_path, chapter_files)
 
                 provider = GeminiProvider() if config.ai_provider == 'GEMINI' else OpenRouterProvider()
-                report.images_can_be_matched = provider.check_if_can_match_images(sample_content)
+                report.images_can_be_matched, usage = provider.check_if_can_match_images(sample_content)
+                
+                # Add image match check costs to the extraction report
+                if usage.get("cost_usd") is not None:
+                    report.cost_usd = round((report.cost_usd or 0) + usage["cost_usd"], 4)
+                if usage.get("input_tokens") is not None:
+                    report.input_tokens = (report.input_tokens or 0) + usage["input_tokens"]
+                if usage.get("output_tokens") is not None:
+                    report.output_tokens = (report.output_tokens or 0) + usage["output_tokens"]
 
                 if report.images_can_be_matched:
                     logger.info("Images can be matched to recipes, using block extraction")

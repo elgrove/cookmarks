@@ -5,7 +5,7 @@ from datetime import date, timedelta
 from django.conf import settings
 from django.contrib import messages
 from django.core.paginator import Paginator
-from django.db.models import Case, Count, Value, When
+from django.db.models import Case, Count, Q, Value, When
 from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.timezone import now
@@ -144,12 +144,16 @@ def book_detail(request, book_id):
                     models.add(model)
             available_models = sorted(models)
     
+    # Get first recipe in book order for "Read Book" button
+    first_recipe = all_recipes.order_by('order').first()
+    
     context = {
         'book': book,
         'recipes': all_recipes,
         'sample_recipes': sample_recipes,
         'all_lists': all_lists,
         'available_models': available_models,
+        'first_recipe': first_recipe,
     }
     
     return render(request, 'core/book_detail.html', context)
@@ -234,7 +238,14 @@ def recipes(request):
     
     search = request.GET.get('search', '')
     if search:
-        recipes = recipes.filter(name__icontains=search) | recipes.filter(description__icontains=search)
+        recipes = recipes.filter(
+            Q(name__icontains=search) |
+            Q(ingredients__icontains=search) |
+            Q(instructions__icontains=search) |
+            Q(keywords__name__icontains=search) |
+            Q(book__author__icontains=search) |
+            Q(book__title__icontains=search)
+        ).distinct()
     
     selected_books = request.GET.getlist('selected_books[]')
     if selected_books:
@@ -248,12 +259,24 @@ def recipes(request):
     if selected_keywords:
         recipes = recipes.filter(keywords__name__in=selected_keywords).distinct()
     
+    # Filter by list(s)
+    selected_lists = request.GET.getlist('selected_lists[]')
+    # Also check for single 'list' param (from direct links)
+    list_id = request.GET.get('list')
+    if list_id and list_id not in selected_lists:
+        selected_lists.append(list_id)
+    if selected_lists:
+        recipes = recipes.filter(recipe_lists__id__in=selected_lists).distinct()
+    
     book_id = request.GET.get('book')
     if book_id:
         recipes = recipes.filter(book__id=book_id)
         default_sort = 'order'
+    elif len(selected_lists) == 1:
+        # Single list filter - default to list order
+        default_sort = 'list_order'
     else:
-        default_sort = 'random'
+        default_sort = 'recent'
     
     sort_by = request.GET.get('sort', default_sort)
     if sort_by == 'order':
@@ -264,24 +287,51 @@ def recipes(request):
         recipes = recipes.order_by('book__title', 'order')
     elif sort_by == 'author':
         recipes = recipes.order_by('book__author', 'book__title', 'order')
+    elif sort_by == 'recent':
+        recipes = recipes.order_by('-created_at')
+    elif sort_by == 'list_order' and len(selected_lists) == 1:
+        # Order by when the recipe was added to the list
+        recipes = recipes.order_by('list_items__id')
     elif sort_by == 'random':
         recipes = recipes.order_by('?')
     else:
-        recipes = recipes.order_by('?')
+        recipes = recipes.order_by('-created_at')
     
     all_books = Book.objects.filter(recipes__isnull=False).distinct().order_by('title')
     all_authors = Book.objects.filter(recipes__isnull=False).values_list('author', flat=True).distinct().order_by('author')
-    all_keywords = Keyword.objects.all()
+    all_keywords = Keyword.objects.annotate(recipe_count=Count('recipes')).order_by('-recipe_count')
+    all_lists = RecipeList.objects.all()
 
     paginator = Paginator(recipes, 30)
     page_number = request.GET.get('page', 1)
     page_obj = paginator.get_page(page_number)
+    
+    if len(selected_lists) == 1 and not search and not selected_books and not selected_authors and not selected_keywords:
+        recipe_context_params = f'context=list&list_id={selected_lists[0]}'
+    elif sort_by != 'random':
+        params = ['context=search']
+        if search:
+            params.append(f'q={search}')
+        if sort_by:
+            params.append(f'sort={sort_by}')
+        for bid in selected_books:
+            params.append(f'selected_books[]={bid}')
+        for author in selected_authors:
+            params.append(f'selected_authors[]={author}')
+        for kw in selected_keywords:
+            params.append(f'selected_keywords[]={kw}')
+        for lid in selected_lists:
+            params.append(f'selected_lists[]={lid}')
+        recipe_context_params = '&'.join(params)
+    else:
+        recipe_context_params = 'context=book'
     
     context = {
         "recipes": page_obj,
         "page_obj": page_obj,
         "search": search,
         "book_id": book_id,
+        "selected_lists": selected_lists,
         "selected_books": selected_books,
         "selected_authors": selected_authors,
         "selected_keywords": selected_keywords,
@@ -289,6 +339,8 @@ def recipes(request):
         "all_books": all_books,
         "all_authors": all_authors,
         "all_keywords": all_keywords,
+        "all_lists": all_lists,
+        "recipe_context_params": recipe_context_params,
     }
     
     return render(request, 'core/recipes.html', context)
@@ -318,23 +370,198 @@ def recipe_detail(request, recipe_id):
     recipe_lists = recipe.recipe_lists.all()
     all_lists = RecipeList.objects.all()
     available_lists = all_lists.exclude(id__in=recipe_lists.values_list('id', flat=True))
+    
+    favourites = RecipeList.get_favourites()
+    is_favourite = RecipeListItem.objects.filter(recipe=recipe, recipe_list=favourites).exists()
 
-    context = {
+    # Context-aware navigation
+    nav_context = request.GET.get('context', 'book')
+    previous_recipe = None
+    next_recipe = None
+    context_params = ''
+    breadcrumb_context = None
+    
+    if nav_context == 'list':
+        # Navigate within a recipe list
+        list_id = request.GET.get('list_id')
+        if list_id:
+            try:
+                recipe_list = RecipeList.objects.get(id=list_id)
+                # Get ordered recipe IDs in this list
+                list_items = RecipeListItem.objects.filter(
+                    recipe_list=recipe_list
+                ).select_related('recipe').order_by('id')
+                recipe_ids = [item.recipe_id for item in list_items]
+                
+                if recipe.id in recipe_ids:
+                    idx = recipe_ids.index(recipe.id)
+                    if idx > 0:
+                        previous_recipe = Recipe.objects.get(id=recipe_ids[idx - 1])
+                    if idx < len(recipe_ids) - 1:
+                        next_recipe = Recipe.objects.get(id=recipe_ids[idx + 1])
+                
+                context_params = f'context=list&list_id={list_id}'
+                breadcrumb_context = {
+                    'type': 'list',
+                    'list': recipe_list,
+                }
+            except RecipeList.DoesNotExist:
+                # Fall back to book context
+                nav_context = 'book'
+    
+    elif nav_context == 'search':
+        # Navigate within search results - rebuild the query
+        search = request.GET.get('q', '')
+        selected_books = request.GET.getlist('selected_books[]')
+        selected_authors = request.GET.getlist('selected_authors[]')
+        selected_keywords = request.GET.getlist('selected_keywords[]')
+        selected_lists = request.GET.getlist('selected_lists[]')
+        sort_by = request.GET.get('sort', 'random')
+        
+        # Rebuild the recipe queryset from search params
+        recipes_qs = Recipe.objects.select_related('book').prefetch_related('keywords').all()
+        
+        if search:
+            recipes_qs = recipes_qs.filter(
+                Q(name__icontains=search) |
+                Q(ingredients__icontains=search) |
+                Q(instructions__icontains=search) |
+                Q(keywords__name__icontains=search) |
+                Q(book__author__icontains=search) |
+                Q(book__title__icontains=search)
+            ).distinct()
+        
+        if selected_books:
+            recipes_qs = recipes_qs.filter(book__id__in=selected_books)
+        if selected_authors:
+            recipes_qs = recipes_qs.filter(book__author__in=selected_authors)
+        if selected_keywords:
+            recipes_qs = recipes_qs.filter(keywords__name__in=selected_keywords).distinct()
+        if selected_lists:
+            recipes_qs = recipes_qs.filter(recipe_lists__id__in=selected_lists).distinct()
+        
+        # Apply sorting
+        if sort_by == 'name':
+            recipes_qs = recipes_qs.order_by('name')
+        elif sort_by == 'book':
+            recipes_qs = recipes_qs.order_by('book__title', 'order')
+        elif sort_by == 'author':
+            recipes_qs = recipes_qs.order_by('book__author', 'book__title', 'order')
+        elif sort_by == 'order':
+            recipes_qs = recipes_qs.order_by('book', 'order')
+        elif sort_by == 'recent':
+            recipes_qs = recipes_qs.order_by('-created_at')
+        elif sort_by == 'list_order' and len(selected_lists) == 1:
+            recipes_qs = recipes_qs.order_by('list_items__id')
+        else:
+            # Random sort or invalid - can't reliably navigate, fall back to book
+            nav_context = 'book'
+            recipes_qs = None
+        
+        if recipes_qs is not None:
+            recipe_ids = list(recipes_qs.values_list('id', flat=True))
+            
+            if recipe.id in recipe_ids:
+                idx = recipe_ids.index(recipe.id)
+                if idx > 0:
+                    previous_recipe = Recipe.objects.get(id=recipe_ids[idx - 1])
+                if idx < len(recipe_ids) - 1:
+                    next_recipe = Recipe.objects.get(id=recipe_ids[idx + 1])
+            
+            # Build context params for navigation links
+            params = ['context=search']
+            if search:
+                params.append(f'q={search}')
+            if sort_by:
+                params.append(f'sort={sort_by}')
+            for book_id in selected_books:
+                params.append(f'selected_books[]={book_id}')
+            for author in selected_authors:
+                params.append(f'selected_authors[]={author}')
+            for kw in selected_keywords:
+                params.append(f'selected_keywords[]={kw}')
+            for list_id in selected_lists:
+                params.append(f'selected_lists[]={list_id}')
+            context_params = '&'.join(params)
+            
+            breadcrumb_context = {
+                'type': 'search',
+            }
+    
+    # Default to book context
+    if nav_context == 'book' or (previous_recipe is None and next_recipe is None and nav_context != 'list'):
+        if nav_context == 'book':
+            previous_recipe = recipe.get_previous_in_book()
+            next_recipe = recipe.get_next_in_book()
+            context_params = 'context=book'
+            breadcrumb_context = {
+                'type': 'book',
+                'book': recipe.book,
+            }
+
+    template_context = {
         'recipe': recipe,
         'book': recipe.book,
-        'previous_recipe': recipe.get_previous_in_book(),
-        'next_recipe': recipe.get_next_in_book(),
+        'previous_recipe': previous_recipe,
+        'next_recipe': next_recipe,
         'recipe_lists': recipe_lists,
         'available_lists': available_lists,
         'form': form,
+        'is_favourite': is_favourite,
+        'favourites_list': favourites,
+        'nav_context': nav_context,
+        'context_params': context_params,
+        'breadcrumb_context': breadcrumb_context,
     }
     
-    # For HTMX requests, return just the partial content
     if request.headers.get('HX-Request'):
-        return render(request, 'core/recipe_detail_content.html', context)
+        return render(request, 'core/recipe_detail_content.html', template_context)
     
-    return render(request, 'core/recipe_detail.html', context)
+    return render(request, 'core/recipe_detail.html', template_context)
 
+
+def toggle_favourite(request, recipe_id):
+    if request.method == 'POST':
+        recipe = get_object_or_404(Recipe, id=recipe_id)
+        favourites = RecipeList.get_favourites()
+        
+        existing = RecipeListItem.objects.filter(recipe=recipe, recipe_list=favourites).first()
+        if existing:
+            existing.delete()
+            is_favourite = False
+        else:
+            RecipeListItem.objects.create(recipe=recipe, recipe_list=favourites)
+            is_favourite = True
+        
+        if request.headers.get('HX-Request'):
+            return render(request, 'core/partials/favourite_button.html', {
+                'recipe': recipe,
+                'is_favourite': is_favourite,
+            })
+        
+        return redirect('recipe_detail', recipe_id=recipe_id)
+    
+    return redirect('recipe_detail', recipe_id=recipe_id)
+
+
+def delete_recipe(request, recipe_id):
+    if request.method == 'POST':
+        recipe = get_object_or_404(Recipe, id=recipe_id)
+        book_id = recipe.book.id
+        recipe_name = recipe.name
+        recipe.delete()
+        messages.success(request, f'Deleted recipe "{recipe_name}".')
+        return redirect('book_detail', book_id=book_id)
+    return redirect('recipe_detail', recipe_id=recipe_id)
+
+
+def clear_recipe_image(request, recipe_id):
+    if request.method == 'POST':
+        recipe = get_object_or_404(Recipe, id=recipe_id)
+        recipe.image = ''
+        recipe.save()
+        messages.success(request, 'Image removed from recipe.')
+    return redirect('recipe_detail', recipe_id=recipe_id)
 
 
 def recipe_lists(request):
@@ -353,15 +580,9 @@ def recipe_lists(request):
 
 
 def recipe_list_detail(request, list_id):
-    recipe_list = get_object_or_404(RecipeList, id=list_id)
-    list_items = RecipeListItem.objects.filter(recipe_list=recipe_list).select_related('recipe__book')
-    
-    context = {
-        'recipe_list': recipe_list,
-        'list_items': list_items,
-    }
-    
-    return render(request, 'core/recipe_list_detail.html', context)
+    """Redirect to recipes page filtered by this list."""
+    get_object_or_404(RecipeList, id=list_id)  # Verify list exists
+    return redirect(f"/recipes/?list={list_id}")
 
 
 def create_recipe_list(request):
@@ -376,6 +597,21 @@ def create_recipe_list(request):
             messages.error(request, 'List name is required')
     
     return redirect('recipe_lists')
+
+
+def create_list_and_add_recipe(request, recipe_id):
+    if request.method == 'POST':
+        recipe = get_object_or_404(Recipe, id=recipe_id)
+        name = request.POST.get('name', '').strip()
+        
+        if name:
+            recipe_list = RecipeList.objects.create(name=name)
+            RecipeListItem.objects.create(recipe=recipe, recipe_list=recipe_list)
+            messages.success(request, f'Created list "{recipe_list.name}" and added "{recipe.name}"')
+        else:
+            messages.error(request, 'List name is required')
+    
+    return redirect(request.META.get('HTTP_REFERER', 'recipe_detail'), recipe_id=recipe_id)
 
 
 def add_recipe_to_list(request, recipe_id, list_id):
@@ -500,7 +736,7 @@ def queue_random_books_for_recipe_extraction(request):
 
         extraction_method = request.POST.get('extraction_method', None)
         count = max(1, min(count, 1000))
-        all_books = list(Book.objects.all())
+        all_books = list(Book.objects.annotate(recipe_count=Count('recipes')).filter(recipe_count=0))
         if not all_books:
             messages.warning(request, 'No books found to queue for extraction.')
             return redirect('tasks')

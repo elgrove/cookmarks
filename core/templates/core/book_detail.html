@@ -103,7 +103,7 @@
                     </h2>
                     {% if recipes.count > 0 %}
                     <a href="{% url 'recipes' %}?book={{ book.id }}" class="btn btn-link text-muted text-decoration-none p-0" style="font-size: 0.9rem;">
-                        View all →
+                        Browse →
                     </a>
                     {% endif %}
                 </div>
@@ -149,9 +149,15 @@
                 <div class="position-lg-sticky" style="top: 1rem;">
                     <h2 class="h6 text-uppercase text-muted mb-3" style="font-size: 0.75rem; letter-spacing: 0.1em;">Actions</h2>
                     <div class="d-flex flex-column gap-2">
+                        {% if first_recipe %}
+                        <a href="{% url 'recipe_detail' first_recipe.id %}?context=book" class="btn btn-dark w-100 d-flex align-items-center justify-content-between">
+                            <span>Read Book</span>
+                            <span>📖</span>
+                        </a>
+                        {% endif %}
                         <form method="post" action="{% url 'queue_book_for_recipe_extraction' book.id %}">
                             {% csrf_token %}
-                            <button type="submit" class="btn btn-dark w-100 d-flex align-items-center justify-content-between">
+                            <button type="submit" class="btn btn-outline-dark w-100 d-flex align-items-center justify-content-between">
                                 <span>Extract Recipes</span>
                                 <span>→</span>
                             </button>

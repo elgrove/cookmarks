@@ -79,6 +79,12 @@ Merged 'Keralan' into 'Kerala' -- merged duplicates
 Merged 'Eggs' into 'Egg' -- merged duplicates
 Merged 'Dry Roast' into 'Dry roast' -- merged duplicates
 Merged 'Umeboshi' into 'Pickle' -- Umeboshi too narrow, only umeboshi would have this tag, pickle is more useful
+Merged 'Bulgur' into 'Bulgur Wheat' -- merged duplicates
+Merged 'Aubergine Salad' into 'Aubergine/Merged 'Barley Salad' into 'Barley'/Merged 'Cauliflower Salad' into 'Cauliflower' -- merged duplicates
+Merged 'Braised Pork Belly' into 'Braised' -- too narrow, only braised pork belly would have this tag, braised is more useful
+Merged 'Brown Rice Pilaf' into 'Brown Rice' -- merged duplicates, and brown rice pilaf too narrow
+Merged 'Crunch' into 'Crunchy' -- merged duplicates
+Merged 'Korean Style' into 'Korean'/Merged 'Korean-inspired' into 'Korean' -- merged duplicates
 
 Bad replacements:
 Merged 'Vietnamese' into 'Asian' -- Asian is too broad, national and subnational cuisines are useful keywords

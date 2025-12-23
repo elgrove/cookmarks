@@ -63,18 +63,18 @@ class AIProvider(abc.ABC):
     def _get_completion(self, prompt: str, model: str, schema: dict = None, temp: float = 0) -> tuple[str, dict]:
         pass
 
-    def check_if_can_match_images(self, sample_content: str) -> bool:
+    def check_if_can_match_images(self, sample_content: str) -> tuple[bool, dict]:
         prompt = IMAGE_MATCH_CHECK_PROMPT.format(sample_content=sample_content)
-        response, _ = self._get_completion(prompt, model=self.IMAGE_MATCH_MODEL, temp=0)
+        response, usage = self._get_completion(prompt, model=self.IMAGE_MATCH_MODEL, temp=0)
 
         if response is None:
             logger.warning("Failed to check image matching, assuming no")
-            return False
+            return False, {"cost_usd": None, "input_tokens": None, "output_tokens": None}
 
         result = response.lower().strip().strip('"\'')
         if result not in ("yes", "no"):
             raise ValueError(f"Unexpected response '{response}'. Expected 'yes' or 'no'.")
-        return result == "yes"
+        return result == "yes", usage
 
     def _get_model_for_extraction_method(self, method: ExtractionMethod) -> str:
         _map = {
@@ -84,11 +84,10 @@ class AIProvider(abc.ABC):
         }
         return _map[method]
 
-    def extract_recipes(self, content: str, method: ExtractionMethod) -> tuple[list[RecipeData], dict]:
+    def extract_recipes(self, content: str, model: str) -> tuple[list[RecipeData], dict]:
         schema = load_recipe_schema()
         prompt = EXTRACT_RECIPES_PROMPT.format(schema=json.dumps(schema), content=content)
 
-        model = self._get_model_for_extraction_method(method)
         response, usage = self._get_completion(prompt, model=model, schema=schema, temp=0)
 
         if not response:
@@ -233,7 +232,7 @@ class GeminiProvider(AIProvider):
     NAME = "GEMINI"
 
     IMAGE_MATCH_MODEL = "gemini-2.5-flash"
-    EXTRACT_MANY_PER_FILE_MODEL = "gemini-2.5-flash"
+    EXTRACT_MANY_PER_FILE_MODEL = "gemini-2.5-flash-lite"
     EXTRACT_ONE_PER_FILE_MODEL = "gemini-2.5-flash-lite"
     EXTRACT_BLOCKS_MODEL = "gemini-2.5-flash"
     DEDUPLICATE_MODEL = "gemini-2.5-flash"
@@ -252,7 +251,6 @@ class GeminiProvider(AIProvider):
 
     def _calculate_cost(self, model: str, input_tokens: int, output_tokens: int) -> Decimal:
         pricing = {
-            "gemini-3-flash": (0.50, 3.00),
             "gemini-2.5-flash": (0.30, 2.50),
             "gemini-2.5-flash-lite": (0.10, 0.40),
             "gemini-2.0-flash-lite": (0.075, 0.30),

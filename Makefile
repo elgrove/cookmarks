@@ -15,3 +15,6 @@ publish: build tag push
 
 test:
 	uv run pytest
+
+localdocker:
+	sudo docker compose -f docker-compose.local.yml up -d
