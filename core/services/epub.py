@@ -75,9 +75,9 @@ def get_chapterlike_files_from_epub(epub_path: Path) -> list[str]:
                 and not re.search(ignore_pattern, os.path.basename(f), re.I)
             ]
 
-            if not chapter_like_files:
+            if len(chapter_like_files) <= 4:
                 logger.warning(
-                    f"No chapter-like files found for {epub_path}, returning all spine files."
+                    f"Too few chapter-like files ({len(chapter_like_files)}) found for {epub_path}, returning all spine files."
                 )
                 chapter_like_files = [
                     f
