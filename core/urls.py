@@ -16,6 +16,7 @@ urlpatterns = [
     path("book/<uuid:book_id>/clear-recipes/", views.clear_book_recipes, name="clear_book_recipes"),
     path("book/<uuid:book_id>/delete/", views.delete_book, name="delete_book"),
     path("recipes/", views.recipes, name="recipes"),
+    path("search/", views.search, name="search"),
     path("recipe/<uuid:recipe_id>/", views.recipe_detail, name="recipe_detail"),
     path(
         "recipe/<uuid:recipe_id>/toggle-favourite/", views.toggle_favourite, name="toggle_favourite"
