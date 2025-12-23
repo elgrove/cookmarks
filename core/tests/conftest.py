@@ -7,7 +7,6 @@ from django.conf import settings
 from core.models import Book, Config
 from core.services.calibre import load_books_from_calibre
 
-
 BOOKS_DIR = settings.BASE_DIR / "_books"
 TEST_CALIBRE_DIR = settings.BASE_DIR / "_test_calibre"
 
@@ -30,16 +29,16 @@ def load_gold_recipes() -> list[dict]:
 def split_recipes_for_api_calls(recipes: list[dict], num_calls: int) -> list[str]:
     if num_calls <= 0:
         return []
-    
+
     chunk_size = math.ceil(len(recipes) / num_calls)
     chunks = []
     for i in range(0, len(recipes), chunk_size):
-        chunk = recipes[i:i + chunk_size]
+        chunk = recipes[i : i + chunk_size]
         chunks.append(json.dumps(chunk))
-    
+
     while len(chunks) < num_calls:
         chunks.append("[]")
-    
+
     return chunks
 
 
@@ -59,12 +58,12 @@ def configured_app(db):
 def calibre_books(db):
     if not TEST_CALIBRE_DIR.exists():
         pytest.skip(f"Test calibre directory not found: {TEST_CALIBRE_DIR}")
-    
+
     created_count, updated_count = load_books_from_calibre(TEST_CALIBRE_DIR)
-    
+
     # Return the book we expect to be loaded
     book = Book.objects.filter(title=TEST_CALIBRE_BOOK["title"]).first()
     if not book:
         pytest.skip(f"Test book not found after loading: {TEST_CALIBRE_BOOK['title']}")
-    
+
     return book

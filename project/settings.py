@@ -24,17 +24,17 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY_FILE = os.path.join(BASE_DIR, '_django_secret_key.txt')
+SECRET_KEY_FILE = os.path.join(BASE_DIR, "_django_secret_key.txt")
 if os.path.exists(SECRET_KEY_FILE):
-    with open(SECRET_KEY_FILE, 'r') as f:
+    with open(SECRET_KEY_FILE) as f:
         SECRET_KEY = f.read().strip()
 else:
     SECRET_KEY = get_random_secret_key()
-    with open(SECRET_KEY_FILE, 'w') as f:
+    with open(SECRET_KEY_FILE, "w") as f:
         f.write(SECRET_KEY)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get("DJANGO_DEBUG", "").lower() == 'true'
+DEBUG = os.environ.get("DJANGO_DEBUG", "").lower() == "true"
 
 # TODO: change this in production
 ALLOWED_HOSTS = ["*"]
@@ -161,8 +161,10 @@ Q_CLUSTER = {
     "sync": os.environ.get("DJANGO_Q_SYNC", "False").lower() in ("true", "1"),
 }
 
+
 class AFCLogFilter(logging.Filter):
     """Filter out Google AI SDK 'AFC is enabled' log messages."""
+
     def filter(self, record):
         return not record.getMessage().startswith("AFC is enabled with max remote calls")
 
@@ -201,7 +203,7 @@ LOGGING = {
 
 
 CALIBRE_ROOT = Path("/books") if Path("/books").exists() else BASE_DIR / "_books"
-if dir := os.environ.get('CALIBRE_ROOT'):
+if dir := os.environ.get("CALIBRE_ROOT"):
     CALIBRE_ROOT = Path(dir)
 
 # Threads for executor making AI requests

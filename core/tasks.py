@@ -4,7 +4,6 @@ from pathlib import Path
 
 import inflect
 import titlecase
-
 from django.conf import settings
 from django.forms.models import model_to_dict
 from django.utils import timezone
@@ -15,6 +14,7 @@ from core.services.calibre import load_books_from_calibre
 from core.services.extract import extract_recipe_data_from_book
 
 logger = logging.getLogger(__name__)
+
 
 def extract_recipes_from_book(book_id: str, extraction_id: str | None = None):
     try:
@@ -41,37 +41,37 @@ def extract_recipes_from_book(book_id: str, extraction_id: str | None = None):
         extraction.save()
 
         recipes_data, extraction = extract_recipe_data_from_book(book, report=extraction)
-        
+
         logger.info(f"Found {len(recipes_data)} recipes for {book.title}")
-        
+
         created_count = 0
         for order, recipe_data in enumerate(recipes_data, start=1):
             recipe, created = Recipe.objects.update_or_create(
                 book=book,
                 name=recipe_data.name,
                 defaults={
-                    'extraction_report': extraction,
-                    'order': order,
-                    'description': recipe_data.description,
-                    'ingredients': recipe_data.ingredients,
-                    'instructions': recipe_data.instructions,
-                    'yields': recipe_data.yields,
-                    'image': recipe_data.image,
-                }
+                    "extraction_report": extraction,
+                    "order": order,
+                    "description": recipe_data.description,
+                    "ingredients": recipe_data.ingredients,
+                    "instructions": recipe_data.instructions,
+                    "yields": recipe_data.yields,
+                    "image": recipe_data.image,
+                },
             )
-            
+
             keyword_objects = []
             for keyword_name in recipe_data.keywords:
                 keyword, _ = Keyword.objects.get_or_create(name=keyword_name)
                 keyword_objects.append(keyword)
             recipe.keywords.set(keyword_objects)
-            
+
             created_count += 1
 
-        with open(book.get_recipes_json_path(), 'w') as f:
+        with open(book.get_recipes_json_path(), "w") as f:
             json.dump([r.model_dump() for r in recipes_data], f, indent=2, ensure_ascii=False)
 
-        with open(book.get_report_path(), 'w') as f:
+        with open(book.get_report_path(), "w") as f:
             json.dump(model_to_dict(extraction), f, indent=2, ensure_ascii=False, default=str)
 
         logger.info(f"Finished extraction for {book.title}. Processed {created_count} recipes.")
@@ -84,13 +84,14 @@ def extract_recipes_from_book(book_id: str, extraction_id: str | None = None):
         logger.error(f"Error extracting recipes: {e}")
         raise e
 
+
 def pre_deduplicate_keywords(keywords: list[str]) -> tuple[list[str], dict[str, str]]:
     p = inflect.engine()
     merge_map = {}
     seen = {}
 
     for kw in keywords:
-        normalized = ' '.join(kw.strip().split())
+        normalized = " ".join(kw.strip().split())
         titlecased = titlecase.titlecase(normalized)
         comparison_key = titlecased.lower()
 
@@ -112,25 +113,27 @@ def pre_deduplicate_keywords(keywords: list[str]) -> tuple[list[str], dict[str, 
 def deduplicate_keywords_task():
     logger.info("Starting keyword deduplication task.")
 
-    all_keywords = list(Keyword.objects.values_list('name', flat=True))
+    all_keywords = list(Keyword.objects.values_list("name", flat=True))
     logger.info(f"Found {len(all_keywords)} keywords to process.")
 
     deduplicated_keywords, pre_merge_map = pre_deduplicate_keywords(all_keywords)
-    logger.info(f"Pre-deduplication reduced to {len(deduplicated_keywords)} keywords, {len(pre_merge_map)} merges.")
+    logger.info(
+        f"Pre-deduplication reduced to {len(deduplicated_keywords)} keywords, {len(pre_merge_map)} merges."
+    )
 
     config = get_config()
-    provider_map = {'GEMINI': GeminiProvider, "OPENROUTER": OpenRouterProvider}
+    provider_map = {"GEMINI": GeminiProvider, "OPENROUTER": OpenRouterProvider}
     provider = provider_map[config.ai_provider]()
     ai_deduplication_map = provider.deduplicate_keywords(deduplicated_keywords)
 
     deduplication_map = {**pre_merge_map, **ai_deduplication_map}
-    
+
     if not deduplication_map:
         logger.info("No keyword duplications found.")
         return "No keyword duplications found."
-        
+
     logger.info(f"AI suggested {len(deduplication_map)} keyword amalgamations.")
-    
+
     for original, canonical in deduplication_map.items():
         if original == canonical:
             continue
@@ -138,23 +141,24 @@ def deduplicate_keywords_task():
         canonical_keyword, created = Keyword.objects.get_or_create(name=canonical)
         if created:
             logger.info(f"Created new canonical keyword: {canonical}")
-            
+
         try:
             original_keyword = Keyword.objects.get(name=original)
             recipes_to_update = Recipe.objects.filter(keywords=original_keyword)
-            
+
             for recipe in recipes_to_update:
                 recipe.keywords.remove(original_keyword)
                 recipe.keywords.add(canonical_keyword)
-            
+
             original_keyword.delete()
             logger.info(f"Merged '{original}' into '{canonical}'.")
 
         except Keyword.DoesNotExist:
             logger.warning(f"Original keyword '{original}' not found in database, skipping.")
-            
+
     logger.info("Finished keyword deduplication task.")
     return f"Processed {len(deduplication_map)} keyword amalgamations."
+
 
 def load_books_from_calibre_task():
     try:

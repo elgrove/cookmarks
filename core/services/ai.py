@@ -37,7 +37,7 @@ def get_config():
 
 
 def load_recipe_schema():
-    with open(SCHEMA_PATH, "r") as f:
+    with open(SCHEMA_PATH) as f:
         return json.load(f)
 
 
@@ -60,7 +60,9 @@ class AIProvider(abc.ABC):
         self.api_key = config.api_key
 
     @abc.abstractmethod
-    def _get_completion(self, prompt: str, model: str, schema: dict = None, temp: float = 0) -> tuple[str, dict]:
+    def _get_completion(
+        self, prompt: str, model: str, schema: dict = None, temp: float = 0
+    ) -> tuple[str, dict]:
         pass
 
     def check_if_can_match_images(self, sample_content: str) -> tuple[bool, dict]:
@@ -71,7 +73,7 @@ class AIProvider(abc.ABC):
             logger.warning("Failed to check image matching, assuming no")
             return False, {"cost_usd": None, "input_tokens": None, "output_tokens": None}
 
-        result = response.lower().strip().strip('"\'')
+        result = response.lower().strip().strip("\"'")
         if result not in ("yes", "no"):
             raise ValueError(f"Unexpected response '{response}'. Expected 'yes' or 'no'.")
         return result == "yes", usage
@@ -157,7 +159,7 @@ class OpenRouterProvider(AIProvider):
         }
 
         if model == "openai/gpt-oss-120b":
-            payload['max_tokens'] = 110_000
+            payload["max_tokens"] = 110_000
 
         max_retries = 5
         backoff_factor = 2
@@ -176,7 +178,7 @@ class OpenRouterProvider(AIProvider):
                     json=payload,
                     timeout=MAX_TIMEOUT,
                 )
-                
+
                 try:
                     result = response.json()
                 except json.JSONDecodeError:
@@ -185,9 +187,9 @@ class OpenRouterProvider(AIProvider):
                 error_data = result.get("error", {})
                 error_code = error_data.get("code")
 
-                is_retryable = (
-                    response.status_code in (429, 500, 502, 503, 504) or
-                    error_code in (429, 500)
+                is_retryable = response.status_code in (429, 500, 502, 503, 504) or error_code in (
+                    429,
+                    500,
                 )
 
                 if is_retryable and attempt < max_retries:
@@ -200,7 +202,7 @@ class OpenRouterProvider(AIProvider):
 
                 if error_data:
                     raise ValueError(f"OpenRouter API error: {error_data}")
-                
+
                 response.raise_for_status()
                 response_content = result["choices"][0]["message"]["content"]
                 usage_data = result.get("usage", {})
@@ -222,7 +224,9 @@ class OpenRouterProvider(AIProvider):
                     continue
                 else:
                     if isinstance(e, KeyError):
-                        raise ValueError(f"Unexpected response format from OpenRouter API: {e}. Response: {result}")
+                        raise ValueError(
+                            f"Unexpected response format from OpenRouter API: {e}. Response: {result}"
+                        )
                     raise
 
         return response_content or "", usage_metadata
@@ -246,7 +250,7 @@ class GeminiProvider(AIProvider):
                     "attempts": 5,
                     "http_status_codes": [429, 500, 502, 503, 504],
                 }
-            }
+            },
         )
 
     def _calculate_cost(self, model: str, input_tokens: int, output_tokens: int) -> Decimal:
@@ -256,7 +260,9 @@ class GeminiProvider(AIProvider):
             "gemini-2.0-flash-lite": (0.075, 0.30),
         }
         input_rate, output_rate = pricing[model]
-        cost_usd = (input_tokens / 1_000_000) * input_rate + (output_tokens / 1_000_000) * output_rate
+        cost_usd = (input_tokens / 1_000_000) * input_rate + (
+            output_tokens / 1_000_000
+        ) * output_rate
         return Decimal(str(cost_usd))
 
     def _get_completion(self, prompt, model, schema=None, temp=0):
@@ -275,8 +281,8 @@ class GeminiProvider(AIProvider):
 
         usage_metadata = {}
         if response.usage_metadata:
-            input_tokens = getattr(response.usage_metadata, 'prompt_token_count', 0) or 0
-            total_tokens = getattr(response.usage_metadata, 'total_token_count', 0) or 0
+            input_tokens = getattr(response.usage_metadata, "prompt_token_count", 0) or 0
+            total_tokens = getattr(response.usage_metadata, "total_token_count", 0) or 0
             output_tokens = total_tokens - input_tokens
             cost = self._calculate_cost(model, input_tokens, output_tokens)
 
@@ -287,5 +293,3 @@ class GeminiProvider(AIProvider):
             }
 
         return response.text or "", usage_metadata
-
-
