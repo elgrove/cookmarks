@@ -186,18 +186,15 @@ Response:
   ]
 }}
 
-User: "lamb or beef curries from indian cookbooks"
+User: "beef and coconut curries"
 Response:
 {{
   "group_logic": "and",
   "groups": [
-    {{"logic": "or", "conditions": [
-      {{"field": "ingredients", "op": "contains", "value": "lamb"}},
-      {{"field": "ingredients", "op": "contains", "value": "beef"}}
-    ]}},
     {{"logic": "and", "conditions": [
       {{"field": "keywords", "op": "contains", "value": "Curry"}},
-      {{"field": "keywords", "op": "contains", "value": "Indian"}}
+      {{"field": "ingredients", "op": "contains", "value": "coconut"}},
+      {{"field": "ingredients", "op": "contains", "value": "beef"}}
     ]}}
   ]
 }}

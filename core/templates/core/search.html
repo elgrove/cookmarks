@@ -5,16 +5,33 @@
 
 {% block content %}
 <style>
-    /* Search page styles */
-    .search-container {
-        max-width: 900px;
+    /* Two-column layout */
+    .search-layout {
+        display: grid;
+        grid-template-columns: 1fr 340px;
+        gap: 2rem;
+        max-width: 1400px;
         margin: 0 auto;
+    }
+    
+    /* Results column (left) */
+    .results-column {
+        min-width: 0;
+    }
+    
+    /* Sidebar (right) */
+    .search-sidebar {
+        position: sticky;
+        top: 1rem;
+        height: fit-content;
+        max-height: calc(100vh - 2rem);
+        overflow-y: auto;
     }
     
     .search-box {
         background: #fff;
         border-radius: 12px;
-        padding: 1.25rem;
+        padding: 1rem;
         box-shadow: 0 1px 3px rgba(0,0,0,0.08);
         margin-bottom: 1rem;
     }
@@ -30,10 +47,16 @@
     }
     
     /* Quick search */
+    .quick-search-row {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+    }
+    
     .quick-search-input {
-        width: 100%;
-        padding: 0.75rem 1rem;
-        font-size: 1rem;
+        flex: 1;
+        padding: 0.6rem 0.75rem;
+        font-size: 0.95rem;
         border: 1px solid #e9ecef;
         border-radius: 8px;
         transition: border-color 0.15s ease, box-shadow 0.15s ease;
@@ -45,11 +68,41 @@
         box-shadow: 0 0 0 3px rgba(33, 37, 41, 0.1);
     }
     
+    .search-btn {
+        padding: 0.6rem 1rem;
+        font-size: 0.85rem;
+        font-weight: 500;
+        border-radius: 8px;
+        border: none;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        white-space: nowrap;
+    }
+    
+    .search-btn-primary {
+        background: #212529;
+        color: white;
+    }
+    
+    .search-btn-primary:hover {
+        background: #343a40;
+    }
+    
+    .search-btn-secondary {
+        background: transparent;
+        border: 1px solid #dee2e6;
+        color: #495057;
+    }
+    
+    .search-btn-secondary:hover {
+        background: #f8f9fa;
+    }
+    
     /* Filter groups */
     .filter-group {
         border: 1px solid #e9ecef;
         border-radius: 8px;
-        padding: 0.875rem;
+        padding: 0.75rem;
         margin-bottom: 0.5rem;
         background: #fafbfc;
     }
@@ -62,14 +115,14 @@
     }
     
     .filter-group-label {
-        font-size: 0.75rem;
+        font-size: 0.7rem;
         color: #6c757d;
         flex: 1;
     }
     
     .filter-group-logic {
-        padding: 0.25rem 0.5rem;
-        font-size: 0.75rem;
+        padding: 0.2rem 0.4rem;
+        font-size: 0.7rem;
         font-weight: 600;
         border: none;
         border-radius: 4px;
@@ -94,9 +147,10 @@
     
     .filter-row {
         display: flex;
-        gap: 0.5rem;
-        margin-bottom: 0.5rem;
+        gap: 0.35rem;
+        margin-bottom: 0.4rem;
         align-items: center;
+        flex-wrap: wrap;
     }
     
     .filter-row:last-child {
@@ -104,25 +158,26 @@
     }
     
     .filter-field-select {
-        min-width: 120px;
-        padding: 0.4rem 0.6rem;
-        font-size: 0.85rem;
+        min-width: 90px;
+        padding: 0.35rem 0.5rem;
+        font-size: 0.8rem;
         border: 1px solid #e9ecef;
         border-radius: 6px;
     }
     
     .filter-operator-select {
-        min-width: 100px;
-        padding: 0.4rem 0.6rem;
-        font-size: 0.85rem;
+        min-width: 85px;
+        padding: 0.35rem 0.5rem;
+        font-size: 0.8rem;
         border: 1px solid #e9ecef;
         border-radius: 6px;
     }
     
     .filter-value-input {
         flex: 1;
-        padding: 0.4rem 0.6rem;
-        font-size: 0.85rem;
+        min-width: 80px;
+        padding: 0.35rem 0.5rem;
+        font-size: 0.8rem;
         border: 1px solid #e9ecef;
         border-radius: 6px;
     }
@@ -131,14 +186,15 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 28px;
-        height: 28px;
+        width: 24px;
+        height: 24px;
         border: none;
         border-radius: 4px;
         background: #f8f9fa;
         color: #6c757d;
         cursor: pointer;
         transition: all 0.15s ease;
+        font-size: 0.9rem;
     }
     
     .filter-remove-btn:hover {
@@ -149,9 +205,9 @@
     .filter-add-btn {
         display: inline-flex;
         align-items: center;
-        gap: 0.35rem;
-        padding: 0.4rem 0.75rem;
-        font-size: 0.8rem;
+        gap: 0.25rem;
+        padding: 0.35rem 0.6rem;
+        font-size: 0.75rem;
         border: 1px dashed #dee2e6;
         border-radius: 6px;
         background: transparent;
@@ -166,23 +222,17 @@
         background: #f8f9fa;
     }
     
-    .filter-actions {
-        display: flex;
-        gap: 0.5rem;
-        margin-top: 1rem;
-    }
-    
     /* Logic connector between groups */
     .logic-connector {
         display: flex;
         align-items: center;
         justify-content: center;
-        padding: 0.5rem 0;
+        padding: 0.35rem 0;
     }
     
     .logic-connector-btn {
-        padding: 0.25rem 0.75rem;
-        font-size: 0.75rem;
+        padding: 0.2rem 0.6rem;
+        font-size: 0.7rem;
         font-weight: 600;
         border: 1px solid #dee2e6;
         border-radius: 12px;
@@ -207,47 +257,80 @@
         color: #004085;
     }
     
-    /* Search actions */
-    .search-actions {
-        display: flex;
-        gap: 0.75rem;
-        justify-content: flex-end;
-        margin-top: 1rem;
-        padding-top: 1rem;
-        border-top: 1px solid #e9ecef;
+    /* AI Prompt */
+    .ai-prompt-input {
+        width: 100%;
+        padding: 0.6rem 0.75rem;
+        font-size: 0.9rem;
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        margin-bottom: 0.5rem;
     }
     
-    .search-btn {
-        padding: 0.6rem 1.5rem;
-        font-size: 0.9rem;
+    .ai-prompt-input:focus {
+        outline: none;
+        border-color: #6f42c1;
+        box-shadow: 0 0 0 3px rgba(111, 66, 193, 0.1);
+    }
+    
+    .ai-prompt-btn {
+        width: 100%;
+        padding: 0.6rem 1rem;
+        font-size: 0.85rem;
         font-weight: 500;
-        border-radius: 8px;
         border: none;
+        border-radius: 8px;
+        background: linear-gradient(135deg, #6f42c1, #5a32a3);
+        color: white;
         cursor: pointer;
         transition: all 0.15s ease;
     }
     
-    .search-btn-primary {
-        background: #212529;
-        color: white;
+    .ai-prompt-btn:hover:not(:disabled) {
+        background: linear-gradient(135deg, #5a32a3, #4a2883);
+        transform: translateY(-1px);
     }
     
-    .search-btn-primary:hover {
-        background: #343a40;
+    .ai-prompt-btn:disabled {
+        background: #adb5bd;
+        cursor: not-allowed;
     }
     
-    .search-btn-secondary {
-        background: transparent;
-        border: 1px solid #dee2e6;
-        color: #495057;
+    .ai-prompt-btn.loading {
+        position: relative;
     }
     
-    .search-btn-secondary:hover {
-        background: #f8f9fa;
+    .ai-prompt-btn.loading::after {
+        content: "";
+        position: absolute;
+        width: 14px;
+        height: 14px;
+        margin-left: 6px;
+        border: 2px solid transparent;
+        border-top-color: white;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
     }
     
-    /* Results */
-    .search-results-header {
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+    
+    .ai-error {
+        color: #dc3545;
+        font-size: 0.8rem;
+        margin-top: 0.5rem;
+    }
+    
+    .ai-hint {
+        font-size: 0.75rem;
+        color: #6c757d;
+        margin-top: 0.5rem;
+    }
+    
+    /* Results header */
+    .results-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
@@ -256,12 +339,12 @@
         border-bottom: 1px solid #e9ecef;
     }
     
-    .search-results-count {
+    .results-count {
         font-size: 0.9rem;
         color: #6c757d;
     }
     
-    .search-results-sort {
+    .results-sort {
         display: flex;
         align-items: center;
         gap: 0.5rem;
@@ -374,81 +457,46 @@
         opacity: 0.5;
     }
     
-    /* AI Prompt */
-    .ai-prompt-row {
+    /* Initial state (no search yet) */
+    .search-initial {
         display: flex;
-        gap: 0.5rem;
+        flex-direction: column;
         align-items: center;
-    }
-    
-    .ai-prompt-input {
-        flex: 1;
-        padding: 0.75rem 1rem;
-        font-size: 1rem;
-        border: 1px solid #e9ecef;
-        border-radius: 8px;
-        transition: border-color 0.15s ease, box-shadow 0.15s ease;
-    }
-    
-    .ai-prompt-input:focus {
-        outline: none;
-        border-color: #6f42c1;
-        box-shadow: 0 0 0 3px rgba(111, 66, 193, 0.1);
-    }
-    
-    .ai-prompt-btn {
-        padding: 0.75rem 1.25rem;
-        font-size: 0.9rem;
-        font-weight: 500;
-        border: none;
-        border-radius: 8px;
-        background: linear-gradient(135deg, #6f42c1, #5a32a3);
-        color: white;
-        cursor: pointer;
-        transition: all 0.15s ease;
-        white-space: nowrap;
-    }
-    
-    .ai-prompt-btn:hover:not(:disabled) {
-        background: linear-gradient(135deg, #5a32a3, #4a2883);
-        transform: translateY(-1px);
-    }
-    
-    .ai-prompt-btn:disabled {
-        background: #adb5bd;
-        cursor: not-allowed;
-    }
-    
-    .ai-prompt-btn.loading {
-        position: relative;
-    }
-    
-    .ai-prompt-btn.loading::after {
-        content: "";
-        position: absolute;
-        width: 16px;
-        height: 16px;
-        margin-left: 8px;
-        border: 2px solid transparent;
-        border-top-color: white;
-        border-radius: 50%;
-        animation: spin 0.8s linear infinite;
-    }
-    
-    @keyframes spin {
-        to { transform: rotate(360deg); }
-    }
-    
-    .ai-error {
-        color: #dc3545;
-        font-size: 0.85rem;
-        margin-top: 0.5rem;
-    }
-    
-    .ai-hint {
-        font-size: 0.8rem;
+        justify-content: center;
+        min-height: 400px;
+        text-align: center;
         color: #6c757d;
-        margin-top: 0.5rem;
+    }
+    
+    .search-initial-icon {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+        opacity: 0.4;
+    }
+    
+    .search-initial h2 {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: #495057;
+        margin-bottom: 0.5rem;
+    }
+    
+    .search-initial p {
+        font-size: 1rem;
+        max-width: 400px;
+    }
+    
+    /* Responsive */
+    @media (max-width: 900px) {
+        .search-layout {
+            grid-template-columns: 1fr;
+        }
+        
+        .search-sidebar {
+            position: static;
+            order: -1;
+            max-height: none;
+        }
     }
 </style>
 
@@ -457,100 +505,16 @@
     <h1 class="page-title">Search Recipes</h1>
 </div>
 
-<div class="search-container">
-    <form method="get" action="{% url 'search' %}" id="searchForm">
-        <!-- Quick Search Box -->
-        <div class="search-box">
-            <input type="text" 
-                   class="quick-search-input" 
-                   name="q" 
-                   placeholder="Search all fields (fuzzy matching)..." 
-                   value="{{ query }}"
-                   autofocus>
-        </div>
-        
-        <!-- Filter Builder -->
-        <div class="search-box">
-            <div id="filterGroups">
-                {% if filters %}
-                    {% for group in filters %}
-                    <div class="filter-group" data-group-index="{{ forloop.counter0 }}">
-                        <div class="filter-group-header">
-                            <button type="button" class="filter-group-logic {{ group.logic }}" onclick="toggleGroupLogic(this)">{{ group.logic|upper }}</button>
-                            <span class="filter-group-label">within this group</span>
-                            <button type="button" class="filter-remove-btn" onclick="removeGroup(this)" title="Remove group">×</button>
-                        </div>
-                        {% for condition in group.conditions %}
-                        <div class="filter-row">
-                            <select class="filter-field-select" name="filter_field[]">
-                                <option value="name" {% if condition.field == 'name' %}selected{% endif %}>Name</option>
-                                <option value="ingredients" {% if condition.field == 'ingredients' %}selected{% endif %}>Ingredients</option>
-                                <option value="instructions" {% if condition.field == 'instructions' %}selected{% endif %}>Instructions</option>
-                                <option value="keywords" {% if condition.field == 'keywords' %}selected{% endif %}>Keywords</option>
-                                <option value="author" {% if condition.field == 'author' %}selected{% endif %}>Author</option>
-                                <option value="book" {% if condition.field == 'book' %}selected{% endif %}>Book</option>
-                            </select>
-                            <select class="filter-operator-select" name="filter_op[]">
-                                <option value="contains" {% if condition.op == 'contains' %}selected{% endif %}>contains</option>
-                                <option value="not_contains" {% if condition.op == 'not_contains' %}selected{% endif %}>doesn't contain</option>
-                                <option value="equals" {% if condition.op == 'equals' %}selected{% endif %}>equals</option>
-                                <option value="starts" {% if condition.op == 'starts' %}selected{% endif %}>starts with</option>
-                            </select>
-                            <input type="text" class="filter-value-input" name="filter_value[]" value="{{ condition.value }}" placeholder="Value...">
-                            <input type="hidden" name="filter_group[]" value="{{ forloop.parentloop.counter0 }}">
-                            <input type="hidden" name="filter_logic[]" value="{{ group.logic }}">
-                            <button type="button" class="filter-remove-btn" onclick="removeFilter(this)" title="Remove filter">×</button>
-                        </div>
-                        {% endfor %}
-                        <button type="button" class="filter-add-btn mt-2" onclick="addFilterToGroup(this.parentElement)">+ Add condition</button>
-                    </div>
-                    {% if not forloop.last %}
-                    <div class="logic-connector">
-                        <button type="button" class="logic-connector-btn {{ group_logic|default:'or' }}" onclick="toggleConnectorLogic(this)">{{ group_logic|default:'OR'|upper }}</button>
-                    </div>
-                    {% endif %}
-                    {% endfor %}
-                {% endif %}
-            </div>
-            <input type="hidden" name="group_logic" id="groupLogicInput" value="{{ group_logic|default:'or' }}">
-            <button type="button" class="filter-add-btn {% if filters %}mt-3{% endif %}" onclick="addFilterGroup()">+ Add filter group</button>
-        </div>
-        
-        <!-- AI Search -->
-        <div class="search-box">
-            <div class="search-box-title">AI Search (describe what you're looking for)</div>
-            <div class="ai-prompt-row">
-                <input type="text" 
-                       class="ai-prompt-input" 
-                       id="aiPromptInput"
-                       placeholder="Try 'thai curries without coconut' or 'quick vegetarian mains'">
-                <button type="button" class="ai-prompt-btn" id="aiPromptBtn" onclick="translateWithAI()">
-                    Ask AI
-                </button>
-            </div>
-            <div id="aiError" class="ai-error" style="display: none;"></div>
-            <div class="ai-hint">AI will populate the filters above for you to review</div>
-        </div>
-        
-        <!-- Sort -->
-        <input type="hidden" name="sort" id="sortInput" value="{{ sort_by|default:'relevance' }}">
-        
-        <!-- Search Actions -->
-        <div class="search-actions">
-            <a href="{% url 'search' %}" class="search-btn search-btn-secondary">Clear All</a>
-            <button type="submit" class="search-btn search-btn-primary">Search</button>
-        </div>
-    </form>
-    
-    <!-- Search Results -->
-    {% if has_searched %}
-    <div class="search-results mt-4">
-        <div class="search-results-header">
-            <span class="search-results-count">
+<div class="search-layout">
+    <!-- Results Column (Left) -->
+    <div class="results-column">
+        {% if has_searched %}
+        <div class="results-header">
+            <span class="results-count">
                 {{ recipes.paginator.count }} result{{ recipes.paginator.count|pluralize }}
                 {% if query %}for "{{ query }}"{% endif %}
             </span>
-            <div class="search-results-sort">
+            <div class="results-sort">
                 <span style="font-size: 0.85rem; color: #6c757d;">Sort:</span>
                 <select class="form-select form-select-sm" style="width: auto; font-size: 0.85rem;" id="sortSelect">
                     <option value="relevance" {% if sort_by == 'relevance' %}selected{% endif %}>Relevance</option>
@@ -617,8 +581,102 @@
             {% endif %}
         </nav>
         {% endif %}
+        {% else %}
+        <!-- Initial state - no search performed yet -->
+        <div class="search-initial">
+            <div class="search-initial-icon">🍳</div>
+            <h2>Find your recipes</h2>
+            <p>Use the search box or filters to find recipes in your collection</p>
+        </div>
+        {% endif %}
     </div>
-    {% endif %}
+    
+    <!-- Search Sidebar (Right) -->
+    <div class="search-sidebar">
+        <form method="get" action="{% url 'search' %}" id="searchForm">
+            <!-- Quick Search Box -->
+            <div class="search-box">
+                <div class="search-box-title">Quick Search</div>
+                <div class="quick-search-row">
+                    <input type="text" 
+                           class="quick-search-input" 
+                           name="q" 
+                           placeholder="Search all fields..." 
+                           value="{{ query }}"
+                           autofocus>
+                </div>
+                <div style="display: flex; gap: 0.5rem; margin-top: 0.75rem;">
+                    <a href="{% url 'search' %}" class="search-btn search-btn-secondary" style="flex: 1; text-align: center;">Clear</a>
+                    <button type="submit" class="search-btn search-btn-primary" style="flex: 1;">Search</button>
+                </div>
+            </div>
+            
+            <!-- Filter Builder -->
+            <div class="search-box">
+                <div class="search-box-title">Advanced Filters</div>
+                <div id="filterGroups">
+                    {% if filters %}
+                        {% for group in filters %}
+                        <div class="filter-group" data-group-index="{{ forloop.counter0 }}">
+                            <div class="filter-group-header">
+                                <button type="button" class="filter-group-logic {{ group.logic }}" onclick="toggleGroupLogic(this)">{{ group.logic|upper }}</button>
+                                <span class="filter-group-label">within this group</span>
+                                <button type="button" class="filter-remove-btn" onclick="removeGroup(this)" title="Remove group">×</button>
+                            </div>
+                            {% for condition in group.conditions %}
+                            <div class="filter-row">
+                                <select class="filter-field-select" name="filter_field[]">
+                                    <option value="name" {% if condition.field == 'name' %}selected{% endif %}>Name</option>
+                                    <option value="ingredients" {% if condition.field == 'ingredients' %}selected{% endif %}>Ingredients</option>
+                                    <option value="instructions" {% if condition.field == 'instructions' %}selected{% endif %}>Instructions</option>
+                                    <option value="keywords" {% if condition.field == 'keywords' %}selected{% endif %}>Keywords</option>
+                                    <option value="author" {% if condition.field == 'author' %}selected{% endif %}>Author</option>
+                                    <option value="book" {% if condition.field == 'book' %}selected{% endif %}>Book</option>
+                                </select>
+                                <select class="filter-operator-select" name="filter_op[]">
+                                    <option value="contains" {% if condition.op == 'contains' %}selected{% endif %}>contains</option>
+                                    <option value="not_contains" {% if condition.op == 'not_contains' %}selected{% endif %}>doesn't contain</option>
+                                    <option value="equals" {% if condition.op == 'equals' %}selected{% endif %}>equals</option>
+                                    <option value="starts" {% if condition.op == 'starts' %}selected{% endif %}>starts with</option>
+                                </select>
+                                <input type="text" class="filter-value-input" name="filter_value[]" value="{{ condition.value }}" placeholder="Value...">
+                                <input type="hidden" name="filter_group[]" value="{{ forloop.parentloop.counter0 }}">
+                                <input type="hidden" name="filter_logic[]" value="{{ group.logic }}">
+                                <button type="button" class="filter-remove-btn" onclick="removeFilter(this)" title="Remove filter">×</button>
+                            </div>
+                            {% endfor %}
+                            <button type="button" class="filter-add-btn mt-2" onclick="addFilterToGroup(this.parentElement)">+ Add condition</button>
+                        </div>
+                        {% if not forloop.last %}
+                        <div class="logic-connector">
+                            <button type="button" class="logic-connector-btn {{ group_logic|default:'or' }}" onclick="toggleConnectorLogic(this)">{{ group_logic|default:'OR'|upper }}</button>
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                    {% endif %}
+                </div>
+                <input type="hidden" name="group_logic" id="groupLogicInput" value="{{ group_logic|default:'or' }}">
+                <button type="button" class="filter-add-btn {% if filters %}mt-2{% endif %}" onclick="addFilterGroup()">+ Add filter group</button>
+            </div>
+            
+            <!-- AI Search -->
+            <div class="search-box">
+                <div class="search-box-title">AI Search</div>
+                <input type="text" 
+                       class="ai-prompt-input" 
+                       id="aiPromptInput"
+                       placeholder="e.g. 'thai curries without coconut'">
+                <button type="button" class="ai-prompt-btn" id="aiPromptBtn" onclick="translateWithAI()">
+                    Ask AI
+                </button>
+                <div id="aiError" class="ai-error" style="display: none;"></div>
+                <div class="ai-hint">AI will populate the filters for you</div>
+            </div>
+            
+            <!-- Sort (hidden) -->
+            <input type="hidden" name="sort" id="sortInput" value="{{ sort_by|default:'relevance' }}">
+        </form>
+    </div>
 </div>
 
 <script>
