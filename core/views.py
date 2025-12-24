@@ -332,19 +332,46 @@ def recipes(request):
     ):
         recipe_context_params = f"context=list&list_id={selected_lists[0]}"
     elif sort_by != "random":
+        # Build context params using the unified filter format
         params = ["context=search"]
         if search:
             params.append(f"q={search}")
         if sort_by:
             params.append(f"sort={sort_by}")
+        params.append("group_logic=and")
+
+        # Translate simple filters to advanced filter format
+        filter_index = 0
         for bid in selected_books:
-            params.append(f"selected_books[]={bid}")
+            params.append("filter_field[]=book")
+            params.append("filter_op[]=contains")
+            params.append(f"filter_value[]={bid}")
+            params.append(f"filter_group[]={filter_index}")
+            params.append("filter_logic[]=or")
+        if selected_books:
+            filter_index += 1
+
         for author in selected_authors:
-            params.append(f"selected_authors[]={author}")
+            params.append("filter_field[]=author")
+            params.append("filter_op[]=contains")
+            params.append(f"filter_value[]={author}")
+            params.append(f"filter_group[]={filter_index}")
+            params.append("filter_logic[]=or")
+        if selected_authors:
+            filter_index += 1
+
         for kw in selected_keywords:
-            params.append(f"selected_keywords[]={kw}")
+            params.append("filter_field[]=keywords")
+            params.append("filter_op[]=contains")
+            params.append(f"filter_value[]={kw}")
+            params.append(f"filter_group[]={filter_index}")
+            params.append("filter_logic[]=or")
+        if selected_keywords:
+            filter_index += 1
+
         for lid in selected_lists:
             params.append(f"selected_lists[]={lid}")
+
         recipe_context_params = "&".join(params)
     else:
         recipe_context_params = "context=book"
@@ -435,17 +462,23 @@ def recipe_detail(request, recipe_id):
                 nav_context = "book"
 
     elif nav_context == "search":
-        # Navigate within search results - rebuild the query
+        # Navigate within search results - rebuild the query using unified filter format
         search = request.GET.get("q", "")
-        selected_books = request.GET.getlist("selected_books[]")
-        selected_authors = request.GET.getlist("selected_authors[]")
-        selected_keywords = request.GET.getlist("selected_keywords[]")
         selected_lists = request.GET.getlist("selected_lists[]")
-        sort_by = request.GET.get("sort", "random")
+        sort_by = request.GET.get("sort", "name")
+        group_logic = request.GET.get("group_logic", "and")
 
-        # Rebuild the recipe queryset from search params
+        # Advanced filter params (unified format used by both recipes and search pages)
+        filter_fields = request.GET.getlist("filter_field[]")
+        filter_ops = request.GET.getlist("filter_op[]")
+        filter_values = request.GET.getlist("filter_value[]")
+        filter_groups = request.GET.getlist("filter_group[]")
+        filter_logics = request.GET.getlist("filter_logic[]")
+
+        # Rebuild the recipe queryset
         recipes_qs = Recipe.objects.select_related("book").prefetch_related("keywords").all()
 
+        # Apply quick search
         if search:
             recipes_qs = recipes_qs.filter(
                 Q(name__icontains=search)
@@ -456,14 +489,68 @@ def recipe_detail(request, recipe_id):
                 | Q(book__title__icontains=search)
             ).distinct()
 
-        if selected_books:
-            recipes_qs = recipes_qs.filter(book__id__in=selected_books)
-        if selected_authors:
-            recipes_qs = recipes_qs.filter(book__author__in=selected_authors)
-        if selected_keywords:
-            recipes_qs = recipes_qs.filter(keywords__name__in=selected_keywords).distinct()
+        # Apply list filter (still passed separately)
         if selected_lists:
             recipes_qs = recipes_qs.filter(recipe_lists__id__in=selected_lists).distinct()
+
+        # Apply advanced filter groups
+        if filter_fields and filter_values:
+
+            def apply_condition(field, op, value):
+                field_map = {
+                    "name": "name",
+                    "ingredients": "ingredients",
+                    "instructions": "instructions",
+                    "keywords": "keywords__name",
+                    "author": "book__author",
+                    "book": "book__title",
+                }
+                db_field = field_map.get(field, field)
+                if op == "contains":
+                    return Q(**{f"{db_field}__icontains": value})
+                elif op == "not_contains":
+                    return ~Q(**{f"{db_field}__icontains": value})
+                elif op == "equals":
+                    return Q(**{f"{db_field}__iexact": value})
+                elif op == "starts":
+                    return Q(**{f"{db_field}__istartswith": value})
+                return Q()
+
+            groups_dict = {}
+            for field, op, value, group_idx, logic in zip(
+                filter_fields, filter_ops, filter_values, filter_groups, filter_logics, strict=False
+            ):
+                if value.strip():
+                    group_key = int(group_idx) if group_idx.isdigit() else 0
+                    if group_key not in groups_dict:
+                        groups_dict[group_key] = {"logic": logic, "conditions": []}
+                    groups_dict[group_key]["conditions"].append(
+                        {"field": field, "op": op, "value": value.strip()}
+                    )
+
+            if groups_dict:
+                group_queries = []
+                for group in [groups_dict[k] for k in sorted(groups_dict.keys())]:
+                    group_q = Q()
+                    for condition in group["conditions"]:
+                        cond_q = apply_condition(
+                            condition["field"], condition["op"], condition["value"]
+                        )
+                        if group["logic"] == "and":
+                            group_q &= cond_q
+                        else:
+                            group_q |= cond_q
+                    if group_q:
+                        group_queries.append(group_q)
+
+                if group_queries:
+                    final_filter_q = group_queries[0]
+                    for gq in group_queries[1:]:
+                        if group_logic == "and":
+                            final_filter_q &= gq
+                        else:
+                            final_filter_q |= gq
+                    recipes_qs = recipes_qs.filter(final_filter_q).distinct()
 
         # Apply sorting
         if sort_by == "name":
@@ -478,6 +565,8 @@ def recipe_detail(request, recipe_id):
             recipes_qs = recipes_qs.order_by("-created_at")
         elif sort_by == "list_order" and len(selected_lists) == 1:
             recipes_qs = recipes_qs.order_by("list_items__id")
+        elif sort_by == "relevance":
+            recipes_qs = recipes_qs.order_by("name")
         else:
             # Random sort or invalid - can't reliably navigate, fall back to book
             nav_context = "book"
@@ -493,20 +582,25 @@ def recipe_detail(request, recipe_id):
                 if idx < len(recipe_ids) - 1:
                     next_recipe = Recipe.objects.get(id=recipe_ids[idx + 1])
 
-            # Build context params for navigation links
+            # Build context params for navigation links (unified format)
             params = ["context=search"]
             if search:
                 params.append(f"q={search}")
             if sort_by:
                 params.append(f"sort={sort_by}")
-            for book_id in selected_books:
-                params.append(f"selected_books[]={book_id}")
-            for author in selected_authors:
-                params.append(f"selected_authors[]={author}")
-            for kw in selected_keywords:
-                params.append(f"selected_keywords[]={kw}")
+            if group_logic:
+                params.append(f"group_logic={group_logic}")
             for list_id in selected_lists:
                 params.append(f"selected_lists[]={list_id}")
+            for field, op, value, group_idx, logic in zip(
+                filter_fields, filter_ops, filter_values, filter_groups, filter_logics, strict=False
+            ):
+                if value.strip():
+                    params.append(f"filter_field[]={field}")
+                    params.append(f"filter_op[]={op}")
+                    params.append(f"filter_value[]={value}")
+                    params.append(f"filter_group[]={group_idx}")
+                    params.append(f"filter_logic[]={logic}")
             context_params = "&".join(params)
 
             breadcrumb_context = {
@@ -1023,6 +1117,25 @@ def search(request):
     page_number = request.GET.get("page", 1)
     page_obj = paginator.get_page(page_number)
 
+    # Build context params for recipe detail navigation
+    params = ["context=search"]
+    if query:
+        params.append(f"q={query}")
+    if sort_by:
+        params.append(f"sort={sort_by}")
+    if group_logic:
+        params.append(f"group_logic={group_logic}")
+    for field, op, value, group_idx, logic in zip(
+        filter_fields, filter_ops, filter_values, filter_groups, filter_logics, strict=False
+    ):
+        if value.strip():
+            params.append(f"filter_field[]={field}")
+            params.append(f"filter_op[]={op}")
+            params.append(f"filter_value[]={value}")
+            params.append(f"filter_group[]={group_idx}")
+            params.append(f"filter_logic[]={logic}")
+    recipe_context_params = "&".join(params)
+
     context = {
         "recipes": page_obj,
         "query": query,
@@ -1030,7 +1143,36 @@ def search(request):
         "group_logic": group_logic,
         "sort_by": sort_by,
         "has_searched": has_searched,
+        "recipe_context_params": recipe_context_params,
     }
 
     return render(request, "core/search.html", context)
 
+
+def ai_search_translate(request):
+    import json
+
+    from django.http import JsonResponse
+
+    from core.services.ai import translate_prompt_to_filters
+
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        prompt = data.get("prompt", "").strip()
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    if not prompt:
+        return JsonResponse({"error": "Prompt is required"}, status=400)
+
+    result = translate_prompt_to_filters(prompt)
+    if result is None:
+        return JsonResponse(
+            {"error": "AI translation failed. Check that AI is configured in Settings."},
+            status=500,
+        )
+
+    return JsonResponse(result)

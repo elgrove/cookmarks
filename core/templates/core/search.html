@@ -373,6 +373,83 @@
         margin-bottom: 1rem;
         opacity: 0.5;
     }
+    
+    /* AI Prompt */
+    .ai-prompt-row {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+    }
+    
+    .ai-prompt-input {
+        flex: 1;
+        padding: 0.75rem 1rem;
+        font-size: 1rem;
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    
+    .ai-prompt-input:focus {
+        outline: none;
+        border-color: #6f42c1;
+        box-shadow: 0 0 0 3px rgba(111, 66, 193, 0.1);
+    }
+    
+    .ai-prompt-btn {
+        padding: 0.75rem 1.25rem;
+        font-size: 0.9rem;
+        font-weight: 500;
+        border: none;
+        border-radius: 8px;
+        background: linear-gradient(135deg, #6f42c1, #5a32a3);
+        color: white;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        white-space: nowrap;
+    }
+    
+    .ai-prompt-btn:hover:not(:disabled) {
+        background: linear-gradient(135deg, #5a32a3, #4a2883);
+        transform: translateY(-1px);
+    }
+    
+    .ai-prompt-btn:disabled {
+        background: #adb5bd;
+        cursor: not-allowed;
+    }
+    
+    .ai-prompt-btn.loading {
+        position: relative;
+    }
+    
+    .ai-prompt-btn.loading::after {
+        content: "";
+        position: absolute;
+        width: 16px;
+        height: 16px;
+        margin-left: 8px;
+        border: 2px solid transparent;
+        border-top-color: white;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+    
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+    
+    .ai-error {
+        color: #dc3545;
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+    }
+    
+    .ai-hint {
+        font-size: 0.8rem;
+        color: #6c757d;
+        margin-top: 0.5rem;
+    }
 </style>
 
 <!-- Page Header -->
@@ -392,9 +469,8 @@
                    autofocus>
         </div>
         
-        <!-- Advanced Filter Builder -->
+        <!-- Filter Builder -->
         <div class="search-box">
-            <div class="search-box-title">Advanced Filters</div>
             <div id="filterGroups">
                 {% if filters %}
                     {% for group in filters %}
@@ -440,6 +516,22 @@
             <button type="button" class="filter-add-btn {% if filters %}mt-3{% endif %}" onclick="addFilterGroup()">+ Add filter group</button>
         </div>
         
+        <!-- AI Search -->
+        <div class="search-box">
+            <div class="search-box-title">AI Search (describe what you're looking for)</div>
+            <div class="ai-prompt-row">
+                <input type="text" 
+                       class="ai-prompt-input" 
+                       id="aiPromptInput"
+                       placeholder="Try 'thai curries without coconut' or 'quick vegetarian mains'">
+                <button type="button" class="ai-prompt-btn" id="aiPromptBtn" onclick="translateWithAI()">
+                    Ask AI
+                </button>
+            </div>
+            <div id="aiError" class="ai-error" style="display: none;"></div>
+            <div class="ai-hint">AI will populate the filters above for you to review</div>
+        </div>
+        
         <!-- Sort -->
         <input type="hidden" name="sort" id="sortInput" value="{{ sort_by|default:'relevance' }}">
         
@@ -471,7 +563,7 @@
         </div>
         
         {% for recipe in recipes %}
-        <a href="{% url 'recipe_detail' recipe.id %}?context=search&q={{ query|urlencode }}" class="result-card">
+        <a href="{% url 'recipe_detail' recipe.id %}?{{ recipe_context_params }}" class="result-card">
             <div class="result-card-header">
                 <div>
                     <h3 class="result-card-title">{{ recipe.clean_name }}</h3>
@@ -675,6 +767,150 @@ function toggleConnectorLogic(button) {
 document.getElementById('sortSelect')?.addEventListener('change', function() {
     document.getElementById('sortInput').value = this.value;
     document.getElementById('searchForm').submit();
+});
+
+// AI Search Translation
+async function translateWithAI() {
+    const promptInput = document.getElementById('aiPromptInput');
+    const btn = document.getElementById('aiPromptBtn');
+    const errorDiv = document.getElementById('aiError');
+    
+    const prompt = promptInput.value.trim();
+    if (!prompt) {
+        showAIError('Please enter a search prompt');
+        return;
+    }
+    
+    // Show loading state
+    btn.disabled = true;
+    btn.classList.add('loading');
+    btn.textContent = 'Translating...';
+    errorDiv.style.display = 'none';
+    
+    try {
+        const response = await fetch('{% url "ai_search_translate" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({ prompt: prompt })
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            showAIError(data.error || 'Translation failed');
+            return;
+        }
+        
+        // Clear existing filters
+        const container = document.getElementById('filterGroups');
+        container.innerHTML = '';
+        groupCounter = 0;
+        
+        // Update group logic
+        if (data.group_logic) {
+            document.getElementById('groupLogicInput').value = data.group_logic;
+        }
+        
+        // Add filter groups from AI response
+        if (data.groups && data.groups.length > 0) {
+            data.groups.forEach((group, groupIndex) => {
+                // Add connector between groups
+                if (groupIndex > 0) {
+                    const connector = document.createElement('div');
+                    connector.className = 'logic-connector';
+                    const logic = data.group_logic || 'and';
+                    connector.innerHTML = `<button type="button" class="logic-connector-btn ${logic}" onclick="toggleConnectorLogic(this)">${logic.toUpperCase()}</button>`;
+                    container.appendChild(connector);
+                }
+                
+                // Create group element
+                const groupEl = document.createElement('div');
+                groupEl.className = 'filter-group';
+                groupEl.dataset.groupIndex = groupCounter;
+                
+                const groupLogic = group.logic || 'and';
+                groupEl.innerHTML = `
+                    <div class="filter-group-header">
+                        <button type="button" class="filter-group-logic ${groupLogic}" onclick="toggleGroupLogic(this)">${groupLogic.toUpperCase()}</button>
+                        <span class="filter-group-label">within this group</span>
+                        <button type="button" class="filter-remove-btn" onclick="removeGroup(this)" title="Remove group">×</button>
+                    </div>
+                `;
+                
+                // Add conditions
+                if (group.conditions) {
+                    group.conditions.forEach(condition => {
+                        const row = createFilterRowWithValues(groupCounter, groupLogic, condition.field, condition.op, condition.value);
+                        groupEl.appendChild(row);
+                    });
+                }
+                
+                // Add "add condition" button
+                const addBtn = document.createElement('button');
+                addBtn.type = 'button';
+                addBtn.className = 'filter-add-btn';
+                addBtn.textContent = '+ Add condition';
+                addBtn.onclick = function() { addFilterToGroup(groupEl); };
+                groupEl.appendChild(addBtn);
+                
+                container.appendChild(groupEl);
+                groupCounter++;
+            });
+        }
+        
+        // Clear the AI prompt input after successful translation
+        promptInput.value = '';
+        
+    } catch (err) {
+        showAIError('Network error: ' + err.message);
+    } finally {
+        btn.disabled = false;
+        btn.classList.remove('loading');
+        btn.textContent = 'Ask AI';
+    }
+}
+
+function showAIError(message) {
+    const errorDiv = document.getElementById('aiError');
+    errorDiv.textContent = message;
+    errorDiv.style.display = 'block';
+}
+
+function createFilterRowWithValues(groupIndex, logic, field, op, value) {
+    const row = document.createElement('div');
+    row.className = 'filter-row';
+    row.innerHTML = `
+        <select class="filter-field-select" name="filter_field[]">
+            <option value="name" ${field === 'name' ? 'selected' : ''}>Name</option>
+            <option value="ingredients" ${field === 'ingredients' ? 'selected' : ''}>Ingredients</option>
+            <option value="instructions" ${field === 'instructions' ? 'selected' : ''}>Instructions</option>
+            <option value="keywords" ${field === 'keywords' ? 'selected' : ''}>Keywords</option>
+            <option value="author" ${field === 'author' ? 'selected' : ''}>Author</option>
+            <option value="book" ${field === 'book' ? 'selected' : ''}>Book</option>
+        </select>
+        <select class="filter-operator-select" name="filter_op[]">
+            <option value="contains" ${op === 'contains' ? 'selected' : ''}>contains</option>
+            <option value="not_contains" ${op === 'not_contains' ? 'selected' : ''}>doesn't contain</option>
+            <option value="equals" ${op === 'equals' ? 'selected' : ''}>equals</option>
+            <option value="starts" ${op === 'starts' ? 'selected' : ''}>starts with</option>
+        </select>
+        <input type="text" class="filter-value-input" name="filter_value[]" value="${value}" placeholder="Value...">
+        <input type="hidden" name="filter_group[]" value="${groupIndex}">
+        <input type="hidden" name="filter_logic[]" value="${logic}">
+        <button type="button" class="filter-remove-btn" onclick="removeFilter(this)" title="Remove filter">×</button>
+    `;
+    return row;
+}
+
+// Allow Enter key to trigger AI translation
+document.getElementById('aiPromptInput')?.addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        translateWithAI();
+    }
 });
 </script>
 {% endblock %}

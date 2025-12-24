@@ -96,3 +96,114 @@ Here is the list of keywords:
 
 Return ONLY a valid JSON object. No other text.
 """
+
+TRANSLATE_SEARCH_PROMPT = """You translate natural language recipe search queries into structured filters.
+
+Available filter fields:
+- name: Recipe name/title
+- ingredients: Recipe ingredients list
+- instructions: Recipe instructions/method
+- keywords: Recipe tags (cuisines, meal types, dietary, techniques)
+- author: Cookbook author name
+- book: Cookbook title
+
+Available operators:
+- contains: Field contains the value (case-insensitive)
+- not_contains: Field does not contain the value
+- equals: Field exactly matches the value
+- starts: Field starts with the value
+
+You must return a JSON object with this structure:
+{{
+  "group_logic": "and" or "or",
+  "groups": [
+    {{
+      "logic": "and" or "or",
+      "conditions": [
+        {{"field": "...", "op": "...", "value": "..."}}
+      ]
+    }}
+  ]
+}}
+
+EXAMPLES:
+
+User: "chinese recipes with chicken or pork"
+Response:
+{{
+  "group_logic": "and",
+  "groups": [
+    {{"logic": "and", "conditions": [{{"field": "keywords", "op": "contains", "value": "Chinese"}}]}},
+    {{"logic": "or", "conditions": [
+      {{"field": "ingredients", "op": "contains", "value": "chicken"}},
+      {{"field": "ingredients", "op": "contains", "value": "pork"}}
+    ]}}
+  ]
+}}
+
+User: "vegetarian starters"
+Response:
+{{
+  "group_logic": "and",
+  "groups": [
+    {{"logic": "and", "conditions": [
+      {{"field": "keywords", "op": "contains", "value": "Vegetarian"}},
+      {{"field": "keywords", "op": "contains", "value": "Starter"}}
+    ]}}
+  ]
+}}
+
+User: "japanese desserts"
+Response:
+{{
+  "group_logic": "and",
+  "groups": [
+    {{"logic": "and", "conditions": [
+      {{"field": "keywords", "op": "contains", "value": "Japanese"}},
+      {{"field": "keywords", "op": "contains", "value": "Dessert"}}
+    ]}}
+  ]
+}}
+
+User: "recipes by fuchsia dunlop"
+Response:
+{{
+  "group_logic": "and",
+  "groups": [
+    {{"logic": "and", "conditions": [{{"field": "author", "op": "contains", "value": "Fuchsia Dunlop"}}]}}
+  ]
+}}
+
+User: "quick breakfast ideas"
+Response:
+{{
+  "group_logic": "and",
+  "groups": [
+    {{"logic": "and", "conditions": [
+      {{"field": "keywords", "op": "contains", "value": "Quick"}},
+      {{"field": "keywords", "op": "contains", "value": "Breakfast"}}
+    ]}}
+  ]
+}}
+
+User: "lamb or beef curries from indian cookbooks"
+Response:
+{{
+  "group_logic": "and",
+  "groups": [
+    {{"logic": "or", "conditions": [
+      {{"field": "ingredients", "op": "contains", "value": "lamb"}},
+      {{"field": "ingredients", "op": "contains", "value": "beef"}}
+    ]}},
+    {{"logic": "and", "conditions": [
+      {{"field": "keywords", "op": "contains", "value": "Curry"}},
+      {{"field": "keywords", "op": "contains", "value": "Indian"}}
+    ]}}
+  ]
+}}
+
+Now translate this user query into a filter structure. Return ONLY the JSON object, no other text.
+
+User: "{prompt}"
+Response:
+"""

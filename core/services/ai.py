@@ -54,6 +54,7 @@ class AIProvider(abc.ABC):
     EXTRACT_ONE_PER_FILE_MODEL = NotImplemented
     EXTRACT_BLOCKS_MODEL = NotImplemented
     DEDUPLICATE_MODEL = NotImplemented
+    SEARCH_MODEL = NotImplemented
 
     def __init__(self) -> None:
         config = get_config()
@@ -141,6 +142,58 @@ class AIProvider(abc.ABC):
 
         return response
 
+    def translate_search_prompt(self, prompt: str) -> dict | None:
+        from core.services.prompts import TRANSLATE_SEARCH_PROMPT
+
+        full_prompt = TRANSLATE_SEARCH_PROMPT.format(prompt=prompt)
+
+        try:
+            response, _ = self._get_completion(full_prompt, model=self.SEARCH_MODEL, temp=0)
+        except Exception as e:
+            logger.error(f"AI search translation failed: {e}")
+            return None
+
+        if not response:
+            return None
+
+        try:
+            response = response.strip()
+            if response.startswith("```json"):
+                response = response[7:]
+            if response.startswith("```"):
+                response = response[3:]
+            if response.endswith("```"):
+                response = response[:-3]
+            response = response.strip()
+
+            result = json.loads(response)
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse AI search response as JSON: {e}")
+            return None
+
+        if not isinstance(result, dict) or "groups" not in result:
+            logger.error("AI search response has invalid structure")
+            return None
+
+        if "group_logic" not in result:
+            result["group_logic"] = "and"
+
+        valid_fields = {"name", "ingredients", "instructions", "keywords", "author", "book"}
+        valid_ops = {"contains", "not_contains", "equals", "starts"}
+
+        for group in result.get("groups", []):
+            if not isinstance(group, dict):
+                continue
+            if "logic" not in group:
+                group["logic"] = "and"
+            for condition in group.get("conditions", []):
+                if condition.get("field") not in valid_fields:
+                    logger.warning(f"Invalid field in condition: {condition.get('field')}")
+                if condition.get("op") not in valid_ops:
+                    condition["op"] = "contains"
+
+        return result
+
 
 class OpenRouterProvider(AIProvider):
     NAME = "OPENROUTER"
@@ -150,6 +203,7 @@ class OpenRouterProvider(AIProvider):
     EXTRACT_ONE_PER_FILE_MODEL = "openai/gpt-oss-120b"
     EXTRACT_BLOCKS_MODEL = "google/gemini-2.5-flash"
     DEDUPLICATE_MODEL = "google/gemini-2.5-flash"
+    SEARCH_MODEL = "google/gemini-2.5-flash-lite"
 
     def _get_completion(self, prompt, model, schema=None, temp=0):
         payload = {
@@ -240,6 +294,7 @@ class GeminiProvider(AIProvider):
     EXTRACT_ONE_PER_FILE_MODEL = "gemini-2.5-flash-lite"
     EXTRACT_BLOCKS_MODEL = "gemini-2.5-flash"
     DEDUPLICATE_MODEL = "gemini-2.5-flash"
+    SEARCH_MODEL = "gemini-2.5-flash-lite"
 
     def __init__(self) -> None:
         super().__init__()
@@ -293,3 +348,27 @@ class GeminiProvider(AIProvider):
             }
 
         return response.text or "", usage_metadata
+
+
+def get_ai_provider():
+    config = get_config()
+    if not config.ai_provider or not config.api_key:
+        return None
+
+    provider_map = {
+        "OPENROUTER": OpenRouterProvider,
+        "GEMINI": GeminiProvider,
+    }
+    provider_class = provider_map.get(config.ai_provider)
+    if provider_class:
+        return provider_class()
+    return None
+
+
+def translate_prompt_to_filters(prompt: str) -> dict | None:
+    provider = get_ai_provider()
+    if not provider:
+        logger.warning("No AI provider configured")
+        return None
+
+    return provider.translate_search_prompt(prompt)
