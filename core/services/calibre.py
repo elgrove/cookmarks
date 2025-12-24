@@ -3,6 +3,8 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 
+from django.conf import settings
+
 from core.models import Book
 
 logger = logging.getLogger(__name__)
@@ -98,8 +100,6 @@ def load_books_from_calibre(calibre_path: Path):
 
 
 def refresh_single_book_from_calibre(book: Book):
-    from django.conf import settings
-
     calibre_path = Path(settings.CALIBRE_LIBRARY_PATH)
     db_path = calibre_path / "metadata.db"
 

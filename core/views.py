@@ -1,14 +1,18 @@
+import json
 import random
 import zipfile
 from datetime import date, timedelta
 
 from django.contrib import messages
 from django.core.paginator import Paginator
-from django.db.models import Case, Count, Q, Value, When
-from django.http import FileResponse, Http404, HttpResponse
+from django.db.models import Case, Count, Q, Sum, Value, When
+from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.timezone import now
 from django_q.tasks import async_task
+
+from core.services.ai import GeminiProvider, OpenRouterProvider, translate_prompt_to_filters
+from core.services.calibre import refresh_single_book_from_calibre
 
 from .forms import ConfigForm, RecipeKeywordsForm
 from .models import (
@@ -126,8 +130,6 @@ def book_detail(request, book_id):
     config = Config.get_solo()
     available_models = []
     if config.ai_provider:
-        from core.services.ai import GeminiProvider, OpenRouterProvider
-
         provider_map = {
             "OPENROUTER": OpenRouterProvider,
             "GEMINI": GeminiProvider,
@@ -225,8 +227,6 @@ def clear_book_recipes(request, book_id):
 def refresh_book_metadata(request, book_id):
     if request.method == "POST":
         book = get_object_or_404(Book, id=book_id)
-        from .services.calibre import refresh_single_book_from_calibre
-
         try:
             refresh_single_book_from_calibre(book)
             messages.success(request, f'Updated metadata for "{book.clean_title}" from Calibre.')
@@ -292,10 +292,12 @@ def recipes(request):
     for f in Recipe._meta.get_fields():
         if f.many_to_many:
             field_map[f.name] = f"{f.name}__name"
-    field_map.update({
-        "author": "book__author",
-        "book": "book__title",
-    })
+    field_map.update(
+        {
+            "author": "book__author",
+            "book": "book__title",
+        }
+    )
 
     def apply_condition(field, op, value):
         db_field = field_map.get(field, field)
@@ -594,10 +596,12 @@ def recipe_detail(request, recipe_id):
             for f in Recipe._meta.get_fields():
                 if f.many_to_many:
                     field_map[f.name] = f"{f.name}__name"
-            field_map.update({
-                "author": "book__author",
-                "book": "book__title",
-            })
+            field_map.update(
+                {
+                    "author": "book__author",
+                    "book": "book__title",
+                }
+            )
 
             def apply_condition(field, op, value):
                 db_field = field_map.get(field, field)
@@ -1087,8 +1091,6 @@ def extraction_reports(request):
     fourteen_days_ago = now() - timedelta(days=14)
 
     # Annotate extraction reports with image count
-    from django.db.models import Q, Sum
-
     extraction_reports = (
         ExtractionReport.objects.select_related("book")
         .filter(created_at__gte=fourteen_days_ago)
@@ -1139,12 +1141,6 @@ def get_recipe_image(request, book_id, image_path):
 
 def ai_search(request):
     """API endpoint for AI-powered search filter generation."""
-    import json
-
-    from django.http import JsonResponse
-
-    from core.services.ai import translate_prompt_to_filters
-
     if request.method != "POST":
         return JsonResponse({"error": "POST required"}, status=405)
 

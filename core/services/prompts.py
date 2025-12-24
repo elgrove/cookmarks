@@ -97,7 +97,7 @@ Here is the list of keywords:
 Return ONLY a valid JSON object. No other text.
 """
 
-TRANSLATE_SEARCH_PROMPT = """You translate natural language recipe search queries into structured filters.
+RECIPE_SEARCH_PROMPT = """You translate natural language recipe search queries into structured filters.
 
 Available filter fields:
 - name: Recipe name/title

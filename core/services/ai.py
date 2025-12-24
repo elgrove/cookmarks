@@ -16,6 +16,7 @@ from core.services.prompts import (
     DEDUPLICATE_KEYWORDS_PROMPT,
     EXTRACT_RECIPES_PROMPT,
     IMAGE_MATCH_CHECK_PROMPT,
+    RECIPE_SEARCH_PROMPT,
 )
 
 logger = logging.getLogger(__name__)
@@ -143,9 +144,7 @@ class AIProvider(abc.ABC):
         return response
 
     def translate_search_prompt(self, prompt: str) -> dict | None:
-        from core.services.prompts import TRANSLATE_SEARCH_PROMPT
-
-        full_prompt = TRANSLATE_SEARCH_PROMPT.format(prompt=prompt)
+        full_prompt = RECIPE_SEARCH_PROMPT.format(prompt=prompt)
 
         try:
             response, _ = self._get_completion(full_prompt, model=self.SEARCH_MODEL, temp=0)

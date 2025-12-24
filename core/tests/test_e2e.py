@@ -8,6 +8,7 @@ from core.services.epub import get_chapterlike_files_from_epub
 from core.tasks import extract_recipes_from_book
 from core.tests.conftest import load_gold_recipes, split_recipes_for_api_calls
 
+
 def mock_openrouter_response(response_content: str):
     responses.add(
         responses.POST,
