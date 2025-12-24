@@ -254,11 +254,29 @@ def recipes(request):
     # Quick search (all fields) - fuzzy by default
     query = request.GET.get("q", "").strip()
 
+    # Book filtering
+    book_id = request.GET.get("book")
+    selected_book = None
+    if book_id:
+        try:
+            selected_book = Book.objects.get(id=book_id)
+            recipes_qs = recipes_qs.filter(book=selected_book)
+            has_searched = True
+        except Book.DoesNotExist:
+            pass
+
     # List filtering
     selected_lists = request.GET.getlist("selected_lists[]")
     list_id = request.GET.get("list")
     if list_id and list_id not in selected_lists:
         selected_lists.append(list_id)
+
+    # Keyword filtering
+    selected_keywords = request.GET.getlist("selected_keywords[]")
+    if selected_keywords:
+        for keyword_name in selected_keywords:
+            recipes_qs = recipes_qs.filter(keywords__name__iexact=keyword_name)
+        has_searched = True
 
     # Build filter groups from form data
     filter_fields = request.GET.getlist("filter_field[]")
@@ -403,7 +421,9 @@ def recipes(request):
         recipes_qs = recipes_qs.distinct()
 
     # Determine default sort
-    if len(selected_lists) == 1:
+    if selected_book:
+        default_sort = "order"
+    elif len(selected_lists) == 1:
         default_sort = "list_order"
     else:
         default_sort = "recent"
@@ -444,7 +464,9 @@ def recipes(request):
     page_obj = paginator.get_page(page_number)
 
     # Build context params for recipe detail navigation
-    if len(selected_lists) == 1 and not query and not filters:
+    if selected_book and not query and not filters and not selected_lists:
+        recipe_context_params = f"context=book&book_id={selected_book.id}"
+    elif len(selected_lists) == 1 and not query and not filters:
         recipe_context_params = f"context=list&list_id={selected_lists[0]}"
     elif sort_by != "random":
         params = ["context=search"]
@@ -454,6 +476,10 @@ def recipes(request):
             params.append(f"sort={sort_by}")
         if group_logic:
             params.append(f"group_logic={group_logic}")
+        if selected_book:
+            params.append(f"book={selected_book.id}")
+        for kw in selected_keywords:
+            params.append(f"selected_keywords[]={kw}")
         for lid in selected_lists:
             params.append(f"selected_lists[]={lid}")
         for field, op, value, group_idx, logic in zip(
@@ -478,6 +504,8 @@ def recipes(request):
         "has_searched": has_searched,
         "recipe_context_params": recipe_context_params,
         "selected_lists": selected_lists,
+        "selected_keywords": selected_keywords,
+        "selected_book": selected_book,
         "all_books": all_books,
         "all_authors": all_authors,
         "all_keywords": all_keywords,
