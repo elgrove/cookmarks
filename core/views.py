@@ -1,14 +1,18 @@
+import json
 import random
 import zipfile
 from datetime import date, timedelta
 
 from django.contrib import messages
 from django.core.paginator import Paginator
-from django.db.models import Case, Count, Q, Value, When
-from django.http import FileResponse, Http404, HttpResponse
+from django.db.models import Case, Count, Q, Sum, Value, When
+from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.timezone import now
 from django_q.tasks import async_task
+
+from core.services.ai import GeminiProvider, OpenRouterProvider, translate_prompt_to_filters
+from core.services.calibre import refresh_single_book_from_calibre
 
 from .forms import ConfigForm, RecipeKeywordsForm
 from .models import (
@@ -126,8 +130,6 @@ def book_detail(request, book_id):
     config = Config.get_solo()
     available_models = []
     if config.ai_provider:
-        from core.services.ai import GeminiProvider, OpenRouterProvider
-
         provider_map = {
             "OPENROUTER": OpenRouterProvider,
             "GEMINI": GeminiProvider,
@@ -225,8 +227,6 @@ def clear_book_recipes(request, book_id):
 def refresh_book_metadata(request, book_id):
     if request.method == "POST":
         book = get_object_or_404(Book, id=book_id)
-        from .services.calibre import refresh_single_book_from_calibre
-
         try:
             refresh_single_book_from_calibre(book)
             messages.success(request, f'Updated metadata for "{book.clean_title}" from Calibre.')
@@ -246,69 +246,188 @@ def delete_book(request, book_id):
 
 
 def recipes(request):
-    recipes = Recipe.objects.select_related("book").prefetch_related("keywords").all()
+    recipes_qs = Recipe.objects.select_related("book").prefetch_related("keywords")
+    has_searched = True
+    filters = []
+    group_logic = request.GET.get("group_logic", "or")
 
-    search = request.GET.get("search", "")
-    if search:
-        recipes = recipes.filter(
-            Q(name__icontains=search)
-            | Q(ingredients__icontains=search)
-            | Q(instructions__icontains=search)
-            | Q(keywords__name__icontains=search)
-            | Q(book__author__icontains=search)
-            | Q(book__title__icontains=search)
-        ).distinct()
+    # Quick search (all fields) - fuzzy by default
+    query = request.GET.get("q", "").strip()
 
-    selected_books = request.GET.getlist("selected_books[]")
-    if selected_books:
-        recipes = recipes.filter(book__id__in=selected_books)
-
-    selected_authors = request.GET.getlist("selected_authors[]")
-    if selected_authors:
-        recipes = recipes.filter(book__author__in=selected_authors)
-
-    selected_keywords = request.GET.getlist("selected_keywords[]")
-    if selected_keywords:
-        recipes = recipes.filter(keywords__name__in=selected_keywords).distinct()
-
-    # Filter by list(s)
+    # List filtering
     selected_lists = request.GET.getlist("selected_lists[]")
-    # Also check for single 'list' param (from direct links)
     list_id = request.GET.get("list")
     if list_id and list_id not in selected_lists:
         selected_lists.append(list_id)
-    if selected_lists:
-        recipes = recipes.filter(recipe_lists__id__in=selected_lists).distinct()
 
-    book_id = request.GET.get("book")
-    if book_id:
-        recipes = recipes.filter(book__id=book_id)
-        default_sort = "order"
-    elif len(selected_lists) == 1:
-        # Single list filter - default to list order
+    # Build filter groups from form data
+    filter_fields = request.GET.getlist("filter_field[]")
+    filter_ops = request.GET.getlist("filter_op[]")
+    filter_values = request.GET.getlist("filter_value[]")
+    filter_groups = request.GET.getlist("filter_group[]")
+    filter_logics = request.GET.getlist("filter_logic[]")
+
+    if filter_fields and filter_values:
+        groups_dict = {}
+        for field, op, value, group_idx, logic in zip(
+            filter_fields, filter_ops, filter_values, filter_groups, filter_logics, strict=False
+        ):
+            if value.strip():
+                group_key = int(group_idx) if group_idx.isdigit() else 0
+                if group_key not in groups_dict:
+                    groups_dict[group_key] = {"logic": logic, "conditions": []}
+                groups_dict[group_key]["conditions"].append(
+                    {"field": field, "op": op, "value": value.strip()}
+                )
+        filters = [groups_dict[k] for k in sorted(groups_dict.keys())]
+
+    # M2M fields need chained .filter() calls for AND logic
+    m2m_fields = {f.name for f in Recipe._meta.get_fields() if f.many_to_many}
+
+    field_map = {
+        f.name: f.name
+        for f in Recipe._meta.get_fields()
+        if hasattr(f, "get_internal_type") and f.get_internal_type() == "TextField"
+    }
+    for f in Recipe._meta.get_fields():
+        if f.many_to_many:
+            field_map[f.name] = f"{f.name}__name"
+    field_map.update(
+        {
+            "author": "book__author",
+            "book": "book__title",
+        }
+    )
+
+    def apply_condition(field, op, value):
+        db_field = field_map.get(field, field)
+
+        if op == "contains":
+            return Q(**{f"{db_field}__icontains": value})
+        elif op == "not_contains":
+            return ~Q(**{f"{db_field}__icontains": value})
+        elif op == "equals":
+            return Q(**{f"{db_field}__iexact": value})
+        elif op == "starts":
+            return Q(**{f"{db_field}__istartswith": value})
+        return Q()
+
+    def is_positive_m2m_condition(condition):
+        return condition["field"] in m2m_fields and condition["op"] in (
+            "contains",
+            "equals",
+            "starts",
+        )
+
+    # Start building query
+    combined_q = Q()
+    chained_m2m_filters = []
+    any_search = False
+
+    # Quick search (fuzzy by default - uses icontains)
+    if query:
+        any_search = True
+        has_searched = True
+        quick_q = (
+            Q(name__icontains=query)
+            | Q(ingredients__icontains=query)
+            | Q(instructions__icontains=query)
+            | Q(keywords__name__icontains=query)
+            | Q(book__author__icontains=query)
+            | Q(book__title__icontains=query)
+        )
+        combined_q &= quick_q
+
+    # List filtering
+    if selected_lists:
+        has_searched = True
+        any_search = True
+        recipes_qs = recipes_qs.filter(recipe_lists__id__in=selected_lists)
+
+    # Advanced filter groups
+    if filters:
+        has_searched = True
+        any_search = True
+        group_queries = []
+
+        for group in filters:
+            if group["logic"] == "and":
+                # For AND groups, separate M2M positive conditions to chain later
+                m2m_conditions = [c for c in group["conditions"] if is_positive_m2m_condition(c)]
+                other_conditions = [
+                    c for c in group["conditions"] if not is_positive_m2m_condition(c)
+                ]
+
+                # Build Q for non-M2M conditions
+                group_q = Q()
+                for condition in other_conditions:
+                    cond_q = apply_condition(
+                        condition["field"], condition["op"], condition["value"]
+                    )
+                    group_q &= cond_q
+
+                # Queue M2M conditions for chained filtering
+                for condition in m2m_conditions:
+                    chained_m2m_filters.append(
+                        apply_condition(condition["field"], condition["op"], condition["value"])
+                    )
+
+                if group_q:
+                    group_queries.append(group_q)
+            else:
+                # OR logic: combine all conditions as before (M2M OR works fine)
+                group_q = Q()
+                for condition in group["conditions"]:
+                    cond_q = apply_condition(
+                        condition["field"], condition["op"], condition["value"]
+                    )
+                    group_q |= cond_q
+                if group_q:
+                    group_queries.append(group_q)
+
+        if group_queries:
+            final_filter_q = group_queries[0]
+            for gq in group_queries[1:]:
+                if group_logic == "and":
+                    final_filter_q &= gq
+                else:
+                    final_filter_q |= gq
+            combined_q &= final_filter_q
+
+    # Apply combined Q filter first
+    if any_search:
+        recipes_qs = recipes_qs.filter(combined_q)
+        # Chain M2M filters for proper AND semantics (each creates a separate JOIN)
+        for m2m_q in chained_m2m_filters:
+            recipes_qs = recipes_qs.filter(m2m_q)
+        recipes_qs = recipes_qs.distinct()
+
+    # Determine default sort
+    if len(selected_lists) == 1:
         default_sort = "list_order"
     else:
         default_sort = "recent"
 
+    # Sorting
     sort_by = request.GET.get("sort", default_sort)
-    if sort_by == "order":
-        recipes = recipes.order_by("book", "order")
-    elif sort_by == "name":
-        recipes = recipes.order_by("name")
-    elif sort_by == "book":
-        recipes = recipes.order_by("book__title", "order")
-    elif sort_by == "author":
-        recipes = recipes.order_by("book__author", "book__title", "order")
+    if sort_by == "name":
+        recipes_qs = recipes_qs.order_by("name")
     elif sort_by == "recent":
-        recipes = recipes.order_by("-created_at")
+        recipes_qs = recipes_qs.order_by("-created_at")
+    elif sort_by == "author":
+        recipes_qs = recipes_qs.order_by("book__author", "book__title", "name")
+    elif sort_by == "book":
+        recipes_qs = recipes_qs.order_by("book__title", "order")
+    elif sort_by == "order":
+        recipes_qs = recipes_qs.order_by("book", "order")
     elif sort_by == "list_order" and len(selected_lists) == 1:
-        # Order by when the recipe was added to the list
-        recipes = recipes.order_by("list_items__id")
+        recipes_qs = recipes_qs.order_by("list_items__id")
     elif sort_by == "random":
-        recipes = recipes.order_by("?")
+        recipes_qs = recipes_qs.order_by("?")
     else:
-        recipes = recipes.order_by("-created_at")
+        recipes_qs = recipes_qs.order_by("name")
 
+    # Prepopulated filter data
     all_books = Book.objects.filter(recipes__isnull=False).distinct().order_by("title")
     all_authors = (
         Book.objects.filter(recipes__isnull=False)
@@ -319,51 +438,50 @@ def recipes(request):
     all_keywords = Keyword.objects.annotate(recipe_count=Count("recipes")).order_by("-recipe_count")
     all_lists = RecipeList.objects.all()
 
-    paginator = Paginator(recipes, 30)
+    # Pagination
+    paginator = Paginator(recipes_qs, 30)
     page_number = request.GET.get("page", 1)
     page_obj = paginator.get_page(page_number)
 
-    if (
-        len(selected_lists) == 1
-        and not search
-        and not selected_books
-        and not selected_authors
-        and not selected_keywords
-    ):
+    # Build context params for recipe detail navigation
+    if len(selected_lists) == 1 and not query and not filters:
         recipe_context_params = f"context=list&list_id={selected_lists[0]}"
     elif sort_by != "random":
         params = ["context=search"]
-        if search:
-            params.append(f"q={search}")
+        if query:
+            params.append(f"q={query}")
         if sort_by:
             params.append(f"sort={sort_by}")
-        for bid in selected_books:
-            params.append(f"selected_books[]={bid}")
-        for author in selected_authors:
-            params.append(f"selected_authors[]={author}")
-        for kw in selected_keywords:
-            params.append(f"selected_keywords[]={kw}")
+        if group_logic:
+            params.append(f"group_logic={group_logic}")
         for lid in selected_lists:
             params.append(f"selected_lists[]={lid}")
+        for field, op, value, group_idx, logic in zip(
+            filter_fields, filter_ops, filter_values, filter_groups, filter_logics, strict=False
+        ):
+            if value.strip():
+                params.append(f"filter_field[]={field}")
+                params.append(f"filter_op[]={op}")
+                params.append(f"filter_value[]={value}")
+                params.append(f"filter_group[]={group_idx}")
+                params.append(f"filter_logic[]={logic}")
         recipe_context_params = "&".join(params)
     else:
         recipe_context_params = "context=book"
 
     context = {
         "recipes": page_obj,
-        "page_obj": page_obj,
-        "search": search,
-        "book_id": book_id,
-        "selected_lists": selected_lists,
-        "selected_books": selected_books,
-        "selected_authors": selected_authors,
-        "selected_keywords": selected_keywords,
+        "query": query,
+        "filters": filters,
+        "group_logic": group_logic,
         "sort_by": sort_by,
+        "has_searched": has_searched,
+        "recipe_context_params": recipe_context_params,
+        "selected_lists": selected_lists,
         "all_books": all_books,
         "all_authors": all_authors,
         "all_keywords": all_keywords,
         "all_lists": all_lists,
-        "recipe_context_params": recipe_context_params,
     }
 
     return render(request, "core/recipes.html", context)
@@ -435,17 +553,23 @@ def recipe_detail(request, recipe_id):
                 nav_context = "book"
 
     elif nav_context == "search":
-        # Navigate within search results - rebuild the query
+        # Navigate within search results - rebuild the query using unified filter format
         search = request.GET.get("q", "")
-        selected_books = request.GET.getlist("selected_books[]")
-        selected_authors = request.GET.getlist("selected_authors[]")
-        selected_keywords = request.GET.getlist("selected_keywords[]")
         selected_lists = request.GET.getlist("selected_lists[]")
-        sort_by = request.GET.get("sort", "random")
+        sort_by = request.GET.get("sort", "name")
+        group_logic = request.GET.get("group_logic", "and")
 
-        # Rebuild the recipe queryset from search params
+        # Advanced filter params (unified format used by both recipes and search pages)
+        filter_fields = request.GET.getlist("filter_field[]")
+        filter_ops = request.GET.getlist("filter_op[]")
+        filter_values = request.GET.getlist("filter_value[]")
+        filter_groups = request.GET.getlist("filter_group[]")
+        filter_logics = request.GET.getlist("filter_logic[]")
+
+        # Rebuild the recipe queryset
         recipes_qs = Recipe.objects.select_related("book").prefetch_related("keywords").all()
 
+        # Apply quick search
         if search:
             recipes_qs = recipes_qs.filter(
                 Q(name__icontains=search)
@@ -456,14 +580,115 @@ def recipe_detail(request, recipe_id):
                 | Q(book__title__icontains=search)
             ).distinct()
 
-        if selected_books:
-            recipes_qs = recipes_qs.filter(book__id__in=selected_books)
-        if selected_authors:
-            recipes_qs = recipes_qs.filter(book__author__in=selected_authors)
-        if selected_keywords:
-            recipes_qs = recipes_qs.filter(keywords__name__in=selected_keywords).distinct()
+        # Apply list filter (still passed separately)
         if selected_lists:
             recipes_qs = recipes_qs.filter(recipe_lists__id__in=selected_lists).distinct()
+
+        # Apply advanced filter groups
+        if filter_fields and filter_values:
+            m2m_fields = {f.name for f in Recipe._meta.get_fields() if f.many_to_many}
+
+            field_map = {
+                f.name: f.name
+                for f in Recipe._meta.get_fields()
+                if hasattr(f, "get_internal_type") and f.get_internal_type() == "TextField"
+            }
+            for f in Recipe._meta.get_fields():
+                if f.many_to_many:
+                    field_map[f.name] = f"{f.name}__name"
+            field_map.update(
+                {
+                    "author": "book__author",
+                    "book": "book__title",
+                }
+            )
+
+            def apply_condition(field, op, value):
+                db_field = field_map.get(field, field)
+                if op == "contains":
+                    return Q(**{f"{db_field}__icontains": value})
+                elif op == "not_contains":
+                    return ~Q(**{f"{db_field}__icontains": value})
+                elif op == "equals":
+                    return Q(**{f"{db_field}__iexact": value})
+                elif op == "starts":
+                    return Q(**{f"{db_field}__istartswith": value})
+                return Q()
+
+            def is_positive_m2m_condition(condition):
+                return condition["field"] in m2m_fields and condition["op"] in (
+                    "contains",
+                    "equals",
+                    "starts",
+                )
+
+            groups_dict = {}
+            for field, op, value, group_idx, logic in zip(
+                filter_fields, filter_ops, filter_values, filter_groups, filter_logics, strict=False
+            ):
+                if value.strip():
+                    group_key = int(group_idx) if group_idx.isdigit() else 0
+                    if group_key not in groups_dict:
+                        groups_dict[group_key] = {"logic": logic, "conditions": []}
+                    groups_dict[group_key]["conditions"].append(
+                        {"field": field, "op": op, "value": value.strip()}
+                    )
+
+            if groups_dict:
+                group_queries = []
+                chained_m2m_filters = []
+
+                for group in [groups_dict[k] for k in sorted(groups_dict.keys())]:
+                    if group["logic"] == "and":
+                        # Separate M2M positive conditions for chaining
+                        m2m_conditions = [
+                            c for c in group["conditions"] if is_positive_m2m_condition(c)
+                        ]
+                        other_conditions = [
+                            c for c in group["conditions"] if not is_positive_m2m_condition(c)
+                        ]
+
+                        group_q = Q()
+                        for condition in other_conditions:
+                            cond_q = apply_condition(
+                                condition["field"], condition["op"], condition["value"]
+                            )
+                            group_q &= cond_q
+
+                        for condition in m2m_conditions:
+                            chained_m2m_filters.append(
+                                apply_condition(
+                                    condition["field"], condition["op"], condition["value"]
+                                )
+                            )
+
+                        if group_q:
+                            group_queries.append(group_q)
+                    else:
+                        # OR logic: combine all conditions
+                        group_q = Q()
+                        for condition in group["conditions"]:
+                            cond_q = apply_condition(
+                                condition["field"], condition["op"], condition["value"]
+                            )
+                            group_q |= cond_q
+                        if group_q:
+                            group_queries.append(group_q)
+
+                if group_queries:
+                    final_filter_q = group_queries[0]
+                    for gq in group_queries[1:]:
+                        if group_logic == "and":
+                            final_filter_q &= gq
+                        else:
+                            final_filter_q |= gq
+                    recipes_qs = recipes_qs.filter(final_filter_q)
+
+                # Chain M2M filters for proper AND semantics
+                for m2m_q in chained_m2m_filters:
+                    recipes_qs = recipes_qs.filter(m2m_q)
+
+                recipes_qs = recipes_qs.distinct()
 
         # Apply sorting
         if sort_by == "name":
@@ -478,6 +703,8 @@ def recipe_detail(request, recipe_id):
             recipes_qs = recipes_qs.order_by("-created_at")
         elif sort_by == "list_order" and len(selected_lists) == 1:
             recipes_qs = recipes_qs.order_by("list_items__id")
+        elif sort_by == "relevance":
+            recipes_qs = recipes_qs.order_by("name")
         else:
             # Random sort or invalid - can't reliably navigate, fall back to book
             nav_context = "book"
@@ -493,20 +720,25 @@ def recipe_detail(request, recipe_id):
                 if idx < len(recipe_ids) - 1:
                     next_recipe = Recipe.objects.get(id=recipe_ids[idx + 1])
 
-            # Build context params for navigation links
+            # Build context params for navigation links (unified format)
             params = ["context=search"]
             if search:
                 params.append(f"q={search}")
             if sort_by:
                 params.append(f"sort={sort_by}")
-            for book_id in selected_books:
-                params.append(f"selected_books[]={book_id}")
-            for author in selected_authors:
-                params.append(f"selected_authors[]={author}")
-            for kw in selected_keywords:
-                params.append(f"selected_keywords[]={kw}")
+            if group_logic:
+                params.append(f"group_logic={group_logic}")
             for list_id in selected_lists:
                 params.append(f"selected_lists[]={list_id}")
+            for field, op, value, group_idx, logic in zip(
+                filter_fields, filter_ops, filter_values, filter_groups, filter_logics, strict=False
+            ):
+                if value.strip():
+                    params.append(f"filter_field[]={field}")
+                    params.append(f"filter_op[]={op}")
+                    params.append(f"filter_value[]={value}")
+                    params.append(f"filter_group[]={group_idx}")
+                    params.append(f"filter_logic[]={logic}")
             context_params = "&".join(params)
 
             breadcrumb_context = {
@@ -859,8 +1091,6 @@ def extraction_reports(request):
     fourteen_days_ago = now() - timedelta(days=14)
 
     # Annotate extraction reports with image count
-    from django.db.models import Q, Sum
-
     extraction_reports = (
         ExtractionReport.objects.select_related("book")
         .filter(created_at__gte=fourteen_days_ago)
@@ -909,128 +1139,25 @@ def get_recipe_image(request, book_id, image_path):
         raise Http404(f"Image '{image_path}' not found in EPUB.")
 
 
-def search(request):
-    recipes = Recipe.objects.select_related("book").prefetch_related("keywords")
-    has_searched = False
-    filters = []
-    group_logic = request.GET.get("group_logic", "or")
+def ai_search(request):
+    """API endpoint for AI-powered search filter generation."""
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
 
-    # Quick search (all fields) - fuzzy by default
-    query = request.GET.get("q", "").strip()
+    try:
+        data = json.loads(request.body)
+        prompt = data.get("prompt", "").strip()
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
 
-    # Build filter groups from form data
-    filter_fields = request.GET.getlist("filter_field[]")
-    filter_ops = request.GET.getlist("filter_op[]")
-    filter_values = request.GET.getlist("filter_value[]")
-    filter_groups = request.GET.getlist("filter_group[]")
-    filter_logics = request.GET.getlist("filter_logic[]")
+    if not prompt:
+        return JsonResponse({"error": "Prompt is required"}, status=400)
 
-    if filter_fields and filter_values:
-        groups_dict = {}
-        for field, op, value, group_idx, logic in zip(
-            filter_fields, filter_ops, filter_values, filter_groups, filter_logics, strict=False
-        ):
-            if value.strip():
-                group_key = int(group_idx) if group_idx.isdigit() else 0
-                if group_key not in groups_dict:
-                    groups_dict[group_key] = {"logic": logic, "conditions": []}
-                groups_dict[group_key]["conditions"].append(
-                    {"field": field, "op": op, "value": value.strip()}
-                )
-        filters = [groups_dict[k] for k in sorted(groups_dict.keys())]
-
-    def apply_condition(field, op, value):
-        field_map = {
-            "name": "name",
-            "ingredients": "ingredients",
-            "instructions": "instructions",
-            "keywords": "keywords__name",
-            "author": "book__author",
-            "book": "book__title",
-        }
-        db_field = field_map.get(field, field)
-
-        if op == "contains":
-            return Q(**{f"{db_field}__icontains": value})
-        elif op == "not_contains":
-            return ~Q(**{f"{db_field}__icontains": value})
-        elif op == "equals":
-            return Q(**{f"{db_field}__iexact": value})
-        elif op == "starts":
-            return Q(**{f"{db_field}__istartswith": value})
-        return Q()
-
-    # Start building query
-    combined_q = Q()
-    any_search = False
-
-    # Quick search (fuzzy by default - uses icontains)
-    if query:
-        any_search = True
-        has_searched = True
-        quick_q = (
-            Q(name__icontains=query)
-            | Q(ingredients__icontains=query)
-            | Q(instructions__icontains=query)
-            | Q(keywords__name__icontains=query)
-            | Q(book__author__icontains=query)
-            | Q(book__title__icontains=query)
+    result = translate_prompt_to_filters(prompt)
+    if result is None:
+        return JsonResponse(
+            {"error": "AI search failed. Check that AI is configured in Settings."},
+            status=500,
         )
-        combined_q &= quick_q
 
-    # Advanced filter groups
-    if filters:
-        has_searched = True
-        any_search = True
-        group_queries = []
-        for group in filters:
-            group_q = Q()
-            for condition in group["conditions"]:
-                cond_q = apply_condition(condition["field"], condition["op"], condition["value"])
-                if group["logic"] == "and":
-                    group_q &= cond_q
-                else:
-                    group_q |= cond_q
-            if group_q:
-                group_queries.append(group_q)
-
-        if group_queries:
-            final_filter_q = group_queries[0]
-            for gq in group_queries[1:]:
-                if group_logic == "and":
-                    final_filter_q &= gq
-                else:
-                    final_filter_q |= gq
-            combined_q &= final_filter_q
-
-    recipes = recipes.filter(combined_q).distinct() if any_search else recipes.none()
-
-    # Sorting
-    sort_by = request.GET.get("sort", "relevance")
-    if sort_by == "name":
-        recipes = recipes.order_by("name")
-    elif sort_by == "recent":
-        recipes = recipes.order_by("-created_at")
-    elif sort_by == "author":
-        recipes = recipes.order_by("book__author", "book__title", "name")
-    elif sort_by == "book":
-        recipes = recipes.order_by("book__title", "order")
-    else:
-        recipes = recipes.order_by("name")
-
-    # Pagination
-    paginator = Paginator(recipes, 30)
-    page_number = request.GET.get("page", 1)
-    page_obj = paginator.get_page(page_number)
-
-    context = {
-        "recipes": page_obj,
-        "query": query,
-        "filters": filters,
-        "group_logic": group_logic,
-        "sort_by": sort_by,
-        "has_searched": has_searched,
-    }
-
-    return render(request, "core/search.html", context)
-
+    return JsonResponse(result)
