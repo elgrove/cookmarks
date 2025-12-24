@@ -4,6 +4,9 @@ A Django app for extracting, browsing and organising recipes from digital cookbo
 
 I have a Calibre library with hundreds of EPUB cookbooks, and I got tired of never being able to find that one recipe I vaguely remembered and having to use certain devices to read them. This app uses LLMs to extract the recipes into a structured format and store them into a searchable database so I can actually find and use them.
 
+![Recipe](docs/recipe.png)
+
+
 ## Stack
 
 - Python/Django
