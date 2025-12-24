@@ -246,9 +246,8 @@ def delete_book(request, book_id):
 
 
 def recipes(request):
-    """Unified recipes view with advanced filter builder and AI search."""
     recipes_qs = Recipe.objects.select_related("book").prefetch_related("keywords")
-    has_searched = False
+    has_searched = True
     filters = []
     group_logic = request.GET.get("group_logic", "or")
 
@@ -282,15 +281,23 @@ def recipes(request):
                 )
         filters = [groups_dict[k] for k in sorted(groups_dict.keys())]
 
+    # M2M fields need chained .filter() calls for AND logic
+    m2m_fields = {f.name for f in Recipe._meta.get_fields() if f.many_to_many}
+
+    field_map = {
+        f.name: f.name
+        for f in Recipe._meta.get_fields()
+        if hasattr(f, "get_internal_type") and f.get_internal_type() == "TextField"
+    }
+    for f in Recipe._meta.get_fields():
+        if f.many_to_many:
+            field_map[f.name] = f"{f.name}__name"
+    field_map.update({
+        "author": "book__author",
+        "book": "book__title",
+    })
+
     def apply_condition(field, op, value):
-        field_map = {
-            "name": "name",
-            "ingredients": "ingredients",
-            "instructions": "instructions",
-            "keywords": "keywords__name",
-            "author": "book__author",
-            "book": "book__title",
-        }
         db_field = field_map.get(field, field)
 
         if op == "contains":
@@ -303,8 +310,16 @@ def recipes(request):
             return Q(**{f"{db_field}__istartswith": value})
         return Q()
 
+    def is_positive_m2m_condition(condition):
+        return condition["field"] in m2m_fields and condition["op"] in (
+            "contains",
+            "equals",
+            "starts",
+        )
+
     # Start building query
     combined_q = Q()
+    chained_m2m_filters = []
     any_search = False
 
     # Quick search (fuzzy by default - uses icontains)
@@ -332,16 +347,41 @@ def recipes(request):
         has_searched = True
         any_search = True
         group_queries = []
+
         for group in filters:
-            group_q = Q()
-            for condition in group["conditions"]:
-                cond_q = apply_condition(condition["field"], condition["op"], condition["value"])
-                if group["logic"] == "and":
+            if group["logic"] == "and":
+                # For AND groups, separate M2M positive conditions to chain later
+                m2m_conditions = [c for c in group["conditions"] if is_positive_m2m_condition(c)]
+                other_conditions = [
+                    c for c in group["conditions"] if not is_positive_m2m_condition(c)
+                ]
+
+                # Build Q for non-M2M conditions
+                group_q = Q()
+                for condition in other_conditions:
+                    cond_q = apply_condition(
+                        condition["field"], condition["op"], condition["value"]
+                    )
                     group_q &= cond_q
-                else:
+
+                # Queue M2M conditions for chained filtering
+                for condition in m2m_conditions:
+                    chained_m2m_filters.append(
+                        apply_condition(condition["field"], condition["op"], condition["value"])
+                    )
+
+                if group_q:
+                    group_queries.append(group_q)
+            else:
+                # OR logic: combine all conditions as before (M2M OR works fine)
+                group_q = Q()
+                for condition in group["conditions"]:
+                    cond_q = apply_condition(
+                        condition["field"], condition["op"], condition["value"]
+                    )
                     group_q |= cond_q
-            if group_q:
-                group_queries.append(group_q)
+                if group_q:
+                    group_queries.append(group_q)
 
         if group_queries:
             final_filter_q = group_queries[0]
@@ -352,7 +392,13 @@ def recipes(request):
                     final_filter_q |= gq
             combined_q &= final_filter_q
 
-    recipes_qs = recipes_qs.filter(combined_q).distinct() if any_search else recipes_qs.none()
+    # Apply combined Q filter first
+    if any_search:
+        recipes_qs = recipes_qs.filter(combined_q)
+        # Chain M2M filters for proper AND semantics (each creates a separate JOIN)
+        for m2m_q in chained_m2m_filters:
+            recipes_qs = recipes_qs.filter(m2m_q)
+        recipes_qs = recipes_qs.distinct()
 
     # Determine default sort
     if len(selected_lists) == 1:
@@ -538,16 +584,22 @@ def recipe_detail(request, recipe_id):
 
         # Apply advanced filter groups
         if filter_fields and filter_values:
+            m2m_fields = {f.name for f in Recipe._meta.get_fields() if f.many_to_many}
+
+            field_map = {
+                f.name: f.name
+                for f in Recipe._meta.get_fields()
+                if hasattr(f, "get_internal_type") and f.get_internal_type() == "TextField"
+            }
+            for f in Recipe._meta.get_fields():
+                if f.many_to_many:
+                    field_map[f.name] = f"{f.name}__name"
+            field_map.update({
+                "author": "book__author",
+                "book": "book__title",
+            })
 
             def apply_condition(field, op, value):
-                field_map = {
-                    "name": "name",
-                    "ingredients": "ingredients",
-                    "instructions": "instructions",
-                    "keywords": "keywords__name",
-                    "author": "book__author",
-                    "book": "book__title",
-                }
                 db_field = field_map.get(field, field)
                 if op == "contains":
                     return Q(**{f"{db_field}__icontains": value})
@@ -558,6 +610,13 @@ def recipe_detail(request, recipe_id):
                 elif op == "starts":
                     return Q(**{f"{db_field}__istartswith": value})
                 return Q()
+
+            def is_positive_m2m_condition(condition):
+                return condition["field"] in m2m_fields and condition["op"] in (
+                    "contains",
+                    "equals",
+                    "starts",
+                )
 
             groups_dict = {}
             for field, op, value, group_idx, logic in zip(
@@ -573,18 +632,44 @@ def recipe_detail(request, recipe_id):
 
             if groups_dict:
                 group_queries = []
+                chained_m2m_filters = []
+
                 for group in [groups_dict[k] for k in sorted(groups_dict.keys())]:
-                    group_q = Q()
-                    for condition in group["conditions"]:
-                        cond_q = apply_condition(
-                            condition["field"], condition["op"], condition["value"]
-                        )
-                        if group["logic"] == "and":
+                    if group["logic"] == "and":
+                        # Separate M2M positive conditions for chaining
+                        m2m_conditions = [
+                            c for c in group["conditions"] if is_positive_m2m_condition(c)
+                        ]
+                        other_conditions = [
+                            c for c in group["conditions"] if not is_positive_m2m_condition(c)
+                        ]
+
+                        group_q = Q()
+                        for condition in other_conditions:
+                            cond_q = apply_condition(
+                                condition["field"], condition["op"], condition["value"]
+                            )
                             group_q &= cond_q
-                        else:
+
+                        for condition in m2m_conditions:
+                            chained_m2m_filters.append(
+                                apply_condition(
+                                    condition["field"], condition["op"], condition["value"]
+                                )
+                            )
+
+                        if group_q:
+                            group_queries.append(group_q)
+                    else:
+                        # OR logic: combine all conditions
+                        group_q = Q()
+                        for condition in group["conditions"]:
+                            cond_q = apply_condition(
+                                condition["field"], condition["op"], condition["value"]
+                            )
                             group_q |= cond_q
-                    if group_q:
-                        group_queries.append(group_q)
+                        if group_q:
+                            group_queries.append(group_q)
 
                 if group_queries:
                     final_filter_q = group_queries[0]
@@ -593,7 +678,13 @@ def recipe_detail(request, recipe_id):
                             final_filter_q &= gq
                         else:
                             final_filter_q |= gq
-                    recipes_qs = recipes_qs.filter(final_filter_q).distinct()
+                    recipes_qs = recipes_qs.filter(final_filter_q)
+
+                # Chain M2M filters for proper AND semantics
+                for m2m_q in chained_m2m_filters:
+                    recipes_qs = recipes_qs.filter(m2m_q)
+
+                recipes_qs = recipes_qs.distinct()
 
         # Apply sorting
         if sort_by == "name":

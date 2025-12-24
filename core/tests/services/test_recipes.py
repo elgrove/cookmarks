@@ -261,6 +261,33 @@ class TestRecipeFilterCombinations:
         assert "Vegetable Spring Rolls" in recipe_names
         assert "Vegetable Samosas" in recipe_names
 
+    def test_vegetarian_and_starter_m2m(self, sample_data):
+        """
+        Test AND logic on the same M2M field: Vegetarian AND Starter.
+        Should match Spring Rolls and Samosas (both have Vegetarian AND Starter).
+        """
+        client = Client()
+        response = client.get(
+            "/recipes/",
+            {
+                "group_logic": "and",
+                "filter_field[]": ["keywords", "keywords"],
+                "filter_op[]": ["contains", "contains"],
+                "filter_value[]": ["Vegetarian", "Starter"],
+                "filter_group[]": ["0", "0"],  # Same group with AND logic
+                "filter_logic[]": ["and", "and"],
+            },
+        )
+
+        assert response.status_code == 200
+        recipes = list(response.context["recipes"])
+        assert len(recipes) == 2
+        recipe_names = {r.name for r in recipes}
+        assert "Vegetable Spring Rolls" in recipe_names
+        assert "Vegetable Samosas" in recipe_names
+        # Dal has Vegetarian but not Starter
+        assert "Dal Tadka" not in recipe_names
+
     def test_curry_with_coconut_and_beef(self, sample_data):
         """
         Example: 'beef and coconut curries'
