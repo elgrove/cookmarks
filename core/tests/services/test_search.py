@@ -119,7 +119,7 @@ class TestAISearchView:
 
         client = Client()
         response = client.post(
-            "/search/ai-translate/",
+            "/recipes/ai-search/",
             data=json.dumps({"prompt": "japanese food"}),
             content_type="application/json",
         )
@@ -131,7 +131,7 @@ class TestAISearchView:
 
     def test_view_rejects_get_request(self, configured_app):
         client = Client()
-        response = client.get("/search/ai-translate/")
+        response = client.get("/recipes/ai-search/")
 
         assert response.status_code == 405
         assert response.json()["error"] == "POST required"
@@ -139,7 +139,7 @@ class TestAISearchView:
     def test_view_requires_prompt(self, configured_app):
         client = Client()
         response = client.post(
-            "/search/ai-translate/",
+            "/recipes/ai-search/",
             data=json.dumps({"prompt": ""}),
             content_type="application/json",
         )
@@ -150,7 +150,7 @@ class TestAISearchView:
     def test_view_handles_invalid_json(self, configured_app):
         client = Client()
         response = client.post(
-            "/search/ai-translate/",
+            "/recipes/ai-search/",
             data="not json",
             content_type="application/json",
         )
