@@ -72,4 +72,9 @@ urlpatterns = [
     ),
     path("config/", views.config, name="config"),
     path("extraction-reports/", views.extraction_reports, name="extraction_reports"),
+    path(
+        "extraction-reports/<uuid:report_id>/resume/",
+        views.resume_extraction,
+        name="resume_extraction",
+    ),
 ]

@@ -1,4 +1,5 @@
 import logging
+import warnings
 import zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -17,6 +18,13 @@ from core.services.epub import (
     split_chapters_into_blocks,
 )
 from core.services.rate_limiter import RateLimitedExecutor
+
+warnings.warn(
+    "core.services.extract is deprecated and will be removed in a future version. "
+    "Use core.services.extraction.graph instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 logger = logging.getLogger(__name__)
 

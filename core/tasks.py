@@ -8,81 +8,12 @@ from django.conf import settings
 from django.forms.models import model_to_dict
 from django.utils import timezone
 
-from core.models import Book, ExtractionReport, Keyword, Recipe
+from core.models import Book, ExtractionReport, Keyword, Recipe, RecipeData
 from core.services.ai import GeminiProvider, OpenRouterProvider, get_config
 from core.services.calibre import load_books_from_calibre
-from core.services.extract import extract_recipe_data_from_book
+from core.services.extraction import app as extraction_app
 
 logger = logging.getLogger(__name__)
-
-
-def extract_recipes_from_book(book_id: str, extraction_id: str | None = None):
-    try:
-        book = Book.objects.get(id=book_id)
-        logger.info(f"Starting recipe extraction for book: {book.title}")
-        # find existing extraction record if provided else create one
-        extraction = None
-        if extraction_id:
-            try:
-                extraction = ExtractionReport.objects.get(id=extraction_id)
-            except Exception:
-                extraction = None
-
-        if extraction is None:
-            config = get_config()
-            extraction = ExtractionReport.objects.create(
-                book=book,
-                provider_name=config.ai_provider,
-                extraction_method="file",
-            )
-
-        # mark started and save
-        extraction.started_at = timezone.now()
-        extraction.save()
-
-        recipes_data, extraction = extract_recipe_data_from_book(book, report=extraction)
-
-        logger.info(f"Found {len(recipes_data)} recipes for {book.title}")
-
-        created_count = 0
-        for order, recipe_data in enumerate(recipes_data, start=1):
-            recipe, created = Recipe.objects.update_or_create(
-                book=book,
-                name=recipe_data.name,
-                defaults={
-                    "extraction_report": extraction,
-                    "order": order,
-                    "description": recipe_data.description,
-                    "ingredients": recipe_data.ingredients,
-                    "instructions": recipe_data.instructions,
-                    "yields": recipe_data.yields,
-                    "image": recipe_data.image,
-                },
-            )
-
-            keyword_objects = []
-            for keyword_name in recipe_data.keywords:
-                keyword, _ = Keyword.objects.get_or_create(name=keyword_name)
-                keyword_objects.append(keyword)
-            recipe.keywords.set(keyword_objects)
-
-            created_count += 1
-
-        with open(book.get_recipes_json_path(), "w") as f:
-            json.dump([r.model_dump() for r in recipes_data], f, indent=2, ensure_ascii=False)
-
-        with open(book.get_report_path(), "w") as f:
-            json.dump(model_to_dict(extraction), f, indent=2, ensure_ascii=False, default=str)
-
-        logger.info(f"Finished extraction for {book.title}. Processed {created_count} recipes.")
-        return f"Extracted {created_count} recipes for {book.title}"
-
-    except Book.DoesNotExist:
-        logger.error(f"Book with id {book_id} not found")
-        return "Book not found"
-    except Exception as e:
-        logger.error(f"Error extracting recipes: {e}")
-        raise e
 
 
 def pre_deduplicate_keywords(keywords: list[str]) -> tuple[list[str], dict[str, str]]:
@@ -138,8 +69,8 @@ def deduplicate_keywords_task():
         if original == canonical:
             continue
 
-        canonical_keyword, created = Keyword.objects.get_or_create(name=canonical)
-        if created:
+        canonical_keyword, _ = Keyword.objects.get_or_create(name=canonical)
+        if _:
             logger.info(f"Created new canonical keyword: {canonical}")
 
         try:
@@ -171,4 +102,114 @@ def load_books_from_calibre_task():
         return str(e)
     except Exception as e:
         logger.error(f"Unexpected error during loading: {e}")
+        raise e
+
+
+def save_recipes_from_graph_state(
+    book: Book, extraction: ExtractionReport, raw_recipes: list[dict]
+):
+    logger.info(f"Saving {len(raw_recipes)} recipes for {book.title}")
+
+    created_count = 0
+    for recipe_dict in raw_recipes:
+        try:
+            recipe_data = RecipeData(**recipe_dict)
+        except Exception as e:
+            logger.error(f"Invalid recipe data: {e}")
+            continue
+
+        recipe, _ = Recipe.objects.update_or_create(
+            book=book,
+            name=recipe_data.name,
+            defaults={
+                "extraction_report": extraction,
+                "order": recipe_data.book_order or 0,
+                "description": recipe_data.description,
+                "ingredients": recipe_data.ingredients,
+                "instructions": recipe_data.instructions,
+                "yields": recipe_data.yields,
+                "image": recipe_data.image,
+            },
+        )
+
+        keyword_objects = []
+        for keyword_name in recipe_data.keywords:
+            keyword, _ = Keyword.objects.get_or_create(name=keyword_name)
+            keyword_objects.append(keyword)
+        recipe.keywords.set(keyword_objects)
+
+        created_count += 1
+
+    recipes_data = []
+    for recipe_dict in raw_recipes:
+        try:
+            recipes_data.append(RecipeData(**recipe_dict))
+        except Exception:
+            continue
+
+    with open(book.get_recipes_json_path(), "w") as f:
+        json.dump([r.model_dump() for r in recipes_data], f, indent=2, ensure_ascii=False)
+
+    with open(book.get_report_path(), "w") as f:
+        json.dump(model_to_dict(extraction), f, indent=2, ensure_ascii=False, default=str)
+
+    logger.info(f"Saved {created_count} recipes for {book.title}")
+    return created_count
+
+
+def extract_recipes_from_book(book_id: str, extraction_id: str | None = None):
+    try:
+        book = Book.objects.get(id=book_id)
+        logger.info(f"Starting LangGraph recipe extraction for book: {book.title}")
+
+        if extraction_id:
+            try:
+                extraction = ExtractionReport.objects.get(id=extraction_id)
+            except Exception:
+                extraction = None
+        else:
+            extraction = None
+
+        if extraction is None:
+            config = get_config()
+            extraction = ExtractionReport.objects.create(
+                book=book,
+                provider_name=config.ai_provider,
+                status="running",
+            )
+
+        extraction.started_at = timezone.now()
+        extraction.thread_id = f"report_{extraction.id}"
+        extraction.save()
+
+        initial_state = {
+            "book_id": str(book.id),
+            "epub_path": str(book.get_epub_path()),
+            "report_id": str(extraction.id),
+            "already_tried": [],
+        }
+
+        graph_config = {"configurable": {"thread_id": extraction.thread_id}}
+
+        result = extraction_app.invoke(initial_state, graph_config)
+
+        extraction.refresh_from_db()
+
+        if extraction.status == "review":
+            logger.info(f"Extraction paused for human review: {book.title}")
+            return f"Extraction paused for review. Check report {extraction.id}"
+
+        if extraction.status == "done":
+            raw_recipes = result.get("raw_recipes", [])
+            created_count = save_recipes_from_graph_state(book, extraction, raw_recipes)
+            logger.info(f"Finished extraction for {book.title}. Processed {created_count} recipes.")
+            return f"Extracted {created_count} recipes for {book.title}"
+
+        return "Extraction completed with unknown status"
+
+    except Book.DoesNotExist:
+        logger.error(f"Book with id {book_id} not found")
+        return "Book not found"
+    except Exception as e:
+        logger.error(f"Error extracting recipes with LangGraph: {e}")
         raise e

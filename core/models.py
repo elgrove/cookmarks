@@ -5,7 +5,7 @@ from pathlib import Path
 
 from django.db import models
 from pydantic import BaseModel as PydanticBase
-from pydantic import Field
+from pydantic import ConfigDict, Field
 
 
 class BaseModel(models.Model):
@@ -83,6 +83,16 @@ class ExtractionReport(BaseModel):
     cost_usd = models.DecimalField(max_digits=10, decimal_places=6, null=True, blank=True)
     input_tokens = models.PositiveIntegerField(null=True, blank=True)
     output_tokens = models.PositiveIntegerField(null=True, blank=True)
+    thread_id = models.CharField(max_length=255, null=True, blank=True)
+    status = models.CharField(
+        max_length=20,
+        default="running",
+        choices=[
+            ("running", "Running"),
+            ("review", "Awaiting Review"),
+            ("done", "Completed"),
+        ],
+    )
 
     def __str__(self):
         return f"{self.book.title} - {self.started_at}"
@@ -113,8 +123,7 @@ class RecipeData(PydanticBase):
     book_title: str | None = Field(None, alias="bookTitle")
     book_order: int | None = Field(None, alias="bookOrder")
 
-    class Config:
-        populate_by_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
     def model_post_init(self, __context):
         self.name = string.capwords(self.name)

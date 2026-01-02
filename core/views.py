@@ -1,4 +1,5 @@
 import json
+import logging
 import random
 import zipfile
 from datetime import date, timedelta
@@ -13,6 +14,8 @@ from django_q.tasks import async_task
 
 from core.services.ai import GeminiProvider, OpenRouterProvider, translate_prompt_to_filters
 from core.services.calibre import refresh_single_book_from_calibre
+from core.services.extraction import app as extraction_app
+from core.tasks import save_recipes_from_graph_state
 
 from .forms import ConfigForm, RecipeKeywordsForm
 from .models import (
@@ -24,6 +27,8 @@ from .models import (
     RecipeList,
     RecipeListItem,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def home(request):
@@ -1189,3 +1194,47 @@ def ai_search(request):
         )
 
     return JsonResponse(result)
+
+
+def resume_extraction(request, report_id):
+    if request.method != "POST":
+        return redirect("extraction_reports")
+
+    report = get_object_or_404(ExtractionReport, id=report_id)
+
+    if report.status != "review":
+        messages.warning(request, "This extraction is not awaiting review.")
+        return redirect("extraction_reports")
+
+    human_response = request.POST.get("response")
+
+    if human_response not in ["has_images", "no_images"]:
+        messages.error(request, "Invalid response.")
+        return redirect("extraction_reports")
+
+    try:
+        graph_config = {"configurable": {"thread_id": report.thread_id}}
+
+        extraction_app.update_state(
+            graph_config, {"human_response": human_response}, as_node="await_human"
+        )
+
+        result = extraction_app.invoke(input=None, config=graph_config)
+
+        report.refresh_from_db()
+
+        if report.status == "done":
+            book = Book.objects.get(id=report.book_id)
+            raw_recipes = result.get("raw_recipes", [])
+            created_count = save_recipes_from_graph_state(book, report, raw_recipes)
+            messages.success(
+                request, f"Extraction resumed and completed. Saved {created_count} recipes."
+            )
+        else:
+            messages.info(request, f"Extraction resumed with status: {report.status}")
+
+    except Exception as e:
+        logger.error(f"Error resuming extraction: {e}")
+        messages.error(request, f"Error resuming extraction: {e}")
+
+    return redirect("extraction_reports")
