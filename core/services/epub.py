@@ -17,9 +17,6 @@ CHAPTER_BLOCK_COUNT = 16
 
 
 def get_chapterlike_files_from_epub(epub_path: Path) -> list[str]:
-    """
-    Extracts chapter-like files from an EPUB.
-    """
     try:
         with zipfile.ZipFile(epub_path, "r") as epub:
             container_xml = epub.read("META-INF/container.xml")

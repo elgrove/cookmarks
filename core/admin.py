@@ -64,11 +64,9 @@ class ConfigAdmin(admin.ModelAdmin):
     )
 
     def has_add_permission(self, request):
-        # Only allow one Config instance
         return not Config.objects.exists()
 
     def has_delete_permission(self, request, obj=None):
-        # Prevent deletion of the singleton Config
         return False
 
 
