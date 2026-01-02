@@ -51,7 +51,7 @@ Each recipe stores: name, description, author, book link, ingredients, instructi
 
 **Recipe detail** - Clean layout with image and ingredients/instructions. Breadcrumb navigation showing your context (book, list, or search results). Prev/next arrows navigate within that context. Keyboard shortcut 's' toggles favourite. Actions for lists, keywords, admin edit, clear image, delete.
 
-**Lists** - Organize recipes into collections. There's a default Favourites list that's always there.
+**Lists** - Organise recipes into collections. There's a default Favourites list that's always there.
 
 **Extraction reports** - History of all extraction attempts with stats: book, method, model, timestamp, recipes found, cost, tokens. Useful for debugging and tracking API usage.
 
