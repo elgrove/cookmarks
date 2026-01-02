@@ -3,7 +3,7 @@ import json
 import pytest
 import responses
 
-from core.models import ExtractionReport, Keyword, Recipe
+from core.models import Book, ExtractionReport, Keyword, Recipe
 from core.services.epub import get_chapterlike_files_from_epub
 from core.tasks import extract_recipes_from_book
 from core.tests.conftest import load_gold_recipes, split_recipes_for_api_calls
@@ -137,3 +137,85 @@ class TestExtractRecipesFromBookTask:
         assert existing_report.started_at is not None
         assert existing_report.completed_at is not None
         assert existing_report.recipes_found > 0
+
+
+@pytest.mark.django_db(transaction=True)
+class TestLangGraphExtractionE2E:
+    def test_full_extraction_file_method(self, mock_langgraph_extraction, configured_app):
+        book = Book.objects.create(
+            calibre_id=999,
+            title="Test Cookbook",
+            author="Test Author",
+            path="/fake/path/to/book",
+        )
+
+        # File method: has_separate_images = False
+        mock_langgraph_extraction["has_separate_images"].return_value = False
+
+        result = extract_recipes_from_book(str(book.id))
+
+        assert "Extracted" in result or "paused" in result.lower()
+
+        report = ExtractionReport.objects.filter(book=book).first()
+        assert report is not None
+
+        if report.status == "done":
+            assert report.recipes_found > 0
+            recipes = Recipe.objects.filter(book=book)
+            assert recipes.count() == report.recipes_found
+
+    def test_full_extraction_block_method(self, mock_langgraph_extraction, configured_app):
+        book = Book.objects.create(
+            calibre_id=999,
+            title="Test Cookbook",
+            author="Test Author",
+            path="/fake/path/to/book",
+        )
+
+        # Block method: has_separate_images = True
+        mock_langgraph_extraction["has_separate_images"].return_value = True
+
+        result = extract_recipes_from_book(str(book.id))
+
+        assert "Extracted 1 recipes" in result
+
+        report = ExtractionReport.objects.filter(book=book).first()
+        assert report is not None
+        assert report.status == "done"
+        assert report.recipes_found == 1
+
+    def test_extraction_pauses_for_human_review(self, mock_langgraph_extraction, configured_app):
+        book = Book.objects.create(
+            calibre_id=999,
+            title="Test Cookbook",
+            author="Test Author",
+            path="/fake/path/to/book",
+        )
+
+        # Configure scenario: separate images, but images can't be matched
+        mock_langgraph_extraction["has_separate_images"].return_value = True
+        mock_langgraph_extraction["build_lookup"].return_value = {}
+        mock_langgraph_extraction["resolve_image"].return_value = None
+
+        # Provider says it can't match images
+        provider = mock_langgraph_extraction["gemini_provider"].return_value
+        provider.check_if_can_match_images.return_value = (False, {})
+
+        # Extract file returns recipes without resolved images
+        mock_langgraph_extraction["extract_file"].return_value = {
+            "raw_recipes": [
+                {
+                    "name": "Test Recipe",
+                    "image": None,
+                    "ingredients": ["test"],
+                    "instructions": ["test"],
+                }
+            ]
+        }
+
+        result = extract_recipes_from_book(str(book.id))
+
+        assert "paused for review" in result.lower()
+
+        report = ExtractionReport.objects.filter(book=book).first()
+        assert report.status == "review"

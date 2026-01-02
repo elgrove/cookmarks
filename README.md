@@ -11,6 +11,7 @@ I have a Calibre library with hundreds of EPUB cookbooks, and I got tired of nev
 
 - Python/Django
 - SQLite
+- LangGraph for agentic workflows
 - HTMX for the interactive bits
 - Bootstrap 5 (greyscale minimal aesthetic)
 - Works with Gemini or OpenRouter APIs
@@ -23,21 +24,47 @@ The app connects to your Calibre database and syncs metadata for books tagged 'F
 
 ### Recipe extraction
 
-This is the interesting part. Cookbook layouts are inconsistent, so we use AI to handle the extraction. After research I found three main patterns which the app will detect and extract in the appropriate (and cost-effective) method.
+This is the interesting part. Cookbook layouts are inconsistent, so I implemented an agentic workflow using **LangGraph** to handle the extraction intelligently.
 
-**Many recipes per file** - Books where each chapter has multiple recipes. Typically less than 20 chapter-like files total. Uses higher context models since we're feeding bigger chunks of text.
+The app analyses the book to determine the best extraction strategy:
 
-**One recipe per file** - Books where each recipe lives in its own xhtml file, often with its image right there. Simpler extraction, lower context needed.
+**Blocks of files** (High Context) - Books where recipes are scattered across chapters or have images in separate files requiring a larger context window (128k) to associate text with images correctly.
 
-**Separate image files** - Recipe text in one set of files, images elsewhere. The app tries to match images to recipes via captions or linking. Falls back to no-image extraction if matching fails.
+**Single files** (Low Context) - Books where each recipe lives in its own file (common in modern epubs). Simple, fast, and cheap.
+
+**Agentic decision making** - If the initial extraction yields recipes but no images, the workflow pauses and asks for human intervention via the UI: "Does this book actually have images?". Depending on your answer, it recursively tries a different strategy or proceeds without them.
+
+The workflow:
+
+```text
+          [analyse_epub]
+           /          \
+      (File mode)    (Block mode)
+          |               |
+    [extract_file]   [extract_block] <----+
+          \               /               |
+           \             /          (User: "Has images")
+            -> [validate]                 |
+              /          \                |
+        (Has images?)  (No images?)       |
+            |              |              |
+            |        [await_human] -------+
+            |              |
+            |        (User: "No images")
+            |              |
+            v              v
+           [resolve_images]
+                  |
+              [finalise]
+```
 
 The process:
-1. Open the epub (it's just a zip), find the chapter files
-2. Figure out which extraction type applies
-3. Send content to the AI with a prompt and schema
-4. AI returns structured recipe data as JSON
-5. Enrich the data: resolve image references, encode as base64, add book metadata
-6. Save to database with proper relationships
+1. **Analyse**: Check file structure and sample content to pick a strategy.
+2. **Extract**: Send content to the LLM with a schema.
+3. **Validate**: Check if we got what we expected (particularly regarding images).
+4. **Human in the Loop**: If results are ambiguous, pause and ask the user.
+5. **Resolve**: Match extracted image paths to actual files in the epub archive.
+6. **Finalise**: Save structured data to the database.
 
 Each recipe stores: name, description, author, book link, ingredients, instructions, yields, image, and keywords.
 

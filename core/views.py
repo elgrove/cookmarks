@@ -1,4 +1,5 @@
 import json
+import logging
 import random
 import zipfile
 from datetime import date, timedelta
@@ -13,6 +14,8 @@ from django_q.tasks import async_task
 
 from core.services.ai import GeminiProvider, OpenRouterProvider, translate_prompt_to_filters
 from core.services.calibre import refresh_single_book_from_calibre
+from core.services.extraction import app as extraction_app
+from core.tasks import save_recipes_from_graph_state
 
 from .forms import ConfigForm, RecipeKeywordsForm
 from .models import (
@@ -24,6 +27,8 @@ from .models import (
     RecipeList,
     RecipeListItem,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def home(request):
@@ -116,7 +121,6 @@ def book_detail(request, book_id):
     book = get_object_or_404(Book, id=book_id)
     all_recipes = book.recipes.prefetch_related("keywords").all()
 
-    # Get a random sample of up to 6 recipes
     recipe_ids = list(all_recipes.values_list("id", flat=True))
     if len(recipe_ids) > 6:
         sample_ids = random.sample(recipe_ids, 6)
@@ -126,7 +130,6 @@ def book_detail(request, book_id):
 
     all_lists = RecipeList.objects.all()
 
-    # Get available AI models from the configured provider
     config = Config.get_solo()
     available_models = []
     if config.ai_provider:
@@ -136,7 +139,6 @@ def book_detail(request, book_id):
         }
         provider_class = provider_map.get(config.ai_provider)
         if provider_class:
-            # Get unique models from class variables
             model_attrs = [
                 "IMAGE_MATCH_MODEL",
                 "EXTRACT_MANY_PER_FILE_MODEL",
@@ -151,7 +153,6 @@ def book_detail(request, book_id):
                     models.add(model)
             available_models = sorted(models)
 
-    # Get first recipe in book order for "Read Book" button
     first_recipe = all_recipes.order_by("order").first()
 
     context = {
@@ -183,12 +184,7 @@ def queue_book_for_recipe_extraction(request, book_id):
             )
             async_task("core.tasks.extract_recipes_from_book", book.id, str(extraction.id))
         else:
-            # already queued — pass the existing queued extraction report id to the worker
-            queued = book.extraction_reports.filter(started_at__isnull=True).first()
-            if queued:
-                async_task("core.tasks.extract_recipes_from_book", book.id, str(queued.id))
-            else:
-                async_task("core.tasks.extract_recipes_from_book", book.id)
+            async_task("core.tasks.extract_recipes_from_book", book.id)
         messages.success(request, f"Queued recipe extraction for {book.title}")
 
         referer = request.META.get("HTTP_REFERER", "")
@@ -251,10 +247,8 @@ def recipes(request):
     filters = []
     group_logic = request.GET.get("group_logic", "or")
 
-    # Quick search (all fields) - fuzzy by default
     query = request.GET.get("q", "").strip()
 
-    # Book filtering
     book_id = request.GET.get("book")
     selected_book = None
     if book_id:
@@ -265,20 +259,17 @@ def recipes(request):
         except Book.DoesNotExist:
             pass
 
-    # List filtering
     selected_lists = request.GET.getlist("selected_lists[]")
     list_id = request.GET.get("list")
     if list_id and list_id not in selected_lists:
         selected_lists.append(list_id)
 
-    # Keyword filtering
     selected_keywords = request.GET.getlist("selected_keywords[]")
     if selected_keywords:
         for keyword_name in selected_keywords:
             recipes_qs = recipes_qs.filter(keywords__name__iexact=keyword_name)
         has_searched = True
 
-    # Build filter groups from form data
     filter_fields = request.GET.getlist("filter_field[]")
     filter_ops = request.GET.getlist("filter_op[]")
     filter_values = request.GET.getlist("filter_value[]")
@@ -337,12 +328,11 @@ def recipes(request):
             "starts",
         )
 
-    # Start building query
+    # Build query
     combined_q = Q()
     chained_m2m_filters = []
     any_search = False
 
-    # Quick search (fuzzy by default - uses icontains)
     if query:
         any_search = True
         has_searched = True
@@ -356,13 +346,11 @@ def recipes(request):
         )
         combined_q &= quick_q
 
-    # List filtering
     if selected_lists:
         has_searched = True
         any_search = True
         recipes_qs = recipes_qs.filter(recipe_lists__id__in=selected_lists)
 
-    # Advanced filter groups
     if filters:
         has_searched = True
         any_search = True
@@ -370,13 +358,11 @@ def recipes(request):
 
         for group in filters:
             if group["logic"] == "and":
-                # For AND groups, separate M2M positive conditions to chain later
                 m2m_conditions = [c for c in group["conditions"] if is_positive_m2m_condition(c)]
                 other_conditions = [
                     c for c in group["conditions"] if not is_positive_m2m_condition(c)
                 ]
 
-                # Build Q for non-M2M conditions
                 group_q = Q()
                 for condition in other_conditions:
                     cond_q = apply_condition(
@@ -384,7 +370,6 @@ def recipes(request):
                     )
                     group_q &= cond_q
 
-                # Queue M2M conditions for chained filtering
                 for condition in m2m_conditions:
                     chained_m2m_filters.append(
                         apply_condition(condition["field"], condition["op"], condition["value"])
@@ -393,7 +378,6 @@ def recipes(request):
                 if group_q:
                     group_queries.append(group_q)
             else:
-                # OR logic: combine all conditions as before (M2M OR works fine)
                 group_q = Q()
                 for condition in group["conditions"]:
                     cond_q = apply_condition(
@@ -412,15 +396,12 @@ def recipes(request):
                     final_filter_q |= gq
             combined_q &= final_filter_q
 
-    # Apply combined Q filter first
     if any_search:
         recipes_qs = recipes_qs.filter(combined_q)
-        # Chain M2M filters for proper AND semantics (each creates a separate JOIN)
         for m2m_q in chained_m2m_filters:
             recipes_qs = recipes_qs.filter(m2m_q)
         recipes_qs = recipes_qs.distinct()
 
-    # Determine default sort
     if selected_book:
         default_sort = "order"
     elif len(selected_lists) == 1:
@@ -428,7 +409,6 @@ def recipes(request):
     else:
         default_sort = "recent"
 
-    # Sorting
     sort_by = request.GET.get("sort", default_sort)
     if sort_by == "name":
         recipes_qs = recipes_qs.order_by("name")
@@ -447,7 +427,6 @@ def recipes(request):
     else:
         recipes_qs = recipes_qs.order_by("name")
 
-    # Prepopulated filter data
     all_books = Book.objects.filter(recipes__isnull=False).distinct().order_by("title")
     all_authors = (
         Book.objects.filter(recipes__isnull=False)
@@ -458,12 +437,10 @@ def recipes(request):
     all_keywords = Keyword.objects.annotate(recipe_count=Count("recipes")).order_by("-recipe_count")
     all_lists = RecipeList.objects.all()
 
-    # Pagination
     paginator = Paginator(recipes_qs, 30)
     page_number = request.GET.get("page", 1)
     page_obj = paginator.get_page(page_number)
 
-    # Build context params for recipe detail navigation
     if selected_book and not query and not filters and not selected_lists:
         recipe_context_params = f"context=book&book_id={selected_book.id}"
     elif len(selected_lists) == 1 and not query and not filters:
@@ -871,8 +848,7 @@ def recipe_lists(request):
 
 
 def recipe_list_detail(request, list_id):
-    """Redirect to recipes page filtered by this list."""
-    get_object_or_404(RecipeList, id=list_id)  # Verify list exists
+    get_object_or_404(RecipeList, id=list_id)
     return redirect(f"/recipes/?list={list_id}")
 
 
@@ -1168,7 +1144,6 @@ def get_recipe_image(request, book_id, image_path):
 
 
 def ai_search(request):
-    """API endpoint for AI-powered search filter generation."""
     if request.method != "POST":
         return JsonResponse({"error": "POST required"}, status=405)
 
@@ -1189,3 +1164,47 @@ def ai_search(request):
         )
 
     return JsonResponse(result)
+
+
+def resume_extraction(request, report_id):
+    if request.method != "POST":
+        return redirect("extraction_reports")
+
+    report = get_object_or_404(ExtractionReport, id=report_id)
+
+    if report.status != "review":
+        messages.warning(request, "This extraction is not awaiting review.")
+        return redirect("extraction_reports")
+
+    human_response = request.POST.get("response")
+
+    if human_response not in ["has_images", "no_images"]:
+        messages.error(request, "Invalid response.")
+        return redirect("extraction_reports")
+
+    try:
+        graph_config = {"configurable": {"thread_id": report.thread_id}}
+
+        extraction_app.update_state(
+            graph_config, {"human_response": human_response}, as_node="await_human"
+        )
+
+        result = extraction_app.invoke(input=None, config=graph_config)
+
+        report.refresh_from_db()
+
+        if report.status == "done":
+            book = Book.objects.get(id=report.book_id)
+            raw_recipes = result.get("raw_recipes", [])
+            created_count = save_recipes_from_graph_state(book, report, raw_recipes)
+            messages.success(
+                request, f"Extraction resumed and completed. Saved {created_count} recipes."
+            )
+        else:
+            messages.info(request, f"Extraction resumed with status: {report.status}")
+
+    except Exception as e:
+        logger.error(f"Error resuming extraction: {e}")
+        messages.error(request, f"Error resuming extraction: {e}")
+
+    return redirect("extraction_reports")

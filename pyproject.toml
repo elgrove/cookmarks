@@ -19,6 +19,8 @@ dependencies = [
     "titlecase>=2.4.1",
     "django-json-widget>=2.1.1",
     "ruff>=0.8.4",
+    "langgraph>=0.3.0",
+    "langgraph-checkpoint-sqlite>=3.0.1",
 ]
 
 [tool.ruff]
