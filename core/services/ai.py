@@ -212,8 +212,15 @@ class OpenRouterProvider(AIProvider):
     EMBEDDING_MODEL = None
     EMBEDDING_DIMENSIONS = None
 
-    def generate_embedding(self, text: str, task_type: str) -> list[float]:
-        raise NotImplementedError("OpenRouter does not support embeddings, use Gemini provider")
+    def generate_embedding(self, text: str, task_type: str) -> list[float] | None:
+        logger.warning("OpenRouter does not yet support embeddings, use Gemini provider")
+        return None
+
+    def generate_embeddings_batch(
+        self, texts: list[str], task_type: str
+    ) -> list[list[float]] | None:
+        logger.warning("OpenRouter does not yet support embeddings, use Gemini provider")
+        return None
 
     def _get_completion(self, prompt, model, schema=None, temp=0):
         payload = {

@@ -148,9 +148,9 @@ def save_recipes_from_graph_state(
     )
 
     try:
-        from core.services.embeddings import get_embedding_provider
+        from core.services.ai import get_ai_provider
 
-        provider = get_embedding_provider()
+        provider = get_ai_provider()
         if provider and provider.EMBEDDING_MODEL:
             generate_recipe_embeddings_batch(list(recipes_to_embed))
     except ValueError:

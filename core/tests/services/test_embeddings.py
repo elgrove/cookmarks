@@ -64,7 +64,7 @@ class TestGenerateRecipeEmbedding:
         fake_embedding = [0.1] * 3072
 
         with (
-            patch("core.services.embeddings.get_embedding_provider") as mock_get_provider,
+            patch("core.services.embeddings.get_ai_provider") as mock_get_provider,
             patch("core.services.embeddings.VectorStore") as mock_store_class,
         ):
             mock_provider = MagicMock()
@@ -94,7 +94,7 @@ class TestGenerateRecipeEmbedding:
         fake_embeddings = [[0.1] * 3072, [0.2] * 3072]
 
         with (
-            patch("core.services.embeddings.get_embedding_provider") as mock_get_provider,
+            patch("core.services.embeddings.get_ai_provider") as mock_get_provider,
             patch("core.services.embeddings.VectorStore") as mock_store_class,
         ):
             mock_provider = MagicMock()
@@ -124,7 +124,7 @@ class TestSearchRecipes:
         fake_query_embedding = [0.2] * 3072
 
         with (
-            patch("core.services.embeddings.get_embedding_provider") as mock_get_provider,
+            patch("core.services.embeddings.get_ai_provider") as mock_get_provider,
             patch("core.services.embeddings.VectorStore") as mock_store_class,
         ):
             mock_provider = MagicMock()

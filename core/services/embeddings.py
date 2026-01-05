@@ -16,21 +16,12 @@ def recipe_to_text(recipe: Recipe) -> str:
 
     keywords = recipe.keywords.values_list("name", flat=True)
     if keywords:
-        parts.append(f"Keywords: {', '.join(keywords)}")
+        parts.append(", ".join(keywords))
 
     if recipe.ingredients:
-        parts.append(f"Ingredients: {', '.join(recipe.ingredients)}")
+        parts.append(", ".join(recipe.ingredients))
 
     return ". ".join(parts)
-
-
-def get_embedding_provider() -> GeminiProvider:
-    provider = get_ai_provider()
-    if provider is None:
-        raise ValueError("No AI provider configured")
-    if not isinstance(provider, GeminiProvider):
-        raise ValueError("Embeddings require Gemini provider")
-    return provider
 
 
 class VectorStore:
@@ -107,9 +98,16 @@ class VectorStore:
 
 
 def generate_recipe_embedding(recipe: Recipe) -> None:
-    provider = get_embedding_provider()
+    provider = get_ai_provider()
+    if not provider:
+        logger.warning("No AI provider configured")
+        return
+
     text = recipe_to_text(recipe)
     embedding = provider.generate_embedding(text, "RETRIEVAL_DOCUMENT")
+    if not embedding:
+        return
+
     store = VectorStore()
     store.upsert(str(recipe.id), embedding)
     logger.info(f"Generated embedding for recipe: {recipe.name}")
@@ -119,11 +117,17 @@ def generate_recipe_embeddings_batch(recipes: list[Recipe]) -> None:
     if not recipes:
         return
 
-    provider = get_embedding_provider()
+    provider = get_ai_provider()
+    if not provider:
+        logger.warning("No AI provider configured")
+        return
+
     store = VectorStore()
 
     texts = [recipe_to_text(recipe) for recipe in recipes]
     embeddings = provider.generate_embeddings_batch(texts, "RETRIEVAL_DOCUMENT")
+    if not embeddings:
+        return
 
     items = [
         (str(recipe.id), embedding) for recipe, embedding in zip(recipes, embeddings, strict=True)
@@ -136,8 +140,15 @@ def generate_recipe_embeddings_batch(recipes: list[Recipe]) -> None:
 
 
 def search_recipes(query: str, limit: int = 20) -> list[Recipe]:
-    provider = get_embedding_provider()
+    provider = get_ai_provider()
+    if not provider:
+        logger.warning("No AI provider configured")
+        return []
+
     query_embedding = provider.generate_embedding(query, "RETRIEVAL_QUERY")
+    if not query_embedding:
+        return []
+
     store = VectorStore()
 
     results = store.search(query_embedding, limit=limit)
