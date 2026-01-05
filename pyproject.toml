@@ -21,6 +21,7 @@ dependencies = [
     "ruff>=0.8.4",
     "langgraph>=0.3.0",
     "langgraph-checkpoint-sqlite>=3.0.1",
+    "sqlite-vec>=0.1.6",
 ]
 
 [tool.ruff]

@@ -11,6 +11,7 @@ from django.utils import timezone
 from core.models import Book, ExtractionReport, Keyword, Recipe, RecipeData
 from core.services.ai import GeminiProvider, OpenRouterProvider, get_config
 from core.services.calibre import load_books_from_calibre
+from core.services.embeddings import generate_recipe_embedding
 from core.services.extraction import app as extraction_app
 
 logger = logging.getLogger(__name__)
@@ -137,6 +138,11 @@ def save_recipes_from_graph_state(
             keyword, _ = Keyword.objects.get_or_create(name=keyword_name)
             keyword_objects.append(keyword)
         recipe.keywords.set(keyword_objects)
+
+        try:
+            generate_recipe_embedding(recipe)
+        except Exception as e:
+            logger.warning(f"Failed to generate embedding for recipe {recipe.name}: {e}")
 
         created_count += 1
 
