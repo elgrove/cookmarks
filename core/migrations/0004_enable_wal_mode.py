@@ -1,8 +1,7 @@
-from django.db import migrations
+from django.db import connection, migrations
 
 
 def enable_wal_mode(apps, schema_editor):
-    from django.db import connection
 
     with connection.cursor() as cursor:
         cursor.execute("PRAGMA journal_mode=WAL;")

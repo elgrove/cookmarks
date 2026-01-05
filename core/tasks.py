@@ -9,7 +9,12 @@ from django.forms.models import model_to_dict
 from django.utils import timezone
 
 from core.models import Book, ExtractionReport, Keyword, Recipe, RecipeData
-from core.services.ai import GeminiProvider, OpenRouterProvider, get_config
+from core.services.ai import (
+    GeminiProvider,
+    OpenRouterProvider,
+    get_ai_provider,
+    get_config,
+)
 from core.services.calibre import load_books_from_calibre
 from core.services.embeddings import generate_recipe_embeddings_batch
 from core.services.extraction import app as extraction_app
@@ -148,8 +153,6 @@ def save_recipes_from_graph_state(
     )
 
     try:
-        from core.services.ai import get_ai_provider
-
         provider = get_ai_provider()
         if provider and provider.EMBEDDING_MODEL:
             generate_recipe_embeddings_batch(list(recipes_to_embed))
