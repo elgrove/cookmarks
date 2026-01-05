@@ -70,7 +70,7 @@ class AIProvider(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def generate_embedding(self, text: str, task_type: str = "RETRIEVAL_DOCUMENT") -> list[float]:
+    def generate_embedding(self, text: str, task_type: str) -> list[float]:
         pass
 
     def check_if_can_match_images(self, sample_content: str) -> tuple[bool, dict]:
@@ -212,7 +212,7 @@ class OpenRouterProvider(AIProvider):
     EMBEDDING_MODEL = None
     EMBEDDING_DIMENSIONS = None
 
-    def generate_embedding(self, text: str, task_type: str = "RETRIEVAL_DOCUMENT") -> list[float]:
+    def generate_embedding(self, text: str, task_type: str) -> list[float]:
         raise NotImplementedError("OpenRouter does not support embeddings, use Gemini provider")
 
     def _get_completion(self, prompt, model, schema=None, temp=0):
@@ -320,13 +320,21 @@ class GeminiProvider(AIProvider):
             },
         )
 
-    def generate_embedding(self, text: str, task_type: str = "RETRIEVAL_DOCUMENT") -> list[float]:
+    def generate_embedding(self, text: str, task_type: str) -> list[float]:
         response = self.client.models.embed_content(
             model=self.EMBEDDING_MODEL,
             contents=text,
             config={"task_type": task_type},
         )
         return response.embeddings[0].values
+
+    def generate_embeddings_batch(self, texts: list[str], task_type: str) -> list[list[float]]:
+        response = self.client.models.embed_content(
+            model=self.EMBEDDING_MODEL,
+            contents=texts,
+            config={"task_type": task_type},
+        )
+        return [embedding.values for embedding in response.embeddings]
 
     def _calculate_cost(self, model: str, input_tokens: int, output_tokens: int) -> Decimal:
         pricing = {

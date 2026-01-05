@@ -4,12 +4,12 @@ import time
 from django.core.management.base import BaseCommand
 
 from core.models import Recipe
-from core.services.embeddings import VectorStore, generate_recipe_embedding
+from core.services.embeddings import VectorStore, generate_recipe_embeddings_batch
 
 logger = logging.getLogger(__name__)
 
 REGENERATE_ALL = False
-BATCH_SIZE = 50
+BATCH_SIZE = 6
 DELAY_SECONDS = 0.2
 
 
@@ -52,34 +52,46 @@ class Command(BaseCommand):
         failed = 0
         start_time = time.time()
 
-        for recipe in recipes.iterator(chunk_size=BATCH_SIZE):
-            try:
-                generate_recipe_embedding(recipe)
-                processed += 1
+        batch = []
+        for recipe in recipes.iterator(chunk_size=100):
+            batch.append(recipe)
 
-                if processed % 10 == 0:
-                    elapsed = time.time() - start_time
-                    rate = processed / elapsed if elapsed > 0 else 0
-                    remaining = recipes_to_process - processed
-                    eta = remaining / rate if rate > 0 else 0
-                    self.stdout.write(
-                        f"Processed {processed}/{recipes_to_process} "
-                        f"({processed * 100 / recipes_to_process:.1f}%) - "
-                        f"ETA: {eta:.0f}s\n"
-                    )
+            if len(batch) >= BATCH_SIZE:
+                try:
+                    generate_recipe_embeddings_batch(batch)
+                    processed += len(batch)
 
-                if DELAY_SECONDS > 0:
-                    time.sleep(DELAY_SECONDS)
-
-            except Exception as e:
-                failed += 1
-                logger.warning(f"Failed to embed recipe {recipe.id} ({recipe.name}): {e}")
-                if failed <= 5:
-                    self.stdout.write(
-                        self.style.WARNING(
-                            f"Failed to generate embedding: {recipe.name[:50]} - {e}\n"
+                    if processed % 10 == 0:
+                        elapsed = time.time() - start_time
+                        rate = processed / elapsed if elapsed > 0 else 0
+                        remaining = recipes_to_process - processed
+                        eta = remaining / rate if rate > 0 else 0
+                        self.stdout.write(
+                            f"Processed {processed}/{recipes_to_process} "
+                            f"({processed * 100 / recipes_to_process:.1f}%) - "
+                            f"ETA: {eta:.0f}s\n"
                         )
-                    )
+
+                    if DELAY_SECONDS > 0:
+                        time.sleep(DELAY_SECONDS)
+
+                except Exception as e:
+                    failed += len(batch)
+                    logger.warning(f"Failed to embed batch of {len(batch)} recipes: {e}")
+                    if failed <= 5:
+                        self.stdout.write(
+                            self.style.WARNING(f"Failed to generate embeddings for batch: {e}\n")
+                        )
+
+                batch = []
+
+        if batch:
+            try:
+                generate_recipe_embeddings_batch(batch)
+                processed += len(batch)
+            except Exception as e:
+                failed += len(batch)
+                logger.warning(f"Failed to embed final batch of {len(batch)} recipes: {e}")
 
         elapsed = time.time() - start_time
         self.stdout.write("\n" + "=" * 80 + "\n")

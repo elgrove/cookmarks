@@ -3,6 +3,7 @@ import sqlite3
 from pathlib import Path
 
 import sqlite_vec
+from django.conf import settings
 
 from core.models import Recipe
 from core.services.ai import GeminiProvider, get_ai_provider
@@ -18,9 +19,9 @@ def recipe_to_text(recipe: Recipe) -> str:
         parts.append(f"Keywords: {', '.join(keywords)}")
 
     if recipe.ingredients:
-        parts.append(f"Ingredients: {chr(10).join(recipe.ingredients)}")
+        parts.append(f"Ingredients: {', '.join(recipe.ingredients)}")
 
-    return "\n\n".join(parts)
+    return ". ".join(parts)
 
 
 def get_embedding_provider() -> GeminiProvider:
@@ -35,8 +36,6 @@ def get_embedding_provider() -> GeminiProvider:
 class VectorStore:
     def __init__(self, db_path: str | Path | None = None):
         if db_path is None:
-            from django.conf import settings
-
             db_path = settings.DATABASES["default"]["NAME"]
         self.db_path = str(db_path)
         self._ensure_tables()
@@ -73,6 +72,22 @@ class VectorStore:
         finally:
             conn.close()
 
+    def upsert_batch(self, items: list[tuple[str, list[float]]]):
+        conn = self._get_connection()
+        try:
+            recipe_ids = [item[0] for item in items]
+            conn.execute(
+                f"DELETE FROM recipe_embeddings WHERE recipe_id IN ({','.join('?' * len(recipe_ids))})",
+                recipe_ids,
+            )
+            conn.executemany(
+                "INSERT INTO recipe_embeddings (recipe_id, embedding) VALUES (?, ?)",
+                [(rid, sqlite_vec.serialize_float32(emb)) for rid, emb in items],
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
     def search(self, query_embedding: list[float], limit: int = 20) -> list[tuple[str, float]]:
         conn = self._get_connection()
         try:
@@ -94,15 +109,35 @@ class VectorStore:
 def generate_recipe_embedding(recipe: Recipe) -> None:
     provider = get_embedding_provider()
     text = recipe_to_text(recipe)
-    embedding = provider.generate_embedding(text)
+    embedding = provider.generate_embedding(text, "RETRIEVAL_DOCUMENT")
     store = VectorStore()
     store.upsert(str(recipe.id), embedding)
     logger.info(f"Generated embedding for recipe: {recipe.name}")
 
 
+def generate_recipe_embeddings_batch(recipes: list[Recipe]) -> None:
+    if not recipes:
+        return
+
+    provider = get_embedding_provider()
+    store = VectorStore()
+
+    texts = [recipe_to_text(recipe) for recipe in recipes]
+    embeddings = provider.generate_embeddings_batch(texts, "RETRIEVAL_DOCUMENT")
+
+    items = [
+        (str(recipe.id), embedding) for recipe, embedding in zip(recipes, embeddings, strict=True)
+    ]
+    store.upsert_batch(items)
+
+    recipe_names = ", ".join([r.name for r in recipes[:3]])
+    suffix = "..." if len(recipes) > 3 else ""
+    logger.info(f"Generated embeddings for {len(recipes)} recipes: {recipe_names}{suffix}")
+
+
 def search_recipes(query: str, limit: int = 20) -> list[Recipe]:
     provider = get_embedding_provider()
-    query_embedding = provider.generate_embedding(query, task_type="RETRIEVAL_QUERY")
+    query_embedding = provider.generate_embedding(query, "RETRIEVAL_QUERY")
     store = VectorStore()
 
     results = store.search(query_embedding, limit=limit)

@@ -11,7 +11,7 @@ from django.utils import timezone
 from core.models import Book, ExtractionReport, Keyword, Recipe, RecipeData
 from core.services.ai import GeminiProvider, OpenRouterProvider, get_config
 from core.services.calibre import load_books_from_calibre
-from core.services.embeddings import generate_recipe_embedding
+from core.services.embeddings import generate_recipe_embeddings_batch
 from core.services.extraction import app as extraction_app
 
 logger = logging.getLogger(__name__)
@@ -139,12 +139,27 @@ def save_recipes_from_graph_state(
             keyword_objects.append(keyword)
         recipe.keywords.set(keyword_objects)
 
-        try:
-            generate_recipe_embedding(recipe)
-        except Exception as e:
-            logger.warning(f"Failed to generate embedding for recipe {recipe.name}: {e}")
-
         created_count += 1
+
+    recipes_to_embed = (
+        Recipe.objects.filter(book=book, extraction_report=extraction)
+        .select_related("book")
+        .prefetch_related("keywords")
+    )
+
+    try:
+        from core.services.embeddings import get_embedding_provider
+
+        provider = get_embedding_provider()
+        if provider and provider.EMBEDDING_MODEL:
+            generate_recipe_embeddings_batch(list(recipes_to_embed))
+    except ValueError:
+        pass
+    except Exception as e:
+        embedding_error = f"Batch embedding failed: {e}"
+        logger.warning(embedding_error)
+        extraction.errors = [*extraction.errors, embedding_error]
+        extraction.save(update_fields=["errors"])
 
     recipes_data = []
     for recipe_dict in raw_recipes:
