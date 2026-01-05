@@ -1,6 +1,7 @@
 import logging
 import sqlite3
 import zipfile
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from django.conf import settings
@@ -10,7 +11,12 @@ from langgraph.graph import END, StateGraph
 from langgraph.types import interrupt
 
 from core.models import Book, ExtractionReport
-from core.services.ai import GeminiProvider, OpenRouterProvider, get_config
+from core.services.ai import (
+    ExtractionMethod,
+    GeminiProvider,
+    OpenRouterProvider,
+    get_config,
+)
 from core.services.epub import (
     MANY_RECIPES_PER_FILE_THRESHOLD,
     get_block_content,
@@ -93,7 +99,6 @@ def extract_file(state: ExtractionState) -> dict:
     )
 
     is_many_per_file = len(chapter_files) <= MANY_RECIPES_PER_FILE_THRESHOLD
-    from core.services.ai import ExtractionMethod
 
     extraction_method = (
         ExtractionMethod.MANY_RECIPES_PER_FILE
@@ -131,8 +136,6 @@ def extract_file(state: ExtractionState) -> dict:
                 [],
                 {"cost_usd": None, "input_tokens": None, "output_tokens": None},
             )
-
-    from concurrent.futures import ThreadPoolExecutor, as_completed
 
     all_recipes = []
     with ThreadPoolExecutor(max_workers=settings.EXTRACTION_THREADS) as executor:
@@ -181,8 +184,6 @@ def extract_block(state: ExtractionState) -> dict:
         model = report.model_name
         logger.info(f"Using user-specified model override: {model}")
     else:
-        from core.services.ai import ExtractionMethod
-
         model = provider._get_model_for_extraction_method(ExtractionMethod.BLOCKS_OF_FILES)
         report.model_name = model
         report.save()
@@ -213,8 +214,6 @@ def extract_block(state: ExtractionState) -> dict:
 
         logger.info(f"Found {len(recipes)} recipes in block {block_index + 1}")
         return (block_index, block, recipes, usage)
-
-    from concurrent.futures import ThreadPoolExecutor, as_completed
 
     all_recipes = []
     with ThreadPoolExecutor(max_workers=settings.EXTRACTION_THREADS) as executor:
