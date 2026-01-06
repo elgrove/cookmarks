@@ -187,3 +187,143 @@ class TestVectorStoreIntegration:
 
         assert len(results) == 3
         assert results[0][0] == "recipe-1"
+
+
+class TestVectorSearchEndToEnd:
+    def test_full_search_flow_with_real_vector_store(self, gemini_config, sample_book):
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
+            db_path = f.name
+
+        thai_recipe = Recipe.objects.create(
+            book=sample_book,
+            order=1,
+            name="Thai Green Curry",
+            ingredients=["coconut milk", "green curry paste", "chicken"],
+        )
+        italian_recipe = Recipe.objects.create(
+            book=sample_book,
+            order=2,
+            name="Spaghetti Carbonara",
+            ingredients=["pasta", "eggs", "pancetta", "parmesan"],
+        )
+        indian_recipe = Recipe.objects.create(
+            book=sample_book,
+            order=3,
+            name="Butter Chicken",
+            ingredients=["chicken", "butter", "tomatoes", "cream"],
+        )
+
+        # Embeddings designed for cosine similarity ordering
+        # Query is [1.0, 0, 0, ...]
+        # Thai is closest: [0.95, 0.05, 0, ...] - nearly same direction
+        # Indian is next: [0.7, 0.3, 0, ...] - more divergence
+        # Italian is furthest: [0, 1, 0, ...] - perpendicular
+        thai_embedding = [0.95, 0.05, 0.0] + [0.0] * 3069
+        italian_embedding = [0.0, 1.0, 0.0] + [0.0] * 3069
+        indian_embedding = [0.7, 0.3, 0.0] + [0.0] * 3069
+
+        store = VectorStore(db_path=db_path)
+        store.upsert(str(thai_recipe.id), thai_embedding)
+        store.upsert(str(italian_recipe.id), italian_embedding)
+        store.upsert(str(indian_recipe.id), indian_embedding)
+
+        query_embedding = [1.0, 0.0, 0.0] + [0.0] * 3069
+
+        with (
+            patch("core.services.embeddings.get_ai_provider") as mock_get_provider,
+            patch("core.services.embeddings.VectorStore") as mock_store_class,
+        ):
+            mock_provider = MagicMock()
+            mock_provider.generate_embedding.return_value = query_embedding
+            mock_get_provider.return_value = mock_provider
+
+            mock_store_class.return_value = store
+
+            results = search_recipes("spicy asian curry", limit=3)
+
+            mock_provider.generate_embedding.assert_called_once_with(
+                "spicy asian curry", "RETRIEVAL_QUERY"
+            )
+
+            assert len(results) == 3
+            assert results[0].name == "Thai Green Curry"
+            assert results[1].name == "Butter Chicken"
+            assert results[2].name == "Spaghetti Carbonara"
+
+    def test_search_returns_results_in_similarity_order(self, gemini_config, sample_book):
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
+            db_path = f.name
+
+        recipe_a = Recipe.objects.create(
+            book=sample_book, order=1, name="Recipe A", ingredients=["a"]
+        )
+        recipe_b = Recipe.objects.create(
+            book=sample_book, order=2, name="Recipe B", ingredients=["b"]
+        )
+        recipe_c = Recipe.objects.create(
+            book=sample_book, order=3, name="Recipe C", ingredients=["c"]
+        )
+
+        store = VectorStore(db_path=db_path)
+        store.upsert(str(recipe_a.id), [0.1, 0.9, 0.0] + [0.0] * 3069)
+        store.upsert(str(recipe_b.id), [0.5, 0.5, 0.0] + [0.0] * 3069)
+        store.upsert(str(recipe_c.id), [0.9, 0.1, 0.0] + [0.0] * 3069)
+
+        query_embedding = [1.0, 0.0, 0.0] + [0.0] * 3069
+
+        with (
+            patch("core.services.embeddings.get_ai_provider") as mock_get_provider,
+            patch("core.services.embeddings.VectorStore") as mock_store_class,
+        ):
+            mock_provider = MagicMock()
+            mock_provider.generate_embedding.return_value = query_embedding
+            mock_get_provider.return_value = mock_provider
+            mock_store_class.return_value = store
+
+            results = search_recipes("test query", limit=3)
+
+            assert len(results) == 3
+            assert results[0].name == "Recipe C"
+            assert results[1].name == "Recipe B"
+            assert results[2].name == "Recipe A"
+
+    def test_search_respects_limit(self, gemini_config, sample_book):
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
+            db_path = f.name
+
+        store = VectorStore(db_path=db_path)
+
+        for i in range(10):
+            recipe = Recipe.objects.create(
+                book=sample_book, order=i, name=f"Recipe {i}", ingredients=[f"ingredient {i}"]
+            )
+            store.upsert(str(recipe.id), [float(i) / 10] + [0.0] * 3071)
+
+        query_embedding = [1.0] + [0.0] * 3071
+
+        with (
+            patch("core.services.embeddings.get_ai_provider") as mock_get_provider,
+            patch("core.services.embeddings.VectorStore") as mock_store_class,
+        ):
+            mock_provider = MagicMock()
+            mock_provider.generate_embedding.return_value = query_embedding
+            mock_get_provider.return_value = mock_provider
+            mock_store_class.return_value = store
+
+            results = search_recipes("test", limit=5)
+
+            assert len(results) == 5
+
+    def test_search_handles_no_provider(self, db):
+        results = search_recipes("test query")
+        assert results == []
+
+    def test_search_handles_embedding_failure(self, gemini_config):
+        with patch("core.services.embeddings.get_ai_provider") as mock_get_provider:
+            mock_provider = MagicMock()
+            mock_provider.generate_embedding.return_value = None
+            mock_get_provider.return_value = mock_provider
+
+            results = search_recipes("test query")
+
+            assert results == []

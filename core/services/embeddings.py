@@ -44,7 +44,7 @@ class VectorStore:
             conn.execute(f"""
                 CREATE VIRTUAL TABLE IF NOT EXISTS recipe_embeddings USING vec0(
                     recipe_id TEXT PRIMARY KEY,
-                    embedding FLOAT[{GeminiProvider.EMBEDDING_DIMENSIONS}]
+                    embedding FLOAT[{GeminiProvider.EMBEDDING_DIMENSIONS}] distance_metric=cosine
                 )
             """)
             conn.commit()

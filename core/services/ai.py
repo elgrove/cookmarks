@@ -16,7 +16,6 @@ from core.services.prompts import (
     DEDUPLICATE_KEYWORDS_PROMPT,
     EXTRACT_RECIPES_PROMPT,
     IMAGE_MATCH_CHECK_PROMPT,
-    RECIPE_SEARCH_PROMPT,
 )
 
 logger = logging.getLogger(__name__)
@@ -55,7 +54,6 @@ class AIProvider(abc.ABC):
     EXTRACT_ONE_PER_FILE_MODEL = NotImplemented
     EXTRACT_BLOCKS_MODEL = NotImplemented
     DEDUPLICATE_MODEL = NotImplemented
-    SEARCH_MODEL = NotImplemented
     EMBEDDING_MODEL = NotImplemented
     EMBEDDING_DIMENSIONS = NotImplemented
 
@@ -149,56 +147,6 @@ class AIProvider(abc.ABC):
 
         return response
 
-    def translate_search_prompt(self, prompt: str) -> dict | None:
-        full_prompt = RECIPE_SEARCH_PROMPT.format(prompt=prompt)
-
-        try:
-            response, _ = self._get_completion(full_prompt, model=self.SEARCH_MODEL, temp=0)
-        except Exception as e:
-            logger.error(f"AI search translation failed: {e}")
-            return None
-
-        if not response:
-            return None
-
-        try:
-            response = response.strip()
-            if response.startswith("```json"):
-                response = response[7:]
-            if response.startswith("```"):
-                response = response[3:]
-            if response.endswith("```"):
-                response = response[:-3]
-            response = response.strip()
-
-            result = json.loads(response)
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse AI search response as JSON: {e}")
-            return None
-
-        if not isinstance(result, dict) or "groups" not in result:
-            logger.error("AI search response has invalid structure")
-            return None
-
-        if "group_logic" not in result:
-            result["group_logic"] = "and"
-
-        valid_fields = {"name", "ingredients", "instructions", "keywords", "author", "book"}
-        valid_ops = {"contains", "not_contains", "equals", "starts"}
-
-        for group in result.get("groups", []):
-            if not isinstance(group, dict):
-                continue
-            if "logic" not in group:
-                group["logic"] = "and"
-            for condition in group.get("conditions", []):
-                if condition.get("field") not in valid_fields:
-                    logger.warning(f"Invalid field in condition: {condition.get('field')}")
-                if condition.get("op") not in valid_ops:
-                    condition["op"] = "contains"
-
-        return result
-
 
 class OpenRouterProvider(AIProvider):
     NAME = "OPENROUTER"
@@ -208,7 +156,6 @@ class OpenRouterProvider(AIProvider):
     EXTRACT_ONE_PER_FILE_MODEL = "openai/gpt-oss-120b"
     EXTRACT_BLOCKS_MODEL = "google/gemini-2.5-flash"
     DEDUPLICATE_MODEL = "google/gemini-2.5-flash"
-    SEARCH_MODEL = "google/gemini-2.5-flash-lite"
     EMBEDDING_MODEL = None
     EMBEDDING_DIMENSIONS = None
 
@@ -311,7 +258,6 @@ class GeminiProvider(AIProvider):
     EXTRACT_ONE_PER_FILE_MODEL = "gemini-2.5-flash-lite"
     EXTRACT_BLOCKS_MODEL = "gemini-2.5-flash"
     DEDUPLICATE_MODEL = "gemini-2.5-flash"
-    SEARCH_MODEL = "gemini-2.5-flash-lite"
     EMBEDDING_MODEL = "gemini-embedding-001"
     EMBEDDING_DIMENSIONS = 3072
 
@@ -400,10 +346,3 @@ def get_ai_provider():
     return None
 
 
-def translate_prompt_to_filters(prompt: str) -> dict | None:
-    provider = get_ai_provider()
-    if not provider:
-        logger.warning("No AI provider configured")
-        return None
-
-    return provider.translate_search_prompt(prompt)
