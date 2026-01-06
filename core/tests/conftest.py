@@ -12,7 +12,6 @@ from core.services.calibre import load_books_from_calibre
 BOOKS_DIR = settings.BASE_DIR / "_books"
 TEST_CALIBRE_DIR = settings.BASE_DIR / "_test_calibre"
 
-# Test calibre book info
 TEST_CALIBRE_BOOK = {
     "title": "Asma's Indian Kitchen: Home-Cooked Food Brought to You by Darjeeling Express",
     "author": "Asma Khan",

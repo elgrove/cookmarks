@@ -12,7 +12,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.timezone import now
 from django_q.tasks import async_task
 
-from core.services.ai import GeminiProvider, OpenRouterProvider, translate_prompt_to_filters
+from core.services.ai import GeminiProvider, OpenRouterProvider
+from core.services.embeddings import search_recipes as vector_search_recipes
 from core.services.calibre import refresh_single_book_from_calibre
 from core.services.extraction import app as extraction_app
 from core.tasks import save_recipes_from_graph_state
@@ -243,9 +244,15 @@ def delete_book(request, book_id):
 
 def recipes(request):
     recipes_qs = Recipe.objects.select_related("book").prefetch_related("keywords")
-    has_searched = True
+    has_searched = False
     filters = []
     group_logic = request.GET.get("group_logic", "or")
+    vector_search_ids = None
+
+    vector_ids_param = request.GET.get("vector_ids", "").strip()
+    if vector_ids_param:
+        vector_search_ids = vector_ids_param.split(",")
+        has_searched = True
 
     query = request.GET.get("q", "").strip()
 
@@ -396,13 +403,17 @@ def recipes(request):
                     final_filter_q |= gq
             combined_q &= final_filter_q
 
-    if any_search:
+    if any_search or vector_search_ids:
         recipes_qs = recipes_qs.filter(combined_q)
         for m2m_q in chained_m2m_filters:
             recipes_qs = recipes_qs.filter(m2m_q)
+        if vector_search_ids:
+            recipes_qs = recipes_qs.filter(id__in=vector_search_ids)
         recipes_qs = recipes_qs.distinct()
 
-    if selected_book:
+    if vector_search_ids:
+        default_sort = "relevance"
+    elif selected_book:
         default_sort = "order"
     elif len(selected_lists) == 1:
         default_sort = "list_order"
@@ -410,7 +421,12 @@ def recipes(request):
         default_sort = "recent"
 
     sort_by = request.GET.get("sort", default_sort)
-    if sort_by == "name":
+    if sort_by == "relevance" and vector_search_ids:
+        id_to_position = {vid: idx for idx, vid in enumerate(vector_search_ids)}
+        recipes_list = list(recipes_qs)
+        recipes_list.sort(key=lambda r: id_to_position.get(str(r.id), 9999))
+        recipes_qs = recipes_list
+    elif sort_by == "name":
         recipes_qs = recipes_qs.order_by("name")
     elif sort_by == "recent":
         recipes_qs = recipes_qs.order_by("-created_at")
@@ -426,6 +442,9 @@ def recipes(request):
         recipes_qs = recipes_qs.order_by("?")
     else:
         recipes_qs = recipes_qs.order_by("name")
+
+    if not has_searched:
+        recipes_qs = Recipe.objects.none()
 
     all_books = Book.objects.filter(recipes__isnull=False).distinct().order_by("title")
     all_authors = (
@@ -449,6 +468,8 @@ def recipes(request):
         params = ["context=search"]
         if query:
             params.append(f"q={query}")
+        if vector_ids_param:
+            params.append(f"vector_ids={vector_ids_param}")
         if sort_by:
             params.append(f"sort={sort_by}")
         if group_logic:
@@ -487,6 +508,7 @@ def recipes(request):
         "all_authors": all_authors,
         "all_keywords": all_keywords,
         "all_lists": all_lists,
+        "vector_ids": vector_ids_param,
     }
 
     return render(request, "core/recipes.html", context)
@@ -1144,26 +1166,26 @@ def get_recipe_image(request, book_id, image_path):
 
 
 def ai_search(request):
-    if request.method != "POST":
-        return JsonResponse({"error": "POST required"}, status=405)
-
     try:
         data = json.loads(request.body)
         prompt = data.get("prompt", "").strip()
+        limit = data.get("limit", 1000)
     except json.JSONDecodeError:
         return JsonResponse({"error": "Invalid JSON"}, status=400)
 
     if not prompt:
         return JsonResponse({"error": "Prompt is required"}, status=400)
 
-    result = translate_prompt_to_filters(prompt)
-    if result is None:
+    try:
+        recipes = vector_search_recipes(prompt, limit=limit)
+        recipe_ids = [str(r.id) for r in recipes]
+        return JsonResponse({"recipe_ids": recipe_ids})
+    except Exception as e:
+        logger.exception("Vector search failed")
         return JsonResponse(
-            {"error": "AI search failed. Check that AI is configured in Settings."},
+            {"error": f"AI search failed: {e!s}"},
             status=500,
         )
-
-    return JsonResponse(result)
 
 
 def resume_extraction(request, report_id):

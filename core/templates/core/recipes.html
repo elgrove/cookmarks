@@ -270,8 +270,8 @@
     
     .ai-prompt-input:focus {
         outline: none;
-        border-color: #6f42c1;
-        box-shadow: 0 0 0 3px rgba(111, 66, 193, 0.1);
+        border-color: #212529;
+        box-shadow: 0 0 0 3px rgba(33, 37, 41, 0.1);
     }
     
     .ai-prompt-btn {
@@ -281,15 +281,14 @@
         font-weight: 500;
         border: none;
         border-radius: 8px;
-        background: linear-gradient(135deg, #6f42c1, #5a32a3);
+        background: #212529;
         color: white;
         cursor: pointer;
         transition: all 0.15s ease;
     }
     
     .ai-prompt-btn:hover:not(:disabled) {
-        background: linear-gradient(135deg, #5a32a3, #4a2883);
-        transform: translateY(-1px);
+        background: #343a40;
     }
     
     .ai-prompt-btn:disabled {
@@ -517,6 +516,7 @@
             <div class="results-sort">
                 <span style="font-size: 0.85rem; color: #6c757d;">Sort:</span>
                 <select class="form-select form-select-sm" style="width: auto; font-size: 0.85rem;" id="sortSelect">
+                    {% if vector_ids %}<option value="relevance" {% if sort_by == 'relevance' %}selected{% endif %}>Relevance</option>{% endif %}
                     <option value="recent" {% if sort_by == 'recent' %}selected{% endif %}>Recently Added</option>
                     <option value="name" {% if sort_by == 'name' %}selected{% endif %}>Name A-Z</option>
                     <option value="author" {% if sort_by == 'author' %}selected{% endif %}>Author</option>
@@ -533,9 +533,6 @@
             <div class="result-card-header">
                 <div>
                     <h3 class="result-card-title">{{ recipe.clean_name }}</h3>
-                    {% if recipe.description %}
-                    <p class="result-card-meta">{{ recipe.description|truncatewords:20 }}</p>
-                    {% endif %}
                 </div>
                 <div class="result-card-source">
                     <span class="result-card-author">{{ recipe.book.author }}</span>
@@ -587,13 +584,13 @@
         <!-- Initial state - no search performed yet -->
         <div class="search-initial">
             <div class="search-initial-icon">🍳</div>
-            <h2>Find your recipes</h2>
-            <p>Use the search box or filters to find recipes in your collection</p>
+            <h2>Browse your recipes</h2>
+            <p>Use the search box to find recipes in your collection.<br>Try the powerful AI search feature to go even deeper.</p>
         </div>
         {% endif %}
     </div>
     
-    <!-- Search Sidebar (Right) -->
+    <!-- Search Sidebar (Right)-->
     <div class="search-sidebar">
         <form method="get" action="{% url 'recipes' %}" id="searchForm">
             <!-- Quick Search Box -->
@@ -603,19 +600,39 @@
                     <input type="text" 
                            class="quick-search-input" 
                            name="q" 
-                           placeholder="Search all fields..." 
                            value="{{ query }}"
                            autofocus>
                 </div>
                 <div style="display: flex; gap: 0.5rem; margin-top: 0.75rem;">
+                    {% if query %}
                     <a href="{% url 'recipes' %}" class="search-btn search-btn-secondary" style="flex: 1; text-align: center;">Clear</a>
-                    <button type="submit" class="search-btn search-btn-primary" style="flex: 1;">Search</button>
+                    {% endif %}
+                    <button type="submit" class="search-btn search-btn-primary" style="{% if not query %}width: 100%;{% else %}flex: 1;{% endif %}">Search</button>
                 </div>
             </div>
             
+            <!-- AI-Powered Vector Search -->
+            <div class="search-box">
+                <div class="search-box-title">AI-Powered Smart Search ✨</div>
+                <!-- <div class="ai-hint">Uses AI to search deeper and find dishes related to your search term</div> -->
+                <input type="text" 
+                       class="ai-prompt-input" 
+                       id="aiPromptInput"
+                       placeholder="e.g. 'salads with cheese and nuts'"{% if vector_ids %} value="{{ request.GET.ai_query }}"{% endif %}>
+                <button type="button" class="ai-prompt-btn" id="aiPromptBtn" onclick="searchWithAI()">
+                    Search
+                </button>
+                <div id="aiError" class="ai-error" style="display: none;"></div>
+                {% if vector_ids %}
+                <div style="margin-top: 0.5rem;">
+                    <a href="{% url 'recipes' %}" class="search-btn search-btn-secondary" style="width: 100%; text-align: center; display: block;">Clear AI Search</a>
+                </div>
+                {% endif %}
+            </div>
+
             <!-- Filter Builder -->
             <div class="search-box">
-                <div class="search-box-title">Advanced Filters</div>
+                <div class="search-box-title">Filters</div>
                 <div id="filterGroups">
                     {% if filters %}
                         {% for group in filters %}
@@ -661,22 +678,9 @@
                 <button type="button" class="filter-add-btn {% if filters %}mt-2{% endif %}" onclick="addFilterGroup()">+ Add filter group</button>
             </div>
             
-            <!-- AI Search -->
-            <div class="search-box">
-                <div class="search-box-title">AI Search</div>
-                <input type="text" 
-                       class="ai-prompt-input" 
-                       id="aiPromptInput"
-                       placeholder="e.g. 'thai curries without coconut'">
-                <button type="button" class="ai-prompt-btn" id="aiPromptBtn" onclick="translateWithAI()">
-                    Ask AI
-                </button>
-                <div id="aiError" class="ai-error" style="display: none;"></div>
-                <div class="ai-hint">AI will populate the filters for you</div>
-            </div>
-            
             <!-- Sort (hidden) -->
             <input type="hidden" name="sort" id="sortInput" value="{{ sort_by|default:'relevance' }}">
+            <input type="hidden" name="vector_ids" id="vectorIdsInput" value="{{ vector_ids }}">
         </form>
     </div>
 </div>
@@ -829,8 +833,8 @@ document.getElementById('sortSelect')?.addEventListener('change', function() {
     document.getElementById('searchForm').submit();
 });
 
-// AI Search Translation
-async function translateWithAI() {
+// AI Vector Search
+async function searchWithAI() {
     const promptInput = document.getElementById('aiPromptInput');
     const btn = document.getElementById('aiPromptBtn');
     const errorDiv = document.getElementById('aiError');
@@ -844,7 +848,7 @@ async function translateWithAI() {
     // Show loading state
     btn.disabled = true;
     btn.classList.add('loading');
-    btn.textContent = 'Translating...';
+    btn.textContent = 'Searching...';
     errorDiv.style.display = 'none';
     
     try {
@@ -854,82 +858,33 @@ async function translateWithAI() {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': '{{ csrf_token }}'
             },
-            body: JSON.stringify({ prompt: prompt })
+            body: JSON.stringify({ prompt: prompt, limit: 1000 })
         });
         
         const data = await response.json();
         
         if (!response.ok) {
-            showAIError(data.error || 'Translation failed');
+            showAIError(data.error || 'Search failed');
             return;
         }
         
-        // Clear existing filters
-        const container = document.getElementById('filterGroups');
-        container.innerHTML = '';
-        groupCounter = 0;
-        
-        // Update group logic
-        if (data.group_logic) {
-            document.getElementById('groupLogicInput').value = data.group_logic;
+        if (data.recipe_ids && data.recipe_ids.length > 0) {
+            // Build URL with vector search results
+            const params = new URLSearchParams();
+            params.set('vector_ids', data.recipe_ids.join(','));
+            params.set('sort', 'relevance');
+            params.set('ai_query', prompt);
+            window.location.href = '{% url "recipes" %}?' + params.toString();
+        } else {
+            showAIError('No matching recipes found');
         }
-        
-        // Add filter groups from AI response
-        if (data.groups && data.groups.length > 0) {
-            data.groups.forEach((group, groupIndex) => {
-                // Add connector between groups
-                if (groupIndex > 0) {
-                    const connector = document.createElement('div');
-                    connector.className = 'logic-connector';
-                    const logic = data.group_logic || 'and';
-                    connector.innerHTML = `<button type="button" class="logic-connector-btn ${logic}" onclick="toggleConnectorLogic(this)">${logic.toUpperCase()}</button>`;
-                    container.appendChild(connector);
-                }
-                
-                // Create group element
-                const groupEl = document.createElement('div');
-                groupEl.className = 'filter-group';
-                groupEl.dataset.groupIndex = groupCounter;
-                
-                const groupLogic = group.logic || 'and';
-                groupEl.innerHTML = `
-                    <div class="filter-group-header">
-                        <button type="button" class="filter-group-logic ${groupLogic}" onclick="toggleGroupLogic(this)">${groupLogic.toUpperCase()}</button>
-                        <span class="filter-group-label">within this group</span>
-                        <button type="button" class="filter-remove-btn" onclick="removeGroup(this)" title="Remove group">×</button>
-                    </div>
-                `;
-                
-                // Add conditions
-                if (group.conditions) {
-                    group.conditions.forEach(condition => {
-                        const row = createFilterRowWithValues(groupCounter, groupLogic, condition.field, condition.op, condition.value);
-                        groupEl.appendChild(row);
-                    });
-                }
-                
-                // Add "add condition" button
-                const addBtn = document.createElement('button');
-                addBtn.type = 'button';
-                addBtn.className = 'filter-add-btn';
-                addBtn.textContent = '+ Add condition';
-                addBtn.onclick = function() { addFilterToGroup(groupEl); };
-                groupEl.appendChild(addBtn);
-                
-                container.appendChild(groupEl);
-                groupCounter++;
-            });
-        }
-        
-        // Clear the AI prompt input after successful translation
-        promptInput.value = '';
         
     } catch (err) {
         showAIError('Network error: ' + err.message);
     } finally {
         btn.disabled = false;
         btn.classList.remove('loading');
-        btn.textContent = 'Ask AI';
+        btn.textContent = 'Search';
     }
 }
 
@@ -939,37 +894,11 @@ function showAIError(message) {
     errorDiv.style.display = 'block';
 }
 
-function createFilterRowWithValues(groupIndex, logic, field, op, value) {
-    const row = document.createElement('div');
-    row.className = 'filter-row';
-    row.innerHTML = `
-        <select class="filter-field-select" name="filter_field[]">
-            <option value="name" ${field === 'name' ? 'selected' : ''}>Name</option>
-            <option value="ingredients" ${field === 'ingredients' ? 'selected' : ''}>Ingredients</option>
-            <option value="instructions" ${field === 'instructions' ? 'selected' : ''}>Instructions</option>
-            <option value="keywords" ${field === 'keywords' ? 'selected' : ''}>Keywords</option>
-            <option value="author" ${field === 'author' ? 'selected' : ''}>Author</option>
-            <option value="book" ${field === 'book' ? 'selected' : ''}>Book</option>
-        </select>
-        <select class="filter-operator-select" name="filter_op[]">
-            <option value="contains" ${op === 'contains' ? 'selected' : ''}>contains</option>
-            <option value="not_contains" ${op === 'not_contains' ? 'selected' : ''}>doesn't contain</option>
-            <option value="equals" ${op === 'equals' ? 'selected' : ''}>equals</option>
-            <option value="starts" ${op === 'starts' ? 'selected' : ''}>starts with</option>
-        </select>
-        <input type="text" class="filter-value-input" name="filter_value[]" value="${value}" placeholder="Value...">
-        <input type="hidden" name="filter_group[]" value="${groupIndex}">
-        <input type="hidden" name="filter_logic[]" value="${logic}">
-        <button type="button" class="filter-remove-btn" onclick="removeFilter(this)" title="Remove filter">×</button>
-    `;
-    return row;
-}
-
-// Allow Enter key to trigger AI translation
+// Allow Enter key to trigger AI search
 document.getElementById('aiPromptInput')?.addEventListener('keypress', function(e) {
     if (e.key === 'Enter') {
         e.preventDefault();
-        translateWithAI();
+        searchWithAI();
     }
 });
 </script>

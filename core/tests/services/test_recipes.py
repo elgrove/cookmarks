@@ -120,6 +120,7 @@ class TestRecipeQuickSearch:
         response = client.get("/recipes/", {"q": "kung pao"})
 
         assert response.status_code == 200
+        assert response.context["has_searched"] is True
         recipes = list(response.context["recipes"])
         assert len(recipes) == 1
         assert recipes[0].name == "Kung Pao Chicken"
@@ -129,6 +130,7 @@ class TestRecipeQuickSearch:
         response = client.get("/recipes/", {"q": "coconut"})
 
         assert response.status_code == 200
+        assert response.context["has_searched"] is True
         recipes = list(response.context["recipes"])
         assert len(recipes) == 1
         assert recipes[0].name == "Kerala Beef Curry"
@@ -138,6 +140,7 @@ class TestRecipeQuickSearch:
         response = client.get("/recipes/", {"q": "fuchsia"})
 
         assert response.status_code == 200
+        assert response.context["has_searched"] is True
         recipes = list(response.context["recipes"])
         assert len(recipes) == 3  # All Chinese cookbook recipes
         recipe_names = {r.name for r in recipes}
@@ -147,9 +150,11 @@ class TestRecipeQuickSearch:
 
     def test_quick_search_finds_by_keyword(self, sample_data):
         client = Client()
+        # This should trigger has_searched=True since q is non-empty
         response = client.get("/recipes/", {"q": "vegetarian"})
 
         assert response.status_code == 200
+        assert response.context["has_searched"] is True
         recipes = list(response.context["recipes"])
         assert len(recipes) == 3
         recipe_names = {r.name for r in recipes}
@@ -177,6 +182,7 @@ class TestRecipeAdvancedFilters:
         )
 
         assert response.status_code == 200
+        assert response.context["has_searched"] is True
         recipes = list(response.context["recipes"])
         assert len(recipes) == 3
         for recipe in recipes:
@@ -198,6 +204,7 @@ class TestRecipeAdvancedFilters:
         )
 
         assert response.status_code == 200
+        assert response.context["has_searched"] is True
         recipes = list(response.context["recipes"])
         assert len(recipes) == 2
         recipe_names = {r.name for r in recipes}
@@ -229,6 +236,7 @@ class TestRecipeFilterCombinations:
         )
 
         assert response.status_code == 200
+        assert response.context["has_searched"] is True
         recipes = list(response.context["recipes"])
         assert len(recipes) == 2
         recipe_names = {r.name for r in recipes}
@@ -254,6 +262,7 @@ class TestRecipeFilterCombinations:
         )
 
         assert response.status_code == 200
+        assert response.context["has_searched"] is True
         recipes = list(response.context["recipes"])
         # Matches: Spring Rolls (both), Samosas (both), Dal (vegetarian)
         assert len(recipes) >= 3
@@ -280,6 +289,7 @@ class TestRecipeFilterCombinations:
         )
 
         assert response.status_code == 200
+        assert response.context["has_searched"] is True
         recipes = list(response.context["recipes"])
         assert len(recipes) == 2
         recipe_names = {r.name for r in recipes}
@@ -307,6 +317,7 @@ class TestRecipeFilterCombinations:
         )
 
         assert response.status_code == 200
+        assert response.context["has_searched"] is True
         recipes = list(response.context["recipes"])
         assert len(recipes) == 1
         assert recipes[0].name == "Kerala Beef Curry"
@@ -329,6 +340,7 @@ class TestRecipeFilterCombinations:
         )
 
         assert response.status_code == 200
+        assert response.context["has_searched"] is True
         recipes = list(response.context["recipes"])
         assert len(recipes) == 3
         for recipe in recipes:
@@ -354,6 +366,7 @@ class TestRecipeFilterCombinations:
         )
 
         assert response.status_code == 200
+        assert response.context["has_searched"] is True
         recipes = list(response.context["recipes"])
         assert len(recipes) == 1
         assert recipes[0].name == "Dal Tadka"
@@ -376,6 +389,7 @@ class TestRecipeListFiltering:
         response = client.get("/recipes/", {"selected_lists[]": str(my_list.id)})
 
         assert response.status_code == 200
+        assert response.context["has_searched"] is True
         recipes = list(response.context["recipes"])
         assert len(recipes) == 2
         recipe_names = {r.name for r in recipes}
@@ -408,6 +422,7 @@ class TestRecipeListFiltering:
         )
 
         assert response.status_code == 200
+        assert response.context["has_searched"] is True
         recipes = list(response.context["recipes"])
         assert len(recipes) == 1
         assert recipes[0].name == "Dal Tadka"
@@ -423,6 +438,7 @@ class TestRecipeSorting:
         response = client.get("/recipes/", {"q": "curry", "sort": "name"})
 
         assert response.status_code == 200
+        assert response.context["has_searched"] is True
         recipes = list(response.context["recipes"])
         names = [r.name for r in recipes]
         assert names == sorted(names)
@@ -444,6 +460,7 @@ class TestRecipeSorting:
         )
 
         assert response.status_code == 200
+        assert response.context["has_searched"] is True
         recipes = list(response.context["recipes"])
         # Asma Khan comes before Fuchsia Dunlop alphabetically
         authors = [r.book.author for r in recipes]
@@ -465,5 +482,6 @@ class TestRecipeSorting:
         )
 
         assert response.status_code == 200
+        assert response.context["has_searched"] is True
         recipes = list(response.context["recipes"])
         assert len(recipes) == 3
