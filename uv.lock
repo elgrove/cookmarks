@@ -158,15 +158,19 @@ dependencies = [
     { name = "langgraph-checkpoint-sqlite" },
     { name = "lxml" },
     { name = "pydantic" },
-    { name = "pytest" },
-    { name = "pytest-django" },
     { name = "requests" },
-    { name = "responses" },
-    { name = "ruff" },
     { name = "sqlite-vec" },
     { name = "tiktoken" },
     { name = "titlecase" },
     { name = "whitenoise" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+    { name = "pytest-django" },
+    { name = "responses" },
+    { name = "ruff" },
 ]
 
 [package.metadata]
@@ -181,15 +185,19 @@ requires-dist = [
     { name = "langgraph-checkpoint-sqlite", specifier = ">=3.0.1" },
     { name = "lxml", specifier = ">=6.0.2" },
     { name = "pydantic", specifier = ">=2.12.4" },
-    { name = "pytest", specifier = ">=9.0.1" },
-    { name = "pytest-django", specifier = ">=4.11.1" },
     { name = "requests", specifier = ">=2.32.5" },
-    { name = "responses", specifier = ">=0.25.8" },
-    { name = "ruff", specifier = ">=0.8.4" },
     { name = "sqlite-vec", specifier = ">=0.1.6" },
     { name = "tiktoken", specifier = ">=0.12.0" },
     { name = "titlecase", specifier = ">=2.4.1" },
     { name = "whitenoise", specifier = ">=6.7.0" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest", specifier = ">=9.0.1" },
+    { name = "pytest-django", specifier = ">=4.11.1" },
+    { name = "responses", specifier = ">=0.25.8" },
+    { name = "ruff", specifier = ">=0.8.4" },
 ]
 
 [[package]]
