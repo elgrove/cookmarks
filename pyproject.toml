@@ -49,6 +49,7 @@ exclude = [
     "dist",
     "wheels",
     "*.egg-info",
+    "core/services/prompts.py",
 ]
 
 [tool.ruff.lint]
@@ -72,7 +73,8 @@ select = [
 ignore = [
     "E501",   # Line too long (handled by formatter)
     "DJ001",  # Avoid using null=True on string-based fields (sometimes needed)
-    "RUF012"  # Mutable class attributes, clashes with Django
+    "RUF012", # Mutable class attributes, clashes with Django
+    "SIM108"  # Use ternary operator instead of if-else-block
 ]
 
 fixable = ["ALL"]

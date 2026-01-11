@@ -13,8 +13,8 @@ from django.utils.timezone import now
 from django_q.tasks import async_task
 
 from core.services.ai import GeminiProvider, OpenRouterProvider
-from core.services.embeddings import search_recipes as vector_search_recipes
 from core.services.calibre import refresh_single_book_from_calibre
+from core.services.embeddings import search_recipes as vector_search_recipes
 from core.services.extraction import app as extraction_app
 from core.tasks import save_recipes_from_graph_state
 
@@ -772,18 +772,17 @@ def recipe_detail(request, recipe_id):
                 "type": "search",
             }
 
-    # Default to book context
+    # Default to book context if requested or if no navigation found elsewhere
     if nav_context == "book" or (
         previous_recipe is None and next_recipe is None and nav_context != "list"
     ):
-        if nav_context == "book":
-            previous_recipe = recipe.get_previous_in_book()
-            next_recipe = recipe.get_next_in_book()
-            context_params = "context=book"
-            breadcrumb_context = {
-                "type": "book",
-                "book": recipe.book,
-            }
+        previous_recipe = recipe.get_previous_in_book()
+        next_recipe = recipe.get_next_in_book()
+        context_params = "context=book"
+        breadcrumb_context = {
+            "type": "book",
+            "book": recipe.book,
+        }
 
     template_context = {
         "recipe": recipe,
@@ -1162,7 +1161,7 @@ def get_recipe_image(request, book_id, image_path):
             image_data = epub.read(image_path)
             return HttpResponse(image_data, content_type="image/jpeg")
     except KeyError:
-        raise Http404(f"Image '{image_path}' not found in EPUB.")
+        raise Http404(f"Image '{image_path}' not found in EPUB.") from None
 
 
 def ai_search(request):

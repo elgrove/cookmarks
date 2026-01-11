@@ -27,6 +27,12 @@ class Book(BaseModel):
     isbn = models.CharField(max_length=50, blank=True)
     description = models.TextField(blank=True)
 
+    class Meta:
+        ordering = ["author"]
+
+    def __str__(self):
+        return f"{self.author} - {self.title}"
+
     def get_epub_path(self) -> Path:
         book_path = Path(self.path)
         epub_files = list(book_path.glob("*.epub"))
@@ -54,12 +60,6 @@ class Book(BaseModel):
         s = self.title.split(":")[0].strip()
         s = s.split("_")[0].strip()
         return s
-
-    def __str__(self):
-        return f"{self.author} - {self.title}"
-
-    class Meta:
-        ordering = ["author"]
 
 
 class ExtractionReport(BaseModel):
@@ -94,21 +94,21 @@ class ExtractionReport(BaseModel):
         ],
     )
 
-    def __str__(self):
-        return f"{self.book.title} - {self.started_at}"
-
     class Meta:
         ordering = ["-completed_at"]
+
+    def __str__(self):
+        return f"{self.book.title} - {self.started_at}"
 
 
 class Keyword(BaseModel):
     name = models.CharField(max_length=200, unique=True)
 
-    def __str__(self):
-        return self.name
-
     class Meta:
         ordering = ["name"]
+
+    def __str__(self):
+        return self.name
 
 
 class RecipeData(PydanticBase):
@@ -147,6 +147,9 @@ class Recipe(BaseModel):
     image = models.TextField(blank=True, null=True)
     keywords = models.ManyToManyField(Keyword, related_name="recipes", blank=True)
 
+    class Meta:
+        ordering = ["book", "order"]
+
     def __str__(self):
         return f"{self.name} ({self.book.author} - {self.book.title})"
 
@@ -177,9 +180,6 @@ class Recipe(BaseModel):
             bookOrder=self.order,
         )
 
-    class Meta:
-        ordering = ["book", "order"]
-
 
 class RecipeList(BaseModel):
     name = models.CharField(max_length=200)
@@ -187,6 +187,9 @@ class RecipeList(BaseModel):
     recipes = models.ManyToManyField(
         Recipe, through="RecipeListItem", related_name="recipe_lists", blank=True
     )
+
+    class Meta:
+        ordering = ["name"]
 
     def __str__(self):
         return self.name
@@ -196,20 +199,17 @@ class RecipeList(BaseModel):
         favourites, _ = cls.objects.get_or_create(is_default=True, defaults={"name": "Favourites"})
         return favourites
 
-    class Meta:
-        ordering = ["name"]
-
 
 class RecipeListItem(BaseModel):
     recipe_list = models.ForeignKey(RecipeList, on_delete=models.CASCADE, related_name="items")
     recipe = models.ForeignKey(Recipe, on_delete=models.CASCADE, related_name="list_items")
 
-    def __str__(self):
-        return f"{self.recipe.name} in {self.recipe_list.name}"
-
     class Meta:
         ordering = ["-created_at"]
         unique_together = ["recipe_list", "recipe"]
+
+    def __str__(self):
+        return f"{self.recipe.name} in {self.recipe_list.name}"
 
 
 class Config(models.Model):

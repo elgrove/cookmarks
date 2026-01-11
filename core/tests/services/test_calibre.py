@@ -14,7 +14,7 @@ class TestLoadBooksFromCalibre:
         # Ensure no books exist before loading
         assert Book.objects.count() == 0
 
-        created_count, updated_count = load_books_from_calibre(TEST_CALIBRE_DIR)
+        created_count, _ = load_books_from_calibre(TEST_CALIBRE_DIR)
 
         # Should have created at least one book
         assert created_count >= 1
@@ -47,7 +47,7 @@ class TestLoadBooksFromCalibre:
             pytest.skip(f"Test calibre directory not found: {TEST_CALIBRE_DIR}")
 
         # First load
-        created_count_1, updated_count_1 = load_books_from_calibre(TEST_CALIBRE_DIR)
+        created_count_1, _ = load_books_from_calibre(TEST_CALIBRE_DIR)
         book_count_after_first = Book.objects.count()
 
         # Second load should update, not create

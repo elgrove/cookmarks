@@ -25,8 +25,8 @@ def get_chapterlike_files_from_epub(epub_path: Path) -> list[str]:
 
             if not opf_path:
                 try:
-                    opf_path = [name for name in epub.namelist() if name.endswith(".opf")][0]
-                except IndexError:
+                    opf_path = next(name for name in epub.namelist() if name.endswith(".opf"))
+                except StopIteration:
                     logger.error(f"Could not find OPF file in {epub_path}")
                     return []
 

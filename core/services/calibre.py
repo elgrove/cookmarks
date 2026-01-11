@@ -1,5 +1,6 @@
 import logging
 import sqlite3
+from contextlib import suppress
 from datetime import datetime
 from pathlib import Path
 
@@ -23,7 +24,7 @@ def load_books_from_calibre(calibre_path: Path):
     cursor = conn.cursor()
 
     cursor.execute("""
-        SELECT DISTINCT 
+        SELECT DISTINCT
             b.id,
             b.title,
             b.path,
@@ -31,9 +32,9 @@ def load_books_from_calibre(calibre_path: Path):
             b.timestamp,
             (SELECT val FROM identifiers WHERE book = b.id AND type = 'isbn' LIMIT 1) as isbn,
             (SELECT name FROM data WHERE book = b.id AND format = 'EPUB' LIMIT 1) as epub_name,
-            (SELECT GROUP_CONCAT(a.name, ' & ') 
-             FROM authors a 
-             JOIN books_authors_link bal ON a.id = bal.author 
+            (SELECT GROUP_CONCAT(a.name, ' & ')
+             FROM authors a
+             JOIN books_authors_link bal ON a.id = bal.author
              WHERE bal.book = b.id) as authors,
             (SELECT text FROM comments WHERE book = b.id) as description
         FROM books b
@@ -112,16 +113,16 @@ def refresh_single_book_from_calibre(book: Book):
 
     cursor.execute(
         """
-        SELECT DISTINCT 
+        SELECT DISTINCT
             b.id,
             b.title,
             b.path,
             b.pubdate,
             b.timestamp,
             (SELECT val FROM identifiers WHERE book = b.id AND type = 'isbn' LIMIT 1) as isbn,
-            (SELECT GROUP_CONCAT(a.name, ' & ') 
-             FROM authors a 
-             JOIN books_authors_link bal ON a.id = bal.author 
+            (SELECT GROUP_CONCAT(a.name, ' & ')
+             FROM authors a
+             JOIN books_authors_link bal ON a.id = bal.author
              WHERE bal.book = b.id) as authors,
             (SELECT text FROM comments WHERE book = b.id) as description
         FROM books b
@@ -138,17 +139,13 @@ def refresh_single_book_from_calibre(book: Book):
 
     pubdate = None
     if row["pubdate"]:
-        try:
+        with suppress(ValueError, IndexError):
             pubdate = datetime.strptime(row["pubdate"].split()[0], "%Y-%m-%d").date()
-        except (ValueError, IndexError):
-            pass
 
     calibre_added_at = None
     if row["timestamp"]:
-        try:
+        with suppress(ValueError, IndexError):
             calibre_added_at = datetime.fromisoformat(row["timestamp"].replace("Z", "+00:00"))
-        except (ValueError, IndexError):
-            pass
 
     book.title = row["title"]
     book.author = row["authors"] or ""

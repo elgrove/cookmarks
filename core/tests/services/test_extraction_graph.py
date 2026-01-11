@@ -116,7 +116,6 @@ class TestExtractionGraph:
             assert mock_report.images_can_be_matched is True
 
     def test_validate_node_with_images(self, initial_state):
-
         state_with_recipes = {
             **initial_state,
             "raw_recipes": [
@@ -129,17 +128,14 @@ class TestExtractionGraph:
         assert result == {}
 
     def test_route_post_analyse_file(self, initial_state):
-
         state = {**initial_state, "extraction_type": "file"}
         assert route_post_analyse(state) == "extract_file"
 
     def test_route_post_analyse_block(self, initial_state):
-
         state = {**initial_state, "extraction_type": "block"}
         assert route_post_analyse(state) == "extract_block"
 
     def test_route_post_validate_with_images(self, initial_state):
-
         state = {
             **initial_state,
             "raw_recipes": [{"name": "Recipe", "image": "image.jpg"}],
@@ -148,7 +144,6 @@ class TestExtractionGraph:
         assert route_post_validate(state) == "resolve_images"
 
     def test_route_post_validate_no_images_first_try(self, initial_state):
-
         state = {
             **initial_state,
             "raw_recipes": [{"name": "Recipe", "image": None}],
@@ -157,7 +152,6 @@ class TestExtractionGraph:
         assert route_post_validate(state) == "await_human"
 
     def test_route_post_validate_no_images_already_tried_block(self, initial_state):
-
         state = {
             **initial_state,
             "raw_recipes": [{"name": "Recipe", "image": None}],
@@ -166,12 +160,10 @@ class TestExtractionGraph:
         assert route_post_validate(state) == "resolve_images"
 
     def test_route_post_human_has_images(self, initial_state):
-
         state = {**initial_state, "human_response": "has_images"}
         assert route_post_human(state) == "extract_block"
 
     def test_route_post_human_no_images(self, initial_state):
-
         state = {**initial_state, "human_response": "no_images"}
         assert route_post_human(state) == "resolve_images"
 
@@ -182,7 +174,6 @@ class TestExtractionGraph:
     ):
         mock_build_lookup.return_value = {"image1.jpg": ["OEBPS/images/image1.jpg"]}
         mock_resolve.return_value = "OEBPS/images/image1.jpg"
-
 
         state = {
             **initial_state,
@@ -199,7 +190,6 @@ class TestExtractionGraph:
         assert recipes[0]["bookTitle"] == "Test Cookbook"
 
     def test_finalise_node(self, mock_book, mock_report, initial_state):
-
         state = {
             **initial_state,
             "raw_recipes": [
@@ -216,7 +206,6 @@ class TestExtractionGraph:
         assert mock_report.completed_at is not None
 
     def test_route_post_resolve_with_images(self, initial_state):
-
         state = {
             **initial_state,
             "raw_recipes": [{"name": "Recipe", "image": "resolved_image.jpg"}],
@@ -225,7 +214,6 @@ class TestExtractionGraph:
         assert route_post_resolve(state) == "finalise"
 
     def test_route_post_resolve_no_images_with_human_response(self, initial_state):
-
         state = {
             **initial_state,
             "raw_recipes": [{"name": "Recipe", "image": None}],
@@ -235,7 +223,6 @@ class TestExtractionGraph:
         assert route_post_resolve(state) == "finalise"
 
     def test_route_post_resolve_no_images_no_human_response(self, initial_state):
-
         state = {
             **initial_state,
             "raw_recipes": [{"name": "Recipe", "image": None}],
@@ -244,7 +231,6 @@ class TestExtractionGraph:
         assert route_post_resolve(state) == "await_human"
 
     def test_route_post_resolve_no_images_already_tried_block(self, initial_state):
-
         state = {
             **initial_state,
             "raw_recipes": [{"name": "Recipe", "image": None}],
