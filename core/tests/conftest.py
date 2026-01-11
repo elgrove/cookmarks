@@ -60,7 +60,7 @@ def calibre_books(db):
     if not TEST_CALIBRE_DIR.exists():
         pytest.skip(f"Test calibre directory not found: {TEST_CALIBRE_DIR}")
 
-    created_count, updated_count = load_books_from_calibre(TEST_CALIBRE_DIR)
+    load_books_from_calibre(TEST_CALIBRE_DIR)
 
     # Return the book we expect to be loaded
     book = Book.objects.filter(title=TEST_CALIBRE_BOOK["title"]).first()

@@ -244,7 +244,7 @@ class OpenRouterProvider(AIProvider):
                     if isinstance(e, KeyError):
                         raise ValueError(
                             f"Unexpected response format from OpenRouter API: {e}. Response: {result}"
-                        )
+                        ) from e
                     raise
 
         return response_content or "", usage_metadata
@@ -344,5 +344,3 @@ def get_ai_provider():
     if provider_class:
         return provider_class()
     return None
-
-
