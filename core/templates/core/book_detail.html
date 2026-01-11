@@ -159,7 +159,7 @@
                             {% csrf_token %}
                             <button type="submit" class="btn btn-outline-dark w-100 d-flex align-items-center justify-content-between">
                                 <span>Extract Recipes</span>
-                                <span>→</span>
+                                <span>⚙</span>
                             </button>
                         </form>
                         
@@ -169,19 +169,27 @@
                             <span class="text-muted">⚙</span>
                         </button>
                         {% endif %}
-                        
+                        {% if recipes.count > 0 %}
+                        <form method="post" action="{% url 'generate_book_embeddings' book.id %}">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-outline-dark w-100 d-flex align-items-center justify-content-between">
+                                <span>Extract Embeddings</span>
+                                <span class="text-muted">⚙</span>
+                            </button>
+                        </form>
+                        {% endif %}
                         <form method="post" action="{% url 'clear_book_images' book.id %}">
                             {% csrf_token %}
                             <button type="submit" class="btn btn-outline-dark w-100 d-flex align-items-center justify-content-between">
                                 <span>Clear All Images</span>
-                                <span class="text-muted">×</span>
+                                <span class="text-muted">❌</span>
                             </button>
                         </form>
                         <form method="post" action="{% url 'clear_book_recipes' book.id %}" onsubmit="return confirm('Are you sure you want to remove all {{ recipes.count }} recipe{{ recipes.count|pluralize }} from this book?');">
                             {% csrf_token %}
                             <button type="submit" class="btn btn-outline-dark w-100 d-flex align-items-center justify-content-between">
                                 <span>Clear All Recipes</span>
-                                <span class="text-muted">×</span>
+                                <span class="text-muted">❌</span>
                             </button>
                         </form>
                         <button type="button" class="btn btn-outline-danger w-100 d-flex align-items-center justify-content-between" data-bs-toggle="modal" data-bs-target="#deleteBookModal">

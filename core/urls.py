@@ -14,6 +14,11 @@ urlpatterns = [
     path("book/<uuid:book_id>/cover/", views.book_cover, name="book_cover"),
     path("book/<uuid:book_id>/clear-images/", views.clear_book_images, name="clear_book_images"),
     path("book/<uuid:book_id>/clear-recipes/", views.clear_book_recipes, name="clear_book_recipes"),
+    path(
+        "book/<uuid:book_id>/generate-embeddings/",
+        views.generate_book_embeddings,
+        name="generate_book_embeddings",
+    ),
     path("book/<uuid:book_id>/delete/", views.delete_book, name="delete_book"),
     path("recipes/", views.recipes, name="recipes"),
     path("recipes/ai-search/", views.ai_search, name="ai_search"),
