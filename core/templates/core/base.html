@@ -8,14 +8,17 @@
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <style>
         body {
+            background-color: var(--bs-body-bg);
+            color: var(--bs-body-color);
+        }
+        [data-bs-theme="light"] body {
             background-color: #f8f9fa;
-            color: #212529;
         }
         .navbar {
-            border-bottom: 1px solid #dee2e6;
+            border-bottom: 1px solid var(--bs-border-color);
         }
         .card {
-            border: 1px solid #dee2e6;
+            border: 1px solid var(--bs-border-color);
             box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
         }
         .card-img-top {
@@ -23,6 +26,9 @@
             aspect-ratio: 2/3;
             width: 100%;
         }
+        /* No override for btn-dark to let bootstrap handle it or keep as is if needed.
+           Bootstrap's btn-dark is fine. Removing hardcoded colors to allow theme adaptability if desirable,
+           but these look like standard bootstrap dark anyway. */
         .btn-dark {
             background-color: #212529;
             border-color: #212529;
@@ -56,7 +62,7 @@
         }
         .dropdown-menu input[type="text"],
         .dropdown-menu input[type="search"] {
-            border-color: #dee2e6;
+            border-color: var(--bs-border-color);
         }
         
         /* Recipe page styles */
@@ -122,16 +128,24 @@
         
         /* Filter bar styles */
         .filter-bar {
-            background: #fff;
+            background: var(--bs-body-bg);
             border-radius: 12px;
             padding: 1rem 1.25rem;
             box-shadow: 0 1px 3px rgba(0,0,0,0.08);
             margin-bottom: 1.5rem;
         }
         
+        [data-bs-theme="light"] .filter-bar {
+            background: #fff;
+        }
+
+        [data-bs-theme="dark"] .filter-bar {
+             background: var(--bs-dark-bg-subtle);
+        }
+
         .filter-bar .form-select,
         .filter-bar .form-control {
-            border: 1px solid #e9ecef;
+            border: 1px solid var(--bs-border-color);
             border-radius: 8px;
             font-size: 0.9rem;
             padding: 0.5rem 0.75rem;
@@ -140,8 +154,8 @@
         
         .filter-bar .form-select:focus,
         .filter-bar .form-control:focus {
-            border-color: #212529;
-            box-shadow: 0 0 0 2px rgba(33, 37, 41, 0.1);
+            border-color: var(--bs-border-color-translucent);
+            box-shadow: 0 0 0 2px rgba(var(--bs-primary-rgb), 0.1);
         }
         
         .filter-btn {
@@ -433,14 +447,14 @@
     {% block extra_css %}{% endblock %}
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-light bg-white">
+    <nav class="navbar navbar-expand-lg bg-body-tertiary">
         <div class="container-fluid">
             <a class="navbar-brand" href="{% url 'home' %}">Cookmarks</a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav">
+                <ul class="navbar-nav me-auto">
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'books' %}">Books</a>
                     </li>
@@ -463,6 +477,36 @@
                         </ul>
                     </li>
                 </ul>
+                <ul class="navbar-nav">
+                    <li class="nav-item dropdown">
+                        <button class="btn btn-link nav-link py-2 px-0 px-lg-2 dropdown-toggle d-flex align-items-center"
+                                id="bd-theme"
+                                type="button"
+                                aria-expanded="false"
+                                data-bs-toggle="dropdown"
+                                data-bs-display="static"
+                                aria-label="Toggle theme (auto)">
+                            <span class="theme-icon-active" id="theme-text">Theme</span>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="bd-theme" style="--bs-dropdown-min-width: 8rem;">
+                            <li>
+                                <button type="button" class="dropdown-item d-flex align-items-center" data-bs-theme-value="light" aria-pressed="false">
+                                    Light
+                                </button>
+                            </li>
+                            <li>
+                                <button type="button" class="dropdown-item d-flex align-items-center" data-bs-theme-value="dark" aria-pressed="false">
+                                    Dark
+                                </button>
+                            </li>
+                            <li>
+                                <button type="button" class="dropdown-item d-flex align-items-center active" data-bs-theme-value="auto" aria-pressed="true">
+                                    Auto
+                                </button>
+                            </li>
+                        </ul>
+                    </li>
+                </ul>
             </div>
         </div>
     </nav>
@@ -482,6 +526,80 @@
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Theme toggle logic
+        (() => {
+            'use strict'
+
+            const getStoredTheme = () => localStorage.getItem('theme')
+            const setStoredTheme = theme => localStorage.setItem('theme', theme)
+
+            const getPreferredTheme = () => {
+                const storedTheme = getStoredTheme()
+                if (storedTheme) {
+                    return storedTheme
+                }
+
+                return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+            }
+
+            const setTheme = theme => {
+                if (theme === 'auto') {
+                    document.documentElement.setAttribute('data-bs-theme', (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'))
+                } else {
+                    document.documentElement.setAttribute('data-bs-theme', theme)
+                }
+            }
+
+            setTheme(getPreferredTheme())
+
+            const showActiveTheme = (theme, focus = false) => {
+                const themeSwitcher = document.querySelector('#bd-theme')
+                const themeText = document.querySelector('#theme-text')
+
+                if (!themeSwitcher) {
+                    return
+                }
+
+                const btnToActive = document.querySelector(`[data-bs-theme-value="${theme}"]`)
+
+                document.querySelectorAll('[data-bs-theme-value]').forEach(element => {
+                    element.classList.remove('active')
+                    element.setAttribute('aria-pressed', 'false')
+                })
+
+                if (btnToActive) {
+                    btnToActive.classList.add('active')
+                    btnToActive.setAttribute('aria-pressed', 'true')
+                }
+
+                // Update text
+                if (themeText) {
+                    themeText.textContent = theme.charAt(0).toUpperCase() + theme.slice(1);
+                }
+            }
+
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+                const storedTheme = getStoredTheme()
+                if (storedTheme !== 'light' && storedTheme !== 'dark') {
+                    setTheme(getPreferredTheme())
+                }
+            })
+
+            window.addEventListener('DOMContentLoaded', () => {
+                showActiveTheme(getStoredTheme() || 'auto')
+
+                document.querySelectorAll('[data-bs-theme-value]').forEach(toggle => {
+                    toggle.addEventListener('click', () => {
+                        const theme = toggle.getAttribute('data-bs-theme-value')
+                        setStoredTheme(theme)
+                        setTheme(theme)
+                        showActiveTheme(theme, true)
+                    })
+                })
+            })
+        })()
+    </script>
     <script>
         // Configure HTMX to include CSRF token in all requests
         document.body.addEventListener('htmx:configRequest', function(evt) {
