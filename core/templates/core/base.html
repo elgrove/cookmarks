@@ -120,6 +120,49 @@
             box-shadow: 0 0 0 2px rgba(var(--bs-primary-rgb), 0.1);
         }
         
+        /* ========================================
+           Global Action Button Styles 
+           ======================================== */
+        
+        .btn-action-primary {
+            background-color: var(--bs-body-color);
+            border-color: var(--bs-body-color);
+            color: var(--bs-body-bg);
+            transition: all 0.15s ease;
+        }
+        
+        .btn-action-primary:hover {
+            background-color: transparent;
+            border-color: var(--bs-body-color);
+            color: var(--bs-body-color);
+        }
+        
+        .btn-action-secondary {
+            background-color: transparent;
+            border: 1px solid var(--bs-body-color);
+            color: var(--bs-body-color);
+            transition: all 0.15s ease;
+        }
+        
+        .btn-action-secondary:hover {
+            background-color: var(--bs-body-color);
+            border-color: var(--bs-body-color);
+            color: var(--bs-body-bg);
+        }
+        
+        .btn-action-danger {
+            background-color: transparent;
+            border: 1px solid var(--bs-danger);
+            color: var(--bs-danger);
+            transition: all 0.15s ease;
+        }
+        
+        .btn-action-danger:hover {
+            background-color: var(--bs-danger);
+            border-color: var(--bs-danger);
+            color: white;
+        }
+        
         .filter-btn {
             border-radius: 8px;
             font-size: 0.875rem;
@@ -128,23 +171,27 @@
         }
         
         .filter-btn-primary {
-            background: var(--bs-secondary-bg);
-            border-color: var(--bs-border-color);
-            color: var(--bs-body-color);
+            background-color: var(--bs-body-color);
+            border-color: var(--bs-body-color);
+            color: var(--bs-body-bg);
         }
         
         .filter-btn-primary:hover {
-            background: var(--bs-tertiary-bg);
+            background-color: transparent;
+            border-color: var(--bs-body-color);
+            color: var(--bs-body-color);
         }
         
         .filter-btn-secondary {
-            background: transparent;
-            border: 1px solid var(--bs-border-color);
+            background-color: transparent;
+            border: 1px solid var(--bs-body-color);
             color: var(--bs-body-color);
         }
         
         .filter-btn-secondary:hover {
-            background: var(--bs-tertiary-bg);
+            background-color: var(--bs-body-color);
+            border-color: var(--bs-body-color);
+            color: var(--bs-body-bg);
         }
         
         .filter-btn-secondary.active {

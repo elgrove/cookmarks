@@ -83,23 +83,27 @@
     }
     
     .search-btn-primary {
-        background: var(--bs-secondary-bg);
-        border: 1px solid var(--bs-border-color);
-        color: var(--bs-body-color);
+        background-color: var(--bs-body-color);
+        border: 1px solid var(--bs-body-color);
+        color: var(--bs-body-bg);
     }
     
     .search-btn-primary:hover {
-        background: var(--bs-tertiary-bg);
+        background-color: transparent;
+        border-color: var(--bs-body-color);
+        color: var(--bs-body-color);
     }
     
     .search-btn-secondary {
-        background: transparent;
-        border: 1px solid var(--bs-border-color);
+        background-color: transparent;
+        border: 1px solid var(--bs-body-color);
         color: var(--bs-body-color);
     }
     
     .search-btn-secondary:hover {
-        background: var(--bs-tertiary-bg);
+        background-color: var(--bs-body-color);
+        border-color: var(--bs-body-color);
+        color: var(--bs-body-bg);
     }
     
     /* Filter groups */
@@ -608,15 +612,15 @@
             <!-- AI-Powered Vector Search -->
             <div class="search-box">
                 <div class="search-box-title">AI-Powered Smart Search ✨</div>
-                <!-- <div class="ai-hint">Uses AI to search deeper and find dishes related to your search term</div> -->
                 <input type="text" 
                        class="ai-prompt-input" 
                        id="aiPromptInput"
-                       placeholder="e.g. 'salads with cheese and nuts'"{% if vector_ids %} value="{{ request.GET.ai_query }}"{% endif %}>
+                       {% if vector_ids %}value="{{ request.GET.ai_query }}"{% endif %}>
                 <button type="button" class="ai-prompt-btn" id="aiPromptBtn" onclick="searchWithAI()">
                     Search
                 </button>
                 <div id="aiError" class="ai-error" style="display: none;"></div>
+                <div class="ai-hint">Search by ingredients, cuisines, occasions, or just describe what you fancy</div>
                 {% if vector_ids %}
                 <div style="margin-top: 0.5rem;">
                     <a href="{% url 'recipes' %}" class="search-btn search-btn-secondary" style="width: 100%; text-align: center; display: block;">Clear AI Search</a>

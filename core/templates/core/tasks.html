@@ -102,7 +102,7 @@
             </p>
             <form method="post" action="{% url 'load_books_from_calibre' %}" class="task-card-form">
                 {% csrf_token %}
-                <button type="submit" class="btn btn-dark task-btn">Load Books</button>
+                <button type="submit" class="btn btn-action-primary task-btn">Load Books</button>
             </form>
         </div>
     </div>
@@ -126,7 +126,7 @@
                         {% endfor %}
                     </select>
                 </div>
-                <button type="button" class="btn btn-dark task-btn" onclick="extractRecipes()">Extract Recipes</button>
+                <button type="button" class="btn btn-action-primary task-btn" onclick="extractRecipes()">Extract Recipes</button>
             </form>
         </div>
     </div>
@@ -145,7 +145,7 @@
                 <div class="mb-2">
                     <input type="number" class="form-control" name="count" id="randomCount" min="1" max="1000" value="10" placeholder="Number of books" />
                 </div>
-                <button type="submit" class="btn btn-dark task-btn">Queue Random Books</button>
+                <button type="submit" class="btn btn-action-primary task-btn">Queue Random Books</button>
             </form>
         </div>
     </div>
@@ -161,7 +161,7 @@
             </p>
             <form method="post" action="{% url 'queue_all_books_for_extraction' %}" class="task-card-form">
                 {% csrf_token %}
-                <button type="submit" class="btn btn-dark task-btn" id="queueAllBtn">Queue All Books</button>
+                <button type="submit" class="btn btn-action-primary task-btn" id="queueAllBtn">Queue All Books</button>
             </form>
         </div>
     </div>
@@ -177,7 +177,7 @@
             </p>
             <form method="post" action="{% url 'deduplicate_keywords' %}" class="task-card-form">
                 {% csrf_token %}
-                <button type="submit" class="btn btn-dark task-btn">Deduplicate Keywords</button>
+                <button type="submit" class="btn btn-action-primary task-btn">Deduplicate Keywords</button>
             </form>
         </div>
     </div>

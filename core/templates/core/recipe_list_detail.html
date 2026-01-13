@@ -20,7 +20,7 @@
     {% if not recipe_list.is_default %}
     <form method="post" action="{% url 'delete_recipe_list' recipe_list.id %}" onsubmit="return confirm('Are you sure you want to delete this list?');">
         {% csrf_token %}
-        <button type="submit" class="btn btn-outline-danger">Delete List</button>
+        <button type="submit" class="btn btn-action-danger">Delete List</button>
     </form>
     {% endif %}
 </div>
@@ -43,7 +43,7 @@
                     <small class="text-muted">Added {{ item.created_at|date:"M d, Y" }}</small>
                     <form method="post" action="{% url 'remove_recipe_from_list' item.recipe.id recipe_list.id %}">
                         {% csrf_token %}
-                        <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+                        <button type="submit" class="btn btn-sm btn-action-danger">Remove</button>
                     </form>
                 </div>
             </div>
@@ -56,7 +56,7 @@
     <div class="empty-state-icon">📋</div>
     <div class="empty-state-title">This list is empty</div>
     <p>Add recipes to this list from the recipe detail page.</p>
-    <a href="{% url 'recipes' %}" class="btn btn-outline-secondary mt-3">Browse Recipes</a>
+    <a href="{% url 'recipes' %}" class="btn btn-action-primary mt-3">Browse Recipes</a>
 </div>
 {% endif %}
 {% endblock %}
