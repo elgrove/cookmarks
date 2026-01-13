@@ -3,85 +3,182 @@
 {% block title %}Tasks - Cookmarks{% endblock %}
 
 {% block content %}
+<style>
+    .task-card {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        background: var(--bs-body-bg);
+        border: 1px solid var(--bs-border-color);
+        border-radius: 12px;
+        padding: 1.5rem;
+        height: 100%;
+        transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    }
+    
+    .task-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+        border-color: var(--bs-primary);
+    }
+    
+    .task-card-header {
+        display: flex;
+        align-items: flex-start;
+        gap: 1rem;
+        margin-bottom: 0.75rem;
+    }
+    
+    .task-card-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 2.5rem;
+        height: 2.5rem;
+        border-radius: 10px;
+        background: var(--bs-tertiary-bg);
+        font-size: 1.25rem;
+        flex-shrink: 0;
+    }
+    
+    .task-card-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        margin: 0;
+        color: var(--bs-body-color);
+    }
+    
+    .task-card-description {
+        font-size: 0.9rem;
+        color: var(--bs-secondary-color);
+        line-height: 1.5;
+        flex-grow: 1;
+        margin-bottom: 1rem;
+    }
+    
+    .task-card-form {
+        margin-top: auto;
+    }
+
+    .task-card-form .form-select,
+    .task-card-form .form-control {
+        border-radius: 8px;
+        font-size: 0.9rem;
+        padding: 0.5rem 0.75rem;
+        border: 1px solid var(--bs-border-color);
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    
+    .task-card-form .form-select:focus,
+    .task-card-form .form-control:focus {
+        border-color: var(--bs-primary);
+        box-shadow: 0 0 0 2px rgba(var(--bs-primary-rgb), 0.1);
+    }
+    
+    .task-btn {
+        border-radius: 8px;
+        font-size: 0.875rem;
+        font-weight: 500;
+        padding: 0.5rem 1rem;
+        transition: all 0.15s ease;
+        width: 100%;
+    }
+</style>
+
 <div class="page-header">
     <h1 class="page-title">Tasks</h1>
     <p class="page-subtitle">Manage your cookbook data and run maintenance tasks.</p>
 </div>
 
-<div class="row row-cols-1 row-cols-md-2 g-4">
-    <div class="col mb-4">
-        <div class="card h-100">
-            <div class="card-body">
-                <h5 class="card-title">Load Books from Calibre</h5>
-                <p class="card-text">Import book metadata from your Calibre library. This will add new books and update existing ones with the latest information from Calibre.</p>
-                <form method="post" action="{% url 'load_books_from_calibre' %}">
-                    {% csrf_token %}
-                    <button type="submit" class="btn btn-dark">Load Books</button>
-                </form>
+<div class="row g-4">
+    <div class="col-12 col-md-6 col-lg-4">
+        <div class="task-card">
+            <div class="task-card-header">
+                <div class="task-card-icon">📚</div>
+                <h5 class="task-card-title">Load Books from Calibre</h5>
             </div>
+            <p class="task-card-description">
+                Import book metadata from your Calibre library. This adds new books and updates existing ones with the latest information.
+            </p>
+            <form method="post" action="{% url 'load_books_from_calibre' %}" class="task-card-form">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-dark task-btn">Load Books</button>
+            </form>
         </div>
     </div>
 
-    <div class="col mb-4">
-        <div class="card h-100">
-            <div class="card-body">
-                <h5 class="card-title">Extract Recipes from Book</h5>
-                <p class="card-text">Extract recipes from a specific book using AI. Select a book below to start the extraction process.</p>
-                <form id="extractForm" data-extract-url-template="{% url 'queue_book_for_recipe_extraction' '00000000-0000-0000-0000-000000000000' %}">
-                    {% csrf_token %}
-                    <div class="mb-3">
-                        <select class="form-select" name="book_id" id="bookSelect" required>
-                            <option value="">Select a book...</option>
-                            {% for book in books %}
-                            <option value="{{ book.id }}">{{ book.clean_title }} - {{ book.author }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <button type="button" class="btn btn-dark" onclick="extractRecipes()">Extract Recipes</button>
-                </form>
+    <div class="col-12 col-md-6 col-lg-4">
+        <div class="task-card">
+            <div class="task-card-header">
+                <div class="task-card-icon">📖</div>
+                <h5 class="task-card-title">Extract from Book</h5>
             </div>
+            <p class="task-card-description">
+                Extract recipes from a specific book using AI. Select a book to start the extraction process.
+            </p>
+            <form id="extractForm" data-extract-url-template="{% url 'queue_book_for_recipe_extraction' '00000000-0000-0000-0000-000000000000' %}" class="task-card-form">
+                {% csrf_token %}
+                <div class="mb-2">
+                    <select class="form-select" name="book_id" id="bookSelect" required>
+                        <option value="">Select a book...</option>
+                        {% for book in books %}
+                        <option value="{{ book.id }}">{{ book.clean_title }} - {{ book.author }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button type="button" class="btn btn-dark task-btn" onclick="extractRecipes()">Extract Recipes</button>
+            </form>
         </div>
     </div>
 
-    <div class="col mb-4">
-        <div class="card h-100">
-            <div class="card-body">
-                <h5 class="card-title">Queue Random Books for Extraction</h5>
-                <p class="card-text">Queue a random selection of books for recipe extraction. Specify how many books you want to queue (default 10).</p>
-                <form method="post" action="{% url 'queue_random_books_for_extraction' %}">
-                    {% csrf_token %}
-                    <div class="mb-3">
-                        <input type="number" class="form-control" name="count" id="randomCount" min="1" max="1000" value="10" />
-                    </div>
-                    <button type="submit" class="btn btn-dark">Queue Random Books</button>
-                </form>
+    <div class="col-12 col-md-6 col-lg-4">
+        <div class="task-card">
+            <div class="task-card-header">
+                <div class="task-card-icon">🎲</div>
+                <h5 class="task-card-title">Queue Random Books</h5>
             </div>
+            <p class="task-card-description">
+                Queue a random selection of books for recipe extraction. Great for batch processing your library.
+            </p>
+            <form method="post" action="{% url 'queue_random_books_for_extraction' %}" class="task-card-form">
+                {% csrf_token %}
+                <div class="mb-2">
+                    <input type="number" class="form-control" name="count" id="randomCount" min="1" max="1000" value="10" placeholder="Number of books" />
+                </div>
+                <button type="submit" class="btn btn-dark task-btn">Queue Random Books</button>
+            </form>
         </div>
     </div>
 
-    <div class="col mb-4">
-        <div class="card h-100">
-            <div class="card-body">
-                <h5 class="card-title">Deduplicate Keywords</h5>
-                <p class="card-text">Use AI to identify and merge similar keywords across all recipes. This helps maintain consistent tagging.</p>
-                <form method="post" action="{% url 'deduplicate_keywords' %}">
-                    {% csrf_token %}
-                    <button type="submit" class="btn btn-dark">Deduplicate Keywords</button>
-                </form>
+    <div class="col-12 col-md-6 col-lg-4">
+        <div class="task-card">
+            <div class="task-card-header">
+                <div class="task-card-icon">📚</div>
+                <h5 class="task-card-title">Queue All Books</h5>
             </div>
+            <p class="task-card-description">
+                Queue extraction jobs for all books in your database. Books are processed newest first (by Calibre ID).
+            </p>
+            <form method="post" action="{% url 'queue_all_books_for_extraction' %}" class="task-card-form">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-dark task-btn" id="queueAllBtn">Queue All Books</button>
+            </form>
         </div>
     </div>
 
-    <div class="col mb-4">
-        <div class="card h-100">
-            <div class="card-body">
-                <h5 class="card-title">Queue all Books for Extraction</h5>
-                <p class="card-text">Queue extraction jobs for ALL books in your database. Books will be queued in descending Calibre id order (newest first).</p>
-                <form method="post" action="{% url 'queue_all_books_for_extraction' %}">
-                    {% csrf_token %}
-                    <button type="submit" class="btn btn-dark" id="queueAllBtn">Queue All Books</button>
-                </form>
+    <div class="col-12 col-md-6 col-lg-4">
+        <div class="task-card">
+            <div class="task-card-header">
+                <div class="task-card-icon">🏷️</div>
+                <h5 class="task-card-title">Deduplicate Keywords</h5>
             </div>
+            <p class="task-card-description">
+                Use AI to identify and merge similar keywords across all recipes. This helps maintain consistent tagging throughout your collection.
+            </p>
+            <form method="post" action="{% url 'deduplicate_keywords' %}" class="task-card-form">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-dark task-btn">Deduplicate Keywords</button>
+            </form>
         </div>
     </div>
 </div>
@@ -96,25 +193,22 @@ function extractRecipes() {
         return;
     }
     
-    const bookTitle = select.options[select.selectedIndex].text;
-    
-    // submit directly, do not ask for confirmation
     const form = document.createElement('form');
     const urlTemplate = document.getElementById('extractForm').dataset.extractUrlTemplate;
     form.method = 'POST';
     form.action = urlTemplate.replace('00000000-0000-0000-0000-000000000000', bookId);
         
-        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
-        if (csrfToken) {
-            const csrfInput = document.createElement('input');
-            csrfInput.type = 'hidden';
-            csrfInput.name = 'csrfmiddlewaretoken';
-            csrfInput.value = csrfToken.value;
-            form.appendChild(csrfInput);
-        }
-        
-        document.body.appendChild(form);
-        form.submit();
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+    if (csrfToken) {
+        const csrfInput = document.createElement('input');
+        csrfInput.type = 'hidden';
+        csrfInput.name = 'csrfmiddlewaretoken';
+        csrfInput.value = csrfToken.value;
+        form.appendChild(csrfInput);
     }
+        
+    document.body.appendChild(form);
+    form.submit();
+}
 </script>
 {% endblock %}
