@@ -4,12 +4,16 @@ import time
 from django.core.management.base import BaseCommand
 
 from core.models import Recipe
-from core.services.embeddings import VectorStore, generate_recipe_embeddings_batch
+from core.services.embeddings import (
+    EMBEDDING_BATCH_SIZE,
+    VectorStore,
+    generate_recipe_embeddings_batch,
+)
 
 logger = logging.getLogger(__name__)
 
 REGENERATE_ALL = False
-BATCH_SIZE = 6
+BATCH_SIZE = EMBEDDING_BATCH_SIZE
 DELAY_SECONDS = 0.2
 
 

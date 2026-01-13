@@ -113,6 +113,9 @@ def generate_recipe_embedding(recipe: Recipe) -> None:
     logger.info(f"Generated embedding for recipe: {recipe.name}")
 
 
+EMBEDDING_BATCH_SIZE = 6
+
+
 def generate_recipe_embeddings_batch(recipes: list[Recipe]) -> None:
     if not recipes:
         return
@@ -124,15 +127,21 @@ def generate_recipe_embeddings_batch(recipes: list[Recipe]) -> None:
 
     store = VectorStore()
 
-    texts = [recipe_to_text(recipe) for recipe in recipes]
-    embeddings = provider.generate_embeddings_batch(texts, "RETRIEVAL_DOCUMENT")
-    if not embeddings:
-        return
+    all_items = []
+    for i in range(0, len(recipes), EMBEDDING_BATCH_SIZE):
+        batch = recipes[i : i + EMBEDDING_BATCH_SIZE]
+        texts = [recipe_to_text(recipe) for recipe in batch]
+        embeddings = provider.generate_embeddings_batch(texts, "RETRIEVAL_DOCUMENT")
+        if not embeddings:
+            continue
 
-    items = [
-        (str(recipe.id), embedding) for recipe, embedding in zip(recipes, embeddings, strict=True)
-    ]
-    store.upsert_batch(items)
+        items = [
+            (str(recipe.id), embedding) for recipe, embedding in zip(batch, embeddings, strict=True)
+        ]
+        all_items.extend(items)
+
+    if all_items:
+        store.upsert_batch(all_items)
 
     recipe_names = ", ".join([r.name for r in recipes[:3]])
     suffix = "..." if len(recipes) > 3 else ""

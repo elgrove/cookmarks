@@ -222,6 +222,21 @@ def clear_book_recipes(request, book_id):
     return redirect("book_detail", book_id=book_id)
 
 
+def generate_book_embeddings(request, book_id):
+    if request.method == "POST":
+        book = get_object_or_404(Book, id=book_id)
+        recipe_count = book.recipes.count()
+        if recipe_count > 0:
+            async_task("core.tasks.generate_book_embeddings_task", book.id)
+            messages.success(
+                request,
+                f"Queued embedding generation for {recipe_count} recipes from {book.clean_title}",
+            )
+        else:
+            messages.warning(request, "No recipes to generate embeddings for.")
+    return redirect("book_detail", book_id=book_id)
+
+
 def refresh_book_metadata(request, book_id):
     if request.method == "POST":
         book = get_object_or_404(Book, id=book_id)

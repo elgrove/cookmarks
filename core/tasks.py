@@ -111,6 +111,28 @@ def load_books_from_calibre_task():
         raise e
 
 
+def generate_book_embeddings_task(book_id: str):
+    try:
+        book = Book.objects.get(id=book_id)
+        recipes = list(book.recipes.select_related("book").prefetch_related("keywords").all())
+
+        if not recipes:
+            logger.info(f"No recipes to embed for book: {book.title}")
+            return "No recipes to embed"
+
+        logger.info(f"Generating embeddings for {len(recipes)} recipes from: {book.title}")
+        generate_recipe_embeddings_batch(recipes)
+        logger.info(f"Finished generating embeddings for {len(recipes)} recipes from: {book.title}")
+        return f"Generated embeddings for {len(recipes)} recipes"
+
+    except Book.DoesNotExist:
+        logger.error(f"Book with id {book_id} not found")
+        return "Book not found"
+    except Exception as e:
+        logger.error(f"Error generating embeddings for book: {e}")
+        raise e
+
+
 def save_recipes_from_graph_state(
     book: Book, extraction: ExtractionReport, raw_recipes: list[dict]
 ):
