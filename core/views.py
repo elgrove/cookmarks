@@ -1,6 +1,7 @@
 import json
 import logging
 import random
+import uuid
 import zipfile
 from datetime import date, timedelta
 
@@ -263,11 +264,17 @@ def recipes(request):
     filters = []
     group_logic = request.GET.get("group_logic", "or")
     vector_search_ids = None
+    vector_search_key = None
+    ai_query = None
 
-    vector_ids_param = request.GET.get("vector_ids", "").strip()
-    if vector_ids_param:
-        vector_search_ids = vector_ids_param.split(",")
-        has_searched = True
+    vector_search_key = request.GET.get("vector_search", "").strip()
+    if vector_search_key:
+        session_key = f"vector_search_{vector_search_key}"
+        vector_data = request.session.get(session_key)
+        if vector_data:
+            vector_search_ids = vector_data.get("recipe_ids", [])
+            ai_query = vector_data.get("query", "")
+            has_searched = True
 
     query = request.GET.get("q", "").strip()
 
@@ -483,8 +490,8 @@ def recipes(request):
         params = ["context=search"]
         if query:
             params.append(f"q={query}")
-        if vector_ids_param:
-            params.append(f"vector_ids={vector_ids_param}")
+        if vector_search_key:
+            params.append(f"vector_search={vector_search_key}")
         if sort_by:
             params.append(f"sort={sort_by}")
         if group_logic:
@@ -523,7 +530,8 @@ def recipes(request):
         "all_authors": all_authors,
         "all_keywords": all_keywords,
         "all_lists": all_lists,
-        "vector_ids": vector_ids_param,
+        "vector_search_key": vector_search_key,
+        "ai_query": ai_query,
     }
 
     return render(request, "core/recipes.html", context)
@@ -601,6 +609,15 @@ def recipe_detail(request, recipe_id):
         sort_by = request.GET.get("sort", "name")
         group_logic = request.GET.get("group_logic", "and")
 
+        # Vector search handling
+        vector_search_key = request.GET.get("vector_search", "").strip()
+        vector_search_ids = None
+        if vector_search_key:
+            session_key = f"vector_search_{vector_search_key}"
+            vector_data = request.session.get(session_key)
+            if vector_data:
+                vector_search_ids = vector_data.get("recipe_ids", [])
+
         # Advanced filter params (unified format used by both recipes and search pages)
         filter_fields = request.GET.getlist("filter_field[]")
         filter_ops = request.GET.getlist("filter_op[]")
@@ -608,184 +625,235 @@ def recipe_detail(request, recipe_id):
         filter_groups = request.GET.getlist("filter_group[]")
         filter_logics = request.GET.getlist("filter_logic[]")
 
-        # Rebuild the recipe queryset
-        recipes_qs = Recipe.objects.select_related("book").prefetch_related("keywords").all()
+        # Fast path: pure vector search with relevance sorting - use session IDs directly
+        is_pure_vector_search = (
+            vector_search_ids
+            and sort_by == "relevance"
+            and not search
+            and not selected_lists
+            and not filter_fields
+        )
 
-        # Apply quick search
-        if search:
-            recipes_qs = recipes_qs.filter(
-                Q(name__icontains=search)
-                | Q(ingredients__icontains=search)
-                | Q(instructions__icontains=search)
-                | Q(keywords__name__icontains=search)
-                | Q(book__author__icontains=search)
-                | Q(book__title__icontains=search)
-            ).distinct()
+        if is_pure_vector_search:
+            # Use the ordered IDs from session directly - no DB query needed for ordering
+            recipe_id_str = str(recipe.id)
+            if recipe_id_str in vector_search_ids:
+                idx = vector_search_ids.index(recipe_id_str)
+                if idx > 0:
+                    prev_id = vector_search_ids[idx - 1]
+                    previous_recipe = Recipe.objects.filter(id=prev_id).first()
+                if idx < len(vector_search_ids) - 1:
+                    next_id = vector_search_ids[idx + 1]
+                    next_recipe = Recipe.objects.filter(id=next_id).first()
 
-        # Apply list filter (still passed separately)
-        if selected_lists:
-            recipes_qs = recipes_qs.filter(recipe_lists__id__in=selected_lists).distinct()
+            context_params = f"context=search&vector_search={vector_search_key}&sort=relevance"
+            breadcrumb_context = {"type": "search"}
+        else:
+            # Rebuild the recipe queryset
+            recipes_qs = Recipe.objects.select_related("book").prefetch_related("keywords").all()
 
-        # Apply advanced filter groups
-        if filter_fields and filter_values:
-            m2m_fields = {f.name for f in Recipe._meta.get_fields() if f.many_to_many}
+            # Apply quick search
+            if search:
+                recipes_qs = recipes_qs.filter(
+                    Q(name__icontains=search)
+                    | Q(ingredients__icontains=search)
+                    | Q(instructions__icontains=search)
+                    | Q(keywords__name__icontains=search)
+                    | Q(book__author__icontains=search)
+                    | Q(book__title__icontains=search)
+                ).distinct()
 
-            field_map = {
-                f.name: f.name
-                for f in Recipe._meta.get_fields()
-                if hasattr(f, "get_internal_type") and f.get_internal_type() == "TextField"
-            }
-            for f in Recipe._meta.get_fields():
-                if f.many_to_many:
-                    field_map[f.name] = f"{f.name}__name"
-            field_map.update(
-                {
-                    "author": "book__author",
-                    "book": "book__title",
+            # Apply list filter (still passed separately)
+            if selected_lists:
+                recipes_qs = recipes_qs.filter(recipe_lists__id__in=selected_lists).distinct()
+
+            # Apply advanced filter groups
+            if filter_fields and filter_values:
+                m2m_fields = {f.name for f in Recipe._meta.get_fields() if f.many_to_many}
+
+                field_map = {
+                    f.name: f.name
+                    for f in Recipe._meta.get_fields()
+                    if hasattr(f, "get_internal_type") and f.get_internal_type() == "TextField"
                 }
-            )
-
-            def apply_condition(field, op, value):
-                db_field = field_map.get(field, field)
-                if op == "contains":
-                    return Q(**{f"{db_field}__icontains": value})
-                elif op == "not_contains":
-                    return ~Q(**{f"{db_field}__icontains": value})
-                elif op == "equals":
-                    return Q(**{f"{db_field}__iexact": value})
-                elif op == "starts":
-                    return Q(**{f"{db_field}__istartswith": value})
-                return Q()
-
-            def is_positive_m2m_condition(condition):
-                return condition["field"] in m2m_fields and condition["op"] in (
-                    "contains",
-                    "equals",
-                    "starts",
+                for f in Recipe._meta.get_fields():
+                    if f.many_to_many:
+                        field_map[f.name] = f"{f.name}__name"
+                field_map.update(
+                    {
+                        "author": "book__author",
+                        "book": "book__title",
+                    }
                 )
 
-            groups_dict = {}
-            for field, op, value, group_idx, logic in zip(
-                filter_fields, filter_ops, filter_values, filter_groups, filter_logics, strict=False
-            ):
-                if value.strip():
-                    group_key = int(group_idx) if group_idx.isdigit() else 0
-                    if group_key not in groups_dict:
-                        groups_dict[group_key] = {"logic": logic, "conditions": []}
-                    groups_dict[group_key]["conditions"].append(
-                        {"field": field, "op": op, "value": value.strip()}
+                def apply_condition(field, op, value):
+                    db_field = field_map.get(field, field)
+                    if op == "contains":
+                        return Q(**{f"{db_field}__icontains": value})
+                    elif op == "not_contains":
+                        return ~Q(**{f"{db_field}__icontains": value})
+                    elif op == "equals":
+                        return Q(**{f"{db_field}__iexact": value})
+                    elif op == "starts":
+                        return Q(**{f"{db_field}__istartswith": value})
+                    return Q()
+
+                def is_positive_m2m_condition(condition):
+                    return condition["field"] in m2m_fields and condition["op"] in (
+                        "contains",
+                        "equals",
+                        "starts",
                     )
 
-            if groups_dict:
-                group_queries = []
-                chained_m2m_filters = []
+                groups_dict = {}
+                for field, op, value, group_idx, logic in zip(
+                    filter_fields,
+                    filter_ops,
+                    filter_values,
+                    filter_groups,
+                    filter_logics,
+                    strict=False,
+                ):
+                    if value.strip():
+                        group_key = int(group_idx) if group_idx.isdigit() else 0
+                        if group_key not in groups_dict:
+                            groups_dict[group_key] = {"logic": logic, "conditions": []}
+                        groups_dict[group_key]["conditions"].append(
+                            {"field": field, "op": op, "value": value.strip()}
+                        )
 
-                for group in [groups_dict[k] for k in sorted(groups_dict.keys())]:
-                    if group["logic"] == "and":
-                        # Separate M2M positive conditions for chaining
-                        m2m_conditions = [
-                            c for c in group["conditions"] if is_positive_m2m_condition(c)
-                        ]
-                        other_conditions = [
-                            c for c in group["conditions"] if not is_positive_m2m_condition(c)
-                        ]
+                if groups_dict:
+                    group_queries = []
+                    chained_m2m_filters = []
 
-                        group_q = Q()
-                        for condition in other_conditions:
-                            cond_q = apply_condition(
-                                condition["field"], condition["op"], condition["value"]
-                            )
-                            group_q &= cond_q
+                    for group in [groups_dict[k] for k in sorted(groups_dict.keys())]:
+                        if group["logic"] == "and":
+                            # Separate M2M positive conditions for chaining
+                            m2m_conditions = [
+                                c for c in group["conditions"] if is_positive_m2m_condition(c)
+                            ]
+                            other_conditions = [
+                                c for c in group["conditions"] if not is_positive_m2m_condition(c)
+                            ]
 
-                        for condition in m2m_conditions:
-                            chained_m2m_filters.append(
-                                apply_condition(
+                            group_q = Q()
+                            for condition in other_conditions:
+                                cond_q = apply_condition(
                                     condition["field"], condition["op"], condition["value"]
                                 )
-                            )
+                                group_q &= cond_q
 
-                        if group_q:
-                            group_queries.append(group_q)
-                    else:
-                        # OR logic: combine all conditions
-                        group_q = Q()
-                        for condition in group["conditions"]:
-                            cond_q = apply_condition(
-                                condition["field"], condition["op"], condition["value"]
-                            )
-                            group_q |= cond_q
-                        if group_q:
-                            group_queries.append(group_q)
+                            for condition in m2m_conditions:
+                                chained_m2m_filters.append(
+                                    apply_condition(
+                                        condition["field"], condition["op"], condition["value"]
+                                    )
+                                )
 
-                if group_queries:
-                    final_filter_q = group_queries[0]
-                    for gq in group_queries[1:]:
-                        if group_logic == "and":
-                            final_filter_q &= gq
+                            if group_q:
+                                group_queries.append(group_q)
                         else:
-                            final_filter_q |= gq
-                    recipes_qs = recipes_qs.filter(final_filter_q)
+                            # OR logic: combine all conditions
+                            group_q = Q()
+                            for condition in group["conditions"]:
+                                cond_q = apply_condition(
+                                    condition["field"], condition["op"], condition["value"]
+                                )
+                                group_q |= cond_q
+                            if group_q:
+                                group_queries.append(group_q)
 
-                # Chain M2M filters for proper AND semantics
-                for m2m_q in chained_m2m_filters:
-                    recipes_qs = recipes_qs.filter(m2m_q)
+                    if group_queries:
+                        final_filter_q = group_queries[0]
+                        for gq in group_queries[1:]:
+                            if group_logic == "and":
+                                final_filter_q &= gq
+                            else:
+                                final_filter_q |= gq
+                        recipes_qs = recipes_qs.filter(final_filter_q)
 
-                recipes_qs = recipes_qs.distinct()
+                    # Chain M2M filters for proper AND semantics
+                    for m2m_q in chained_m2m_filters:
+                        recipes_qs = recipes_qs.filter(m2m_q)
 
-        # Apply sorting
-        if sort_by == "name":
-            recipes_qs = recipes_qs.order_by("name")
-        elif sort_by == "book":
-            recipes_qs = recipes_qs.order_by("book__title", "order")
-        elif sort_by == "author":
-            recipes_qs = recipes_qs.order_by("book__author", "book__title", "order")
-        elif sort_by == "order":
-            recipes_qs = recipes_qs.order_by("book", "order")
-        elif sort_by == "recent":
-            recipes_qs = recipes_qs.order_by("-created_at")
-        elif sort_by == "list_order" and len(selected_lists) == 1:
-            recipes_qs = recipes_qs.order_by("list_items__id")
-        elif sort_by == "relevance":
-            recipes_qs = recipes_qs.order_by("name")
-        else:
-            # Random sort or invalid - can't reliably navigate, fall back to book
-            nav_context = "book"
-            recipes_qs = None
+                    recipes_qs = recipes_qs.distinct()
 
-        if recipes_qs is not None:
-            recipe_ids = list(recipes_qs.values_list("id", flat=True))
+            # Apply vector search filter
+            if vector_search_ids:
+                recipes_qs = recipes_qs.filter(id__in=vector_search_ids)
 
-            if recipe.id in recipe_ids:
-                idx = recipe_ids.index(recipe.id)
-                if idx > 0:
-                    previous_recipe = Recipe.objects.get(id=recipe_ids[idx - 1])
-                if idx < len(recipe_ids) - 1:
-                    next_recipe = Recipe.objects.get(id=recipe_ids[idx + 1])
+            # Apply sorting
+            if sort_by == "name":
+                recipes_qs = recipes_qs.order_by("name")
+            elif sort_by == "book":
+                recipes_qs = recipes_qs.order_by("book__title", "order")
+            elif sort_by == "author":
+                recipes_qs = recipes_qs.order_by("book__author", "book__title", "order")
+            elif sort_by == "order":
+                recipes_qs = recipes_qs.order_by("book", "order")
+            elif sort_by == "recent":
+                recipes_qs = recipes_qs.order_by("-created_at")
+            elif sort_by == "list_order" and len(selected_lists) == 1:
+                recipes_qs = recipes_qs.order_by("list_items__id")
+            elif sort_by == "relevance" and vector_search_ids:
+                # For vector search relevance, use the order from vector_search_ids
+                id_to_position = {vid: idx for idx, vid in enumerate(vector_search_ids)}
+                recipes_list = list(recipes_qs)
+                recipes_list.sort(key=lambda r: id_to_position.get(str(r.id), 9999))
+                recipes_qs = recipes_list
+            elif sort_by == "relevance":
+                # Fallback for relevance without vector search
+                recipes_qs = recipes_qs.order_by("name")
+            else:
+                # Random sort or invalid - can't reliably navigate, fall back to book
+                nav_context = "book"
+                recipes_qs = None
 
-            # Build context params for navigation links (unified format)
-            params = ["context=search"]
-            if search:
-                params.append(f"q={search}")
-            if sort_by:
-                params.append(f"sort={sort_by}")
-            if group_logic:
-                params.append(f"group_logic={group_logic}")
-            for list_id in selected_lists:
-                params.append(f"selected_lists[]={list_id}")
-            for field, op, value, group_idx, logic in zip(
-                filter_fields, filter_ops, filter_values, filter_groups, filter_logics, strict=False
-            ):
-                if value.strip():
-                    params.append(f"filter_field[]={field}")
-                    params.append(f"filter_op[]={op}")
-                    params.append(f"filter_value[]={value}")
-                    params.append(f"filter_group[]={group_idx}")
-                    params.append(f"filter_logic[]={logic}")
-            context_params = "&".join(params)
+            if recipes_qs is not None:
+                # Handle both queryset and list (from relevance sorting)
+                if hasattr(recipes_qs, "values_list"):
+                    recipe_ids = list(recipes_qs.values_list("id", flat=True))
+                else:
+                    recipe_ids = [r.id for r in recipes_qs]
 
-            breadcrumb_context = {
-                "type": "search",
-            }
+                if recipe.id in recipe_ids:
+                    idx = recipe_ids.index(recipe.id)
+                    if idx > 0:
+                        previous_recipe = Recipe.objects.get(id=recipe_ids[idx - 1])
+                    if idx < len(recipe_ids) - 1:
+                        next_recipe = Recipe.objects.get(id=recipe_ids[idx + 1])
+
+                # Build context params for navigation links (unified format)
+                params = ["context=search"]
+                if search:
+                    params.append(f"q={search}")
+                if vector_search_key:
+                    params.append(f"vector_search={vector_search_key}")
+                if sort_by:
+                    params.append(f"sort={sort_by}")
+                if group_logic:
+                    params.append(f"group_logic={group_logic}")
+                for list_id in selected_lists:
+                    params.append(f"selected_lists[]={list_id}")
+                for field, op, value, group_idx, logic in zip(
+                    filter_fields,
+                    filter_ops,
+                    filter_values,
+                    filter_groups,
+                    filter_logics,
+                    strict=False,
+                ):
+                    if value.strip():
+                        params.append(f"filter_field[]={field}")
+                        params.append(f"filter_op[]={op}")
+                        params.append(f"filter_value[]={value}")
+                        params.append(f"filter_group[]={group_idx}")
+                        params.append(f"filter_logic[]={logic}")
+                context_params = "&".join(params)
+
+                breadcrumb_context = {
+                    "type": "search",
+                }
 
     # Default to book context if requested or if no navigation found elsewhere
     if nav_context == "book" or (
@@ -1193,7 +1261,16 @@ def ai_search(request):
     try:
         recipes = vector_search_recipes(prompt, limit=limit)
         recipe_ids = [str(r.id) for r in recipes]
-        return JsonResponse({"recipe_ids": recipe_ids})
+
+        search_key = uuid.uuid4().hex[:12]
+        session_key = f"vector_search_{search_key}"
+        request.session[session_key] = {
+            "query": prompt,
+            "recipe_ids": recipe_ids,
+            "timestamp": now().isoformat(),
+        }
+
+        return JsonResponse({"search_key": search_key, "count": len(recipe_ids)})
     except Exception as e:
         logger.exception("Vector search failed")
         return JsonResponse(

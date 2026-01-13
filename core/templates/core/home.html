@@ -92,7 +92,7 @@
                         {% if book_of_the_day.description %}
                         <p class="card-text">{{ book_of_the_day.description|truncatechars:800|safe }}</p>
                         {% endif %}
-                        <a href="{% url 'book_detail' book_of_the_day.id %}" class="btn btn-dark">View Book</a>
+                        <a href="{% url 'book_detail' book_of_the_day.id %}" class="btn btn-action-primary">View Book</a>
                     </div>
                 </div>
             </div>

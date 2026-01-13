@@ -1,38 +1,17 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-bs-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Cookmarks{% endblock %}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <style>
-        body {
-            background-color: #f8f9fa;
-            color: #212529;
-        }
-        .navbar {
-            border-bottom: 1px solid #dee2e6;
-        }
-        .card {
-            border: 1px solid #dee2e6;
-            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
-        }
         .card-img-top {
             object-fit: cover;
             aspect-ratio: 2/3;
             width: 100%;
-        }
-        .btn-dark {
-            background-color: #212529;
-            border-color: #212529;
-        }
-        .btn-dark:hover {
-            background-color: #424649;
-            border-color: #373b3e;
-        }
-        .dropdown-menu {
-            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
         }
         .dropdown-menu .form-check {
             padding: 0.25rem 0;
@@ -54,10 +33,6 @@
             margin-bottom: 0;
             line-height: 1.5;
         }
-        .dropdown-menu input[type="text"],
-        .dropdown-menu input[type="search"] {
-            border-color: #dee2e6;
-        }
         
         /* Recipe page styles */
         .recipe-nav-link {
@@ -70,13 +45,13 @@
             transition: background-color 0.15s ease;
         }
         .ingredient-item:hover {
-            background-color: rgba(0, 0, 0, 0.02);
+            background-color: var(--bs-tertiary-bg);
         }
         .method-step {
             transition: background-color 0.15s ease;
         }
         .method-step:hover {
-            background-color: rgba(0, 0, 0, 0.02);
+            background-color: var(--bs-tertiary-bg);
         }
         .book-link {
             transition: opacity 0.15s ease;
@@ -105,7 +80,7 @@
         .page-header {
             padding-bottom: 0.75rem;
             margin-bottom: 1.5rem;
-            border-bottom: 1px solid #e9ecef;
+            border-bottom: 1px solid var(--bs-border-color);
         }
         
         .page-title {
@@ -115,23 +90,24 @@
         }
         
         .page-subtitle {
-            color: #6c757d;
+            color: var(--bs-secondary-color);
             font-size: 0.95rem;
             margin-bottom: 0;
         }
         
         /* Filter bar styles */
         .filter-bar {
-            background: #fff;
+            background: var(--bs-body-bg);
             border-radius: 12px;
             padding: 1rem 1.25rem;
             box-shadow: 0 1px 3px rgba(0,0,0,0.08);
             margin-bottom: 1.5rem;
+            border: 1px solid var(--bs-border-color);
         }
         
         .filter-bar .form-select,
         .filter-bar .form-control {
-            border: 1px solid #e9ecef;
+            border: 1px solid var(--bs-border-color);
             border-radius: 8px;
             font-size: 0.9rem;
             padding: 0.5rem 0.75rem;
@@ -140,8 +116,51 @@
         
         .filter-bar .form-select:focus,
         .filter-bar .form-control:focus {
-            border-color: #212529;
-            box-shadow: 0 0 0 2px rgba(33, 37, 41, 0.1);
+            border-color: var(--bs-primary);
+            box-shadow: 0 0 0 2px rgba(var(--bs-primary-rgb), 0.1);
+        }
+        
+        /* ========================================
+           Global Action Button Styles 
+           ======================================== */
+        
+        .btn-action-primary {
+            background-color: var(--bs-body-color);
+            border-color: var(--bs-body-color);
+            color: var(--bs-body-bg);
+            transition: all 0.15s ease;
+        }
+        
+        .btn-action-primary:hover {
+            background-color: transparent;
+            border-color: var(--bs-body-color);
+            color: var(--bs-body-color);
+        }
+        
+        .btn-action-secondary {
+            background-color: transparent;
+            border: 1px solid var(--bs-body-color);
+            color: var(--bs-body-color);
+            transition: all 0.15s ease;
+        }
+        
+        .btn-action-secondary:hover {
+            background-color: var(--bs-body-color);
+            border-color: var(--bs-body-color);
+            color: var(--bs-body-bg);
+        }
+        
+        .btn-action-danger {
+            background-color: transparent;
+            border: 1px solid var(--bs-danger);
+            color: var(--bs-danger);
+            transition: all 0.15s ease;
+        }
+        
+        .btn-action-danger:hover {
+            background-color: var(--bs-danger);
+            border-color: var(--bs-danger);
+            color: white;
         }
         
         .filter-btn {
@@ -152,39 +171,42 @@
         }
         
         .filter-btn-primary {
-            background: #212529;
-            border-color: #212529;
-            color: white;
+            background-color: var(--bs-body-color);
+            border-color: var(--bs-body-color);
+            color: var(--bs-body-bg);
         }
         
         .filter-btn-primary:hover {
-            background: #343a40;
-            border-color: #343a40;
+            background-color: transparent;
+            border-color: var(--bs-body-color);
+            color: var(--bs-body-color);
         }
         
         .filter-btn-secondary {
-            background: transparent;
-            border: 1px solid #dee2e6;
-            color: #495057;
+            background-color: transparent;
+            border: 1px solid var(--bs-body-color);
+            color: var(--bs-body-color);
         }
         
         .filter-btn-secondary:hover {
-            background: #f8f9fa;
-            border-color: #ced4da;
+            background-color: var(--bs-body-color);
+            border-color: var(--bs-body-color);
+            color: var(--bs-body-bg);
         }
         
         .filter-btn-secondary.active {
-            background: #212529;
-            border-color: #212529;
-            color: white;
+            background: var(--bs-secondary-bg);
+            border-color: var(--bs-border-color);
+            color: var(--bs-body-color);
+            font-weight: 600;
         }
         
         .filter-badge {
             display: inline-flex;
             align-items: center;
             gap: 0.25rem;
-            background: #212529;
-            color: white;
+            background: var(--bs-secondary);
+            color: var(--bs-light);
             border-radius: 4px;
             font-size: 0.7rem;
             padding: 0.15rem 0.35rem;
@@ -192,7 +214,7 @@
         }
         
         .filter-count {
-            color: #6c757d;
+            color: var(--bs-secondary-color);
             font-size: 0.875rem;
             font-weight: 500;
         }
@@ -209,17 +231,17 @@
             display: inline-flex;
             align-items: center;
             gap: 0.5rem;
-            background: #f8f9fa;
-            border: 1px solid #e9ecef;
+            background: var(--bs-tertiary-bg);
+            border: 1px solid var(--bs-border-color);
             border-radius: 20px;
             padding: 0.35rem 0.75rem;
             font-size: 0.8rem;
-            color: #495057;
+            color: var(--bs-body-color);
             transition: all 0.15s ease;
         }
         
         .filter-pill:hover {
-            background: #e9ecef;
+            background: var(--bs-secondary-bg);
         }
         
         .filter-pill-close {
@@ -229,8 +251,8 @@
             width: 16px;
             height: 16px;
             border-radius: 50%;
-            background: #dee2e6;
-            color: #495057;
+            background: var(--bs-secondary-bg);
+            color: var(--bs-body-color);
             font-size: 0.7rem;
             border: none;
             cursor: pointer;
@@ -238,14 +260,14 @@
         }
         
         .filter-pill-close:hover {
-            background: #dc3545;
+            background: var(--bs-danger);
             color: white;
         }
         
         /* Filter dropdown panel */
         .filter-dropdown {
-            background: #fff;
-            border: 1px solid #e9ecef;
+            background: var(--bs-body-bg);
+            border: 1px solid var(--bs-border-color);
             border-radius: 12px;
             padding: 1rem;
             box-shadow: 0 4px 12px rgba(0,0,0,0.1);
@@ -257,7 +279,7 @@
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.08em;
-            color: #6c757d;
+            color: var(--bs-secondary-color);
             margin-bottom: 0.75rem;
         }
         
@@ -281,7 +303,7 @@
         }
         
         .filter-checkbox-label:hover {
-            background: #f8f9fa;
+            background: var(--bs-tertiary-bg);
         }
         
         .filter-checkbox-label input {
@@ -307,30 +329,29 @@
             min-width: 40px;
             height: 40px;
             padding: 0 0.75rem;
-            border: 1px solid #e9ecef;
+            border: 1px solid var(--bs-border-color);
             border-radius: 8px;
-            background: white;
-            color: #495057;
+            background: var(--bs-body-bg);
+            color: var(--bs-body-color);
             text-decoration: none;
             font-size: 0.875rem;
             transition: all 0.15s ease;
         }
         
         .pagination-btn:hover {
-            background: #f8f9fa;
-            border-color: #dee2e6;
-            color: #212529;
+            background: var(--bs-tertiary-bg);
+            color: var(--bs-body-color);
         }
         
         .pagination-btn.active,
         .pagination-btn:disabled {
-            background: #f8f9fa;
-            color: #6c757d;
+            background: var(--bs-tertiary-bg);
+            color: var(--bs-secondary-color);
             cursor: default;
         }
         
         .pagination-info {
-            color: #6c757d;
+            color: var(--bs-secondary-color);
             font-size: 0.875rem;
             padding: 0 1rem;
         }
@@ -339,7 +360,7 @@
         .empty-state {
             text-align: center;
             padding: 4rem 2rem;
-            color: #6c757d;
+            color: var(--bs-secondary-color);
         }
         
         .empty-state-icon {
@@ -351,7 +372,7 @@
         .empty-state-title {
             font-size: 1.25rem;
             font-weight: 500;
-            color: #495057;
+            color: var(--bs-body-color);
             margin-bottom: 0.5rem;
         }
         
@@ -429,11 +450,33 @@
             border-radius: 50%;
             animation: spinner-rotate 0.75s linear infinite;
         }
+        
+        /* Theme toggle button */
+        .theme-toggle {
+            background: transparent;
+            border: none;
+            padding: 0.5rem;
+            cursor: pointer;
+            color: var(--bs-body-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 0.375rem;
+            transition: background-color 0.15s ease;
+        }
+        
+        .theme-toggle:hover {
+            background: var(--bs-tertiary-bg);
+        }
+        
+        .theme-toggle .bi {
+            font-size: 1.25rem;
+        }
     </style>
     {% block extra_css %}{% endblock %}
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-light bg-white">
+    <nav class="navbar navbar-expand-lg bg-body-tertiary border-bottom">
         <div class="container-fluid">
             <a class="navbar-brand" href="{% url 'home' %}">Cookmarks</a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
@@ -463,6 +506,11 @@
                         </ul>
                     </li>
                 </ul>
+                <div class="ms-auto d-flex align-items-center">
+                    <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle theme">
+                        <i class="bi bi-sun-fill"></i>
+                    </button>
+                </div>
             </div>
         </div>
     </nav>
@@ -482,6 +530,57 @@
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Theme management
+        (function() {
+            const THEME_KEY = 'cookmarks-theme';
+            const themeToggle = document.getElementById('themeToggle');
+            const html = document.documentElement;
+            
+            function getStoredTheme() {
+                return localStorage.getItem(THEME_KEY);
+            }
+            
+            function getPreferredTheme() {
+                const stored = getStoredTheme();
+                if (stored) return stored;
+                return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            }
+            
+            function setTheme(theme) {
+                html.setAttribute('data-bs-theme', theme);
+                localStorage.setItem(THEME_KEY, theme);
+                updateToggleIcon(theme);
+            }
+            
+            function updateToggleIcon(theme) {
+                const icon = themeToggle.querySelector('i');
+                if (theme === 'dark') {
+                    icon.className = 'bi bi-moon-fill';
+                } else {
+                    icon.className = 'bi bi-sun-fill';
+                }
+            }
+            
+            // Set initial theme
+            const initialTheme = getPreferredTheme();
+            setTheme(initialTheme);
+            
+            // Toggle handler
+            themeToggle.addEventListener('click', function() {
+                const currentTheme = html.getAttribute('data-bs-theme');
+                const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+                setTheme(newTheme);
+            });
+            
+            // Listen for system theme changes
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
+                if (!getStoredTheme()) {
+                    setTheme(e.matches ? 'dark' : 'light');
+                }
+            });
+        })();
+    </script>
     <script>
         // Configure HTMX to include CSRF token in all requests
         document.body.addEventListener('htmx:configRequest', function(evt) {
@@ -537,6 +636,39 @@
                 }
             }
         });
+        
+        // Description "Read more" toggle - shared across pages
+        function initDescriptionToggles() {
+            document.querySelectorAll('.description-container').forEach(function(container) {
+                const preview = container.querySelector('.description-preview');
+                const full = container.querySelector('.description-full');
+                const toggleBtn = container.querySelector('.description-toggle');
+                
+                if (!preview || !toggleBtn) return;
+                
+                // Hide toggle if content doesn't overflow
+                if (preview.scrollHeight <= preview.clientHeight) {
+                    toggleBtn.style.display = 'none';
+                    return;
+                }
+                
+                toggleBtn.addEventListener('click', function() {
+                    const isExpanded = full && full.style.display !== 'none';
+                    if (isExpanded) {
+                        preview.style.display = '-webkit-box';
+                        if (full) full.style.display = 'none';
+                        toggleBtn.textContent = 'Read more';
+                    } else {
+                        preview.style.display = 'none';
+                        if (full) full.style.display = 'block';
+                        toggleBtn.textContent = 'Show less';
+                    }
+                });
+            });
+        }
+        
+        document.addEventListener('DOMContentLoaded', initDescriptionToggles);
+        document.body.addEventListener('htmx:afterSwap', initDescriptionToggles);
     </script>
     {% block extra_js %}{% endblock %}
 </body>
