@@ -589,6 +589,39 @@
                 }
             }
         });
+        
+        // Description "Read more" toggle - shared across pages
+        function initDescriptionToggles() {
+            document.querySelectorAll('.description-container').forEach(function(container) {
+                const preview = container.querySelector('.description-preview');
+                const full = container.querySelector('.description-full');
+                const toggleBtn = container.querySelector('.description-toggle');
+                
+                if (!preview || !toggleBtn) return;
+                
+                // Hide toggle if content doesn't overflow
+                if (preview.scrollHeight <= preview.clientHeight) {
+                    toggleBtn.style.display = 'none';
+                    return;
+                }
+                
+                toggleBtn.addEventListener('click', function() {
+                    const isExpanded = full && full.style.display !== 'none';
+                    if (isExpanded) {
+                        preview.style.display = '-webkit-box';
+                        if (full) full.style.display = 'none';
+                        toggleBtn.textContent = 'Read more';
+                    } else {
+                        preview.style.display = 'none';
+                        if (full) full.style.display = 'block';
+                        toggleBtn.textContent = 'Show less';
+                    }
+                });
+            });
+        }
+        
+        document.addEventListener('DOMContentLoaded', initDescriptionToggles);
+        document.body.addEventListener('htmx:afterSwap', initDescriptionToggles);
     </script>
     {% block extra_js %}{% endblock %}
 </body>

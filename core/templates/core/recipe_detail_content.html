@@ -431,35 +431,6 @@
         });
     }
 
-    // Description read more toggle
-    const descContainer = document.querySelector('.description-container');
-    if (descContainer) {
-        const preview = descContainer.querySelector('.description-preview');
-        const full = descContainer.querySelector('.description-full');
-        const toggleBtn = descContainer.querySelector('.description-toggle');
-
-        // Hide toggle if content doesn't overflow
-        if (preview && preview.scrollHeight <= preview.clientHeight) {
-            if (toggleBtn) toggleBtn.style.display = 'none';
-        }
-
-        if (toggleBtn) {
-            let expanded = false;
-            toggleBtn.addEventListener('click', function () {
-                expanded = !expanded;
-                if (expanded) {
-                    preview.style.display = 'none';
-                    full.style.display = 'block';
-                    toggleBtn.textContent = 'Show less';
-                } else {
-                    preview.style.display = '-webkit-box';
-                    full.style.display = 'none';
-                    toggleBtn.textContent = 'Read more';
-                }
-            });
-        }
-    }
-
     // Keyboard navigation (left/right arrow keys, F for favourite)
     function handleKeyNav(e) {
         // Don't trigger if user is typing in an input/textarea

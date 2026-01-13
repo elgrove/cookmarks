@@ -450,19 +450,6 @@
         border-radius: 2px;
     }
     
-    /* Empty state */
-    .search-empty {
-        text-align: center;
-        padding: 4rem 2rem;
-        color: var(--bs-secondary-color);
-    }
-    
-    .search-empty-icon {
-        font-size: 3rem;
-        margin-bottom: 1rem;
-        opacity: 0.5;
-    }
-    
     /* Initial state (no search yet) */
     .search-initial {
         display: flex;
@@ -562,9 +549,9 @@
             {% endif %}
         </a>
         {% empty %}
-        <div class="search-empty">
-            <div class="search-empty-icon">🔍</div>
-            <h3>No recipes found</h3>
+        <div class="empty-state">
+            <div class="empty-state-icon">🔍</div>
+            <div class="empty-state-title">No recipes found</div>
             <p>Try adjusting your search terms or filters</p>
         </div>
         {% endfor %}

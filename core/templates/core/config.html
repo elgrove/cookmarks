@@ -3,14 +3,12 @@
 {% block title %}Settings - Cookmarks{% endblock %}
 
 {% block content %}
-<div class="row mb-4">
-    <div class="col">
-        <h1>Settings</h1>
-        <p class="text-muted">Configure your AI provider settings.</p>
+<div class="page-header d-flex justify-content-between align-items-start">
+    <div>
+        <h1 class="page-title">Settings</h1>
+        <p class="page-subtitle">Configure your AI provider settings.</p>
     </div>
-    <div class="col-auto d-flex align-items-end">
-        <button type="submit" form="config-form" class="btn btn-dark">Save Configuration</button>
-    </div>
+    <button type="submit" form="config-form" class="btn btn-dark">Save Configuration</button>
 </div>
 
 <form method="post" id="config-form">

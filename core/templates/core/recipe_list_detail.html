@@ -12,15 +12,17 @@
     </nav>
 </div>
 
-<div class="d-flex justify-content-between align-items-start mb-4">
+<div class="page-header d-flex justify-content-between align-items-start">
     <div>
-        <h1 class="mb-2">{{ recipe_list.name }}</h1>
-        <small class="text-muted">{{ list_items.count }} recipe{{ list_items.count|pluralize }}</small>
+        <h1 class="page-title">{{ recipe_list.name }}</h1>
+        <p class="page-subtitle">{{ list_items.count }} recipe{{ list_items.count|pluralize }}</p>
     </div>
+    {% if not recipe_list.is_default %}
     <form method="post" action="{% url 'delete_recipe_list' recipe_list.id %}" onsubmit="return confirm('Are you sure you want to delete this list?');">
         {% csrf_token %}
         <button type="submit" class="btn btn-outline-danger">Delete List</button>
     </form>
+    {% endif %}
 </div>
 
 {% if list_items %}
@@ -50,11 +52,11 @@
     </div>
 </div>
 {% else %}
-<div class="card border-0 shadow-sm">
-    <div class="card-body text-center py-5">
-        <p class="text-muted mb-3">This list is empty.</p>
-        <a href="{% url 'recipes' %}" class="btn btn-outline-secondary">Browse Recipes</a>
-    </div>
+<div class="empty-state">
+    <div class="empty-state-icon">📋</div>
+    <div class="empty-state-title">This list is empty</div>
+    <p>Add recipes to this list from the recipe detail page.</p>
+    <a href="{% url 'recipes' %}" class="btn btn-outline-secondary mt-3">Browse Recipes</a>
 </div>
 {% endif %}
 {% endblock %}
