@@ -514,7 +514,7 @@
             <div class="results-sort">
             <span class="text-secondary" style="font-size: 0.85rem;">Sort:</span>
                 <select class="form-select form-select-sm" style="width: auto; font-size: 0.85rem;" id="sortSelect">
-                    {% if vector_ids %}<option value="relevance" {% if sort_by == 'relevance' %}selected{% endif %}>Relevance</option>{% endif %}
+                    {% if vector_search_key %}<option value="relevance" {% if sort_by == 'relevance' %}selected{% endif %}>Relevance</option>{% endif %}
                     <option value="recent" {% if sort_by == 'recent' %}selected{% endif %}>Recently Added</option>
                     <option value="name" {% if sort_by == 'name' %}selected{% endif %}>Name A-Z</option>
                     <option value="author" {% if sort_by == 'author' %}selected{% endif %}>Author</option>
@@ -615,13 +615,13 @@
                 <input type="text" 
                        class="ai-prompt-input" 
                        id="aiPromptInput"
-                       {% if vector_ids %}value="{{ request.GET.ai_query }}"{% endif %}>
+                       {% if ai_query %}value="{{ ai_query }}"{% endif %}>
                 <button type="button" class="ai-prompt-btn" id="aiPromptBtn" onclick="searchWithAI()">
                     Search
                 </button>
                 <div id="aiError" class="ai-error" style="display: none;"></div>
                 <div class="ai-hint">Search by ingredients, cuisines, occasions, or just describe what you fancy</div>
-                {% if vector_ids %}
+                {% if vector_search_key %}
                 <div style="margin-top: 0.5rem;">
                     <a href="{% url 'recipes' %}" class="search-btn search-btn-secondary" style="width: 100%; text-align: center; display: block;">Clear AI Search</a>
                 </div>
@@ -678,7 +678,7 @@
             
             <!-- Sort (hidden) -->
             <input type="hidden" name="sort" id="sortInput" value="{{ sort_by|default:'relevance' }}">
-            <input type="hidden" name="vector_ids" id="vectorIdsInput" value="{{ vector_ids }}">
+            <input type="hidden" name="vector_search" id="vectorSearchInput" value="{{ vector_search_key }}">
         </form>
     </div>
 </div>
@@ -866,15 +866,17 @@ async function searchWithAI() {
             return;
         }
         
-        if (data.recipe_ids && data.recipe_ids.length > 0) {
-            // Build URL with vector search results
-            const params = new URLSearchParams();
-            params.set('vector_ids', data.recipe_ids.join(','));
-            params.set('sort', 'relevance');
-            params.set('ai_query', prompt);
-            window.location.href = '{% url "recipes" %}?' + params.toString();
+        if (data.search_key) {
+            if (data.count > 0) {
+                const params = new URLSearchParams();
+                params.set('vector_search', data.search_key);
+                params.set('sort', 'relevance');
+                window.location.href = '{% url "recipes" %}?' + params.toString();
+            } else {
+                showAIError('No matching recipes found');
+            }
         } else {
-            showAIError('No matching recipes found');
+            showAIError('Search failed - no results returned');
         }
         
     } catch (err) {
