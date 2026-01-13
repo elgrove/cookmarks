@@ -29,7 +29,8 @@
     }
     
     .search-box {
-        background: #fff;
+        background: var(--bs-body-bg);
+        border: 1px solid var(--bs-border-color);
         border-radius: 12px;
         padding: 1rem;
         box-shadow: 0 1px 3px rgba(0,0,0,0.08);
@@ -41,7 +42,7 @@
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.08em;
-        color: #6c757d;
+        color: var(--bs-secondary-color);
         margin-bottom: 0.75rem;
         display: block;
     }
@@ -57,15 +58,17 @@
         flex: 1;
         padding: 0.6rem 0.75rem;
         font-size: 0.95rem;
-        border: 1px solid #e9ecef;
+        border: 1px solid var(--bs-border-color);
         border-radius: 8px;
+        background: var(--bs-body-bg);
+        color: var(--bs-body-color);
         transition: border-color 0.15s ease, box-shadow 0.15s ease;
     }
     
     .quick-search-input:focus {
         outline: none;
-        border-color: #212529;
-        box-shadow: 0 0 0 3px rgba(33, 37, 41, 0.1);
+        border-color: var(--bs-emphasis-color);
+        box-shadow: 0 0 0 3px rgba(var(--bs-emphasis-color-rgb), 0.1);
     }
     
     .search-btn {
@@ -80,31 +83,32 @@
     }
     
     .search-btn-primary {
-        background: #212529;
-        color: white;
+        background: var(--bs-secondary-bg);
+        border: 1px solid var(--bs-border-color);
+        color: var(--bs-body-color);
     }
     
     .search-btn-primary:hover {
-        background: #343a40;
+        background: var(--bs-tertiary-bg);
     }
     
     .search-btn-secondary {
         background: transparent;
-        border: 1px solid #dee2e6;
-        color: #495057;
+        border: 1px solid var(--bs-border-color);
+        color: var(--bs-body-color);
     }
     
     .search-btn-secondary:hover {
-        background: #f8f9fa;
+        background: var(--bs-tertiary-bg);
     }
     
     /* Filter groups */
     .filter-group {
-        border: 1px solid #e9ecef;
+        border: 1px solid var(--bs-border-color);
         border-radius: 8px;
         padding: 0.75rem;
         margin-bottom: 0.5rem;
-        background: #fafbfc;
+        background: var(--bs-tertiary-bg);
     }
     
     .filter-group-header {
@@ -116,7 +120,7 @@
     
     .filter-group-label {
         font-size: 0.7rem;
-        color: #6c757d;
+        color: var(--bs-secondary-color);
         flex: 1;
     }
     
@@ -126,23 +130,24 @@
         font-weight: 600;
         border: none;
         border-radius: 4px;
-        background: #e9ecef;
+        background: var(--bs-secondary-bg);
+        color: var(--bs-body-color);
         cursor: pointer;
         transition: all 0.15s ease;
     }
     
     .filter-group-logic:hover {
-        background: #dee2e6;
+        background: var(--bs-tertiary-bg);
     }
     
     .filter-group-logic.and {
-        background: #d4edda;
-        color: #155724;
+        background: var(--bs-success-bg-subtle);
+        color: var(--bs-success-text-emphasis);
     }
     
     .filter-group-logic.or {
-        background: #cce5ff;
-        color: #004085;
+        background: var(--bs-info-bg-subtle);
+        color: var(--bs-info-text-emphasis);
     }
     
     .filter-row {
@@ -157,29 +162,28 @@
         margin-bottom: 0;
     }
     
-    .filter-field-select {
-        min-width: 90px;
+    .filter-field-select,
+    .filter-operator-select,
+    .filter-value-input {
         padding: 0.35rem 0.5rem;
         font-size: 0.8rem;
-        border: 1px solid #e9ecef;
+        border: 1px solid var(--bs-border-color);
         border-radius: 6px;
+        background: var(--bs-body-bg);
+        color: var(--bs-body-color);
+    }
+    
+    .filter-field-select {
+        min-width: 90px;
     }
     
     .filter-operator-select {
         min-width: 85px;
-        padding: 0.35rem 0.5rem;
-        font-size: 0.8rem;
-        border: 1px solid #e9ecef;
-        border-radius: 6px;
     }
     
     .filter-value-input {
         flex: 1;
         min-width: 80px;
-        padding: 0.35rem 0.5rem;
-        font-size: 0.8rem;
-        border: 1px solid #e9ecef;
-        border-radius: 6px;
     }
     
     .filter-remove-btn {
@@ -190,15 +194,15 @@
         height: 24px;
         border: none;
         border-radius: 4px;
-        background: #f8f9fa;
-        color: #6c757d;
+        background: var(--bs-tertiary-bg);
+        color: var(--bs-secondary-color);
         cursor: pointer;
         transition: all 0.15s ease;
         font-size: 0.9rem;
     }
     
     .filter-remove-btn:hover {
-        background: #dc3545;
+        background: var(--bs-danger);
         color: white;
     }
     
@@ -208,18 +212,18 @@
         gap: 0.25rem;
         padding: 0.35rem 0.6rem;
         font-size: 0.75rem;
-        border: 1px dashed #dee2e6;
+        border: 1px dashed var(--bs-border-color);
         border-radius: 6px;
         background: transparent;
-        color: #6c757d;
+        color: var(--bs-secondary-color);
         cursor: pointer;
         transition: all 0.15s ease;
     }
     
     .filter-add-btn:hover {
-        border-color: #212529;
-        color: #212529;
-        background: #f8f9fa;
+        border-color: var(--bs-emphasis-color);
+        color: var(--bs-body-color);
+        background: var(--bs-tertiary-bg);
     }
     
     /* Logic connector between groups */
@@ -234,27 +238,28 @@
         padding: 0.2rem 0.6rem;
         font-size: 0.7rem;
         font-weight: 600;
-        border: 1px solid #dee2e6;
+        border: 1px solid var(--bs-border-color);
         border-radius: 12px;
-        background: #fff;
+        background: var(--bs-body-bg);
+        color: var(--bs-body-color);
         cursor: pointer;
         transition: all 0.15s ease;
     }
     
     .logic-connector-btn:hover {
-        background: #f8f9fa;
+        background: var(--bs-tertiary-bg);
     }
     
     .logic-connector-btn.and {
-        background: #d4edda;
-        border-color: #c3e6cb;
-        color: #155724;
+        background: var(--bs-success-bg-subtle);
+        border-color: var(--bs-success-border-subtle);
+        color: var(--bs-success-text-emphasis);
     }
     
     .logic-connector-btn.or {
-        background: #cce5ff;
-        border-color: #b8daff;
-        color: #004085;
+        background: var(--bs-info-bg-subtle);
+        border-color: var(--bs-info-border-subtle);
+        color: var(--bs-info-text-emphasis);
     }
     
     /* AI Prompt */
@@ -262,16 +267,18 @@
         width: 100%;
         padding: 0.6rem 0.75rem;
         font-size: 0.9rem;
-        border: 1px solid #e9ecef;
+        border: 1px solid var(--bs-border-color);
         border-radius: 8px;
+        background: var(--bs-body-bg);
+        color: var(--bs-body-color);
         transition: border-color 0.15s ease, box-shadow 0.15s ease;
         margin-bottom: 0.5rem;
     }
     
     .ai-prompt-input:focus {
         outline: none;
-        border-color: #212529;
-        box-shadow: 0 0 0 3px rgba(33, 37, 41, 0.1);
+        border-color: var(--bs-emphasis-color);
+        box-shadow: 0 0 0 3px rgba(var(--bs-emphasis-color-rgb), 0.1);
     }
     
     .ai-prompt-btn {
@@ -279,20 +286,20 @@
         padding: 0.6rem 1rem;
         font-size: 0.85rem;
         font-weight: 500;
-        border: none;
+        border: 1px solid var(--bs-border-color);
         border-radius: 8px;
-        background: #212529;
-        color: white;
+        background: var(--bs-secondary-bg);
+        color: var(--bs-body-color);
         cursor: pointer;
         transition: all 0.15s ease;
     }
     
     .ai-prompt-btn:hover:not(:disabled) {
-        background: #343a40;
+        background: var(--bs-tertiary-bg);
     }
     
     .ai-prompt-btn:disabled {
-        background: #adb5bd;
+        opacity: 0.5;
         cursor: not-allowed;
     }
     
@@ -307,7 +314,7 @@
         height: 14px;
         margin-left: 6px;
         border: 2px solid transparent;
-        border-top-color: white;
+        border-top-color: var(--bs-body-bg);
         border-radius: 50%;
         animation: spin 0.8s linear infinite;
     }
@@ -317,14 +324,14 @@
     }
     
     .ai-error {
-        color: #dc3545;
+        color: var(--bs-danger);
         font-size: 0.8rem;
         margin-top: 0.5rem;
     }
     
     .ai-hint {
         font-size: 0.75rem;
-        color: #6c757d;
+        color: var(--bs-secondary-color);
         margin-top: 0.5rem;
     }
     
@@ -335,12 +342,12 @@
         align-items: center;
         margin-bottom: 1rem;
         padding-bottom: 0.75rem;
-        border-bottom: 1px solid #e9ecef;
+        border-bottom: 1px solid var(--bs-border-color);
     }
     
     .results-count {
         font-size: 0.9rem;
-        color: #6c757d;
+        color: var(--bs-secondary-color);
     }
     
     .results-sort {
@@ -352,8 +359,8 @@
     /* Recipe result card */
     .result-card {
         display: block;
-        background: #fff;
-        border: 1px solid #e9ecef;
+        background: var(--bs-body-bg);
+        border: 1px solid var(--bs-border-color);
         border-radius: 10px;
         padding: 1rem 1.25rem;
         margin-bottom: 0.75rem;
@@ -363,7 +370,7 @@
     }
     
     .result-card:hover {
-        border-color: #dee2e6;
+        border-color: var(--bs-border-color-translucent);
         box-shadow: 0 4px 12px rgba(0,0,0,0.08);
         transform: translateY(-1px);
     }
@@ -379,13 +386,13 @@
     .result-card-title {
         font-size: 1.1rem;
         font-weight: 600;
-        color: #212529;
+        color: var(--bs-body-color);
         margin: 0;
     }
     
     .result-card-meta {
         font-size: 0.85rem;
-        color: #6c757d;
+        color: var(--bs-secondary-color);
     }
     
     .result-card-source {
@@ -393,13 +400,13 @@
         flex-direction: column;
         align-items: flex-end;
         font-size: 0.8rem;
-        color: #6c757d;
+        color: var(--bs-secondary-color);
         text-align: right;
     }
     
     .result-card-author {
         font-weight: 500;
-        color: #495057;
+        color: var(--bs-body-color);
     }
     
     .result-card-highlights {
@@ -411,9 +418,9 @@
     
     .highlight-tag {
         display: inline-block;
-        background: #fff3cd;
-        border: 1px solid #ffc107;
-        color: #856404;
+        background: var(--bs-warning-bg-subtle);
+        border: 1px solid var(--bs-warning-border-subtle);
+        color: var(--bs-warning-text-emphasis);
         font-size: 0.75rem;
         padding: 0.2rem 0.5rem;
         border-radius: 4px;
@@ -428,9 +435,9 @@
     
     .result-keyword {
         display: inline-block;
-        background: #f8f9fa;
-        border: 1px solid #e9ecef;
-        color: #495057;
+        background: var(--bs-tertiary-bg);
+        border: 1px solid var(--bs-border-color);
+        color: var(--bs-body-color);
         font-size: 0.75rem;
         padding: 0.15rem 0.5rem;
         border-radius: 10px;
@@ -438,7 +445,7 @@
     
     /* Match highlight in text */
     .match {
-        background: #fff3cd;
+        background: var(--bs-warning-bg-subtle);
         padding: 0 0.15rem;
         border-radius: 2px;
     }
@@ -447,7 +454,7 @@
     .search-empty {
         text-align: center;
         padding: 4rem 2rem;
-        color: #6c757d;
+        color: var(--bs-secondary-color);
     }
     
     .search-empty-icon {
@@ -464,7 +471,7 @@
         justify-content: center;
         min-height: 400px;
         text-align: center;
-        color: #6c757d;
+        color: var(--bs-secondary-color);
     }
     
     .search-initial-icon {
@@ -476,7 +483,7 @@
     .search-initial h2 {
         font-size: 1.5rem;
         font-weight: 600;
-        color: #495057;
+        color: var(--bs-body-color);
         margin-bottom: 0.5rem;
     }
     
@@ -514,7 +521,7 @@
                 {% if query %}for "{{ query }}"{% endif %}
             </span>
             <div class="results-sort">
-                <span style="font-size: 0.85rem; color: #6c757d;">Sort:</span>
+            <span class="text-secondary" style="font-size: 0.85rem;">Sort:</span>
                 <select class="form-select form-select-sm" style="width: auto; font-size: 0.85rem;" id="sortSelect">
                     {% if vector_ids %}<option value="relevance" {% if sort_by == 'relevance' %}selected{% endif %}>Relevance</option>{% endif %}
                     <option value="recent" {% if sort_by == 'recent' %}selected{% endif %}>Recently Added</option>
