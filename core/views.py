@@ -15,6 +15,7 @@ from django_q.tasks import async_task
 
 from core.services.ai import GeminiProvider, OpenRouterProvider
 from core.services.calibre import refresh_single_book_from_calibre
+from core.services.embeddings import find_similar_recipes
 from core.services.embeddings import search_recipes as vector_search_recipes
 from core.services.extraction import app as extraction_app
 from core.tasks import save_recipes_from_graph_state
@@ -914,6 +915,19 @@ def toggle_favourite(request, recipe_id):
         return redirect("recipe_detail", recipe_id=recipe_id)
 
     return redirect("recipe_detail", recipe_id=recipe_id)
+
+
+def similar_recipes(request, recipe_id):
+    recipe = get_object_or_404(Recipe, id=recipe_id)
+    results = find_similar_recipes(recipe, limit=12)
+    return render(
+        request,
+        "core/partials/similar_recipes.html",
+        {
+            "recipe": recipe,
+            "similar_recipes": results,
+        },
+    )
 
 
 def delete_recipe(request, recipe_id):

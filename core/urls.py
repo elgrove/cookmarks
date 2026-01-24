@@ -26,6 +26,7 @@ urlpatterns = [
     path(
         "recipe/<uuid:recipe_id>/toggle-favourite/", views.toggle_favourite, name="toggle_favourite"
     ),
+    path("recipe/<uuid:recipe_id>/similar/", views.similar_recipes, name="similar_recipes"),
     path("recipe/<uuid:recipe_id>/delete/", views.delete_recipe, name="delete_recipe"),
     path(
         "recipe/<uuid:recipe_id>/clear-image/", views.clear_recipe_image, name="clear_recipe_image"
