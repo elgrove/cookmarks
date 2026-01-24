@@ -1,0 +1,14 @@
+{% if similar_recipes %}
+<div class="d-flex flex-wrap gap-2">
+    {% for similar_recipe, distance in similar_recipes %}
+    <a href="{% url 'recipe_detail' similar_recipe.id %}" class="text-decoration-none">
+        <span class="badge bg-body-secondary text-body border d-inline-flex align-items-center gap-1" style="font-size: 0.85rem; padding: 0.5em 0.75em;">
+            <span>{{ similar_recipe.name|truncatechars:40 }}</span>
+            <small class="text-muted">{{ similar_recipe.book.author|truncatechars:15 }}</small>
+        </span>
+    </a>
+    {% endfor %}
+</div>
+{% else %}
+<span class="text-muted small">No similar recipes found</span>
+{% endif %}

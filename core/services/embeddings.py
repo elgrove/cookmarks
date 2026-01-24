@@ -1,5 +1,6 @@
 import logging
 import sqlite3
+import struct
 from pathlib import Path
 
 import sqlite_vec
@@ -96,6 +97,28 @@ class VectorStore:
         finally:
             conn.close()
 
+    def get_embedding(self, recipe_id: str) -> list[float] | None:
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute(
+                "SELECT embedding FROM recipe_embeddings WHERE recipe_id = ?",
+                (recipe_id,),
+            )
+            row = cursor.fetchone()
+            if row is None:
+                return None
+            blob = row[0]
+            num_floats = len(blob) // 4
+            return list(struct.unpack(f"{num_floats}f", blob))
+        finally:
+            conn.close()
+
+    def search_excluding(
+        self, query_embedding: list[float], exclude_id: str, limit: int = 20
+    ) -> list[tuple[str, float]]:
+        results = self.search(query_embedding, limit=limit + 1)
+        return [(rid, dist) for rid, dist in results if rid != exclude_id][:limit]
+
 
 def generate_recipe_embedding(recipe: Recipe) -> None:
     provider = get_ai_provider()
@@ -168,3 +191,21 @@ def search_recipes(query: str, limit: int = 20) -> list[Recipe]:
     }
 
     return [recipes_by_id[rid] for rid in recipe_ids if rid in recipes_by_id]
+
+
+def find_similar_recipes(recipe: Recipe, limit: int = 8) -> list[tuple[Recipe, float]]:
+    store = VectorStore()
+    embedding = store.get_embedding(str(recipe.id))
+    if not embedding:
+        logger.debug(f"No embedding found for recipe: {recipe.name}")
+        return []
+
+    results = store.search_excluding(embedding, str(recipe.id), limit=limit)
+
+    recipe_ids = [r[0] for r in results]
+    distances = {r[0]: r[1] for r in results}
+    recipes_by_id = {
+        str(r.id): r for r in Recipe.objects.filter(id__in=recipe_ids).select_related("book")
+    }
+
+    return [(recipes_by_id[rid], distances[rid]) for rid in recipe_ids if rid in recipes_by_id]

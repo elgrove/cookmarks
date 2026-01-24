@@ -6,6 +6,7 @@ import pytest
 from core.models import Book, Config, Keyword, Recipe
 from core.services.embeddings import (
     VectorStore,
+    find_similar_recipes,
     generate_recipe_embedding,
     generate_recipe_embeddings_batch,
     recipe_to_text,
@@ -325,5 +326,101 @@ class TestVectorSearchEndToEnd:
             mock_get_provider.return_value = mock_provider
 
             results = search_recipes("test query")
+
+            assert results == []
+
+
+class TestVectorStoreGetEmbedding:
+    def test_get_embedding_returns_embedding_when_exists(self, gemini_config):
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
+            db_path = f.name
+
+        store = VectorStore(db_path=db_path)
+        embedding = [0.1, 0.2, 0.3] + [0.0] * 3069
+        store.upsert("recipe-1", embedding)
+
+        result = store.get_embedding("recipe-1")
+
+        assert result is not None
+        assert len(result) == 3072
+        assert abs(result[0] - 0.1) < 0.001
+        assert abs(result[1] - 0.2) < 0.001
+
+    def test_get_embedding_returns_none_when_missing(self, gemini_config):
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
+            db_path = f.name
+
+        store = VectorStore(db_path=db_path)
+
+        result = store.get_embedding("nonexistent-recipe")
+
+        assert result is None
+
+
+class TestFindSimilarRecipes:
+    def test_find_similar_recipes_returns_similar(self, gemini_config, sample_book):
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
+            db_path = f.name
+
+        source_recipe = Recipe.objects.create(
+            book=sample_book, order=1, name="Source Recipe", ingredients=["a"]
+        )
+        similar_recipe = Recipe.objects.create(
+            book=sample_book, order=2, name="Similar Recipe", ingredients=["b"]
+        )
+
+        store = VectorStore(db_path=db_path)
+        source_embedding = [1.0, 0.0, 0.0] + [0.0] * 3069
+        similar_embedding = [0.9, 0.1, 0.0] + [0.0] * 3069
+        store.upsert(str(source_recipe.id), source_embedding)
+        store.upsert(str(similar_recipe.id), similar_embedding)
+
+        with patch("core.services.embeddings.VectorStore") as mock_store_class:
+            mock_store_class.return_value = store
+
+            results = find_similar_recipes(source_recipe, limit=5)
+
+            assert len(results) == 1
+            assert results[0][0].id == similar_recipe.id
+            assert results[0][1] >= 0  # distance is non-negative
+
+    def test_find_similar_recipes_excludes_source(self, gemini_config, sample_book):
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
+            db_path = f.name
+
+        source_recipe = Recipe.objects.create(
+            book=sample_book, order=1, name="Source Recipe", ingredients=["a"]
+        )
+        other_recipe = Recipe.objects.create(
+            book=sample_book, order=2, name="Other Recipe", ingredients=["b"]
+        )
+
+        store = VectorStore(db_path=db_path)
+        embedding = [1.0, 0.0, 0.0] + [0.0] * 3069
+        store.upsert(str(source_recipe.id), embedding)
+        store.upsert(str(other_recipe.id), [0.5, 0.5, 0.0] + [0.0] * 3069)
+
+        with patch("core.services.embeddings.VectorStore") as mock_store_class:
+            mock_store_class.return_value = store
+
+            results = find_similar_recipes(source_recipe, limit=10)
+
+            result_ids = [r[0].id for r in results]
+            assert source_recipe.id not in result_ids
+
+    def test_find_similar_recipes_returns_empty_when_no_embedding(self, gemini_config, sample_book):
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
+            db_path = f.name
+
+        recipe = Recipe.objects.create(
+            book=sample_book, order=1, name="Recipe Without Embedding", ingredients=["a"]
+        )
+
+        store = VectorStore(db_path=db_path)
+
+        with patch("core.services.embeddings.VectorStore") as mock_store_class:
+            mock_store_class.return_value = store
+
+            results = find_similar_recipes(recipe, limit=5)
 
             assert results == []
