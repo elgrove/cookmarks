@@ -94,9 +94,7 @@ class Command(BaseCommand):
         recipes_path = book.get_recipes_json_path()
         if not recipes_path.exists():
             self.stderr.write(
-                self.style.WARNING(
-                    f"No gold recipes.json at {recipes_path}; skipping recipe seed."
-                )
+                self.style.WARNING(f"No gold recipes.json at {recipes_path}; skipping recipe seed.")
             )
             return
 
