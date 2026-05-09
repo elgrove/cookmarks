@@ -1,6 +1,10 @@
-.PHONY: build tag push publish test localdocker lint format check fix
+.PHONY: build tag push publish test localdocker lint format check fix dev
 
 TAG ?= latest
+
+dev:
+	uv run python manage.py migrate
+	uv run honcho start
 
 build:
 	docker build -t cookmarks .
