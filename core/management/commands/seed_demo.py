@@ -85,9 +85,9 @@ class Command(BaseCommand):
     def _load_book(self, fixture_path) -> Book | None:
         created, updated = load_books_from_calibre(fixture_path)
         self.stdout.write(f"Calibre load: {created} created, {updated} updated.")
-        book = Book.objects.first()
+        book = Book.objects.filter(path__startswith=str(fixture_path)).first()
         if not book:
-            self.stderr.write(self.style.ERROR("No Books loaded — fixture is empty?"))
+            self.stderr.write(self.style.ERROR("No Books loaded from fixture."))
         return book
 
     def _seed_recipes(self, book: Book):
