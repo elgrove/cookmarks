@@ -216,6 +216,7 @@ class Config(models.Model):
     AI_PROVIDER_CHOICES = [
         ("GEMINI", "Google Gemini"),
         ("OPENROUTER", "OpenRouter"),
+        ("STUB", "Stub (offline / dev)"),
     ]
 
     ai_provider = models.CharField(max_length=20, choices=AI_PROVIDER_CHOICES, blank=True)

@@ -13,8 +13,7 @@ from langgraph.types import interrupt
 from core.models import Book, ExtractionReport
 from core.services.ai import (
     ExtractionMethod,
-    GeminiProvider,
-    OpenRouterProvider,
+    get_ai_provider,
     get_config,
 )
 from core.services.epub import (
@@ -53,8 +52,7 @@ def analyse_epub(state: ExtractionState) -> dict:
 
     if images_in_separate:
         sample_content = get_sample_chapters_content(epub_path, chapter_files)
-        config = get_config()
-        provider = GeminiProvider() if config.ai_provider == "GEMINI" else OpenRouterProvider()
+        provider = get_ai_provider()
 
         images_can_be_matched, usage = provider.check_if_can_match_images(sample_content)
 
@@ -92,7 +90,7 @@ def extract_file(state: ExtractionState) -> dict:
     chapter_files = state["chapter_files"]
 
     config = get_config()
-    provider = GeminiProvider() if config.ai_provider == "GEMINI" else OpenRouterProvider()
+    provider = get_ai_provider()
     rate_limiter = RateLimitedExecutor(
         max_workers=settings.EXTRACTION_THREADS,
         rate_per_minute=config.extraction_rate_limit_per_minute,
@@ -178,7 +176,7 @@ def extract_block(state: ExtractionState) -> dict:
     logger.info(f"Split {len(chapter_files)} chapters into {len(blocks)} blocks")
 
     config = get_config()
-    provider = GeminiProvider() if config.ai_provider == "GEMINI" else OpenRouterProvider()
+    provider = get_ai_provider()
 
     if report.model_name:
         model = report.model_name

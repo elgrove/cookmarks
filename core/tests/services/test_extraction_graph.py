@@ -99,8 +99,8 @@ class TestExtractionGraph:
         mock_config = mock_get_config.return_value
         mock_config.ai_provider = "GEMINI"
 
-        with patch("core.services.extraction.graph.GeminiProvider") as mock_provider:
-            provider_instance = mock_provider.return_value
+        with patch("core.services.extraction.graph.get_ai_provider") as mock_get_provider:
+            provider_instance = mock_get_provider.return_value
             provider_instance.check_if_can_match_images.return_value = (
                 True,
                 {"cost_usd": 0.001, "input_tokens": 100, "output_tokens": 10},

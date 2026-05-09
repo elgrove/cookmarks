@@ -1,4 +1,5 @@
 import abc
+import hashlib
 import json
 import logging
 import time
@@ -331,6 +332,57 @@ class GeminiProvider(AIProvider):
         return response.text or "", usage_metadata
 
 
+def _hash_vector(text: str, dims: int) -> list[float]:
+    digest = hashlib.blake2b(text.encode("utf-8"), digest_size=64).digest()
+    floats = [(b - 128) / 128.0 for b in digest]
+    repeats = (dims + len(floats) - 1) // len(floats)
+    return (floats * repeats)[:dims]
+
+
+class StubAIProvider(AIProvider):
+    NAME = "STUB"
+
+    IMAGE_MATCH_MODEL = "stub-vision"
+    EXTRACT_MANY_PER_FILE_MODEL = "stub-extract"
+    EXTRACT_ONE_PER_FILE_MODEL = "stub-extract"
+    EXTRACT_BLOCKS_MODEL = "stub-extract"
+    DEDUPLICATE_MODEL = "stub-dedupe"
+    EMBEDDING_MODEL = "stub-embed"
+    EMBEDDING_DIMENSIONS = 3072
+
+    def __init__(self) -> None:
+        self.api_key = "stub"
+
+    def _get_completion(self, prompt, model, schema=None, temp=0):
+        # Route by prompt prefix — each prompt template has a stable distinctive opening line.
+        usage = {"cost_usd": Decimal("0"), "input_tokens": 0, "output_tokens": 0}
+
+        if prompt.startswith(IMAGE_MATCH_CHECK_PROMPT[:40]):
+            return "yes", usage
+
+        if prompt.startswith(DEDUPLICATE_KEYWORDS_PROMPT[:40]):
+            # Echo each keyword as its own canonical form: no merging.
+            keywords_match = json.loads(prompt[prompt.rfind("[") : prompt.rfind("]") + 1])
+            return json.dumps({k: k for k in keywords_match}), usage
+
+        # Default to recipe extraction. Return a single minimal valid recipe.
+        recipe = {
+            "name": f"Stub recipe ({_hash_vector(prompt, 4)[0]:+.2f})",
+            "description": "Synthetic recipe produced by StubAIProvider for offline dev.",
+            "recipeIngredients": ["1 cup stub flour", "2 stub eggs"],
+            "recipeInstructions": ["Combine ingredients.", "Cook until done."],
+            "recipeYield": "Serves 4",
+            "keywords": ["Stub", "Dev"],
+        }
+        return json.dumps([recipe]), usage
+
+    def generate_embedding(self, text: str, task_type: str) -> list[float]:
+        return _hash_vector(text, self.EMBEDDING_DIMENSIONS)
+
+    def generate_embeddings_batch(self, texts: list[str], task_type: str) -> list[list[float]]:
+        return [_hash_vector(t, self.EMBEDDING_DIMENSIONS) for t in texts]
+
+
 def get_ai_provider():
     config = get_config()
     if not config.ai_provider or not config.api_key:
@@ -339,6 +391,7 @@ def get_ai_provider():
     provider_map = {
         "OPENROUTER": OpenRouterProvider,
         "GEMINI": GeminiProvider,
+        "STUB": StubAIProvider,
     }
     provider_class = provider_map.get(config.ai_provider)
     if provider_class:
