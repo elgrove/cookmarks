@@ -198,7 +198,7 @@ class TestLangGraphExtractionE2E:
         mock_langgraph_extraction["resolve_image"].return_value = None
 
         # Provider says it can't match images
-        provider = mock_langgraph_extraction["gemini_provider"].return_value
+        provider = mock_langgraph_extraction["get_ai_provider"].return_value
         provider.check_if_can_match_images.return_value = (False, {})
 
         # Extract file returns recipes without resolved images

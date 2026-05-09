@@ -102,7 +102,7 @@ def mock_langgraph_extraction():
             ),
             "extract_file": stack.enter_context(patch(f"{graph_module}.extract_file")),
             "save_recipes": stack.enter_context(patch("core.tasks.save_recipes_from_graph_state")),
-            "gemini_provider": stack.enter_context(patch(f"{graph_module}.GeminiProvider")),
+            "get_ai_provider": stack.enter_context(patch(f"{graph_module}.get_ai_provider")),
         }
 
         # Set sensible defaults
@@ -122,8 +122,8 @@ def mock_langgraph_extraction():
         mock_config.extraction_rate_limit_per_minute = 999
         mocks["get_config"].return_value = mock_config
 
-        # Gemini provider mock with default behaviors
-        provider_instance = mocks["gemini_provider"].return_value
+        # AI provider mock with default behaviors
+        provider_instance = mocks["get_ai_provider"].return_value
         provider_instance.check_if_can_match_images.return_value = (
             True,
             {
