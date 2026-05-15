@@ -21,6 +21,9 @@ COPY supervisord.conf /app/supervisord.conf
 
 COPY . .
 
+# Don't ship the frontend source — it has its own image
+RUN rm -rf frontend
+
 RUN uv run python manage.py collectstatic --no-input
 
 EXPOSE 8789

@@ -43,6 +43,12 @@ def split_recipes_for_api_calls(recipes: list[dict], num_calls: int) -> list[str
     return chunks
 
 
+@pytest.fixture(autouse=True)
+def _enable_no_auth(monkeypatch):
+    """Auto-authenticate as admin in all tests."""
+    monkeypatch.setenv("NO_AUTH", "1")
+
+
 @pytest.fixture
 def configured_app(db):
     Config.objects.update_or_create(

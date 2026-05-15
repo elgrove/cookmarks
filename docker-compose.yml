@@ -1,9 +1,24 @@
 services:
-  cookmarks:
+  backend:
     image: cookmarks:latest
-    ports:
-      - "8789:8789"
+    expose:
+      - "8789"
     volumes:
       - ./data:/data
       - <path to calibre library>:/books
+    environment:
+      # Set NO_AUTH=1 for a single-user, no-login deployment.
+      # Otherwise, log in via /login as a Django user.
+      NO_AUTH: "0"
+    restart: unless-stopped
+
+  frontend:
+    image: cookmarks-frontend:latest
+    ports:
+      - "80:3000"
+    environment:
+      ORIGIN: http://localhost
+      API_URL: http://backend:8789
+    depends_on:
+      - backend
     restart: unless-stopped
