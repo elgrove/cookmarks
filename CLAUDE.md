@@ -21,6 +21,7 @@ The defining principle (inspired by Anthropic's "Verifiable React" workshop, re-
 Run from the repo root unless noted.
 
 - `make install` — `uv sync` (backend) + `npm install` (frontend).
+- `make migrate` — apply Alembic migrations (`uv run python -m alembic upgrade head`). The `alembic` console script isn't installed; use the `python -m alembic` module form for revisions too.
 - `make dev` — both dev servers via honcho (`uvx honcho start`, reads `Procfile`).
 - `make verify` — **the headless verification matrix** (`vitest run`): every unit × fixture, prints verdicts. Fast inner loop.
 - `make check` — backend `ruff check` + `ty check`; frontend `svelte-check`.
@@ -28,6 +29,16 @@ Run from the repo root unless noted.
 - `make build` — build the SPA into `frontend/build/`.
 - Single backend test: `cd backend && uv run pytest tests/test_health.py::test_health`.
 - Single frontend test file: `cd frontend && npx vitest run src/lib/verify/harness.test.ts`.
+
+## Data layer
+
+SQLite (`backend/db.sqlite3` by default; `COOKMARKS_DB_PATH` overrides — see `app/config.py`). `app/db.py` loads the **sqlite-vec** extension and sets `PRAGMA foreign_keys=ON` on every connection (SQLite ignores foreign keys and `ON DELETE` otherwise).
+
+- **Models** (`app/models/`, one module per aggregate): SQLAlchemy 2.0 declarative — `Book`, `Recipe` (+ `Keyword` and the `recipe_keywords` association), `RecipeList`/`RecipeListItem`, `ExtractionRun`, and a singleton `Config`. All inherit `UUIDAuditBase` (`base.py`): UUID PK + `created_at`/`updated_at`. Choice fields are `StrEnum`s (`enums.py`), stored by value. The schema mirrors v1's domain, re-thought from first principles — **except `ExtractionRun`**, which tracks v1's `ExtractionReport` faithfully (method, image flags, chapter progress) since extraction is carried over as-is.
+- **Recipe identity** is stable across re-extraction: the extraction task reconciles by matching on the normalised name within a book (update in place, not wipe-and-recreate), so favourites and list membership survive a re-run. This is a contract on the extraction task, not enforced by schema.
+- **Migrations** (`backend/alembic/`, excluded from lint/typecheck): autogenerate with `uv run python -m alembic revision --autogenerate -m "..."` from `backend/`, apply with `make migrate`.
+- **Embeddings**: a `recipe_embeddings` **vec0** virtual table, separate from the ORM (not in Alembic), keyed by the hyphenated UUID string (`str(recipe.id)`). The `VectorStore` is ported in the search milestone.
+- **Seeding dev data**: `cd backend && uv run python -m scripts.import_v1_data` copies real data (books, recipes, keywords, lists, runs, config, embeddings) from the v1 production SQLite into the v2 DB, preserving UUIDs. Re-runnable (clears then repopulates); `--source PATH`, `--no-embeddings`.
 
 ## The agent feedback loop (read this before changing UI)
 
@@ -55,6 +66,7 @@ Verdict rules (`runner.ts`): any `fail` check → `FAIL`; mount error → `BLOCK
 
 ## Conventions
 
+- **Maintain `REBUILD_LOG.md`** — the running journal of the rebuild. Append an entry (context, decisions, outcome) whenever a meaningful chunk of work lands. CLAUDE.md is the current-state snapshot; the log is the history.
 - Backend: ruff (line length 100), strict `ty`, British spelling. Imports at top of module only. Alembic migrations live in `backend/alembic/` (excluded from lint/typecheck).
 - Frontend: TypeScript strict; harness tests must stay free of SvelteKit (`$app/*`) imports so they run in plain vitest.
 - Celery: `app/tasks/celery_app.py` is a skeleton with a `ping` task; the broker (likely Redis) is wired when the real worker is ported.
