@@ -1,0 +1,28 @@
+from collections.abc import Iterator
+from typing import Any
+
+import sqlite_vec
+from sqlalchemy import create_engine, event
+from sqlalchemy.orm import Session, sessionmaker
+
+from app.config import settings
+
+engine = create_engine(
+    f"sqlite:///{settings.db_path}",
+    connect_args={"check_same_thread": False},
+)
+
+
+@event.listens_for(engine, "connect")
+def _load_sqlite_vec(dbapi_conn: Any, _record: Any) -> None:
+    dbapi_conn.enable_load_extension(True)
+    sqlite_vec.load(dbapi_conn)
+    dbapi_conn.enable_load_extension(False)
+
+
+SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+
+
+def get_session() -> Iterator[Session]:
+    with SessionLocal() as session:
+        yield session

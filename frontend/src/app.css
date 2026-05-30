@@ -1,0 +1,28 @@
+:root {
+	color-scheme: light dark;
+	font-family: ui-sans-serif, system-ui, sans-serif;
+	--pass: #1a7f37;
+	--fail: #cf222e;
+	--blocked: #9a6700;
+	--skip: #57606a;
+}
+
+body {
+	margin: 0;
+	line-height: 1.5;
+}
+
+a {
+	color: inherit;
+}
+
+.nav {
+	display: flex;
+	gap: 1rem;
+	padding: 0.75rem 1rem;
+	border-bottom: 1px solid color-mix(in srgb, currentColor 15%, transparent);
+}
+
+main {
+	padding: 1.5rem;
+}
