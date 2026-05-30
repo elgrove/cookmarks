@@ -12,7 +12,7 @@ The defining principle (inspired by Anthropic's "Verifiable React" workshop, re-
 
 - **Backend** (`backend/`): FastAPI · SQLAlchemy 2.0 + Alembic · Celery · SQLite · `uv` · Python 3.11. Type-checked with **ty**, linted/formatted with **ruff**, tested with **pytest**.
 - **Frontend** (`frontend/`): SvelteKit (`adapter-static`, SPA mode) · Vite · TypeScript · Zod. Tested with **vitest** (jsdom). Type-checked with **svelte-check**.
-- **Serving**: dev runs two processes — Vite (`:5173`, HMR) proxies `/api` → uvicorn (`:8000`). Prod builds the SPA to `frontend/build/`, which FastAPI serves with an SPA catch-all fallback (`app/static.py`) — single origin, no CORS.
+- **Serving**: dev runs two processes — Vite (`:9789`, HMR) proxies `/api` → uvicorn (`:9788`). Prod builds the SPA to `frontend/build/`, which FastAPI serves with an SPA catch-all fallback (`app/static.py`) — single origin, no CORS.
 
 ## Commands
 
@@ -33,8 +33,8 @@ This harness exists so you can **drive the app and correct yourself**. Three way
 
 1. **Headless (fastest):** run `make verify`. Non-probe fixtures must be `PASS`; the matrix asserts it. Use this as your inner loop after any harness/unit change.
 2. **Live (self-correction via Playwright MCP):** `make dev`, then navigate the browser to:
-   - `http://localhost:5173/verify` — dashboard; click "Run all", read the verdict grid.
-   - `http://localhost:5173/verify/<unit>/<fixture>?chrome=0` — one unit mounted in isolation, chrome stripped for clean screenshots.
+   - `http://localhost:9789/verify` — dashboard; click "Run all", read the verdict grid.
+   - `http://localhost:9789/verify/<unit>/<fixture>?chrome=0` — one unit mounted in isolation, chrome stripped for clean screenshots.
    - Read structured results without evaluating JS by scraping `#verify-result-json` (the latest `current()`/`runAll()` payload), or call `window.__verify.runAll()` / `window.__verify.manifest()`.
 3. **Human:** open `/verify` to eyeball the grid.
 

@@ -9,7 +9,7 @@ the dashboard, CI, and an AI agent driving a live browser.
 
 - **Backend** — FastAPI · SQLAlchemy 2.0 + Alembic · Celery · SQLite · uv · Python 3.11 (ruff, ty, pytest)
 - **Frontend** — SvelteKit (adapter-static SPA) · Vite · TypeScript · Zod (vitest, svelte-check)
-- **Serving** — dev: Vite `:5173` proxies `/api` → uvicorn `:8000`; prod: FastAPI serves the built SPA.
+- **Serving** — dev: Vite `:9789` proxies `/api` → uvicorn `:9788`; prod: FastAPI serves the built SPA.
 
 ## Getting started
 
@@ -18,7 +18,7 @@ make install      # uv sync + npm install
 make dev          # Vite (:5173) + uvicorn (:8000)
 ```
 
-Open <http://localhost:5173> for the app and <http://localhost:5173/verify> for the
+Open <http://localhost:9789> for the app and <http://localhost:9789/verify> for the
 verification dashboard.
 
 ## Verification
