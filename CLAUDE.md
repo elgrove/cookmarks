@@ -8,6 +8,22 @@ Cookmarks v2 — a rebuild of the Django/HTMX v1 onto a **typed-Python FastAPI b
 
 **The v1 codebase is the reference for porting.** It lives at `/home/aaron/dev/cookmarks` (branch `main`). V1 is to be used as a guide, in V2 all core concepts and decisions can be re-thought from first principles, with the exception of recipe extraction, which is proven to work as-is.
 
+## Repository layout & worktree workflow
+
+This checkout — `~/dev/cookmarks-v2`, branch `v2` — is the **v2 trunk**: the integration branch every piece of v2 work merges back into. The v1 reference at `~/dev/cookmarks` (branch `main`) **owns the shared git store** (`~/dev/cookmarks/.git`); each worktree, including this one, is just a pointer into it, so don't move or delete the v1 checkout.
+
+Do all work in a **sub-worktree branched off `v2`** — never edit the trunk directly — so `v2` stays clean and merges stay trivial. Sub-worktrees live under `.claude/worktrees/<branch>/` (gitignored):
+
+```bash
+cd ~/dev/cookmarks-v2
+git worktree add -b <branch> .claude/worktrees/<branch> v2   # branch off the trunk
+# ... work and commit inside the sub-worktree ...
+cd ~/dev/cookmarks-v2 && git merge <branch>                  # land back on the trunk
+git worktree remove .claude/worktrees/<branch>               # clean up
+```
+
+This overrides the global rule about basing worktrees on `origin/main`: for v2 work the base is the local `v2` trunk.
+
 The defining principle (inspired by Anthropic's "Verifiable React" workshop, re-derived for this stack): **verification is an architectural concern, not a test afterthought.** Every UI unit exposes a machine-readable `data-verify-*` DOM contract, mounts in isolation at `/verify/:unit/:fixture`, and is checked through one verdict taxonomy via a single code path (`runFixture`) shared by three consumers — the **agent** (live browser), the **dashboard** (human), and **CI** (headless matrix).
 
 ## Stack
