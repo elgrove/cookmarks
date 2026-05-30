@@ -12,7 +12,6 @@
 {#if $page.url.searchParams.get('chrome') !== '0'}
 	<nav class="nav">
 		<a href="/">Cookmarks</a>
-		<a href="/verify">Verify</a>
 	</nav>
 {/if}
 
