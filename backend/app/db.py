@@ -14,10 +14,12 @@ engine = create_engine(
 
 
 @event.listens_for(engine, "connect")
-def _load_sqlite_vec(dbapi_conn: Any, _record: Any) -> None:
+def _configure_connection(dbapi_conn: Any, _record: Any) -> None:
     dbapi_conn.enable_load_extension(True)
     sqlite_vec.load(dbapi_conn)
     dbapi_conn.enable_load_extension(False)
+    # SQLite ignores foreign keys (and ON DELETE) unless enabled per connection.
+    dbapi_conn.execute("PRAGMA foreign_keys=ON")
 
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)

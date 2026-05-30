@@ -1,8 +1,12 @@
-.PHONY: install dev build verify check test fmt
+.PHONY: install dev migrate build verify check test fmt
 
 install:
 	cd backend && uv sync
 	cd frontend && npm install
+
+# Apply Alembic migrations (the alembic console script isn't installed; use the module).
+migrate:
+	cd backend && uv run python -m alembic upgrade head
 
 # Dev: Vite (:5173, HMR, proxies /api) + uvicorn (:8000). The agent's live loop.
 dev:

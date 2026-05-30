@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Cookmarks v2 — a rebuild of the Django/HTMX v1 onto a **typed-Python FastAPI backend + Svelte SPA**. v1's proven Python service/extraction logic (LangGraph extraction, AI providers, sqlite-vec embeddings, Calibre parsing) is ported in later milestones; this scaffold establishes the app skeleton and, above all, the **agent-verifiable harness**.
 
-**The v1 codebase is the reference for porting.** It lives at `/home/aaron/dev/cookmarks` (branch `main`) — read its `CLAUDE.md` for v1's architecture, and lift the framework-agnostic service code from `core/services/` (extraction graph, `ai.py`, `embeddings.py`, Calibre/EPUB) when wiring up each v2 feature. The Django ORM models, Django-Q tasks, and HTMX views are *not* ported as-is — they map to SQLAlchemy models, Celery tasks, and FastAPI routes respectively.
+**The v1 codebase is the reference for porting.** It lives at `/home/aaron/dev/cookmarks` (branch `main`). V1 is to be used as a guide, in V2 all core concepts and decisions can be re-thought from first principles, with the exception of recipe extraction, which is proven to work as-is.
 
 The defining principle (inspired by Anthropic's "Verifiable React" workshop, re-derived for this stack): **verification is an architectural concern, not a test afterthought.** Every UI unit exposes a machine-readable `data-verify-*` DOM contract, mounts in isolation at `/verify/:unit/:fixture`, and is checked through one verdict taxonomy via a single code path (`runFixture`) shared by three consumers — the **agent** (live browser), the **dashboard** (human), and **CI** (headless matrix).
 
