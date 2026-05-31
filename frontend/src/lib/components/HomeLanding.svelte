@@ -73,7 +73,7 @@
 	.home {
 		max-width: var(--max-w);
 		margin: 0 auto;
-		padding: 6rem var(--page-h);
+		padding: 3rem var(--page-h) 5rem;
 	}
 
 	.feature {
