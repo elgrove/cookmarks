@@ -123,3 +123,66 @@ An initial "/" slash motif was **rejected and removed from the language**.
 (tokens, components, screens; referenced from `CLAUDE.md`). The exploration mockups
 were removed once the spec captured the decisions, so `DESIGN.md` alone is enough to
 build the UI. Suggested first production slice: `/books`.
+
+## 2026-05-31 — `/books` vertical slice (first real feature)
+
+**Goal:** the first end-to-end feature on the v2 stack — a books library page —
+landing the patterns every later milestone reuses: a Pydantic response-schema layer,
+a typed+validated frontend API client, the `DESIGN.md` §3 tokens + self-hosted fonts,
+and the **first real verifiable unit** (retiring the Smoke self-test).
+
+**Scope (decided with the user):** basic grid only — no search/sort/filter yet
+(the §5 controls come later). Book **covers are in**, served from a **config-driven**
+library location.
+
+**Backend:**
+
+- `GET /api/books` → `BookSummary` (id, title, author, recipe_count, has_cover,
+  pubdate). Recipe counts come from one grouped `outerjoin + count(Recipe.id)` query
+  (not `*`, so the 89 zero-recipe books correctly read 0), default order
+  `created_at DESC`. New `app/schemas/` layer; router wired in `api/router.py`.
+- `GET /api/books/{id}/cover` streams `cover.jpg` via `FileResponse`, with a
+  `is_relative_to` path-traversal guard. `has_cover` is a per-book file-existence check.
+- **Paths are no longer absolute in the DB.** `Book.path` now stores a path *relative*
+  to `settings.calibre_library_path` (new setting, default `~/books/calibre-all`); the
+  v1 import strips the baked-in `/books/` prefix (`copy_books`). The library can now be
+  relocated by config alone. Re-seeded: 192 books, all 192 covers resolve.
+
+**Frontend:**
+
+- `DESIGN.md` §3 tokens + `.label`/`.mono` helpers + `fadeUp`/reduced-motion landed in
+  `app.css` (verdict colours preserved); fonts self-hosted via `@fontsource`
+  (Schibsted Grotesk / Source Serif 4 variable / IBM Plex Mono).
+- Presentational components: `BookCard` (cover plate **or** §7 no-cover title-plate,
+  clay accession number, serif title, recipe count / "— pending extraction") and
+  `BooksLibrary` (responsive grid 4→3→2→1, total count, the `data-verify-*` contract).
+- `$lib/api/books.ts` validates the response with Zod (the response-validation pattern);
+  `/books` route fetches, maps, and renders with loading/error states; nav gains a
+  clay-underline **Books** link.
+
+**Verification:** the Smoke unit was deleted and `harness.test.ts` repointed at the new
+unit's `populated` (PASS) / `contract-lie` (deliberate FAIL) fixtures. New backend
+`conftest.py` (temp-sqlite fixture + `get_session` override) + `test_books.py`.
+`make verify`/`check`/`test` all green; Playwright at 1280 and 390 confirmed real
+covers, the §7 plates, the pending state, accession numbers, single-column mobile
+reflow with no horizontal scroll, and the verify dashboard (smoke gone, `books-library`
+passing, `contract-lie` the sole intended FAIL).
+
+**Home page + app shell (same slice).** The books page can't be judged in isolation, so
+the slice also landed the surrounding frame. `GET /api/home` returns a stats ledger
+(books · recipes · keywords) and a **book of the day** — a daily, stable rotation among
+books that actually have recipes, carrying its description. The landing (`HomeLanding`,
+verifiable unit `home-landing`) is a **single book-of-the-day feature** — cover plate
+(or §7 fallback), large italic-serif title, author, a plain-text description excerpt,
+recipe count, and a browse link; the `/` route replaces the scaffold placeholder.
+(`GET /api/home` also returns a library stats ledger — books · recipes · keywords — kept
+for later use, though the landing itself shows only the feature.) A warm footer was added
+to the shell; the wordmark (nav + footer) is set in **italic Source Serif 4**, an
+editorial masthead matching the display titles; nav stays **live links only**
+(Home · Books) until the Recipes/Lists slices land. Per the agreed scope, the home
+**featured-recipes index** was deferred (no recipe-row component yet). Shared backend tidy-up: `app/covers.py`
+(`cover_path`/`has_cover`) and `SessionDep` moved to `app/db.py`. Two data-shape fixes
+found via Playwright: Calibre descriptions carry HTML (stripped to a plain-text excerpt,
+separator underscore-runs collapsed) and a long unbreakable token overflowed the mobile
+grid (fixed with `min-width:0` + `overflow-wrap`, and `--page-h` made responsive).
+`home-landing` (populated + no-feature probe) joins the green matrix.

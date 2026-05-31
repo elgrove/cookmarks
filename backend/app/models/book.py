@@ -22,6 +22,8 @@ class Book(UUIDAuditBase):
     isbn: Mapped[str | None] = mapped_column(String(50))
     pubdate: Mapped[date | None]
     description: Mapped[str] = mapped_column(Text, default="")
+    # Book directory relative to settings.calibre_library_path (e.g.
+    # "Neelam Batra/1,000 Indian Recipes (141)") — never an absolute path.
     path: Mapped[str] = mapped_column(String(1000))
     calibre_added_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 

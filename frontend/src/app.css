@@ -1,28 +1,175 @@
 :root {
-	color-scheme: light dark;
-	font-family: ui-sans-serif, system-ui, sans-serif;
+	/* Verify-harness verdict colours — read by the /verify dashboard + isolation route. */
 	--pass: #1a7f37;
 	--fail: #cf222e;
 	--blocked: #9a6700;
 	--skip: #57606a;
+
+	/* Colour — DESIGN §3.1 (authoritative). Light theme only. */
+	--bg: #faf9f5;
+	--bg-warm: #f3efe5;
+	--ink: #141413;
+	--muted: #86847b;
+	--faint: #b0aea5;
+	--line: #e8e6dc;
+	--line-strong: #d8d4c6;
+	--clay: #d97757;
+	--clay-deep: #c2613f;
+
+	--chip-clay: rgba(217, 119, 87, 0.11);
+	--chip-clay-c: #d97757;
+	--chip-blue: rgba(106, 155, 204, 0.11);
+	--chip-blue-c: #4c7fa8;
+	--chip-green: rgba(120, 140, 93, 0.11);
+	--chip-green-c: #5c7245;
+
+	/* Typography — DESIGN §3.2. Self-hosted via @fontsource (imported in +layout). */
+	--f-grotesk: 'Schibsted Grotesk', 'Helvetica Neue', sans-serif;
+	--f-serif: 'Source Serif 4 Variable', 'Source Serif 4', Georgia, serif;
+	--f-mono: 'IBM Plex Mono', 'Courier New', monospace;
+
+	/* Layout & shape — DESIGN §3.3. */
+	--max-w: 1200px;
+	--col-gap: 3rem;
+	--page-h: 5rem;
+	--border: 1px solid var(--line);
+	--border-strong: 1px solid var(--line-strong);
+	--ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Tighter page gutter on mobile — every var(--page-h) consumer (nav, footer, pages)
+   shrinks together so nothing overflows the viewport. */
+@media (max-width: 760px) {
+	:root {
+		--page-h: 1.25rem;
+	}
+}
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
 }
 
 body {
 	margin: 0;
 	line-height: 1.5;
+	background: var(--bg);
+	color: var(--ink);
+	font-family: var(--f-serif);
+	-webkit-font-smoothing: antialiased;
+	text-rendering: optimizeLegibility;
 }
 
 a {
 	color: inherit;
 }
 
+/* Helper classes — DESIGN §3.2. */
+.label {
+	font-family: var(--f-mono);
+	font-size: 0.65rem;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	color: var(--muted);
+}
+
+.mono {
+	font-family: var(--f-mono);
+	font-size: 0.72rem;
+	letter-spacing: 0.08em;
+}
+
+/* App shell / top nav — DESIGN §5. */
 .nav {
 	display: flex;
-	gap: 1rem;
-	padding: 0.75rem 1rem;
-	border-bottom: 1px solid color-mix(in srgb, currentColor 15%, transparent);
+	align-items: baseline;
+	gap: 1.75rem;
+	padding: 1.1rem var(--page-h);
+	border-bottom: var(--border);
+	background: var(--bg);
+	font-family: var(--f-grotesk);
+}
+
+.nav a {
+	text-decoration: none;
+}
+
+.nav .wordmark {
+	font-family: var(--f-serif);
+	font-style: italic;
+	font-weight: 600;
+	font-size: 1.35rem;
+	letter-spacing: -0.01em;
+	color: var(--ink);
+	margin-right: 0.25rem;
+}
+
+.nav .navlink {
+	font-size: 0.9rem;
+	color: var(--muted);
+	padding-bottom: 3px;
+	border-bottom: 2px solid transparent;
+	transition: color 0.18s var(--ease-out);
+}
+
+.nav .navlink:hover {
+	color: var(--ink);
+}
+
+.nav .navlink.active {
+	color: var(--ink);
+	border-bottom-color: var(--clay);
 }
 
 main {
-	padding: 1.5rem;
+	/* Pages own their own padding; full-bleed keeps the verify isolation route clean. */
+	padding: 0;
+}
+
+/* Footer — DESIGN §5/§3.1 (warm band). */
+.foot {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 0.75rem 1.25rem;
+	padding: 2rem var(--page-h);
+	margin-top: 4rem;
+	background: var(--bg-warm);
+	border-top: var(--border-strong);
+}
+
+.foot-mark {
+	font-family: var(--f-serif);
+	font-style: italic;
+	font-weight: 600;
+	font-size: 1.1rem;
+	letter-spacing: -0.01em;
+	color: var(--ink);
+}
+
+.foot-note {
+	color: var(--muted);
+}
+
+/* Motion — DESIGN §3.4. Entrance only; content is visible at rest (fill-mode both). */
+@keyframes fadeUp {
+	from {
+		opacity: 0;
+		transform: translateY(10px);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.001ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.001ms !important;
+	}
 }

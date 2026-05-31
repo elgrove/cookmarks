@@ -21,17 +21,11 @@ from app.models.enums import AIProvider
 V1_DEFAULT = Path.home() / "docker" / "cookmarks" / "data" / "db.sqlite3"
 EMBEDDING_DIM = 3072  # v1 Gemini embedding dimensions
 EMBEDDING_BATCH = 1000
+V1_LIBRARY_ROOT = "/books/"  # absolute prefix on v1 book paths; stripped to store paths relative
 
 # Each entry: (v2 table, v2 columns, SELECT against the v1 schema in the same order).
+# Books are copied by copy_books() (it rewrites `path` to be library-relative).
 COPIES: list[tuple[str, list[str], str]] = [
-    (
-        "books",
-        ["id", "created_at", "updated_at", "calibre_id", "title", "author",
-         "isbn", "pubdate", "description", "path", "calibre_added_at"],
-        """SELECT id, created_at, updated_at, calibre_id, title, author,
-                  isbn, pubdate, description, path, calibre_added_at
-           FROM core_book""",
-    ),
     (
         "keywords",
         ["id", "created_at", "updated_at", "name"],
@@ -114,6 +108,26 @@ def copy_table(
     return len(rows)
 
 
+def copy_books(src: sqlite3.Connection, tgt: sqlite3.Connection) -> int:
+    """Copy books, rewriting `path` to be relative to the Calibre library root so the
+    library location stays a runtime setting (settings.calibre_library_path) not baked-in data."""
+    rows = src.execute(
+        """SELECT id, created_at, updated_at, calibre_id, title, author,
+                  isbn, pubdate, description, path, calibre_added_at
+           FROM core_book"""
+    ).fetchall()
+    out = [(*row[:9], row[9].removeprefix(V1_LIBRARY_ROOT), row[10]) for row in rows]
+    tgt.executemany(
+        """INSERT INTO books
+           (id, created_at, updated_at, calibre_id, title, author,
+            isbn, pubdate, description, path, calibre_added_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        out,
+    )
+    tgt.commit()
+    return len(out)
+
+
 def copy_list_items(src: sqlite3.Connection, tgt: sqlite3.Connection) -> int:
     rows = src.execute(
         """SELECT id, created_at, updated_at, recipe_list_id, recipe_id
@@ -180,6 +194,7 @@ def main() -> None:
     tgt = open_target()
     try:
         clear_target(tgt)
+        print(f"  {'books':20} {copy_books(src, tgt)}")
         for table, cols, select in COPIES:
             n = copy_table(src, tgt, table, cols, select)
             print(f"  {table:20} {n}")

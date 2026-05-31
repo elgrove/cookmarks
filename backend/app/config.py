@@ -13,6 +13,10 @@ class Settings(BaseSettings):
 
     db_path: Path = BACKEND_ROOT / "db.sqlite3"
 
+    # Absolute root of the Calibre library on this machine. Book.path is stored
+    # relative to it, so the library can be relocated without touching the data.
+    calibre_library_path: Path = Path.home() / "books" / "calibre-all"
+
     # SvelteKit adapter-static output, served by FastAPI in production.
     frontend_dist: Path = BACKEND_ROOT.parent / "frontend" / "build"
 

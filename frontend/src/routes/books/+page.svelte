@@ -1,28 +1,25 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import HomeLanding, { type BookOfTheDay } from '$lib/components/HomeLanding.svelte';
-	import { fetchHome } from '$lib/api/home';
+	import BooksLibrary, { type LibraryBook } from '$lib/components/BooksLibrary.svelte';
+	import { fetchBooks } from '$lib/api/books';
 
 	let status = $state<'loading' | 'error' | 'ready'>('loading');
-	let bookOfTheDay = $state<BookOfTheDay | null>(null);
+	let books = $state<LibraryBook[]>([]);
 
 	async function load() {
 		status = 'loading';
 		try {
-			const b = (await fetchHome()).book_of_the_day;
-			bookOfTheDay = b
-				? {
-						id: b.id,
-						title: b.title,
-						author: b.author,
-						description: b.description,
-						recipeCount: b.recipe_count,
-						hasCover: b.has_cover
-					}
-				: null;
+			const data = await fetchBooks();
+			books = data.map((b) => ({
+				id: b.id,
+				title: b.title,
+				author: b.author,
+				recipeCount: b.recipe_count,
+				hasCover: b.has_cover
+			}));
 			status = 'ready';
 		} catch (err) {
-			console.error('failed to load home', err);
+			console.error('failed to load books', err);
 			status = 'error';
 		}
 	}
@@ -31,13 +28,14 @@
 </script>
 
 {#if status === 'ready'}
-	<HomeLanding {bookOfTheDay} />
+	<BooksLibrary {books} />
 {:else}
 	<div class="status">
+		<p class="label">The library</p>
 		{#if status === 'loading'}
-			<p class="msg">Loading…</p>
+			<p class="msg">Loading library…</p>
 		{:else}
-			<p class="msg">Couldn’t load the home page.</p>
+			<p class="msg">Couldn’t load the library.</p>
 			<button class="retry" onclick={load}>Try again</button>
 		{/if}
 	</div>
@@ -47,7 +45,7 @@
 	.status {
 		max-width: var(--max-w);
 		margin: 0 auto;
-		padding: 5rem var(--page-h);
+		padding: 4rem var(--page-h);
 	}
 
 	.msg {
@@ -55,7 +53,7 @@
 		font-style: italic;
 		font-size: 1.4rem;
 		color: var(--muted);
-		margin: 0 0 1.2rem;
+		margin: 0.5rem 0 1.2rem;
 	}
 
 	.retry {
