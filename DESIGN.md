@@ -18,9 +18,8 @@ clutter, no decorative noise.
 
 ## 2. Design language
 
-A **warm editorial archive**: the precision of a well-kept index — numbered entries, accession
-numbers, hairline rules, abundant whitespace, typography doing the heavy lifting — softened by warmth
-and human craft. The palette and type take their cue from **Anthropic's brand identity, designed by
+A **warm editorial archive**: the precision of a well-kept index — numbered entries, hairline rules,
+abundant whitespace, typography doing the heavy lifting — softened by warmth and human craft. The palette and type take their cue from **Anthropic's brand identity, designed by
 Geist** ([geist.co/work/anthropic](https://geist.co/work/anthropic)): warm off-white grounds, a single
 clay accent, and a refined grotesque-with-serif pairing — "technically refined and charmingly quirky."
 
@@ -36,8 +35,8 @@ clay accent, and a refined grotesque-with-serif pairing — "technically refined
    almost the entire identity. Keep the rhythm and hierarchy crisp.
 5. **Restraint with the accent.** Clay marks only moments of emphasis (active nav, index numbers, step
    counters, key actions, hover). If everything is clay, nothing is.
-6. **Index structure.** Numbered, zero-padded entries; accession numbers; `label · value` metadata
-   tables; small letterspaced mono section labels. This is the recurring structural motif.
+6. **Index structure.** Numbered, zero-padded entries; `label · value` metadata tables; small
+   letterspaced mono section labels. This is the recurring structural motif.
 
 ### Stay away from
 
@@ -87,7 +86,7 @@ for the index/metadata layer. (In the spirit of Anthropic's Styrene + Tiempos pa
 |---|---|---|---|
 | **Schibsted Grotesk** | `--f-grotesk` | Headings, nav, buttons, labels, UI chrome. Often letterspaced uppercase at small sizes. | 400/500/600/700 + italic 400/500 |
 | **Source Serif 4** | `--f-serif` | **Body & reading**: descriptions, ingredients, method steps, and large display titles (often italic). | 300/400/500/600 + italics; optical size 8–60 |
-| **IBM Plex Mono** | `--f-mono` | Metadata, accession numbers, tabular data, section labels. Letterspaced uppercase for labels. | 300/400 + italics |
+| **IBM Plex Mono** | `--f-mono` | Metadata, tabular data, section labels. Letterspaced uppercase for labels. | 300/400 + italics |
 
 ```css
 --f-grotesk: 'Schibsted Grotesk', 'Helvetica Neue', sans-serif;
@@ -140,8 +139,6 @@ The recurring building blocks that give the UI its archival character:
 
 - **Numbered index entries** — zero-padded mono counters (`001`, `002`…) lead recipe lists, search
   results, and featured strips; the number is clay.
-- **Accession numbers** — each book carries a stable id (e.g. `CM-001`) and recipes may carry a
-  per-book id (e.g. `CP-088`), set small in mono. Consistent, archival.
 - **Hairline metadata tables** — `LABEL · value` rows (mono label in `--muted`, serif or mono value),
   separated by hairlines. Used for book and recipe metadata.
 - **Mono section labels** — small letterspaced uppercase labels above sections (`INGREDIENTS`,
@@ -160,16 +157,16 @@ so it can mount in isolation in the verification harness (§9). Routes do the fe
 - **App shell / top nav** — **Cookmarks** wordmark (grotesque); nav: Home · Books · Recipes (search) ·
   Lists. Active item = **clay underline**. Ivory background, hairline bottom border. Collapses to a
   drawer on mobile.
-- **Book card** — cover as a small bordered "plate" (hairline border, `2:3`, `object-fit:cover`);
-  accession number (mono, corner); title (serif); author (`--muted`); recipe count. Books with no
-  extracted recipes show a mono **"— pending extraction"** note instead of a count. Missing covers →
-  §7.
+- **Book card** — cover as a small bordered "plate" (hairline border, `2:3`, `object-fit:cover`); a
+  **recipe-count circle** in the cover's top-right corner (clay fill, ivory numeral) showing how many
+  recipes were extracted — **unextracted books show no circle**; title (serif); author (`--muted`).
+  Missing covers → §7.
 - **Book grid + controls** — responsive grid of book cards; a controls bar with **search**, **sort**
   (Recently added / Title A–Z / Author / Most recipes) and **author filter**; a total count. With a
   library of this size, filtering and sorting are **client-side**.
 - **Recipe index row** — numbered row: index number (clay mono) · recipe name (serif) · book & author
   (right, `--muted`) · keyword chips. The unit of book-detail lists, search results, and featured lists.
-- **Recipe masthead** — breadcrumb · a mono metadata line (accession · book · author) · **large serif
+- **Recipe masthead** — breadcrumb · a mono metadata line (book · author) · **large serif
   (often italic) title** · favourite (★) toggle · yields · keyword chips. Shared identically by the
   with-image and no-image recipe layouts.
 - **Recipe image vs no-image** — the key component decision; see §7.
@@ -214,8 +211,8 @@ a deliberate design state — **never** as a broken or apologetic gap.
 - **Recipe with image** — a **bordered figure** (hairline border) with a mono caption naming the source.
 - **Recipe without image** — a **typographic plate** in the same position: a `--bg-warm` panel with a
   hairline border holding the recipe's **large light-italic serif drop-initial** (its first letter)
-  beside its **accession number** (mono) and its **opening line** set in italic serif. No empty box, no
-  "no image available" text. The masthead is otherwise identical to the with-image layout.
+  beside its **opening line** set in italic serif. No empty box, no "no image available" text. The
+  masthead is otherwise identical to the with-image layout.
 - **Metadata honesty** — the metadata table states `IMAGE · None in source` rather than hiding it.
 - **Lists & grids are text-first** — recipe rows carry no thumbnails, so image presence never affects
   layout. Only **book covers** use imagery; a missing cover falls back to a hairline plate bearing the

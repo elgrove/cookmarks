@@ -208,3 +208,17 @@ stays presentational.
 Verified headless (matrix, with `flushSync`) and live via Playwright — confirming the
 synchronous read pitfall: Svelte 5 batches DOM updates, so live assertions must await a
 tick where the harness gets it for free.
+
+## 2026-05-31 — Drop accession numbers; recipe-count circle
+
+Per the user: the `CM-001` **accession numbers were removed throughout** — from `BookCard`
+(and the `BooksLibrary` accession map), the verify invariants, and `DESIGN.md` (§2, §4's
+accession bullet, §5 book card + recipe masthead, §7 plate, §3.2 mono role). The numbered
+**recipe-index** motif (`001, 002…` leading list rows) stays — only the per-book accession
+id is gone.
+
+Extraction state moved off a text tag and **onto the cover**: a clay **count circle** in the
+top-right shows how many recipes were extracted; **unextracted books show no circle** (so
+the old "— pending extraction" text is gone too). The circle folds its count into the card
+link's accessible name and is otherwise `aria-hidden`. Verified live: 103 circles across the
+192 covers, none on the 89 unextracted books.

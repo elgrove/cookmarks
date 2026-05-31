@@ -4,24 +4,24 @@
 		title,
 		author,
 		recipeCount,
-		hasCover,
-		accession
+		hasCover
 	}: {
 		id: string;
 		title: string;
 		author: string;
 		recipeCount: number;
 		hasCover: boolean;
-		accession: string;
 	} = $props();
 
-	let pending = $derived(recipeCount === 0);
 	let coverFailed = $state(false);
 	let showCover = $derived(hasCover && !coverFailed);
+	// Extraction state lives on the cover as a count circle; fold the count into the
+	// link's accessible name since the circle itself is decorative.
+	let linkLabel = $derived(recipeCount > 0 ? `${title}, ${recipeCount} recipes` : title);
 </script>
 
-<article class="card" data-card-pending={pending ? 'true' : 'false'}>
-	<a class="plate-link" href={`/books/${id}`} aria-label={title}>
+<article class="card">
+	<a class="plate-link" href={`/books/${id}`} aria-label={linkLabel}>
 		<div class="plate">
 			{#if showCover}
 				<img
@@ -32,20 +32,17 @@
 					onerror={() => (coverFailed = true)}
 				/>
 			{:else}
-				<!-- §7: missing cover → hairline plate bearing the title in serif. Decorative
-				     (the real title is in the meta below), so hidden from assistive tech. -->
+				<!-- §7: missing cover → hairline plate bearing the title in serif. -->
 				<span class="plate-title" aria-hidden="true">{title}</span>
 			{/if}
-			<span class="accession mono">{accession}</span>
+			{#if recipeCount > 0}
+				<span class="count-badge" aria-hidden="true">{recipeCount}</span>
+			{/if}
 		</div>
 	</a>
 	<div class="meta">
 		<h3 class="title"><a href={`/books/${id}`}>{title}</a></h3>
 		<p class="author">{author}</p>
-		<p class="count mono">
-			{#if pending}— pending extraction{:else}{recipeCount}
-				{recipeCount === 1 ? 'recipe' : 'recipes'}{/if}
-		</p>
 	</div>
 </article>
 
@@ -96,15 +93,25 @@
 		padding: 1.4rem 1.2rem;
 	}
 
-	.accession {
+	/* Recipe-count circle — how many recipes were extracted. Absent = unextracted. */
+	.count-badge {
 		position: absolute;
-		top: 0.5rem;
-		left: 0.5rem;
-		font-size: 0.6rem;
-		color: var(--clay-deep);
-		background: color-mix(in srgb, var(--bg) 82%, transparent);
-		padding: 0.12rem 0.36rem;
-		border-radius: 2px;
+		top: 0.6rem;
+		right: 0.6rem;
+		min-width: 2.1rem;
+		height: 2.1rem;
+		padding: 0 0.5rem;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		border-radius: 999px;
+		background: var(--clay);
+		color: var(--bg);
+		font-family: var(--f-grotesk);
+		font-weight: 600;
+		font-size: 0.8rem;
+		line-height: 1;
+		box-shadow: 0 0 0 2.5px var(--bg);
 	}
 
 	.meta {
@@ -135,10 +142,5 @@
 		font-size: 0.82rem;
 		color: var(--muted);
 		margin: 0;
-	}
-
-	.count {
-		color: var(--faint);
-		margin: 0.2rem 0 0;
 	}
 </style>

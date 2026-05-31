@@ -25,12 +25,6 @@
 		{ key: 'recipes', label: 'Most recipes' }
 	];
 
-	// Stable accession per book from its position in the library (recently-added
-	// order), so sorting or filtering never renumbers a book.
-	let accessionOf = $derived(
-		new Map(books.map((b, i) => [b.id, `CM-${String(i + 1).padStart(3, '0')}`]))
-	);
-
 	let query = $derived(search.trim().toLowerCase());
 
 	let visible = $derived.by(() => {
@@ -122,7 +116,6 @@
 						author={book.author}
 						recipeCount={book.recipeCount}
 						hasCover={book.hasCover}
-						accession={accessionOf.get(book.id) ?? ''}
 					/>
 				</li>
 			{/each}

@@ -24,12 +24,11 @@ const populated: LibraryBook[] = [
 
 const SEARCH = 'input[type="search"]';
 const SORT = 'select[aria-label="Sort books"]';
-const withCards = ['populated', 'pending-extraction', 'search-match', 'sort-title', 'long-title', 'contract-lie'];
 
 const unit: VerifiableUnit<Props> = {
 	id: 'books-library',
 	title: 'Books library',
-	description: 'The collection grid with client-side search + sort, accession numbers, and no-image plates.',
+	description: 'The collection grid with client-side search + sort, recipe-count circles, and no-image plates.',
 	kind: 'component',
 	component: BooksLibrary,
 	propsSchema: z.object({ books: z.array(bookSchema) }),
@@ -114,12 +113,25 @@ const unit: VerifiableUnit<Props> = {
 				`expected empty=true count=0, saw empty=${contract.empty} count=${contract.count}`
 		},
 		{
-			id: 'pending-rendered',
-			description: 'zero-recipe books report as pending in the contract and the DOM',
+			id: 'extracted-badges',
+			description: 'one count circle per extracted book; none for unextracted',
+			onlyFixtures: ['populated', 'pending-extraction'],
+			check: ({ root, props }) => {
+				const extracted = props.books.filter((b) => b.recipeCount > 0).length;
+				const badges = root.querySelectorAll('.count-badge').length;
+				return badges === extracted || `expected ${extracted} count circles, saw ${badges}`;
+			}
+		},
+		{
+			id: 'pending-no-circle',
+			description: 'the unextracted book gets no circle; the extracted one shows its count',
 			onlyFixtures: ['pending-extraction'],
-			check: ({ contract, root }) =>
-				(Number(contract.pending) >= 1 && (root.textContent ?? '').includes('pending extraction')) ||
-				`expected a pending note; pending=${contract.pending}`
+			check: ({ contract, root, props }) => {
+				const unextracted = props.books.filter((b) => b.recipeCount === 0).length;
+				if (Number(contract.pending) !== unextracted) return `pending=${contract.pending}`;
+				const badge = root.querySelector('.count-badge')?.textContent?.trim();
+				return badge === '200' || `badge text=${badge}`;
+			}
 		},
 		{
 			id: 'search-filters',
@@ -149,14 +161,6 @@ const unit: VerifiableUnit<Props> = {
 					contract.empty === 'true' &&
 					(root.textContent ?? '').includes('No books match')) ||
 				`count=${contract.count} empty=${contract.empty}`
-		},
-		{
-			id: 'accession-present',
-			description: 'cards carry a stable CM-NNN accession number',
-			onlyFixtures: withCards,
-			check: ({ root }) =>
-				/CM-\d{3}/.test(root.querySelector('.accession')?.textContent ?? '') ||
-				'first card is missing a CM-NNN accession'
 		},
 		{
 			id: 'intentional-fail',
