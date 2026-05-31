@@ -91,3 +91,35 @@ embeddings, preserves UUIDs. Re-runnable; `--source`, `--no-embeddings`.
 links, 135 extraction runs, 3 lists / 9 items, 1 config, 13,275 embeddings.
 Verified: no FK violations, ORM read-back, enum round-trip, working vec search.
 Dev DB ~218 MB (gitignored). Commit `8b7c519`.
+
+## 2026-05-31 — UI design direction + `DESIGN.md`
+
+**Goal:** choose a visual/interaction language for the v2 UI and capture it so a
+fresh agent can build the real app without re-deriving it.
+
+**Process:** explored **four** distinct directions as self-contained static HTML
+mockups over the *real* imported data (actual covers, recipe photos extracted from
+the EPUBs, real titles/counts), served on `0.0.0.0` for remote review:
+*Editorial* (warm print-magazine, Fraunces), *Market* (bold grocer signage,
+Archivo + marquee), *Catalogue* (library card-index, Newsreader + Plex Mono), and
+*Kitchen* (cosy warm-dark, Bricolage Grotesque). Built in parallel by subagents.
+
+**QA:** drove every screen via Playwright at 1280 and 390. One real bug found and
+fixed — Kitchen gated reveals behind an `IntersectionObserver` (`threshold: 0.05`)
+that never fired on tall containers, leaving whole sections stuck at `opacity:0`;
+the lesson (no scroll-gated reveals that can strand content) is recorded in
+`DESIGN.md`. Market/Kitchen mobile "overflow" was a fixed-layer screenshot artefact
+(no real horizontal scroll).
+
+**Decision:** **Catalogue**, refined by mixing in the **Anthropic brand language**
+(Geist) → a *"Catalogue × Anthropic"* direction: warm
+ivory `#faf9f5` + ink `#141413` + clay `#d97757` accent; Schibsted Grotesk
+(headings) + Source Serif 4 (body) + IBM Plex Mono (metadata); numbered, text-first
+catalogue layouts. Added a real **no-image recipe** page ("Dal", Felicity Cloake) —
+absence is treated as a designed typographic state, since most recipes lack images.
+An initial "/" slash motif was **rejected and removed from the language**.
+
+**Outcome:** `DESIGN.md` — a standalone, conversation-free UI design-language spec
+(tokens, components, screens; referenced from `CLAUDE.md`). The exploration mockups
+were removed once the spec captured the decisions, so `DESIGN.md` alone is enough to
+build the UI. Suggested first production slice: `/books`.

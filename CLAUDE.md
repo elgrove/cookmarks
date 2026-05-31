@@ -8,6 +8,10 @@ Cookmarks v2 — a rebuild of the Django/HTMX v1 onto a **typed-Python FastAPI b
 
 **The v1 codebase is the reference for porting.** It lives at `/home/aaron/dev/cookmarks` (branch `main`). V1 is to be used as a guide, in V2 all core concepts and decisions can be re-thought from first principles, with the exception of recipe extraction, which is proven to work as-is.
 
+## UI design language
+
+**`DESIGN.md` is the canonical spec for how the v2 UI looks and feels** — read it before building or changing any UI. In short: a warm, text-first **editorial-archive** aesthetic — warm ivory ground + clay accent, a Schibsted Grotesk / Source Serif 4 / IBM Plex Mono type system, numbered index layouts, and a deliberately-designed **no-image** state (most recipes have none). Palette and type take their cue from Anthropic's brand identity (by Geist). `DESIGN.md` is self-contained — tokens, components, and screens — and is the only document needed to build the UI.
+
 ## Repository layout & worktree workflow
 
 This checkout — `~/dev/cookmarks-v2`, branch `v2` — is the **v2 trunk**: the integration branch every piece of v2 work merges back into. The v1 reference at `~/dev/cookmarks` (branch `main`) **owns the shared git store** (`~/dev/cookmarks/.git`); each worktree, including this one, is just a pointer into it, so don't move or delete the v1 checkout.
