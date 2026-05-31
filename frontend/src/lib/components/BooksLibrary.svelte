@@ -6,6 +6,8 @@
 		recipeCount: number;
 		hasCover: boolean;
 	};
+
+	type SortKey = 'recent' | 'title' | 'author' | 'recipes';
 </script>
 
 <script lang="ts">
@@ -13,33 +15,106 @@
 
 	let { books }: { books: LibraryBook[] } = $props();
 
-	let total = $derived(books.length);
-	let pendingCount = $derived(books.filter((b) => b.recipeCount === 0).length);
+	let search = $state('');
+	let sort = $state<SortKey>('recent');
 
-	// Stable archival accession id from the book's position in the library.
-	function accession(i: number): string {
-		return `CM-${String(i + 1).padStart(3, '0')}`;
-	}
+	const sortOptions: { key: SortKey; label: string }[] = [
+		{ key: 'recent', label: 'Recently added' },
+		{ key: 'title', label: 'Title A–Z' },
+		{ key: 'author', label: 'Author' },
+		{ key: 'recipes', label: 'Most recipes' }
+	];
+
+	// Stable accession per book from its position in the library (recently-added
+	// order), so sorting or filtering never renumbers a book.
+	let accessionOf = $derived(
+		new Map(books.map((b, i) => [b.id, `CM-${String(i + 1).padStart(3, '0')}`]))
+	);
+
+	let query = $derived(search.trim().toLowerCase());
+
+	let visible = $derived.by(() => {
+		let list = books;
+		if (query) {
+			list = list.filter(
+				(b) => b.title.toLowerCase().includes(query) || b.author.toLowerCase().includes(query)
+			);
+		}
+		const sorted = [...list];
+		switch (sort) {
+			case 'title':
+				sorted.sort((a, b) => a.title.localeCompare(b.title));
+				break;
+			case 'author':
+				sorted.sort((a, b) => a.author.localeCompare(b.author) || a.title.localeCompare(b.title));
+				break;
+			case 'recipes':
+				sorted.sort((a, b) => b.recipeCount - a.recipeCount);
+				break;
+			// 'recent' keeps the incoming order (created_at desc)
+		}
+		return sorted;
+	});
+
+	let pendingCount = $derived(visible.filter((b) => b.recipeCount === 0).length);
+	let countLabel = $derived(query ? `${visible.length} of ${books.length}` : `${books.length}`);
 </script>
 
 <section
 	class="library"
 	data-verify-unit="books-library"
-	data-verify-count={total}
-	data-verify-empty={total === 0 ? 'true' : 'false'}
+	data-verify-count={visible.length}
+	data-verify-total={books.length}
+	data-verify-empty={visible.length === 0 ? 'true' : 'false'}
 	data-verify-pending={pendingCount}
+	data-verify-sort={sort}
+	data-verify-query={query}
+	data-verify-first={visible[0]?.title ?? ''}
 >
 	<header class="head">
 		<p class="label">The library</p>
 		<h1 class="display">Books</h1>
-		<p class="total mono">{total} {total === 1 ? 'book' : 'books'}</p>
 	</header>
 
-	{#if total === 0}
-		<p class="empty">No books yet.</p>
+	<div class="controls">
+		<div class="search">
+			<input
+				type="search"
+				class="search-input"
+				placeholder="Search by title or author…"
+				aria-label="Search books"
+				value={search}
+				oninput={(e) => (search = e.currentTarget.value)}
+			/>
+			{#if search}
+				<button class="clear" aria-label="Clear search" onclick={() => (search = '')}>×</button>
+			{/if}
+		</div>
+
+		<label class="sort">
+			<span class="label">Sort</span>
+			<select
+				class="sort-select"
+				aria-label="Sort books"
+				value={sort}
+				oninput={(e) => (sort = e.currentTarget.value as SortKey)}
+			>
+				{#each sortOptions as opt (opt.key)}
+					<option value={opt.key}>{opt.label}</option>
+				{/each}
+			</select>
+		</label>
+
+		<p class="count mono">{countLabel} {books.length === 1 ? 'book' : 'books'}</p>
+	</div>
+
+	{#if visible.length === 0}
+		<p class="empty">
+			{#if books.length === 0}No books yet.{:else}No books match “{search.trim()}”.{/if}
+		</p>
 	{:else}
 		<ul class="grid">
-			{#each books as book, i (book.id)}
+			{#each visible as book, i (book.id)}
 				<li class="cell" style={`animation-delay: ${Math.min(i * 30, 600)}ms`}>
 					<BookCard
 						id={book.id}
@@ -47,7 +122,7 @@
 						author={book.author}
 						recipeCount={book.recipeCount}
 						hasCover={book.hasCover}
-						accession={accession(i)}
+						accession={accessionOf.get(book.id) ?? ''}
 					/>
 				</li>
 			{/each}
@@ -63,7 +138,7 @@
 	}
 
 	.head {
-		margin-bottom: 2.5rem;
+		margin-bottom: 1.75rem;
 	}
 
 	.display {
@@ -73,12 +148,89 @@
 		font-size: clamp(2.2rem, 5vw, 3.2rem);
 		line-height: 1.05;
 		letter-spacing: -0.01em;
-		margin: 0.2rem 0 0.5rem;
+		margin: 0.2rem 0 0;
 	}
 
-	.total {
+	/* Controls bar */
+	.controls {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 1rem 1.5rem;
+		margin-bottom: 2.5rem;
+		padding-bottom: 1.25rem;
+		border-bottom: var(--border);
+	}
+
+	.search {
+		position: relative;
+		display: flex;
+		align-items: center;
+		flex: 1 1 18rem;
+		min-width: 0;
+	}
+
+	.search-input {
+		width: 100%;
+		font-family: var(--f-grotesk);
+		font-size: 0.95rem;
+		color: var(--ink);
+		background: transparent;
+		border: none;
+		border-bottom: 1px solid var(--line-strong);
+		padding: 0.5rem 1.5rem 0.5rem 0;
+		transition: border-color 0.18s var(--ease-out);
+	}
+
+	.search-input::placeholder {
+		color: var(--faint);
+	}
+
+	.search-input:focus {
+		border-bottom-color: var(--clay);
+	}
+
+	.clear {
+		position: absolute;
+		right: 0;
+		display: flex;
+		background: none;
+		border: none;
+		cursor: pointer;
 		color: var(--muted);
-		margin: 0;
+		font-size: 1.2rem;
+		line-height: 1;
+		padding: 0.15rem 0.25rem;
+	}
+
+	.clear:hover {
+		color: var(--clay-deep);
+	}
+
+	.sort {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.55rem;
+	}
+
+	.sort-select {
+		font-family: var(--f-grotesk);
+		font-size: 0.9rem;
+		color: var(--ink);
+		background-color: var(--bg);
+		border: var(--border);
+		border-radius: 3px;
+		padding: 0.4rem 1.9rem 0.4rem 0.7rem;
+		cursor: pointer;
+		appearance: none;
+		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M1 1.5l4 4 4-4' fill='none' stroke='%2386847b' stroke-width='1.5'/%3E%3C/svg%3E");
+		background-repeat: no-repeat;
+		background-position: right 0.65rem center;
+	}
+
+	.count {
+		margin: 0 0 0 auto;
+		color: var(--muted);
 	}
 
 	.grid {
@@ -99,7 +251,7 @@
 		font-style: italic;
 		font-size: 1.3rem;
 		color: var(--muted);
-		padding: 3rem 0;
+		padding: 2rem 0;
 		margin: 0;
 	}
 
@@ -111,7 +263,13 @@
 
 	@media (max-width: 760px) {
 		.library {
-			padding: 2rem 1.25rem 3rem;
+			padding: 2rem var(--page-h) 3rem;
+		}
+		.controls {
+			gap: 0.75rem 1rem;
+		}
+		.count {
+			margin-left: 0;
 		}
 		.grid {
 			grid-template-columns: repeat(2, 1fr);

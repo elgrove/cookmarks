@@ -12,35 +12,58 @@ const bookSchema = z.object({
 	hasCover: z.boolean()
 });
 
-const withCards = ['populated', 'pending-extraction', 'long-title', 'contract-lie'];
-
+// Incoming (recently-added) order is deliberately NOT alphabetical, so a title
+// sort visibly reorders the list.
 const populated: LibraryBook[] = [
-	{ id: 'a1', title: 'A Modern Way to Cook', author: 'Anna Jones', recipeCount: 150, hasCover: true },
-	{ id: 'a2', title: 'Salt, Fat, Acid, Heat', author: 'Samin Nosrat', recipeCount: 100, hasCover: false },
+	{ id: 'a1', title: 'Salt, Fat, Acid, Heat', author: 'Samin Nosrat', recipeCount: 100, hasCover: false },
+	{ id: 'a2', title: 'A Modern Way to Eat', author: 'Anna Jones', recipeCount: 200, hasCover: false },
 	{ id: 'a3', title: 'The Nordic Baking Book', author: 'Magnus Nilsson', recipeCount: 84, hasCover: true },
-	{ id: 'a4', title: 'Persiana', author: 'Sabrina Ghayour', recipeCount: 92, hasCover: false },
-	{ id: 'a5', title: "A Cook's Book", author: 'Nigel Slater', recipeCount: 220, hasCover: true }
+	{ id: 'a4', title: 'A Modern Way to Cook', author: 'Anna Jones', recipeCount: 150, hasCover: false },
+	{ id: 'a5', title: 'Persiana', author: 'Sabrina Ghayour', recipeCount: 92, hasCover: true }
 ];
+
+const SEARCH = 'input[type="search"]';
+const SORT = 'select[aria-label="Sort books"]';
+const withCards = ['populated', 'pending-extraction', 'search-match', 'sort-title', 'long-title', 'contract-lie'];
 
 const unit: VerifiableUnit<Props> = {
 	id: 'books-library',
 	title: 'Books library',
-	description: 'The collection grid: book cards, accession numbers, recipe counts, no-image plates.',
+	description: 'The collection grid with client-side search + sort, accession numbers, and no-image plates.',
 	kind: 'component',
 	component: BooksLibrary,
 	propsSchema: z.object({ books: z.array(bookSchema) }),
 	fixtures: [
-		{ id: 'populated', description: 'several books with varied recipe counts', props: { books: populated } },
+		{ id: 'populated', description: 'several books, default (recently-added) order', props: { books: populated } },
 		{ id: 'empty', description: 'no books in the library', props: { books: [] } },
 		{
 			id: 'pending-extraction',
-			description: 'a book with zero recipes shows the pending note, not a count',
+			description: 'a zero-recipe book shows the pending note, not a count',
 			props: {
 				books: [
 					{ id: 'b1', title: 'River Cottage Veg', author: 'Hugh Fearnley-Whittingstall', recipeCount: 200, hasCover: false },
 					{ id: 'b2', title: 'Just added, not yet extracted', author: 'Unknown', recipeCount: 0, hasCover: false }
 				]
 			}
+		},
+		{
+			id: 'search-match',
+			description: 'searching narrows to matching title/author',
+			props: { books: populated },
+			act: ({ type }) => type(SEARCH, 'modern')
+		},
+		{
+			id: 'sort-title',
+			description: 'sorting Title A–Z reorders the visible list',
+			props: { books: populated },
+			act: ({ type }) => type(SORT, 'title')
+		},
+		{
+			id: 'no-results',
+			description: 'probe: a search matching nothing shows the calm empty state',
+			probe: true,
+			props: { books: populated },
+			act: ({ type }) => type(SEARCH, 'zzzznope')
 		},
 		{
 			id: 'long-title',
@@ -68,15 +91,23 @@ const unit: VerifiableUnit<Props> = {
 	],
 	invariants: [
 		{
-			id: 'count-matches',
-			description: 'the rendered count equals the number of books passed in',
+			id: 'unfiltered-count',
+			description: 'with no query the count equals the whole library',
+			onlyFixtures: ['populated'],
 			check: ({ contract, props }) =>
-				Number(contract.count) === props.books.length ||
-				`expected count=${props.books.length}, saw ${contract.count}`
+				(contract.query === '' && Number(contract.count) === props.books.length) ||
+				`expected count=${props.books.length} query=empty, saw ${contract.count}/${contract.query}`
+		},
+		{
+			id: 'default-order',
+			description: 'the default sort preserves the incoming (recently-added) order',
+			onlyFixtures: ['populated'],
+			check: ({ contract, props }) =>
+				contract.first === props.books[0].title || `first=${contract.first}`
 		},
 		{
 			id: 'empty-state',
-			description: 'the empty fixture flags empty and a zero count',
+			description: 'an empty library flags empty and a zero count',
 			onlyFixtures: ['empty'],
 			check: ({ contract }) =>
 				(contract.empty === 'true' && contract.count === '0') ||
@@ -84,15 +115,44 @@ const unit: VerifiableUnit<Props> = {
 		},
 		{
 			id: 'pending-rendered',
-			description: 'zero-recipe books report as pending, both in the contract and the DOM',
+			description: 'zero-recipe books report as pending in the contract and the DOM',
 			onlyFixtures: ['pending-extraction'],
 			check: ({ contract, root }) =>
 				(Number(contract.pending) >= 1 && (root.textContent ?? '').includes('pending extraction')) ||
 				`expected a pending note; pending=${contract.pending}`
 		},
 		{
+			id: 'search-filters',
+			description: 'searching "modern" shows only matching books',
+			onlyFixtures: ['search-match'],
+			check: ({ contract, root }) => {
+				if (contract.query !== 'modern') return `query=${contract.query}`;
+				if (Number(contract.count) !== 2) return `expected 2 matches, saw ${contract.count}`;
+				const titles = [...root.querySelectorAll('.title')].map((t) => (t.textContent ?? '').toLowerCase());
+				return titles.every((t) => t.includes('modern')) || `non-matching title rendered: ${titles}`;
+			}
+		},
+		{
+			id: 'sort-applied',
+			description: 'Title A–Z makes the alphabetically-first book lead',
+			onlyFixtures: ['sort-title'],
+			check: ({ contract }) =>
+				(contract.sort === 'title' && contract.first === 'A Modern Way to Cook') ||
+				`saw sort=${contract.sort} first=${contract.first}`
+		},
+		{
+			id: 'no-results-state',
+			description: 'a non-matching search shows the calm no-results message',
+			onlyFixtures: ['no-results'],
+			check: ({ contract, root }) =>
+				(Number(contract.count) === 0 &&
+					contract.empty === 'true' &&
+					(root.textContent ?? '').includes('No books match')) ||
+				`count=${contract.count} empty=${contract.empty}`
+		},
+		{
 			id: 'accession-present',
-			description: 'cards carry a CM-NNN accession number',
+			description: 'cards carry a stable CM-NNN accession number',
 			onlyFixtures: withCards,
 			check: ({ root }) =>
 				/CM-\d{3}/.test(root.querySelector('.accession')?.textContent ?? '') ||

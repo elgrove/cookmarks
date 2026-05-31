@@ -186,3 +186,25 @@ found via Playwright: Calibre descriptions carry HTML (stripped to a plain-text 
 separator underscore-runs collapsed) and a long unbreakable token overflowed the mobile
 grid (fixed with `min-width:0` + `overflow-wrap`, and `--page-h` made responsive).
 `home-landing` (populated + no-feature probe) joins the green matrix.
+
+## 2026-05-31 — Books search + sort
+
+The deferred §5 controls, scoped down with the user: a client-side **search** box
+(substring over title + author) and a **sort dropdown** (Recently added / Title A–Z /
+Author / Most recipes) — **no** author filter (search covers author) and **no** URL state
+(filters are in-component). All over the already-loaded `books` prop, so `BooksLibrary`
+stays presentational.
+
+- Accession numbers are now derived from each book's position in the full (recently-added)
+  library and looked up by id, so sorting/filtering never renumbers a book.
+- The contract gained `data-verify-{total,sort,query,first}`; the unit's fixtures now drive
+  the controls via `act` (`type` into the search box and the `<select>`) — `search-match`,
+  `sort-title`, and a `no-results` probe — with invariants asserting the filtered count,
+  matching titles, sort order, and the calm no-results message. The `<select>` is wired on
+  `oninput` so the harness can drive it (its `act` has no native select support).
+- Calm states: a "No books match …" message distinct from the empty-library "No books yet";
+  a clay focus ring (`:focus-visible`) was added globally for the new controls.
+
+Verified headless (matrix, with `flushSync`) and live via Playwright — confirming the
+synchronous read pitfall: Svelte 5 batches DOM updates, so live assertions must await a
+tick where the harness gets it for free.
