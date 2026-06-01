@@ -31,9 +31,9 @@ def test_search_matches_book_author(client: TestClient) -> None:
 
 
 def test_keyword_filter(client: TestClient) -> None:
-    body = client.get("/api/recipes", params={"keyword": "weeknight"}).json()
+    body = client.get("/api/recipes", params={"keyword": "Pasta"}).json()
     assert body["total"] == 1
-    assert body["items"][0]["keywords"] == ["weeknight"]
+    assert body["items"][0]["keywords"] == ["Pasta", "Quick"]
 
 
 def test_keyword_filter_unknown_is_empty(client: TestClient) -> None:
@@ -55,7 +55,7 @@ def test_author_filter(client: TestClient) -> None:
 
 def test_query_and_filter_are_anded(client: TestClient) -> None:
     # "recipe" matches all three by name; the keyword narrows to Recipe 0.
-    both = client.get("/api/recipes", params={"q": "recipe", "keyword": "weeknight"}).json()
+    both = client.get("/api/recipes", params={"q": "recipe", "keyword": "Pasta"}).json()
     assert both["total"] == 1
     assert both["items"][0]["name"] == "Recipe 0"
 
@@ -76,4 +76,7 @@ def test_pagination(client: TestClient) -> None:
 
 def test_keywords_endpoint(client: TestClient) -> None:
     body = client.get("/api/keywords").json()
-    assert body == [{"name": "weeknight", "recipe_count": 1}]
+    assert body == [
+        {"name": "Pasta", "recipe_count": 1},
+        {"name": "Quick", "recipe_count": 1},
+    ]

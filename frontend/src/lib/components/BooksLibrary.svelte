@@ -66,7 +66,6 @@
 	data-verify-first={visible[0]?.title ?? ''}
 >
 	<header class="head">
-		<p class="label">The library</p>
 		<h1 class="display">Books</h1>
 	</header>
 

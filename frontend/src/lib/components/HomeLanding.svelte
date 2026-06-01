@@ -10,20 +10,16 @@
 </script>
 
 <script lang="ts">
+	import { plainText } from '$lib/html';
+	import { cleanTitle } from '$lib/title';
+
 	let { bookOfTheDay }: { bookOfTheDay: BookOfTheDay | null } = $props();
 
 	const nf = new Intl.NumberFormat('en-GB');
 	let coverFailed = $state(false);
 	let showCover = $derived(!!bookOfTheDay?.hasCover && !coverFailed);
 
-	// Calibre descriptions carry HTML; show a plain-text excerpt.
-	function plainText(html: string): string {
-		if (typeof DOMParser === 'undefined') return html;
-		return (new DOMParser().parseFromString(html, 'text/html').body.textContent ?? '')
-			.replace(/_{3,}/g, ' ') // collapse Calibre separator underscore runs
-			.replace(/\s+/g, ' ')
-			.trim();
-	}
+	let title = $derived(bookOfTheDay ? cleanTitle(bookOfTheDay.title) : '');
 	let description = $derived(bookOfTheDay ? plainText(bookOfTheDay.description) : '');
 </script>
 
@@ -34,24 +30,24 @@
 >
 	{#if bookOfTheDay}
 		<section class="feature">
-			<a class="feature-plate" href={`/books/${bookOfTheDay.id}`} aria-label={bookOfTheDay.title}>
+			<a class="feature-plate" href={`/books/${bookOfTheDay.id}`} aria-label={title}>
 				<div class="plate">
 					{#if showCover}
 						<img
 							class="cover"
 							src={`/api/books/${bookOfTheDay.id}/cover`}
-							alt={`Cover of ${bookOfTheDay.title}`}
+							alt={`Cover of ${title}`}
 							onerror={() => (coverFailed = true)}
 						/>
 					{:else}
-						<span class="plate-title" aria-hidden="true">{bookOfTheDay.title}</span>
+						<span class="plate-title" aria-hidden="true">{title}</span>
 					{/if}
 				</div>
 			</a>
 			<div class="feature-meta">
 				<p class="label">Book of the day</p>
 				<h1 class="feature-title">
-					<a href={`/books/${bookOfTheDay.id}`}>{bookOfTheDay.title}</a>
+					<a href={`/books/${bookOfTheDay.id}`}>{title}</a>
 				</h1>
 				<p class="feature-author">{bookOfTheDay.author}</p>
 				{#if description}

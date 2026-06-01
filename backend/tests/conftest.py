@@ -35,22 +35,23 @@ def _seed(session: Session) -> None:
     )
     session.add_all([with_recipes, without_recipes])
     session.flush()
-    # Recipe 0 carries a keyword and an ingredient so the search/filter paths
-    # (keyword chip, ingredient substring) have something to match.
-    weeknight = Keyword(name="weeknight")
-    session.add(weeknight)
-    recipes = [
-        Recipe(
+    # Recipe 0 carries keywords and an ingredient so the search/filter paths
+    # (keyword chip, ingredient substring) and the book-detail keyword join all
+    # have something to match.
+    pasta = Keyword(name="Pasta")
+    quick = Keyword(name="Quick")
+    session.add_all([pasta, quick])
+    for i in range(3):
+        recipe = Recipe(
             book_id=with_recipes.id,
             order=i,
             name=f"Recipe {i}",
             ingredients=["100g anchovy"] if i == 0 else [],
             instructions=[],
         )
-        for i in range(3)
-    ]
-    recipes[0].keywords.append(weeknight)
-    session.add_all(recipes)
+        if i == 0:
+            recipe.keywords = [pasta, quick]
+        session.add(recipe)
     session.commit()
 
 

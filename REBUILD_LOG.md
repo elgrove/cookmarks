@@ -256,3 +256,44 @@ papering over gaps in the verifiability thesis. Fixed all of them:
 All green: backend `pytest` 13 passed (4 new contract tests), `ruff`/`ty` clean; frontend `vitest`
 14 passed (matrix 9, harness 2, contract 3), `svelte-check` 0/0, `build` OK. Verified live via
 Playwright: dashboard 9 `PASS` / 1 `FAIL` (the `contract-lie` sentinel).
+
+## 2026-06-01 — Book detail page ("The Index" layout)
+
+The first detail view, landing the `/books/{id}` route the library grid already linked to.
+Design chosen from four reviewed mockups (`mockups/book-detail/`): **Layout A "The Index"** —
+a two-column editorial view (serif masthead + reading column; a sticky cover / actions /
+metadata sidebar, its top aligned to the title).
+
+- **Backend:** `GET /api/books/{id}` → `BookDetail` (schemas/book.py) with real model fields
+  only — title, author, isbn, pubdate, description, total `recipe_count`, `has_cover`,
+  `added` (calibre_added_at) — plus a **random sample of 10** recipes (`ORDER BY RANDOM()
+  LIMIT 10`, `selectinload(keywords)`) as `RecipeRow` (id, name, keywords). 404 on unknown id.
+  Tests in `test_books.py` (shape, ≤10 cap, keyword shape, empty book, 404); the seed gained
+  two keywords (so `test_home` keyword count moved 0→2).
+- **Frontend:** presentational `BookDetail.svelte` (`data-verify-unit="book-detail"` with
+  `id / recipe-count / shown / has-cover / empty`), the `/books/[id]` route
+  (onMount→`fetchBookDetail`→3-state), `fetchBookDetail` + Zod schemas, and shared
+  `lib/title.ts` (clean-title / subtitle split, v1 `clean_title`) + `lib/html.ts`
+  (Calibre-HTML→text, shared with Home). `book-detail.verify.ts` uses the post-merge
+  convention: `populated / no-cover / no-recipes / no-subtitle` plus `long-title` &
+  `many-keywords` **probes** (adversarial, must PASS) and a `contract-lie` **expectFail**
+  sentinel; invariants on id, count, rows≤10=shown, main title, empty state, count circle,
+  no-subtitle.
+- **UI:** masthead (clean title + post-colon subtitle) + read-more description; a `RECIPES`
+  label, recipe rows of **name + one line of keyword chips** (extra chips clip; no numbers)
+  and a `+ N more` footer; sticky sidebar with the cover (count circle, §7 no-cover plate),
+  dark **Read book** / outlined **Action** buttons (no-op), and an all-mono `LABEL · value`
+  metadata ledger. No fabricated data; no eyebrow labels.
+- **App-wide while here:** footer pinned to the viewport bottom (min-height flex column);
+  clean titles (drop the post-colon subtitle) on the home feature; eyebrow labels removed
+  from `BooksLibrary` + the `/books` loading state.
+- **Cover-path fix (dev data):** covers resolved 0/192 — the seeded dev DB pre-dated the
+  import script's `removeprefix(V1_LIBRARY_ROOT)` and still held absolute `/books/...` paths
+  while `calibre_library_path` (`~/books/calibre-all`) expects them relative. Normalised the
+  stale DB in place (`UPDATE books SET path = substr(path, 8)`); 192/192 covers now resolve.
+
+Merged the concurrent critical-review work (above) in: migrated the verify unit to the new
+`probe`/`expectFail` split and re-greened (`make check` + `make test`). Verified via Playwright
+(1280×800 + 390×844): real cover + count circle, random-10 reshuffling, empty state, §7
+no-cover plate, single-line tags, footer pinned on short pages, mobile reflow without
+horizontal scroll.
