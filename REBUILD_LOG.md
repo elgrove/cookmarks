@@ -298,6 +298,126 @@ Merged the concurrent critical-review work (above) in: migrated the verify unit 
 no-cover plate, single-line tags, footer pinned on short pages, mobile reflow without
 horizontal scroll.
 
+## 2026-06-01 — Recipes search page
+
+The **Recipes** screen: a server-driven keyword search over the ~13k-recipe archive, **empty
+until a query**. Deliberately **not** semantic/AI search (v1 had Gemini vector search; deferred
+to a later slice) — this is substring + filters only.
+
+- **Backend** `GET /api/recipes?q=&keyword=&book_id=&author=&sort=&limit=&offset=`: substring
+  (`ILIKE`) across recipe name, keyword names, book title/author **and the JSON ingredients**
+  (so an ingredient query like "anchovy" matches); keyword chips **AND-narrow** (each chosen
+  keyword must be present, via `.keywords.any(...)`); `book_id`/`author` filters; `name`/`recent`
+  sort; offset pagination; returns `{ total, items }`. **Filters count as a query** — a chip or
+  book/author alone returns results; nothing set returns the resting empty state. `GET /api/keywords`
+  feeds the filter chips (name + recipe count, popularity-ordered).
+- **Frontend**: presentational `RecipesSearch.svelte` (search box · keyword chips · book/author
+  selects · sort · result count · text-first rows · resting/loading/results/empty states · prev/next
+  pager) + `RecipeRow.svelte` (name · right-aligned book·author · rotating-tint chips; **no leading
+  number, no thumbnail** per DESIGN §5). The component owns its live criteria and emits `onSearch`;
+  the `/recipes` route owns fetching (debounced text, monotonic-sequence guard against stale
+  responses) and loads books+keywords on mount. Added the **Recipes** nav link.
+- **DESIGN.md**: removed the **numbered-index-row** styling (the clay zero-padded `001` counter on
+  list rows) per direction — rows are now plain text-first rows; method *step* numbers are kept.
+  Recorded that the search screen is empty until a query.
+- **Harness**: `recipes-search` verify unit — fixtures for resting/results/no-results, `act`
+  fixtures (type query, toggle chip), a long-unicode-name probe, and the `expectFail` sentinel;
+  invariants over the `data-verify-*` contract. Wire contract pinned both sides
+  (`contract/recipes.example.json`, `keywords.example.json`).
+- **Integrated `v2`** after book-detail landed: reconciled `schemas/recipe.py` (kept their
+  `RecipeRow` index model alongside the search models), the test seed (Recipe 0 now carries both
+  the `Pasta`/`Quick` keywords and an ingredient), and the home keyword count. No code dependency
+  on book-detail; its `/books/:id` route now backs the row's book link. Both pages link to a
+  `/recipes/:id` detail route that doesn't exist yet — a shared follow-up.
+
+Green: backend `pytest` 33, `ruff`/`ty` clean; frontend `vitest` 25 (matrix 17), `svelte-check`
+0/0. Verified via Playwright (1280×800 + 390×844): resting prompt, results with count + rows +
+chips, AND-narrowing (chicken 1713 → +Quick 297), no-results state, mobile row reflow (source
+wraps under the name). Fixed two issues found in the pass: a duplicate native `type=search` clear
+button (hidden via `::-webkit-search-cancel-button`), and the keyword chip block pushing results
+below the fold on mobile (capped the chips to 18; rarer keywords remain reachable by typing).
+
+## 2026-06-01 — Keyword co-occurrence facets
+
+**Goal:** make the keyword chips *contextual* — when a search is active, show the keywords that
+most often co-occur with the current criteria (so clicking a chip re-ranks the rest to what
+narrows further), instead of a fixed global top-N.
+
+**Interpretation:** **data** co-occurrence — keywords appearing on the recipes that match the
+current filters — not user-behaviour (no selection-history tracking).
+
+- **Backend**: folded `facets` into the `GET /api/recipes` response (`{ total, items, facets }`)
+  rather than a second endpoint — the search already computes the matching set, so facets are one
+  more aggregation over it. Extracted the AND-narrowing filter into a shared `_search_conditions`
+  helper used by the total, the rows **and** the facets. Facets = top-`FACET_LIMIT` (24) keywords
+  by count over the filtered recipe ids, **excluding already-selected keywords** (every match
+  carries them); their `recipe_count` is the count *within the current set*, so it shrinks as you
+  narrow. `GET /api/keywords` is unchanged and now serves only as the **resting-state** global list.
+- **Frontend**: the `/recipes` route caches the global list on mount, swaps the chips to
+  `data.facets` on each active search (guarded by the existing monotonic `seq`), and restores the
+  global list when cleared back to resting. `RecipesSearch.svelte` derives the displayed chips as
+  **pinned selected keywords first** (pressed, no count — they're already chosen) then the facets,
+  capped at 20 so the block stays a roughly constant height. Pinning keeps a selected chip
+  deselectable even after it drops out of the server's facet list.
+- **Harness**: new `facet-narrowed` fixture (a selected keyword absent from the facets) + a
+  `facet-pins-selected` invariant asserting it's pinned first, pressed, and that no facet chip is
+  pressed; added a `data-verify-chips` contract attribute (the rendered chip names, in order).
+  Wire contract bumped both sides (`recipes.example.json` gains `facets`; Zod
+  `recipeSearchResultsSchema` gains the array).
+
+**Decisions:** pinned (already-selected) chips render **without a count** (every result carries
+them — the number would just equal the total). Accepted chip reflow on selection rather than
+reserving a fixed-height block; pinning + deterministic order (count desc, then name) keeps a
+stable anchor.
+
+Green: backend `pytest` 36 (+3 facet tests), `ruff`/`ty` clean; frontend `vitest` 25, matrix all
+PASS, `svelte-check` 0/0. Verified via Playwright (1280×800 + 390×844) on real data: `chicken`
+(1713) showed contextual facets (Main 1145, Chicken 730, Chinese 334, Quick 297…); selecting
+**Quick** (→ 297) pinned it first and re-ranked the rest to the chicken+Quick set (Main 216,
+Chicken 139, Chinese 75…) with Quick dropped from the facet list. Mobile chip block stays ~5 rows,
+results remain near the first fold.
+
+## 2026-06-01 — Keyword block prominence, clear button, random default sort
+
+**Goal:** make the keyword facets the primary way to explore the archive (more prominent, more of
+them), let the selection be cleared in one click, and default the result order to **random** so the
+archive feels alive rather than alphabetised.
+
+- **Prominence**: the keyword chips moved into a labelled `.keywords` section — a `KEYWORDS`
+  header (darker/larger than the standard control label) over a 2px top rule, with slightly larger
+  chips. The backend now hands over a generous pool (`FACET_LIMIT` and the route's global slice
+  both **50**); the component renders them all and **clamps the block to 4 rows by measurement** —
+  it reads each chip's row via `getBoundingClientRect`, clips the overflow rows (`overflow:hidden`
+  + a measured `max-height`) and marks them `inert` (out of tab order / a11y tree), re-measuring on
+  width change (`ResizeObserver`, width-guarded to avoid feedback) and on `document.fonts.ready`.
+  Variable-width chips mean a fixed count can't hit a line target; measuring does, and it adapts to
+  viewport (≈9 chips/row desktop, ≈3 mobile, always 4 rows). No layout (jsdom/SSR) → nothing
+  clipped, everything shows. This deliberately reverses the earlier "cap at 18" call — the keywords
+  now lead but stay bounded.
+- **Clear selection**: a `Clear selection (n)` text button in the keyword header (shown only when
+  something is selected) empties `selected` and re-searches; it disappears once empty.
+- **Random sort, seeded**: added `random` to the sort options (now the **default**, ahead of
+  Name/Recently-added). To keep pagination coherent, random is a **seeded deterministic shuffle**,
+  not `ORDER BY random()`: the order key is `(recipes.rowid * multiplier) % 2147483647` (prime
+  modulus → bijection, no ties), where `multiplier = 1 + (seed * 2654435761) % (MODULUS-1)` mixes
+  the seed via Knuth's multiplicative hash so even small/adjacent seeds land large and well-spread.
+  The frontend mints a fresh seed only when a *new* search starts (not on prev/next), so one result
+  set keeps one ordering across pages. `seed` is a request param (`?sort=random&seed=…`); the
+  response contract is unchanged. This reproducible total order is also the foundation for a future
+  recipe-detail next/previous (still needs criteria+seed in the URL and a neighbours lookup).
+  - **Bug caught in testing**: the first multiplier (`≈ seed`) was too small — with only ~13k rows,
+    `rowid * multiplier` never exceeded the modulus, so it never wrapped and every small seed
+    collapsed to plain rowid order (seed 42 == seed 99). The Knuth-hash multiplier fixed it.
+
+**Tests/harness**: `clear-selection` fixture + `clears-selection` invariant (selection empties, no
+chip pressed, button gone); backend `test_sort_name`/`test_default_sort_is_random`/
+`test_random_sort_is_stable_per_seed`; pagination test pinned to `sort=name` for determinism.
+
+Green: backend `pytest` 38, `ruff`/`ty` clean; frontend `vitest` 25, matrix all PASS,
+`svelte-check` 0/0. Verified via Playwright (1280×800 + 390×844): prominent KEYWORDS block with ~40
+facets, clear button appears/clears correctly, Random is the default and results are shuffled;
+seeded pagination confirmed over real data (seed 42 pages disjoint and stable on refetch; seeds
+42/43/99 give distinct orderings).
 ## 2026-06-01 — Recipe detail page (basic reading view)
 
 Lands the `/recipes/{id}` route the book-detail recipe index already linked to (its rows

@@ -24,6 +24,11 @@
 		<a class="wordmark" href="/">Cookmarks</a>
 		<a class="navlink" class:active={$page.url.pathname === '/'} href="/">Home</a>
 		<a class="navlink" class:active={$page.url.pathname.startsWith('/books')} href="/books">Books</a>
+		<a
+			class="navlink"
+			class:active={$page.url.pathname.startsWith('/recipes')}
+			href="/recipes">Recipes</a
+		>
 	</nav>
 {/if}
 

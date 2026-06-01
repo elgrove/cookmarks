@@ -35,6 +35,9 @@ def _seed(session: Session) -> None:
     )
     session.add_all([with_recipes, without_recipes])
     session.flush()
+    # Recipe 0 carries keywords and an ingredient so the search/filter paths
+    # (keyword chip, ingredient substring) and the book-detail keyword join all
+    # have something to match.
     pasta = Keyword(name="Pasta")
     quick = Keyword(name="Quick")
     session.add_all([pasta, quick])
@@ -46,13 +49,14 @@ def _seed(session: Session) -> None:
             ingredients=[],
             instructions=[],
         )
-        # First recipe carries full content + keywords so the detail endpoint's
-        # keyword join and reading view are exercised.
+        # Recipe 0 carries full content + keywords so the search/filter paths
+        # (ingredient substring, keyword chip) and the detail reading view are
+        # all exercised.
         if i == 0:
             recipe.keywords = [pasta, quick]
             recipe.description = "A quick weeknight pasta."
             recipe.yields = "Serves 2"
-            recipe.ingredients = ["200g pasta", "2 tbsp olive oil"]
+            recipe.ingredients = ["200g pasta", "100g anchovy", "2 tbsp olive oil"]
             recipe.instructions = ["Boil the pasta.", "Toss with the oil and serve."]
             recipe.image = "OPS/images/recipe-0.jpg"
         session.add(recipe)
