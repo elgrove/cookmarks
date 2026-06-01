@@ -9,7 +9,9 @@ function accessibleName(el: Element): string {
 	);
 }
 
-/** Lightweight accessibility checks: named controls, labelled inputs, alt text. */
+/** Accessibility checks (DESIGN §8 makes these load-bearing): named controls,
+ *  labelled inputs, alt text. Real violations `fail` the verdict — they are not
+ *  advisory. An intentionally-decorative image still passes (it carries alt=""). */
 export const a11y: Verifier = {
 	id: 'a11y',
 	description: 'Buttons named, inputs labelled, images have alt text',
@@ -22,7 +24,7 @@ export const a11y: Verifier = {
 		checks.push(
 			unnamedButtons.length === 0
 				? { verifier: 'a11y', status: 'ok', label: 'buttons named' }
-				: { verifier: 'a11y', status: 'warn', label: `${unnamedButtons.length} unnamed button(s)` }
+				: { verifier: 'a11y', status: 'fail', label: `${unnamedButtons.length} unnamed button(s)` }
 		);
 
 		const unlabelledInputs = Array.from(root.querySelectorAll('input, select, textarea')).filter(
@@ -35,14 +37,14 @@ export const a11y: Verifier = {
 		checks.push(
 			unlabelledInputs.length === 0
 				? { verifier: 'a11y', status: 'ok', label: 'inputs labelled' }
-				: { verifier: 'a11y', status: 'warn', label: `${unlabelledInputs.length} unlabelled input(s)` }
+				: { verifier: 'a11y', status: 'fail', label: `${unlabelledInputs.length} unlabelled input(s)` }
 		);
 
 		const altless = Array.from(root.querySelectorAll('img')).filter((img) => !img.hasAttribute('alt'));
 		checks.push(
 			altless.length === 0
 				? { verifier: 'a11y', status: 'ok', label: 'images have alt' }
-				: { verifier: 'a11y', status: 'warn', label: `${altless.length} image(s) missing alt` }
+				: { verifier: 'a11y', status: 'fail', label: `${altless.length} image(s) missing alt` }
 		);
 
 		return checks;
