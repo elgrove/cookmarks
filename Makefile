@@ -8,7 +8,7 @@ install:
 migrate:
 	cd backend && uv run python -m alembic upgrade head
 
-# Dev: Vite (:5173, HMR, proxies /api) + uvicorn (:8000). The agent's live loop.
+# Dev: Vite (:9789, HMR, proxies /api) + uvicorn (:9788). The agent's live loop.
 dev:
 	uvx honcho start
 
@@ -24,8 +24,10 @@ check:
 	cd backend && uv run ruff check . && uv run ty check
 	cd frontend && npm run check
 
+# Module form (python -m) over the bare `pytest` console script: immune to stale
+# venv shebangs, exactly as `make migrate` uses `python -m alembic`.
 test:
-	cd backend && uv run pytest
+	cd backend && uv run python -m pytest
 	cd frontend && npm run test
 
 fmt:
