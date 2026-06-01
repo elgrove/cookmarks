@@ -15,6 +15,9 @@ RECIPE_KEYS = {
     "yields",
     "keywords",
     "has_image",
+    "context",
+    "previous",
+    "next",
 }
 
 
@@ -60,6 +63,32 @@ def test_recipe_optional_fields_when_absent(client: TestClient) -> None:
     assert body["ingredients"] == []
     assert body["instructions"] == []
     assert body["keywords"] == []
+
+
+def test_recipe_nav_default_is_book_order(client: TestClient) -> None:
+    # The seed's three recipes have order 0,1,2; the middle one has both neighbours.
+    body = client.get(f"/api/recipes/{_recipe_id(client, 'Recipe 1')}").json()
+    assert body["context"] == "book"
+    assert body["previous"]["name"] == "Recipe 0"
+    assert body["next"]["name"] == "Recipe 2"
+
+
+def test_recipe_nav_first_has_no_previous(client: TestClient) -> None:
+    body = client.get(f"/api/recipes/{_recipe_id(client, 'Recipe 0')}").json()
+    assert body["previous"] is None
+    assert body["next"]["name"] == "Recipe 1"
+
+
+def test_recipe_nav_last_has_no_next(client: TestClient) -> None:
+    body = client.get(f"/api/recipes/{_recipe_id(client, 'Recipe 2')}").json()
+    assert body["previous"]["name"] == "Recipe 1"
+    assert body["next"] is None
+
+
+def test_recipe_nav_unknown_context_falls_back_to_book(client: TestClient) -> None:
+    body = client.get(f"/api/recipes/{_recipe_id(client, 'Recipe 1')}?context=search").json()
+    assert body["context"] == "book"
+    assert body["previous"]["name"] == "Recipe 0"
 
 
 def test_recipe_404_for_unknown_id(client: TestClient) -> None:

@@ -16,7 +16,10 @@ const recipeSchema = z.object({
 	instructions: z.array(z.string()),
 	yields: z.string().nullable(),
 	keywords: z.array(z.string()),
-	hasImage: z.boolean()
+	hasImage: z.boolean(),
+	context: z.string(),
+	previous: z.object({ id: z.string(), name: z.string() }).nullable(),
+	next: z.object({ id: z.string(), name: z.string() }).nullable()
 });
 
 const trofie: RecipeDetailData = {
@@ -44,7 +47,10 @@ const trofie: RecipeDetailData = {
 	],
 	yields: 'Serves 4',
 	keywords: ['Pasta', 'Pesto', 'Vegetarian', 'Liguria'],
-	hasImage: false
+	hasImage: false,
+	context: 'book',
+	previous: { id: '11111111-1111-4111-8111-111111111111', name: "Cornelia's Pansotti with Walnut Pesto" },
+	next: { id: '22222222-2222-4222-8222-222222222222', name: "Angela's Busiate with Trapanese Pesto" }
 };
 
 // >360 chars, so it clamps behind a Read more toggle.
@@ -59,7 +65,7 @@ const unit: VerifiableUnit<Props> = {
 	id: 'recipe-detail',
 	title: 'Recipe detail',
 	description:
-		'The reading view: masthead + keyword chips, the §7 no-image typographic plate, a flat ingredient list and numbered method, a sticky actions/metadata sidebar, and book provenance.',
+		'The reading view: a breadcrumb bar with a prev/next pager, a masthead (title, chips, yield, Read-more description, placeholder actions), a two-column ingredients + numbered method body, and book provenance.',
 	kind: 'component',
 	component: RecipeDetail,
 	propsSchema: z.object({ recipe: recipeSchema }),
@@ -105,6 +111,21 @@ const unit: VerifiableUnit<Props> = {
 			description: 'clicking Read more reveals the full blurb and flips the toggle',
 			props: { recipe: { ...trofie, description: longDesc } },
 			act: ({ click }) => click('.readmore')
+		},
+		{
+			id: 'first-in-source',
+			description: 'first recipe in the ordering: only a Next link in the pager',
+			props: { recipe: { ...trofie, previous: null } }
+		},
+		{
+			id: 'last-in-source',
+			description: 'last recipe in the ordering: only a Previous link in the pager',
+			props: { recipe: { ...trofie, next: null } }
+		},
+		{
+			id: 'only-recipe',
+			description: 'a lone recipe in its ordering: no pager at all',
+			props: { recipe: { ...trofie, previous: null, next: null } }
 		},
 		{
 			id: 'long-content',
@@ -225,6 +246,39 @@ const unit: VerifiableUnit<Props> = {
 			check: ({ root, props }) =>
 				root.querySelector(`a[href="/books/${props.recipe.bookId}"]`) !== null ||
 				`no link to /books/${props.recipe.bookId}`
+		},
+		{
+			id: 'pager-context',
+			description: 'the data-verify-context contract reflects the navigation ordering',
+			check: ({ contract, props }) =>
+				contract.context === props.recipe.context ||
+				`context=${contract.context} expected ${props.recipe.context}`
+		},
+		{
+			id: 'prev-link',
+			description: 'a Previous link appears iff there is a previous recipe, carrying its id + context',
+			check: ({ root, props }) => {
+				const a = root.querySelector('.pager a.prev');
+				if (props.recipe.previous) {
+					if (!a) return 'previous recipe present but no Prev link';
+					const want = `/recipes/${props.recipe.previous.id}?context=${props.recipe.context}`;
+					return a.getAttribute('href') === want || `prev href=${a.getAttribute('href')} expected ${want}`;
+				}
+				return a === null || 'Prev link shown with no previous recipe';
+			}
+		},
+		{
+			id: 'next-link',
+			description: 'a Next link appears iff there is a next recipe, carrying its id + context',
+			check: ({ root, props }) => {
+				const a = root.querySelector('.pager a.next');
+				if (props.recipe.next) {
+					if (!a) return 'next recipe present but no Next link';
+					const want = `/recipes/${props.recipe.next.id}?context=${props.recipe.context}`;
+					return a.getAttribute('href') === want || `next href=${a.getAttribute('href')} expected ${want}`;
+				}
+				return a === null || 'Next link shown with no next recipe';
+			}
 		},
 		{
 			id: 'intentional-fail',

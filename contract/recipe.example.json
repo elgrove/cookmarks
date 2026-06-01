@@ -18,5 +18,8 @@
   ],
   "yields": "Serves 4",
   "keywords": ["Chicken", "Roast"],
-  "has_image": false
+  "has_image": false,
+  "context": "book",
+  "previous": { "id": "1f2e3d4c-5b6a-4079-8281-7060504a3b2c", "name": "Buttermilk Biscuits" },
+  "next": { "id": "2a3b4c5d-6e7f-4081-8291-a0b1c2d3e4f5", "name": "Cast-Iron Roast Potatoes" }
 }

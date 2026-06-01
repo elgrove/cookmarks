@@ -336,3 +336,34 @@ keeps **Add to list / Action** no-op placeholders for them), and **no image serv
   horizontal overflow.
 - **Dev tooling:** `frontend/vite.config.ts` now reads `VITE_DEV_PORT` / `VITE_API_PROXY`
   (defaults unchanged at 9789 / 9788) so worktrees can run dev servers side by side.
+
+## 2026-06-01 — Recipe prev/next + navigation context
+
+Ported v1's "where did I come from" navigation — the recipe page now pages through its **source
+ordering** with previous/next and ←/→ keys — re-implemented cleanly for the v2 stack rather than
+copying v1's query-string machinery. Like v1 it stays **stateless + URL-driven**: the recipe URL
+carries `?context=<ordering>` and the page resolves the neighbours from it. Only **book order** is
+wired today (search/list contexts arrive with those pages); an unknown context falls back to book
+rather than 404.
+
+- **Backend:** `GET /api/recipes/{id}` gained `context` (echoed, validated against
+  `SUPPORTED_CONTEXTS`) plus `previous`/`next` (`RecipeNeighbour` = id + name, null at the ends),
+  computed by `Recipe.order` within the book (one small ordered query each way). The contract
+  example + `test_contract.py` were updated; `test_recipes.py` covers first/last/middle and the
+  unknown-context→book fallback.
+- **Frontend:** the breadcrumb row became a `.topbar` — breadcrumb left, a **prev/next pager on
+  the right** (desktop; clay arrows, grotesk labels), each link carrying the context in its href.
+  The `/recipes/[id]` route reads `?context`, reloads via `$effect` when the id/context changes
+  (prev/next reuses the same route component), and a window `keydown` handler pages with **←/→**
+  (ignored while typing in a field). `fetchRecipeDetail(id, fetch, context)` + Zod
+  `recipeNeighbourSchema`.
+- **Verify:** `data-verify-context/prev/next` contract; `first-in-source` / `last-in-source` /
+  `only-recipe` fixtures with `pager-context` / `prev-link` / `next-link` invariants (a link
+  appears iff that neighbour exists, and its href carries the id + context). `make verify` /
+  `check` / `test` green; Playwright confirmed ←/→ **and** the click links page in book order on
+  the live page (Spiral Curry Puffs ⇄ Prosperity Toss Fish Salad) and that the ends hide the
+  spent arrow.
+
+Book-detail still links recipes without an explicit context param, so arriving from it uses the
+default book context — the correct ordering anyway. Search/list links will pass
+`?context=search|list` and the endpoint grows those branches when those pages land.

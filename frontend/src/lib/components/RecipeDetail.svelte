@@ -12,6 +12,11 @@
 		yields: string | null;
 		keywords: string[];
 		hasImage: boolean;
+		/** The navigation ordering this page was reached through (e.g. 'book'). */
+		context: string;
+		/** Adjacent recipes in `context` order, for the prev/next pager (null at the ends). */
+		previous: { id: string; name: string } | null;
+		next: { id: string; name: string } | null;
 	};
 
 	// Rotating chip tints (DESIGN §3.1), assigned deterministically per keyword.
@@ -47,14 +52,44 @@
 	data-verify-steps={recipe.instructions.length}
 	data-verify-keywords={recipe.keywords.length}
 	data-verify-has-image={recipe.hasImage ? 'true' : 'false'}
+	data-verify-context={recipe.context}
+	data-verify-prev={recipe.previous?.id ?? ''}
+	data-verify-next={recipe.next?.id ?? ''}
 >
-	<nav class="crumb" aria-label="Breadcrumb">
-		<a href="/books">Books</a><span class="sep">›</span><a
-			href={`/books?author=${encodeURIComponent(recipe.bookAuthor)}`}>{recipe.bookAuthor}</a
-		><span class="sep">›</span><a href={`/books/${recipe.bookId}`}>{bookTitle}</a><span
-			class="sep">›</span
-		><span class="here">{recipe.name}</span>
-	</nav>
+	<div class="topbar">
+		<nav class="crumb" aria-label="Breadcrumb">
+			<a href="/books">Books</a><span class="sep">›</span><a
+				href={`/books?author=${encodeURIComponent(recipe.bookAuthor)}`}>{recipe.bookAuthor}</a
+			><span class="sep">›</span><a href={`/books/${recipe.bookId}`}>{bookTitle}</a><span
+				class="sep">›</span
+			><span class="here">{recipe.name}</span>
+		</nav>
+
+		{#if recipe.previous || recipe.next}
+			<div class="pager">
+				{#if recipe.previous}
+					<a
+						class="pg prev"
+						href={`/recipes/${recipe.previous.id}?context=${recipe.context}`}
+						title={recipe.previous.name}
+						aria-label={`Previous recipe: ${recipe.previous.name}`}
+					>
+						<span class="ar" aria-hidden="true">‹</span> Prev
+					</a>
+				{/if}
+				{#if recipe.next}
+					<a
+						class="pg next"
+						href={`/recipes/${recipe.next.id}?context=${recipe.context}`}
+						title={recipe.next.name}
+						aria-label={`Next recipe: ${recipe.next.name}`}
+					>
+						Next <span class="ar" aria-hidden="true">›</span>
+					</a>
+				{/if}
+			</div>
+		{/if}
+	</div>
 
 	<header class="masthead">
 		<div class="head">
@@ -155,14 +190,24 @@
 		animation: fadeUp 0.6s var(--ease-out) both;
 	}
 
+	/* Breadcrumb on the left, the prev/next pager on the right (desktop). */
+	.topbar {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 1.25rem 1.75rem;
+		flex-wrap: wrap;
+		padding-bottom: 1.15rem;
+		border-bottom: var(--border);
+		margin-bottom: 1.05rem;
+	}
 	.crumb {
 		font-family: var(--f-mono);
 		font-size: 0.7rem;
 		letter-spacing: 0.04em;
 		color: var(--muted);
-		padding-bottom: 1.15rem;
-		border-bottom: var(--border);
-		margin-bottom: 1.05rem;
+		min-width: 0;
+		flex: 1 1 auto;
 	}
 	.crumb a {
 		text-decoration: none;
@@ -177,6 +222,32 @@
 	}
 	.crumb .here {
 		color: var(--ink);
+	}
+
+	.pager {
+		display: flex;
+		gap: 1.25rem;
+		flex: none;
+	}
+	.pg {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.3rem;
+		font-family: var(--f-grotesk);
+		font-size: 0.8rem;
+		font-weight: 600;
+		color: var(--muted);
+		text-decoration: none;
+		white-space: nowrap;
+		transition: color 0.18s var(--ease-out);
+	}
+	.pg:hover {
+		color: var(--ink);
+	}
+	.pg .ar {
+		color: var(--clay);
+		font-size: 0.95rem;
+		line-height: 1;
 	}
 
 	/* Masthead — full width, with the actions pulled to the top-right. */
