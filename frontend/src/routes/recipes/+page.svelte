@@ -1,8 +1,12 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { page } from '$app/stores';
+	import { replaceState } from '$app/navigation';
 	import RecipesSearch, { type SearchStatus } from '$lib/components/RecipesSearch.svelte';
 	import { fetchBooks } from '$lib/api/books';
 	import {
+		criteriaFromParams,
+		criteriaToParams,
 		fetchKeywords,
 		hasCriteria,
 		searchRecipes,
@@ -10,6 +14,13 @@
 		type RecipeSearchResults,
 		type SearchCriteria
 	} from '$lib/api/recipes';
+
+	// Seed the controls from the URL, so the search is shareable and survives a
+	// round-trip into a recipe and back. Read window.location, not $page.url: on a
+	// client back-navigation the page store lags a tick behind the real URL, which
+	// would otherwise restore an empty search.
+	const initialSearch = typeof window !== 'undefined' ? window.location.search : $page.url.search;
+	const initialCriteria = criteriaFromParams(new URLSearchParams(initialSearch));
 
 	let status = $state<SearchStatus>('resting');
 	let results = $state<RecipeSearchResults>({ total: 0, items: [], facets: [] });
@@ -25,7 +36,19 @@
 	// overwrite the results of a newer one.
 	let seq = 0;
 
+	// Mirror the live criteria in the URL — one history entry that updates as you
+	// search (replaceState), so leaving for a recipe and coming back restores it.
+	function syncUrl(criteria: SearchCriteria): void {
+		const p = criteriaToParams(criteria);
+		p.delete('limit'); // constant page size — keep the URL clean
+		if (!criteria.offset) p.delete('offset');
+		if (criteria.sort === 'random') p.delete('sort'); // the default
+		const qs = p.toString();
+		replaceState(qs ? `/recipes?${qs}` : '/recipes', {});
+	}
+
 	async function run(criteria: SearchCriteria): Promise<void> {
+		syncUrl(criteria);
 		if (!hasCriteria(criteria)) {
 			status = 'resting';
 			results = { total: 0, items: [], facets: [] };
@@ -69,7 +92,17 @@
 		} catch (err) {
 			console.error('failed to load keywords', err);
 		}
+		// Restore the search the URL describes (if any) once the filters are loaded.
+		if (hasCriteria(initialCriteria)) run(initialCriteria);
 	});
 </script>
 
-<RecipesSearch {status} {results} {keywords} {books} {authors} onSearch={run} />
+<RecipesSearch
+	{status}
+	{results}
+	{keywords}
+	{books}
+	{authors}
+	criteria={initialCriteria}
+	onSearch={run}
+/>

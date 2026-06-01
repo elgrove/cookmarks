@@ -487,3 +487,26 @@ rather than 404.
 Book-detail still links recipes without an explicit context param, so arriving from it uses the
 default book context — the correct ordering anyway. Search/list links will pass
 `?context=search|list` and the endpoint grows those branches when those pages land.
+
+## 2026-06-01 — Recipes search: URL-driven state (restore on back)
+
+Bug: the `/recipes` criteria (query, selected keywords, sort) lived only in component state, so
+opening a recipe and pressing **back** reset the search to empty. Fix: make the search URL-driven.
+
+- The `/recipes` route **seeds the controls from the URL** on mount and writes the live criteria
+  back with `replaceState` on every search — one history entry that updates in place, so clicking a
+  recipe pushes a new entry and browser-back returns to the criteria-bearing URL. Search URLs are
+  shareable now too.
+- `criteriaFromParams` / the now-exported `criteriaToParams` round-trip `SearchCriteria` ↔ query
+  params (`q`, `keyword[]`, `book_id`, `author`, `sort`, `seed`, `offset`; the constant page size is
+  dropped from the URL). `RecipesSearch` already accepted a `criteria` prop, so it seeds unchanged.
+- Subtlety caught via Playwright: on a client **back-navigation** the `$app/stores` `page` lags a
+  tick behind the real URL, so seeding from `$page.url` restored an *empty* search even though the
+  route remounted. Read `window.location.search` at mount instead (the browser's synchronous truth),
+  falling back to `$page.url` when there's no `window`.
+- Verified end-to-end: search *chicken* + select *Quick* → open a recipe → browser back restores the
+  query, the pressed *Quick* chip, the co-occurrence facets and the 297-result list. `make check` /
+  `test` / `verify` green.
+
+Still book-order only on recipe detail: search-order prev/next + a "back to search" breadcrumb (the
+`context=search` branch) is the remaining follow-up.

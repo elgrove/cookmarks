@@ -87,7 +87,7 @@ export function hasCriteria(c: SearchCriteria): boolean {
 	return Boolean(c.q?.trim() || c.keywords?.length || c.bookId || c.author);
 }
 
-function toParams(c: SearchCriteria): URLSearchParams {
+export function criteriaToParams(c: SearchCriteria): URLSearchParams {
 	const p = new URLSearchParams();
 	if (c.q?.trim()) p.set('q', c.q.trim());
 	for (const kw of c.keywords ?? []) p.append('keyword', kw);
@@ -100,12 +100,33 @@ function toParams(c: SearchCriteria): URLSearchParams {
 	return p;
 }
 
+/** Parse search criteria back out of URL query params — the inverse of
+ *  `criteriaToParams`, so a search survives a round-trip through the URL. */
+export function criteriaFromParams(p: URLSearchParams): SearchCriteria {
+	const c: SearchCriteria = {};
+	const q = p.get('q');
+	if (q) c.q = q;
+	const keywords = p.getAll('keyword');
+	if (keywords.length) c.keywords = keywords;
+	const bookId = p.get('book_id');
+	if (bookId) c.bookId = bookId;
+	const author = p.get('author');
+	if (author) c.author = author;
+	const sort = p.get('sort');
+	if (sort === 'name' || sort === 'recent' || sort === 'random') c.sort = sort;
+	const seed = p.get('seed');
+	if (seed) c.seed = Number(seed);
+	const offset = p.get('offset');
+	if (offset) c.offset = Number(offset);
+	return c;
+}
+
 /** Search recipes. `fetchFn` is injectable for SSR/tests. */
 export async function searchRecipes(
 	criteria: SearchCriteria,
 	fetchFn: typeof fetch = fetch
 ): Promise<RecipeSearchResults> {
-	const res = await fetchFn(`/api/recipes?${toParams(criteria)}`);
+	const res = await fetchFn(`/api/recipes?${criteriaToParams(criteria)}`);
 	if (!res.ok) throw new Error(`GET /api/recipes → ${res.status}`);
 	return recipeSearchResultsSchema.parse(await res.json());
 }
