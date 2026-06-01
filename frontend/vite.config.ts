@@ -5,9 +5,10 @@ export default defineConfig({
 	plugins: [sveltekit()],
 	server: {
 		host: '0.0.0.0',
-		port: 9789,
+		// Defaults match the standard dev setup; override to run worktrees side by side.
+		port: Number(process.env.VITE_DEV_PORT) || 9789,
 		proxy: {
-			'/api': 'http://localhost:9788'
+			'/api': process.env.VITE_API_PROXY || 'http://localhost:9788'
 		}
 	}
 });

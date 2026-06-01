@@ -1,0 +1,22 @@
+{
+  "id": "9f8e7d6c-5b4a-4039-8281-7060504a3b2c",
+  "book_id": "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+  "book_title": "Salt, Fat, Acid, Heat",
+  "book_author": "Samin Nosrat",
+  "book_has_cover": true,
+  "name": "Buttermilk-Marinated Roast Chicken",
+  "description": "A weeknight roast chicken that turns out juicy every time, thanks to an overnight buttermilk brine.",
+  "ingredients": [
+    "1 whole chicken, about 1.8kg",
+    "500ml buttermilk",
+    "1 tbsp kosher salt"
+  ],
+  "instructions": [
+    "The day before, season the chicken generously and submerge it in the buttermilk.",
+    "Roast at 220°C, turning once, until the juices run clear, about 50 minutes.",
+    "Rest for 10 minutes before carving."
+  ],
+  "yields": "Serves 4",
+  "keywords": ["Chicken", "Roast"],
+  "has_image": false
+}

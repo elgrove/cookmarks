@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 
 from app.schemas.book import BookSummary
 from app.schemas.home import HomeData
+from app.schemas.recipe import RecipeDetail
 
 CONTRACT_DIR = Path(__file__).resolve().parents[2] / "contract"
 
@@ -33,10 +34,24 @@ def test_home_model_matches_contract() -> None:
     assert dumped == example
 
 
+def test_recipe_detail_model_matches_contract() -> None:
+    example = _example("recipe.example.json")
+    dumped = RecipeDetail.model_validate(example).model_dump(mode="json")
+    assert dumped == example
+
+
 def test_books_endpoint_keys_match_contract(client: TestClient) -> None:
     example = _example("books.example.json")
     item = client.get("/api/books").json()[0]
     assert set(item.keys()) == set(example.keys())
+
+
+def test_recipe_endpoint_keys_match_contract(client: TestClient) -> None:
+    example = _example("recipe.example.json")
+    book = next(b for b in client.get("/api/books").json() if b["title"] == "With Recipes")
+    recipe_id = client.get(f"/api/books/{book['id']}").json()["recipes"][0]["id"]
+    body = client.get(f"/api/recipes/{recipe_id}").json()
+    assert set(body.keys()) == set(example.keys())
 
 
 def test_home_endpoint_keys_match_contract(client: TestClient) -> None:

@@ -297,3 +297,42 @@ Merged the concurrent critical-review work (above) in: migrated the verify unit 
 (1280×800 + 390×844): real cover + count circle, random-10 reshuffling, empty state, §7
 no-cover plate, single-line tags, footer pinned on short pages, mobile reflow without
 horizontal scroll.
+
+## 2026-06-01 — Recipe detail page (basic reading view)
+
+Lands the `/recipes/{id}` route the book-detail recipe index already linked to (its rows
+pointed at `/recipes/${id}`, previously dead). Scoped deliberately **basic, to extend later**:
+no favourite / add-to-list / check-off / prev-next / keyword-search features (the masthead
+keeps **Add to list / Action** no-op placeholders for them), and **no image serving yet** —
+`has_image` is reported but the page is text-only for now.
+
+- **Backend:** `GET /api/recipes/{id}` → `RecipeDetail` (schemas/recipe.py, beside `RecipeRow`):
+  recipe fields (name, description, ingredients, instructions, yields, keywords sorted) + book
+  provenance (book_id / title / author / has_cover) + `has_image` (= `image is not None`; serving
+  the in-EPUB image is a later slice). `selectinload(keywords)` + `joinedload(book)`; 404 on
+  unknown id. New `app/api/recipes.py`, registered in `router.py`. Pinned both-sides via
+  `contract/recipe.example.json` (test_contract.py model + endpoint-keys; frontend
+  contract.test.ts accept + drift). `test_recipes.py` (shape, content, provenance, optionals-null,
+  404); the conftest seed's "Recipe 0" gained full content + an image path.
+- **Frontend:** presentational `RecipeDetail.svelte` (`data-verify-unit="recipe-detail"` with
+  `id / ingredients / steps / keywords / has-image`), the `/recipes/[id]` route
+  (onMount→`fetchRecipeDetail`→3-state, snake→camel), `fetchRecipeDetail` + Zod. Reuses
+  `lib/html` (Calibre-HTML→text) + `lib/title`.
+- **Layout (iterated live with the user):** breadcrumb (carries book · author, so no kicker);
+  a full-width **masthead** — large serif-italic title with the **Add to list / Action**
+  placeholders pulled to the top-right, tinted keyword chips, a mono yield line, and the
+  description as a serif **lede** (≤50rem) that clamps to 4 lines behind a **Read more / Read
+  less** toggle once it passes ~360 chars (book-detail's pattern); then a **two-column body** —
+  an ingredient-list rail beside a **wide numbered method column** (clay mono step gutter) that
+  uses the desktop width — and a quiet full-width **From the book** provenance footer. No image
+  callout, no metadata ledger. Mobile stacks the columns and the actions become a row.
+- **Verify:** fixtures `populated / image-in-source / no-keywords / minimal / long-description /
+  read-more-expanded` (the last drives the toggle via an `act: click`) + a `long-content`
+  **probe** + the `contract-lie` **expectFail** sentinel; invariants on id, title,
+  ingredient/step/keyword counts, sequential zero-padded step numbers, lede presence, the
+  read-more collapsed/expanded states, the `has-image` contract flag, and the book back-link.
+  `make verify` / `make check` / `make test` all green; Playwright at 390 / 1280 / 1536 across
+  fixtures and real recipes (with-image, long-blurb, and no-/minimal-description) — zero
+  horizontal overflow.
+- **Dev tooling:** `frontend/vite.config.ts` now reads `VITE_DEV_PORT` / `VITE_API_PROXY`
+  (defaults unchanged at 9789 / 9788) so worktrees can run dev servers side by side.

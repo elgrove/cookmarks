@@ -46,9 +46,15 @@ def _seed(session: Session) -> None:
             ingredients=[],
             instructions=[],
         )
-        # First recipe carries keywords so the detail endpoint's keyword join is exercised.
+        # First recipe carries full content + keywords so the detail endpoint's
+        # keyword join and reading view are exercised.
         if i == 0:
             recipe.keywords = [pasta, quick]
+            recipe.description = "A quick weeknight pasta."
+            recipe.yields = "Serves 2"
+            recipe.ingredients = ["200g pasta", "2 tbsp olive oil"]
+            recipe.instructions = ["Boil the pasta.", "Toss with the oil and serve."]
+            recipe.image = "OPS/images/recipe-0.jpg"
         session.add(recipe)
     session.commit()
 
