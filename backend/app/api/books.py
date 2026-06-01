@@ -3,13 +3,15 @@ import uuid
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 from sqlalchemy import func, select
+from sqlalchemy.orm import selectinload
 
 from app.config import settings
 from app.covers import cover_path, has_cover
 from app.db import SessionDep
 from app.models.book import Book
 from app.models.recipe import Recipe
-from app.schemas.book import BookSummary
+from app.schemas.book import BookDetail, BookSummary
+from app.schemas.recipe import RecipeRow
 
 router = APIRouter(tags=["books"])
 
@@ -35,6 +37,42 @@ def list_books(session: SessionDep) -> list[BookSummary]:
         )
         for book, recipe_count in rows
     ]
+
+
+@router.get("/books/{book_id}", response_model=BookDetail)
+def get_book(book_id: uuid.UUID, session: SessionDep) -> BookDetail:
+    book = session.get(Book, book_id)
+    if book is None:
+        raise HTTPException(status_code=404, detail="book not found")
+    total = (
+        session.scalar(select(func.count(Recipe.id)).where(Recipe.book_id == book_id)) or 0
+    )
+    # A random sample of the book's recipes; selectinload avoids an N+1 on keywords.
+    recipes = (
+        session.scalars(
+            select(Recipe)
+            .where(Recipe.book_id == book_id)
+            .order_by(func.random())
+            .limit(10)
+            .options(selectinload(Recipe.keywords))
+        )
+        .all()
+    )
+    return BookDetail(
+        id=book.id,
+        title=book.title,
+        author=book.author,
+        isbn=book.isbn,
+        pubdate=book.pubdate,
+        description=book.description,
+        recipe_count=total,
+        has_cover=has_cover(book),
+        added=book.calibre_added_at,
+        recipes=[
+            RecipeRow(id=r.id, name=r.name, keywords=sorted(k.name for k in r.keywords))
+            for r in recipes
+        ],
+    )
 
 
 @router.get("/books/{book_id}/cover")

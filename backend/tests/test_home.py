@@ -8,7 +8,7 @@ def test_home_shape(client: TestClient) -> None:
     assert resp.status_code == 200
     body = resp.json()
     assert set(body["stats"].keys()) == {"books", "recipes", "keywords"}
-    assert body["stats"] == {"books": 2, "recipes": 3, "keywords": 0}
+    assert body["stats"] == {"books": 2, "recipes": 3, "keywords": 2}
 
 
 def test_home_book_of_the_day(client: TestClient) -> None:

@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.db import get_session
 from app.main import app
-from app.models import Base, Book, Recipe
+from app.models import Base, Book, Keyword, Recipe
 
 
 def _seed(session: Session) -> None:
@@ -35,16 +35,21 @@ def _seed(session: Session) -> None:
     )
     session.add_all([with_recipes, without_recipes])
     session.flush()
+    pasta = Keyword(name="Pasta")
+    quick = Keyword(name="Quick")
+    session.add_all([pasta, quick])
     for i in range(3):
-        session.add(
-            Recipe(
-                book_id=with_recipes.id,
-                order=i,
-                name=f"Recipe {i}",
-                ingredients=[],
-                instructions=[],
-            )
+        recipe = Recipe(
+            book_id=with_recipes.id,
+            order=i,
+            name=f"Recipe {i}",
+            ingredients=[],
+            instructions=[],
         )
+        # First recipe carries keywords so the detail endpoint's keyword join is exercised.
+        if i == 0:
+            recipe.keywords = [pasta, quick]
+        session.add(recipe)
     session.commit()
 
 

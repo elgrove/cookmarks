@@ -222,3 +222,44 @@ top-right shows how many recipes were extracted; **unextracted books show no cir
 the old "— pending extraction" text is gone too). The circle folds its count into the card
 link's accessible name and is otherwise `aria-hidden`. Verified live: 103 circles across the
 192 covers, none on the 89 unextracted books.
+
+## 2026-05-31 — Book detail page ("The Index" layout)
+
+The first detail view, landing the `/books/{id}` route the library grid already linked to.
+Design chosen from four reviewed mockups (`mockups/book-detail/`): **Layout A "The Index"** —
+a two-column editorial view (serif masthead + reading column on the left; a sticky
+cover / actions / metadata sidebar on the right).
+
+- **Backend:** `GET /api/books/{id}` → `BookDetail` (schemas/book.py) carrying real model
+  fields only — title, author, isbn, pubdate, description, total `recipe_count`, `has_cover`,
+  `added` (calibre_added_at) — plus a **random sample of 10** recipes (`ORDER BY RANDOM()
+  LIMIT 10`, `selectinload(keywords)` to avoid N+1) as `RecipeRow` (schemas/recipe.py:
+  id, name, keywords). 404 on unknown id. Tests in `test_books.py` (shape, ≤10 cap, keyword
+  shape, empty book, 404); the seed gained two keywords on a recipe (so `test_home` keyword
+  count moved 0→2).
+- **Frontend:** `BookDetail.svelte` (presentational, `data-verify-unit="book-detail"` with
+  `id / recipe-count / shown / has-cover / empty`), `book-detail.verify.ts` (fixtures:
+  populated, no-cover, no-recipes, no-subtitle + long-title & contract-lie probes; invariants
+  on id, count, rows≤10=shown, main-title, empty state, count circle, no-subtitle), the
+  `/books/[id]` route (onMount→`fetchBookDetail`→3-state), and `fetchBookDetail` + Zod schemas
+  in `api/books.ts`. The Calibre-HTML→text helper moved to `lib/html.ts` (shared with Home).
+  Title splits on the first `:` → display title + serif subtitle (v1 `clean_title`).
+- **Decisions (from review):** recipes = a random 10 (caption "N of M shown"); each row =
+  name + keyword chips (no region — not a model field); actions = a dark **Read book** + a
+  generic outlined **Action** button (both no-op for now); extraction info omitted; **no
+  fabricated data** (the James-Beard accolade tag dropped — the award still appears only as
+  part of the book's real description text).
+- **Eyebrow-label cleanup:** the page-title `.label` eyebrows ("The library", "Cookbook")
+  were removed from `BooksLibrary`, the `/books` loading state, and the mockup; functional
+  labels (section + `LABEL · value` metadata rows) stay.
+- **Cover-path fix:** covers resolved 0/192 because the seeded dev DB (pre-dating the import
+  script's `removeprefix(V1_LIBRARY_ROOT)`) still held absolute `/books/<author>/<book>`
+  paths, while the model contract + `calibre_library_path` (`~/books/calibre-all`) expect
+  them **relative**. The import script is already correct; normalised the stale dev DB in
+  place (`UPDATE books SET path = substr(path, 8)`), so 192/192 covers now resolve.
+
+Verified: `make check` + `make test` (13 backend, 12 frontend) green; matrix PASS on
+book-detail non-probe fixtures. Live via Playwright (1280×800 + 390×844): real cover + clay
+count circle, masthead/subtitle/byline, random-10 index reshuffling on reload, the empty
+state on a 0-recipe book, the §7 no-cover plate (isolation route), and mobile reflow with no
+horizontal scroll.
