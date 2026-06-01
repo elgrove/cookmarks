@@ -21,13 +21,24 @@ describe('verify matrix', () => {
 				for (const r of results) expect(TAXONOMY).toContain(r.verdict);
 			});
 
-			it('passes all non-probe fixtures', async () => {
+			// Probes are adversarial inputs that must still PASS; only fixtures explicitly
+			// marked expectFail are allowed (and required) to FAIL.
+			it('passes every fixture that is not an expectFail sentinel', async () => {
 				const results = await runUnit(unit);
 				const regressions = results
-					.filter((r) => !unit.fixtures.find((f) => f.id === r.fixtureId)?.probe)
+					.filter((r) => !unit.fixtures.find((f) => f.id === r.fixtureId)?.expectFail)
 					.filter((r) => r.verdict !== 'PASS')
 					.map((r) => `${r.unitId}/${r.fixtureId}=${r.verdict}`);
 				expect(regressions).toEqual([]);
+			});
+
+			it('fails every expectFail sentinel (proves the harness reports truthfully)', async () => {
+				const results = await runUnit(unit);
+				const wrong = results
+					.filter((r) => unit.fixtures.find((f) => f.id === r.fixtureId)?.expectFail)
+					.filter((r) => r.verdict !== 'FAIL')
+					.map((r) => `${r.unitId}/${r.fixtureId}=${r.verdict}`);
+				expect(wrong).toEqual([]);
 			});
 		});
 	}

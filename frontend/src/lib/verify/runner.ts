@@ -36,18 +36,35 @@ function makeActContext(root: HTMLElement): ActContext {
 	};
 }
 
+export interface RunOptions {
+	/** Mount into this element (left visible) instead of a hidden off-screen container.
+	 *  The isolation route passes its on-screen node so the *verified* instance is the
+	 *  one the agent screenshots — `act` and all. */
+	target?: HTMLElement;
+	/** Leave the component mounted after verifying (for the visible isolation route). */
+	keepMounted?: boolean;
+}
+
 /** mount -> act -> verify -> verdict, for one unit/fixture pair. The single code
- *  path shared by the dashboard, the agent (window.__verify) and CI. */
+ *  path shared by the dashboard, the agent (window.__verify), the isolation route
+ *  and CI — so the screenshot, the DOM contract and the verdict can never disagree. */
 export async function runFixture(
 	unit: VerifiableUnit,
-	fixture: Fixture
+	fixture: Fixture,
+	opts: RunOptions = {}
 ): Promise<VerifyResult> {
 	const start = performance.now();
-	const container = document.createElement('div');
-	container.style.position = 'fixed';
-	container.style.left = '-10000px';
-	container.style.top = '0';
-	document.body.appendChild(container);
+	const ownsContainer = !opts.target;
+	let container: HTMLElement;
+	if (opts.target) {
+		container = opts.target;
+	} else {
+		container = document.createElement('div');
+		container.style.position = 'fixed';
+		container.style.left = '-10000px';
+		container.style.top = '0';
+		document.body.appendChild(container);
+	}
 
 	const checks: Check[] = [];
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -94,14 +111,16 @@ export async function runFixture(
 			blockedReason: `mount failed: ${String(err)}`
 		};
 	} finally {
-		if (instance) {
-			try {
-				unmount(instance);
-			} catch {
-				/* best-effort teardown */
+		if (!opts.keepMounted) {
+			if (instance) {
+				try {
+					unmount(instance);
+				} catch {
+					/* best-effort teardown */
+				}
 			}
+			if (ownsContainer) container.remove();
 		}
-		container.remove();
 	}
 }
 
@@ -147,6 +166,7 @@ export function buildManifest(): ManifestEntry[] {
 			unitId: unit.id,
 			fixtureId: fixture.id,
 			probe: Boolean(fixture.probe),
+			expectFail: Boolean(fixture.expectFail),
 			verifiers: verifiersFor(unit).map((v) => v.id)
 		}))
 	);

@@ -35,8 +35,13 @@ export interface Fixture<P = any> {
 	id: string;
 	description: string;
 	props: P;
-	/** Marks an adversarial / edge-case fixture in the manifest. Does not change verdict logic. */
+	/** Marks an adversarial / edge-case input. Orthogonal to the verdict: a probe is
+	 *  still expected to PASS — adversarial inputs must not break the unit. Every unit
+	 *  ships ≥1 probe (the matrix enforces it). */
 	probe?: boolean;
+	/** A truthfulness sentinel that is *expected* to FAIL — proves the harness reports
+	 *  failures rather than going silently green. The matrix enforces it actually fails. */
+	expectFail?: boolean;
 	act?: (ctx: ActContext) => void | Promise<void>;
 }
 
@@ -87,6 +92,7 @@ export interface ManifestEntry {
 	unitId: string;
 	fixtureId: string;
 	probe: boolean;
+	expectFail: boolean;
 	verifiers: string[];
 }
 
