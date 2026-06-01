@@ -18,7 +18,7 @@ clutter, no decorative noise.
 
 ## 2. Design language
 
-A **warm editorial archive**: the precision of a well-kept index — numbered entries, hairline rules,
+A **warm editorial archive**: the precision of a well-kept index — hairline rules,
 abundant whitespace, typography doing the heavy lifting — softened by warmth and human craft. The palette and type take their cue from **Anthropic's brand identity, designed by
 Geist** ([geist.co/work/anthropic](https://geist.co/work/anthropic)): warm off-white grounds, a single
 clay accent, and a refined grotesque-with-serif pairing — "technically refined and charmingly quirky."
@@ -33,10 +33,10 @@ clay accent, and a refined grotesque-with-serif pairing — "technically refined
 3. **Warm, not cool.** Ivory paper, near-black ink, one clay accent. Inviting, never clinical.
 4. **Typography is the interface.** A strict three-family hierarchy (grotesque / serif / mono) carries
    almost the entire identity. Keep the rhythm and hierarchy crisp.
-5. **Restraint with the accent.** Clay marks only moments of emphasis (active nav, index numbers, step
-   counters, key actions, hover). If everything is clay, nothing is.
-6. **Index structure.** Numbered, zero-padded entries; `label · value` metadata tables; small
-   letterspaced mono section labels. This is the recurring structural motif.
+5. **Restraint with the accent.** Clay marks only moments of emphasis (active nav, step counters,
+   key actions, hover). If everything is clay, nothing is.
+6. **Archival structure.** `label · value` metadata tables, hairline rules, and small letterspaced
+   mono section labels. This is the recurring structural motif.
 
 ### Stay away from
 
@@ -59,7 +59,7 @@ the wordmark is simply **Cookmarks** set in the grotesque.
 | `--faint` | `#b0aea5` | De-emphasised text, captions, disabled, separators |
 | `--line` | `#e8e6dc` | Hairline rules / borders (default) |
 | `--line-strong` | `#d8d4c6` | Stronger hairline (section dividers) |
-| `--clay` | `#d97757` | **The accent.** Index numbers, active nav, step counters, hover, key actions, emphasis. Used sparingly. |
+| `--clay` | `#d97757` | **The accent.** Active nav, step counters, hover, key actions, emphasis. Used sparingly. |
 | `--clay-deep` | `#c2613f` | Clay for text/links needing more contrast; hover-darken |
 
 **Category chip tints** (rotating, for keyword/category chips only — never as body text colour):
@@ -137,8 +137,6 @@ Helper classes:
 
 The recurring building blocks that give the UI its archival character:
 
-- **Numbered index entries** — zero-padded mono counters (`001`, `002`…) lead recipe lists, search
-  results, and featured strips; the number is clay.
 - **Hairline metadata tables** — `LABEL · value` rows (mono label in `--muted`, serif or mono value),
   separated by hairlines. Used for book and recipe metadata.
 - **Mono section labels** — small letterspaced uppercase labels above sections (`INGREDIENTS`,
@@ -164,8 +162,9 @@ so it can mount in isolation in the verification harness (§9). Routes do the fe
 - **Book grid + controls** — responsive grid of book cards; a controls bar with **search**, **sort**
   (Recently added / Title A–Z / Author / Most recipes) and **author filter**; a total count. With a
   library of this size, filtering and sorting are **client-side**.
-- **Recipe index row** — numbered row: index number (clay mono) · recipe name (serif) · book & author
-  (right, `--muted`) · keyword chips. The unit of book-detail lists, search results, and featured lists.
+- **Recipe row** — a text-first list row: recipe name (serif) · book & author (right, `--muted`) ·
+  keyword chips; **no leading number, no thumbnail**. The unit of book-detail lists, search results,
+  and featured lists.
 - **Recipe masthead** — breadcrumb · a mono metadata line (book · author) · **large serif
   (often italic) title** · favourite (★) toggle · yields · keyword chips. Shared identically by the
   with-image and no-image recipe layouts.
@@ -180,7 +179,7 @@ so it can mount in isolation in the verification harness (§9). Routes do the fe
 - **Add-to-list control** — choose an existing list (Favourites, Weeknight dinners, To try…) or create
   a new one.
 - **Buttons** — grotesque, weight 600; primary = ink or clay fill; secondary = hairline outline.
-- **Prev/next, pagination, similar-recipes** — text-first, in the index style.
+- **Prev/next, pagination, similar-recipes** — text-first, as list rows.
 - **Empty / loading / error states** — designed in the same language (calm hairline skeletons for
   loading; a plain serif message such as "No recipes extracted yet" for empty). Never an afterthought.
 
@@ -190,11 +189,11 @@ so it can mount in isolation in the verification harness (§9). Routes do the fe
 
 | Screen | Purpose & key content |
 |---|---|
-| **Home** | A quiet landing, distinct from Books. Hero; a stats ledger (books · recipes · keywords); a "Book of the day" feature; quick-access links; a short numbered index of featured recipes. |
+| **Home** | A quiet landing, distinct from Books. Hero; a stats ledger (books · recipes · keywords); a "Book of the day" feature; quick-access links; a short index of featured recipes. |
 | **Books library** | The collection: book-card grid with search + sort + author filter and a total count. |
-| **Book detail** | Cover plate + title + author + a metadata table (publisher, ISBN, pages, recipe count, added, last extraction run); a **numbered recipe index** of the book's recipes; actions (Read book / Re-extract / Add to list). |
+| **Book detail** | Cover plate + title + author + a metadata table (publisher, ISBN, pages, recipe count, added, last extraction run); a **recipe index** of the book's recipes; actions (Read book / Re-extract / Add to list). |
 | **Recipe detail** | The reading view (see masthead, §5): with an image it appears as a bordered figure with a mono caption; **without an image, the no-image treatment of §7 applies**. Ingredients; full numbered method; any cooking-guide table; provenance; add-to-list; prev/next; similar recipes. |
-| **Search / browse** | A prominent search field; a **semantic / natural-language search** affordance ("Describe what you fancy…"); filters (keywords, book, author, favourites); sort; a result count; results as numbered index rows; pagination. |
+| **Search / browse** | A prominent search field; a **semantic / natural-language search** affordance ("Describe what you fancy…"); filters (keywords, book, author, favourites); sort; a result count; results as text-first list rows; pagination. **The list is empty until a query is entered** — the resting state is a calm prompt to search, not a dump of every recipe. |
 | **Lists** | Collections, including a default **Favourites**; a grid of lists; create / rename / delete; opening a list shows its recipes as a filtered index. |
 
 Features the UI must accommodate: **Favourites** (a default list, toggled by the ★ on a recipe),

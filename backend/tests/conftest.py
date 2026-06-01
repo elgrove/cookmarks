@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.db import get_session
 from app.main import app
-from app.models import Base, Book, Recipe
+from app.models import Base, Book, Keyword, Recipe
 
 
 def _seed(session: Session) -> None:
@@ -35,16 +35,22 @@ def _seed(session: Session) -> None:
     )
     session.add_all([with_recipes, without_recipes])
     session.flush()
-    for i in range(3):
-        session.add(
-            Recipe(
-                book_id=with_recipes.id,
-                order=i,
-                name=f"Recipe {i}",
-                ingredients=[],
-                instructions=[],
-            )
+    # Recipe 0 carries a keyword and an ingredient so the search/filter paths
+    # (keyword chip, ingredient substring) have something to match.
+    weeknight = Keyword(name="weeknight")
+    session.add(weeknight)
+    recipes = [
+        Recipe(
+            book_id=with_recipes.id,
+            order=i,
+            name=f"Recipe {i}",
+            ingredients=["100g anchovy"] if i == 0 else [],
+            instructions=[],
         )
+        for i in range(3)
+    ]
+    recipes[0].keywords.append(weeknight)
+    session.add_all(recipes)
     session.commit()
 
 

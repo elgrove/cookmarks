@@ -1,0 +1,13 @@
+{
+  "total": 1,
+  "items": [
+    {
+      "id": "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+      "name": "Roast Chicken with Anchovy Butter",
+      "book_id": "1f2e3d4c-5b6a-4789-9a0b-1c2d3e4f5a6b",
+      "book_title": "Salt, Fat, Acid, Heat",
+      "book_author": "Samin Nosrat",
+      "keywords": ["chicken", "roast"]
+    }
+  ]
+}

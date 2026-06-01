@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { booksResponseSchema, bookSummarySchema } from './books';
 import { homeSchema } from './home';
+import { keywordSummarySchema, recipeSearchResultsSchema } from './recipes';
 
 // Frontend half of the API wire contract (see /contract/README.md): the Zod
 // schemas must accept the shared example the backend pins itself to, and reject
@@ -28,5 +29,20 @@ describe('api wire contract', () => {
 
 	it('accepts the home example', () => {
 		expect(() => homeSchema.parse(load('home.example.json'))).not.toThrow();
+	});
+
+	it('accepts the recipes search example', () => {
+		expect(() => recipeSearchResultsSchema.parse(load('recipes.example.json'))).not.toThrow();
+	});
+
+	it('rejects a recipes example with a drifted field name', () => {
+		const example = load('recipes.example.json');
+		const { book_title, ...rest } = example.items[0];
+		const drifted = { ...example, items: [{ ...rest, bookTitle: book_title }] };
+		expect(() => recipeSearchResultsSchema.parse(drifted)).toThrow();
+	});
+
+	it('accepts the keywords example', () => {
+		expect(() => keywordSummarySchema.parse(load('keywords.example.json'))).not.toThrow();
 	});
 });
