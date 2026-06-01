@@ -59,14 +59,13 @@ const unit: VerifiableUnit<Props> = {
 		},
 		{
 			id: 'no-results',
-			description: 'probe: a search matching nothing shows the calm empty state',
-			probe: true,
+			description: 'a search matching nothing shows the calm empty state',
 			props: { books: populated },
 			act: ({ type }) => type(SEARCH, 'zzzznope')
 		},
 		{
 			id: 'long-title',
-			description: 'probe: an overlong unicode title must not break layout',
+			description: 'probe: an overlong unicode title renders in full without breaking the contract',
 			probe: true,
 			props: {
 				books: [
@@ -83,8 +82,8 @@ const unit: VerifiableUnit<Props> = {
 		},
 		{
 			id: 'contract-lie',
-			description: 'probe: a deliberately-failing invariant proves the harness reports truthfully',
-			probe: true,
+			description: 'sentinel: a deliberately-failing invariant proves the harness reports truthfully',
+			expectFail: true,
 			props: { books: populated.slice(0, 2) }
 		}
 	],
@@ -163,10 +162,21 @@ const unit: VerifiableUnit<Props> = {
 				`count=${contract.count} empty=${contract.empty}`
 		},
 		{
+			id: 'long-title-rendered',
+			description: 'the overlong title renders in full as a single card (no crash/truncation)',
+			onlyFixtures: ['long-title'],
+			check: ({ root, props }) => {
+				const cards = root.querySelectorAll('.card').length;
+				if (cards !== props.books.length) return `expected ${props.books.length} card(s), saw ${cards}`;
+				const title = root.querySelector('.title')?.textContent?.trim() ?? '';
+				return title === props.books[0].title || `title not rendered in full: ${title}`;
+			}
+		},
+		{
 			id: 'intentional-fail',
-			description: 'always fails — the truthfulness probe',
+			description: 'always fails — the truthfulness sentinel (expectFail)',
 			onlyFixtures: ['contract-lie'],
-			check: () => 'intentional failure: this probe must surface as FAIL'
+			check: () => 'intentional failure: this sentinel must surface as FAIL'
 		}
 	]
 };

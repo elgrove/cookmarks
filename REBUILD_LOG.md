@@ -223,43 +223,77 @@ the old "— pending extraction" text is gone too). The circle folds its count i
 link's accessible name and is otherwise `aria-hidden`. Verified live: 103 circles across the
 192 covers, none on the 89 unextracted books.
 
-## 2026-05-31 — Book detail page ("The Index" layout)
+## 2026-06-01 — Critical-review fixes (harness truthfulness + tooling)
+
+A critical review of the v2 scaffold surfaced several spots where the green matrix was
+papering over gaps in the verifiability thesis. Fixed all of them:
+
+- **Isolation route showed a different instance than it verified.** `/verify/<unit>/<fixture>`
+  rendered the component declaratively *and* ran `runFixture` on a second, hidden copy — so
+  for any `act` fixture (search/sort) the screenshot showed the **unfiltered** view while the
+  verdict reflected the filtered one. `runFixture` now takes `{ target, keepMounted }`; the route
+  mounts into its on-screen node and verifies *that*. The screenshot can no longer disagree with
+  the verdict. Confirmed live: `search-match` shows 2 cards + `query=modern` + `PASS`.
+- **`probe` was overloaded and silently exempted real states from enforcement.** Split into two
+  orthogonal flags: `probe` = adversarial *input* (still must `PASS`; ≥1 per unit), `expectFail` =
+  the truthfulness sentinel (must `FAIL`). The matrix now asserts *every* non-`expectFail` fixture
+  passes (probes included) and every sentinel fails. `no-results`/`long-title` are now enforced
+  (`long-title` gained a real "renders in full" invariant); `contract-lie` became the lone
+  `expectFail` sentinel.
+- **The a11y verifier could never fail** (all `warn`). Promoted unnamed-button / unlabelled-input /
+  alt-less-image to `fail` — load-bearing per DESIGN §8. No existing unit regressed.
+- **The backend ↔ frontend contract was verified by nobody.** Added `contract/*.example.json` pinned
+  from both sides: `backend/tests/test_contract.py` asserts each Pydantic model serialises to the
+  example (and the live endpoints emit the same keys); `frontend/src/lib/api/contract.test.ts`
+  asserts the Zod schemas accept it and reject a drifted copy. A one-sided rename now fails CI.
+- **`make test` / CI ran the wrong pytest.** A stale console-script shebang (relocated worktree)
+  let `uv run pytest` fall through to a system pytest with no `sqlite_vec`. Switched `make test`
+  and `ci.yml` to `uv run python -m pytest`, matching the existing `python -m alembic` rationale.
+- **Hygiene:** removed stray review screenshots from the repo root and gitignored Playwright MCP
+  artefacts (`.playwright-mcp/`, `*-desktop.png`, `*-mobile.png`); fixed the stale port comment in
+  the Makefile `dev` target (9789/9788).
+
+All green: backend `pytest` 13 passed (4 new contract tests), `ruff`/`ty` clean; frontend `vitest`
+14 passed (matrix 9, harness 2, contract 3), `svelte-check` 0/0, `build` OK. Verified live via
+Playwright: dashboard 9 `PASS` / 1 `FAIL` (the `contract-lie` sentinel).
+
+## 2026-06-01 — Book detail page ("The Index" layout)
 
 The first detail view, landing the `/books/{id}` route the library grid already linked to.
 Design chosen from four reviewed mockups (`mockups/book-detail/`): **Layout A "The Index"** —
-a two-column editorial view (serif masthead + reading column on the left; a sticky
-cover / actions / metadata sidebar on the right).
+a two-column editorial view (serif masthead + reading column; a sticky cover / actions /
+metadata sidebar, its top aligned to the title).
 
-- **Backend:** `GET /api/books/{id}` → `BookDetail` (schemas/book.py) carrying real model
-  fields only — title, author, isbn, pubdate, description, total `recipe_count`, `has_cover`,
+- **Backend:** `GET /api/books/{id}` → `BookDetail` (schemas/book.py) with real model fields
+  only — title, author, isbn, pubdate, description, total `recipe_count`, `has_cover`,
   `added` (calibre_added_at) — plus a **random sample of 10** recipes (`ORDER BY RANDOM()
-  LIMIT 10`, `selectinload(keywords)` to avoid N+1) as `RecipeRow` (schemas/recipe.py:
-  id, name, keywords). 404 on unknown id. Tests in `test_books.py` (shape, ≤10 cap, keyword
-  shape, empty book, 404); the seed gained two keywords on a recipe (so `test_home` keyword
-  count moved 0→2).
-- **Frontend:** `BookDetail.svelte` (presentational, `data-verify-unit="book-detail"` with
-  `id / recipe-count / shown / has-cover / empty`), `book-detail.verify.ts` (fixtures:
-  populated, no-cover, no-recipes, no-subtitle + long-title & contract-lie probes; invariants
-  on id, count, rows≤10=shown, main-title, empty state, count circle, no-subtitle), the
-  `/books/[id]` route (onMount→`fetchBookDetail`→3-state), and `fetchBookDetail` + Zod schemas
-  in `api/books.ts`. The Calibre-HTML→text helper moved to `lib/html.ts` (shared with Home).
-  Title splits on the first `:` → display title + serif subtitle (v1 `clean_title`).
-- **Decisions (from review):** recipes = a random 10 (caption "N of M shown"); each row =
-  name + keyword chips (no region — not a model field); actions = a dark **Read book** + a
-  generic outlined **Action** button (both no-op for now); extraction info omitted; **no
-  fabricated data** (the James-Beard accolade tag dropped — the award still appears only as
-  part of the book's real description text).
-- **Eyebrow-label cleanup:** the page-title `.label` eyebrows ("The library", "Cookbook")
-  were removed from `BooksLibrary`, the `/books` loading state, and the mockup; functional
-  labels (section + `LABEL · value` metadata rows) stay.
-- **Cover-path fix:** covers resolved 0/192 because the seeded dev DB (pre-dating the import
-  script's `removeprefix(V1_LIBRARY_ROOT)`) still held absolute `/books/<author>/<book>`
-  paths, while the model contract + `calibre_library_path` (`~/books/calibre-all`) expect
-  them **relative**. The import script is already correct; normalised the stale dev DB in
-  place (`UPDATE books SET path = substr(path, 8)`), so 192/192 covers now resolve.
+  LIMIT 10`, `selectinload(keywords)`) as `RecipeRow` (id, name, keywords). 404 on unknown id.
+  Tests in `test_books.py` (shape, ≤10 cap, keyword shape, empty book, 404); the seed gained
+  two keywords (so `test_home` keyword count moved 0→2).
+- **Frontend:** presentational `BookDetail.svelte` (`data-verify-unit="book-detail"` with
+  `id / recipe-count / shown / has-cover / empty`), the `/books/[id]` route
+  (onMount→`fetchBookDetail`→3-state), `fetchBookDetail` + Zod schemas, and shared
+  `lib/title.ts` (clean-title / subtitle split, v1 `clean_title`) + `lib/html.ts`
+  (Calibre-HTML→text, shared with Home). `book-detail.verify.ts` uses the post-merge
+  convention: `populated / no-cover / no-recipes / no-subtitle` plus `long-title` &
+  `many-keywords` **probes** (adversarial, must PASS) and a `contract-lie` **expectFail**
+  sentinel; invariants on id, count, rows≤10=shown, main title, empty state, count circle,
+  no-subtitle.
+- **UI:** masthead (clean title + post-colon subtitle) + read-more description; a `RECIPES`
+  label, recipe rows of **name + one line of keyword chips** (extra chips clip; no numbers)
+  and a `+ N more` footer; sticky sidebar with the cover (count circle, §7 no-cover plate),
+  dark **Read book** / outlined **Action** buttons (no-op), and an all-mono `LABEL · value`
+  metadata ledger. No fabricated data; no eyebrow labels.
+- **App-wide while here:** footer pinned to the viewport bottom (min-height flex column);
+  clean titles (drop the post-colon subtitle) on the home feature; eyebrow labels removed
+  from `BooksLibrary` + the `/books` loading state.
+- **Cover-path fix (dev data):** covers resolved 0/192 — the seeded dev DB pre-dated the
+  import script's `removeprefix(V1_LIBRARY_ROOT)` and still held absolute `/books/...` paths
+  while `calibre_library_path` (`~/books/calibre-all`) expects them relative. Normalised the
+  stale DB in place (`UPDATE books SET path = substr(path, 8)`); 192/192 covers now resolve.
 
-Verified: `make check` + `make test` (13 backend, 12 frontend) green; matrix PASS on
-book-detail non-probe fixtures. Live via Playwright (1280×800 + 390×844): real cover + clay
-count circle, masthead/subtitle/byline, random-10 index reshuffling on reload, the empty
-state on a 0-recipe book, the §7 no-cover plate (isolation route), and mobile reflow with no
+Merged the concurrent critical-review work (above) in: migrated the verify unit to the new
+`probe`/`expectFail` split and re-greened (`make check` + `make test`). Verified via Playwright
+(1280×800 + 390×844): real cover + count circle, random-10 reshuffling, empty state, §7
+no-cover plate, single-line tags, footer pinned on short pages, mobile reflow without
 horizontal scroll.

@@ -10,22 +10,23 @@
 	const fixtureId = $page.params.fixture ?? '';
 	const unit = getUnit(unitId);
 	const fixture = unit?.fixtures.find((f) => f.id === fixtureId);
-	const Component = unit?.component;
 
+	let target = $state<HTMLElement>();
 	let result = $state<VerifyResult | null>(null);
 
+	// Verify the *visible* instance: runFixture mounts the component into this
+	// on-screen node and applies `act` to it, so the screenshot an agent takes
+	// always matches the verdict it scrapes (no parallel hidden copy).
 	onMount(async () => {
-		if (unit && fixture) {
-			result = await runFixture(unit, fixture);
+		if (unit && fixture && target) {
+			result = await runFixture(unit, fixture, { target, keepMounted: true });
 			setCurrent(result);
 		}
 	});
 </script>
 
-{#if unit && fixture && Component}
-	<div data-verify-target>
-		<Component {...fixture.props} />
-	</div>
+{#if unit && fixture}
+	<div bind:this={target} data-verify-target></div>
 	{#if result}
 		<p
 			data-verify-verdict={result.verdict}

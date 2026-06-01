@@ -9,7 +9,7 @@ describe('harness self-test (books-library unit)', () => {
 		expect(result?.verdict).toBe('PASS');
 	});
 
-	it('catches the broken probe', async () => {
+	it('catches the expectFail sentinel', async () => {
 		const result = await runOne('books-library', 'contract-lie');
 		expect(result?.verdict).toBe('FAIL');
 		expect(

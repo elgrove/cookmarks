@@ -125,8 +125,8 @@ const unit: VerifiableUnit<Props> = {
 		},
 		{
 			id: 'contract-lie',
-			description: 'probe: a deliberately-failing invariant proves the harness reports truthfully',
-			probe: true,
+			description: 'expectFail: a deliberately-failing invariant proves the harness reports truthfully',
+			expectFail: true,
 			props: { book: pastaGrannies }
 		}
 	],
@@ -193,9 +193,9 @@ const unit: VerifiableUnit<Props> = {
 		},
 		{
 			id: 'intentional-fail',
-			description: 'always fails — the truthfulness probe',
+			description: 'always fails — the truthfulness sentinel (expectFail)',
 			onlyFixtures: ['contract-lie'],
-			check: () => 'intentional failure: this probe must surface as FAIL'
+			check: () => 'intentional failure: this sentinel must surface as FAIL'
 		}
 	]
 };
