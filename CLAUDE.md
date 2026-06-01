@@ -64,10 +64,10 @@ SQLite (`backend/db.sqlite3` by default; `COOKMARKS_DB_PATH` overrides — see `
 
 This harness exists so you can **drive the app and correct yourself**. Three ways to observe, same `runFixture` code path underneath:
 
-1. **Headless (fastest):** run `make verify`. Non-probe fixtures must be `PASS`; the matrix asserts it. Use this as your inner loop after any harness/unit change.
+1. **Headless (fastest):** run `make verify`. Every fixture that isn't an `expectFail` sentinel must be `PASS` (probes included); the matrix asserts it. Use this as your inner loop after any harness/unit change.
 2. **Live (self-correction via Playwright MCP):** `make dev`, then navigate the browser to:
    - `http://localhost:9789/verify` — dashboard; click "Run all", read the verdict grid.
-   - `http://localhost:9789/verify/<unit>/<fixture>?chrome=0` — one unit mounted in isolation, chrome stripped for clean screenshots.
+   - `http://localhost:9789/verify/<unit>/<fixture>?chrome=0` — one unit mounted in isolation, chrome stripped for clean screenshots. The mounted instance **is** the verified one (`act` applied to it), so the screenshot can never disagree with the verdict.
    - Read structured results without evaluating JS by scraping `#verify-result-json` (the latest `current()`/`runAll()` payload), or call `window.__verify.runAll()` / `window.__verify.manifest()`.
 3. **Human:** open `/verify` to eyeball the grid.
 
@@ -77,10 +77,12 @@ This harness exists so you can **drive the app and correct yourself**. Three way
 
 1. Build a Svelte component that emits a `data-verify-*` contract on a self-identifying root element (`data-verify-unit="<id>"` plus whatever state attributes the invariants need).
 2. Add a `*.verify.ts` anywhere under `src/` that **default-exports a `VerifiableUnit`** (`src/lib/verify/types.ts`). It is auto-discovered via `import.meta.glob` in `src/lib/verify/registry.ts` — no manual registration.
-3. Declare `fixtures` (named prop sets; mark adversarial ones `probe: true`), `invariants` (predicates over the DOM contract), and an optional Zod `propsSchema`. Every unit must ship **≥1 probe** (the matrix enforces it).
-4. Verifiers (`src/lib/verify/verifiers/`): `dom-contract`, `schema`, `invariants`, `a11y`. Add a new one by writing a file and appending it to `verifiers/index.ts` — units are untouched.
+3. Declare `fixtures` (named prop sets; mark adversarial ones `probe: true`), `invariants` (predicates over the DOM contract), and an optional Zod `propsSchema`. Every unit must ship **≥1 probe** (the matrix enforces it). `probe` and the verdict are **orthogonal**: a probe is an adversarial *input* that must still `PASS`. The only fixture allowed (and required) to `FAIL` is the **truthfulness sentinel** marked `expectFail: true`.
+4. Verifiers (`src/lib/verify/verifiers/`): `dom-contract`, `schema`, `invariants`, `a11y`. Add a new one by writing a file and appending it to `verifiers/index.ts` — units are untouched. The `a11y` verifier is **load-bearing** (DESIGN §8): unnamed buttons, unlabelled inputs and alt-less images `fail` the verdict, not just warn.
 
-Verdict rules (`runner.ts`): any `fail` check → `FAIL`; mount error → `BLOCKED` (couldn't observe, distinct from a real failure); no fixtures → `SKIP`; otherwise `PASS`. Warnings never fail a verdict. When in doubt, the harness fails rather than greenwashes.
+Verdict rules (`runner.ts`): any `fail` check → `FAIL`; mount error → `BLOCKED` (couldn't observe, distinct from a real failure); no fixtures → `SKIP`; otherwise `PASS`. Warnings never fail a verdict. The matrix enforces every non-`expectFail` fixture is `PASS` and every `expectFail` sentinel is `FAIL`. When in doubt, the harness fails rather than greenwashes.
+
+**The backend ↔ frontend wire contract** is pinned from both sides by the `contract/*.example.json` files (see `contract/README.md`): `backend/tests/test_contract.py` asserts each Pydantic model serialises to the example, and `frontend/src/lib/api/contract.test.ts` asserts the Zod schemas accept it. A one-sided field rename fails CI instead of only breaking at runtime.
 
 `src/lib/components/Smoke.svelte` + `src/verify-units/_smoke.verify.ts` are a temporary self-test (a passing fixture and a deliberately-failing probe). **Delete both once the first real unit lands.**
 

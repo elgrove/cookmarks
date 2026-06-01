@@ -222,3 +222,37 @@ top-right shows how many recipes were extracted; **unextracted books show no cir
 the old "— pending extraction" text is gone too). The circle folds its count into the card
 link's accessible name and is otherwise `aria-hidden`. Verified live: 103 circles across the
 192 covers, none on the 89 unextracted books.
+
+## 2026-06-01 — Critical-review fixes (harness truthfulness + tooling)
+
+A critical review of the v2 scaffold surfaced several spots where the green matrix was
+papering over gaps in the verifiability thesis. Fixed all of them:
+
+- **Isolation route showed a different instance than it verified.** `/verify/<unit>/<fixture>`
+  rendered the component declaratively *and* ran `runFixture` on a second, hidden copy — so
+  for any `act` fixture (search/sort) the screenshot showed the **unfiltered** view while the
+  verdict reflected the filtered one. `runFixture` now takes `{ target, keepMounted }`; the route
+  mounts into its on-screen node and verifies *that*. The screenshot can no longer disagree with
+  the verdict. Confirmed live: `search-match` shows 2 cards + `query=modern` + `PASS`.
+- **`probe` was overloaded and silently exempted real states from enforcement.** Split into two
+  orthogonal flags: `probe` = adversarial *input* (still must `PASS`; ≥1 per unit), `expectFail` =
+  the truthfulness sentinel (must `FAIL`). The matrix now asserts *every* non-`expectFail` fixture
+  passes (probes included) and every sentinel fails. `no-results`/`long-title` are now enforced
+  (`long-title` gained a real "renders in full" invariant); `contract-lie` became the lone
+  `expectFail` sentinel.
+- **The a11y verifier could never fail** (all `warn`). Promoted unnamed-button / unlabelled-input /
+  alt-less-image to `fail` — load-bearing per DESIGN §8. No existing unit regressed.
+- **The backend ↔ frontend contract was verified by nobody.** Added `contract/*.example.json` pinned
+  from both sides: `backend/tests/test_contract.py` asserts each Pydantic model serialises to the
+  example (and the live endpoints emit the same keys); `frontend/src/lib/api/contract.test.ts`
+  asserts the Zod schemas accept it and reject a drifted copy. A one-sided rename now fails CI.
+- **`make test` / CI ran the wrong pytest.** A stale console-script shebang (relocated worktree)
+  let `uv run pytest` fall through to a system pytest with no `sqlite_vec`. Switched `make test`
+  and `ci.yml` to `uv run python -m pytest`, matching the existing `python -m alembic` rationale.
+- **Hygiene:** removed stray review screenshots from the repo root and gitignored Playwright MCP
+  artefacts (`.playwright-mcp/`, `*-desktop.png`, `*-mobile.png`); fixed the stale port comment in
+  the Makefile `dev` target (9789/9788).
+
+All green: backend `pytest` 13 passed (4 new contract tests), `ruff`/`ty` clean; frontend `vitest`
+14 passed (matrix 9, harness 2, contract 3), `svelte-check` 0/0, `build` OK. Verified live via
+Playwright: dashboard 9 `PASS` / 1 `FAIL` (the `contract-lie` sentinel).
