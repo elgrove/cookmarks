@@ -298,6 +298,12 @@
 		color: var(--faint);
 	}
 
+	/* Hide the native clear affordance — we render our own. */
+	.search-input::-webkit-search-cancel-button {
+		-webkit-appearance: none;
+		appearance: none;
+	}
+
 	.search-input:focus {
 		border-bottom-color: var(--clay);
 	}

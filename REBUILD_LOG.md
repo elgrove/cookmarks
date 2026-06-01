@@ -297,3 +297,42 @@ Merged the concurrent critical-review work (above) in: migrated the verify unit 
 (1280×800 + 390×844): real cover + count circle, random-10 reshuffling, empty state, §7
 no-cover plate, single-line tags, footer pinned on short pages, mobile reflow without
 horizontal scroll.
+
+## 2026-06-01 — Recipes search page
+
+The **Recipes** screen: a server-driven keyword search over the ~13k-recipe archive, **empty
+until a query**. Deliberately **not** semantic/AI search (v1 had Gemini vector search; deferred
+to a later slice) — this is substring + filters only.
+
+- **Backend** `GET /api/recipes?q=&keyword=&book_id=&author=&sort=&limit=&offset=`: substring
+  (`ILIKE`) across recipe name, keyword names, book title/author **and the JSON ingredients**
+  (so an ingredient query like "anchovy" matches); keyword chips **AND-narrow** (each chosen
+  keyword must be present, via `.keywords.any(...)`); `book_id`/`author` filters; `name`/`recent`
+  sort; offset pagination; returns `{ total, items }`. **Filters count as a query** — a chip or
+  book/author alone returns results; nothing set returns the resting empty state. `GET /api/keywords`
+  feeds the filter chips (name + recipe count, popularity-ordered).
+- **Frontend**: presentational `RecipesSearch.svelte` (search box · keyword chips · book/author
+  selects · sort · result count · text-first rows · resting/loading/results/empty states · prev/next
+  pager) + `RecipeRow.svelte` (name · right-aligned book·author · rotating-tint chips; **no leading
+  number, no thumbnail** per DESIGN §5). The component owns its live criteria and emits `onSearch`;
+  the `/recipes` route owns fetching (debounced text, monotonic-sequence guard against stale
+  responses) and loads books+keywords on mount. Added the **Recipes** nav link.
+- **DESIGN.md**: removed the **numbered-index-row** styling (the clay zero-padded `001` counter on
+  list rows) per direction — rows are now plain text-first rows; method *step* numbers are kept.
+  Recorded that the search screen is empty until a query.
+- **Harness**: `recipes-search` verify unit — fixtures for resting/results/no-results, `act`
+  fixtures (type query, toggle chip), a long-unicode-name probe, and the `expectFail` sentinel;
+  invariants over the `data-verify-*` contract. Wire contract pinned both sides
+  (`contract/recipes.example.json`, `keywords.example.json`).
+- **Integrated `v2`** after book-detail landed: reconciled `schemas/recipe.py` (kept their
+  `RecipeRow` index model alongside the search models), the test seed (Recipe 0 now carries both
+  the `Pasta`/`Quick` keywords and an ingredient), and the home keyword count. No code dependency
+  on book-detail; its `/books/:id` route now backs the row's book link. Both pages link to a
+  `/recipes/:id` detail route that doesn't exist yet — a shared follow-up.
+
+Green: backend `pytest` 33, `ruff`/`ty` clean; frontend `vitest` 25 (matrix 17), `svelte-check`
+0/0. Verified via Playwright (1280×800 + 390×844): resting prompt, results with count + rows +
+chips, AND-narrowing (chicken 1713 → +Quick 297), no-results state, mobile row reflow (source
+wraps under the name). Fixed two issues found in the pass: a duplicate native `type=search` clear
+button (hidden via `::-webkit-search-cancel-button`), and the keyword chip block pushing results
+below the fold on mobile (capped the chips to 18; rarer keywords remain reachable by typing).

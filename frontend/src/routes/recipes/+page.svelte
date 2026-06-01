@@ -52,8 +52,10 @@
 			console.error('failed to load books for filters', err);
 		}
 		try {
-			// Show the most-used keywords as filter chips.
-			keywords = (await fetchKeywords()).slice(0, 40);
+			// Show the most-used keywords as quick filter chips; rarer keywords are
+			// still reachable by typing (search matches keyword names too). Capped so
+			// the chip block doesn't push results below the fold, especially on mobile.
+			keywords = (await fetchKeywords()).slice(0, 18);
 		} catch (err) {
 			console.error('failed to load keywords', err);
 		}
