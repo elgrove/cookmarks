@@ -9,5 +9,9 @@
       "book_author": "Samin Nosrat",
       "keywords": ["chicken", "roast"]
     }
+  ],
+  "facets": [
+    { "name": "roast", "recipe_count": 1 },
+    { "name": "dinner", "recipe_count": 1 }
   ]
 }

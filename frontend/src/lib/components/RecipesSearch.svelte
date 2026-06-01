@@ -19,7 +19,7 @@
 
 	let {
 		status = 'resting',
-		results = { total: 0, items: [] },
+		results = { total: 0, items: [], facets: [] },
 		keywords = [],
 		books = [],
 		authors = [],
@@ -28,6 +28,7 @@
 	}: RecipesSearchProps = $props();
 
 	const sortOptions: { key: SortKey; label: string }[] = [
+		{ key: 'random', label: 'Random' },
 		{ key: 'name', label: 'Name A–Z' },
 		{ key: 'recent', label: 'Recently added' }
 	];
@@ -42,12 +43,99 @@
 	let selected = $state<string[]>(seed.keywords ?? []);
 	let bookId = $state(seed.bookId ?? '');
 	let author = $state(seed.author ?? '');
-	let sort = $state<SortKey>(seed.sort ?? 'name');
+	let sort = $state<SortKey>(seed.sort ?? 'random');
 	let offset = $state(seed.offset ?? 0);
+
+	// Random sort is seeded so a result set keeps its order across pagination; a
+	// fresh seed is minted each time a *new* search starts (not on prev/next).
+	let randomSeed = seed.seed ?? 0;
 
 	let active = $derived(
 		Boolean(query.trim() || selected.length || bookId || author)
 	);
+
+	// The chips shown: selected keywords pinned first (so they stay deselectable
+	// even when they drop out of the facets), then the co-occurrence facets. A
+	// pinned chip has no count — it's already chosen, every result carries it.
+	const CHIP_CAP = 50;
+	type DisplayChip = { name: string; count: number | null };
+	let chips = $derived.by<DisplayChip[]>(() => {
+		const pinned = selected
+			.filter((name) => !keywords.some((k) => k.name === name))
+			.map((name) => ({ name, count: null }));
+		const room = Math.max(0, CHIP_CAP - pinned.length);
+		const facets = keywords
+			.slice(0, room)
+			.map((k) => ({ name: k.name, count: k.recipe_count }));
+		return [...pinned, ...facets];
+	});
+
+	// Clamp the chips to at most CHIP_LINES rows. Chips are variable-width, so we
+	// render them all and measure: overflow rows are clipped away and made inert
+	// (out of tab order / the a11y tree). With no layout (jsdom/SSR) nothing is
+	// measured and everything shows.
+	const CHIP_LINES = 4;
+	let chipsEl = $state<HTMLUListElement>();
+	let clampHeight = $state<number | null>(null);
+
+	function clampChips(): void {
+		const ul = chipsEl;
+		if (!ul) return;
+		const lis = [...ul.querySelectorAll<HTMLLIElement>(':scope > li')];
+		if (!lis.length) {
+			clampHeight = null;
+			return;
+		}
+		const top = ul.getBoundingClientRect().top;
+		const rowTops: number[] = [];
+		const liTops = lis.map((li) => {
+			const t = Math.round(li.getBoundingClientRect().top - top);
+			if (!rowTops.some((r) => Math.abs(r - t) < 2)) rowTops.push(t);
+			return t;
+		});
+		rowTops.sort((a, b) => a - b);
+		let firstHidden = lis.length;
+		if (rowTops.length > CHIP_LINES) {
+			const cut = rowTops[CHIP_LINES];
+			const idx = liTops.findIndex((t) => t >= cut - 1);
+			if (idx !== -1) firstHidden = idx;
+		}
+		let visibleBottom = 0;
+		lis.forEach((li, i) => {
+			const hidden = i >= firstHidden;
+			li.inert = hidden;
+			if (!hidden) {
+				visibleBottom = Math.max(visibleBottom, Math.round(li.getBoundingClientRect().bottom - top));
+			}
+		});
+		clampHeight = firstHidden < lis.length ? visibleBottom : null;
+	}
+
+	$effect(() => {
+		chips; // re-clamp whenever the chip set changes
+		clampChips();
+	});
+
+	$effect(() => {
+		const ul = chipsEl;
+		if (!ul || typeof ResizeObserver === 'undefined') return;
+		let lastWidth = -1;
+		const ro = new ResizeObserver((entries) => {
+			const width = entries[0].contentRect.width;
+			if (Math.abs(width - lastWidth) < 0.5) return; // ignore our own height changes
+			lastWidth = width;
+			clampChips();
+		});
+		ro.observe(ul);
+		return () => ro.disconnect();
+	});
+
+	$effect(() => {
+		// Chips reflow once the mono font loads — re-measure then.
+		if (typeof document !== 'undefined' && document.fonts) {
+			void document.fonts.ready.then(() => clampChips());
+		}
+	});
 
 	let rangeStart = $derived(results.items.length ? offset + 1 : 0);
 	let rangeEnd = $derived(offset + results.items.length);
@@ -55,13 +143,19 @@
 	let canNext = $derived(offset + limit < results.total);
 
 	function emit(resetOffset = true): void {
-		if (resetOffset) offset = 0;
+		if (resetOffset) {
+			offset = 0;
+			// New search → reshuffle. Pagination (resetOffset=false) keeps the seed
+			// so the user pages through one stable random ordering.
+			if (sort === 'random') randomSeed = Math.floor(Math.random() * 2_000_000_000) + 1;
+		}
 		onSearch?.({
 			q: query,
 			keywords: selected,
 			bookId: bookId || undefined,
 			author: author || undefined,
 			sort,
+			seed: sort === 'random' ? randomSeed : undefined,
 			limit,
 			offset
 		});
@@ -78,6 +172,12 @@
 		selected = selected.includes(name)
 			? selected.filter((k) => k !== name)
 			: [...selected, name];
+		emit();
+	}
+
+	function clearKeywords(): void {
+		if (!selected.length) return;
+		selected = [];
 		emit();
 	}
 
@@ -101,12 +201,12 @@
 	data-verify-shown={results.items.length}
 	data-verify-query={query}
 	data-verify-keywords={selected.join('|')}
+	data-verify-chips={chips.map((c) => c.name).join('|')}
 	data-verify-book={bookId}
 	data-verify-author={author}
 	data-verify-sort={sort}
 >
 	<header class="head">
-		<p class="label">Search</p>
 		<h1 class="display">Recipes</h1>
 	</header>
 
@@ -188,21 +288,38 @@
 		</label>
 	</div>
 
-	{#if keywords.length}
-		<ul class="chips" aria-label="Filter by keyword">
-			{#each keywords as kw (kw.name)}
-				<li>
-					<button
-						class="chip"
-						class:on={selected.includes(kw.name)}
-						aria-pressed={selected.includes(kw.name)}
-						onclick={() => toggleKeyword(kw.name)}
-					>
-						{kw.name}<span class="chip-count">{kw.recipe_count}</span>
+	{#if chips.length}
+		<section class="keywords">
+			<div class="keywords-head">
+				<p class="label kw-label">Keywords</p>
+				{#if selected.length}
+					<button class="clear-kw" onclick={clearKeywords}>
+						Clear selection ({selected.length})
 					</button>
-				</li>
-			{/each}
-		</ul>
+				{/if}
+			</div>
+			<ul
+				class="chips"
+				class:clamped={clampHeight != null}
+				style:max-height={clampHeight != null ? `${clampHeight}px` : null}
+				bind:this={chipsEl}
+				aria-label="Filter by keyword"
+			>
+				{#each chips as chip (chip.name)}
+					<li>
+						<button
+							class="chip"
+							class:on={selected.includes(chip.name)}
+							aria-pressed={selected.includes(chip.name)}
+							onclick={() => toggleKeyword(chip.name)}
+						>
+							{chip.name}{#if chip.count !== null}<span class="chip-count">{chip.count}</span
+								>{/if}
+						</button>
+					</li>
+				{/each}
+			</ul>
+		</section>
 	{/if}
 
 	<div class="results">
@@ -215,10 +332,7 @@
 		{:else if status === 'error'}
 			<p class="state">Couldn’t run the search. Try again.</p>
 		{:else if status === 'resting'}
-			<p class="state resting">
-				Search your archive — by name, ingredient, keyword, book or author. Pick a keyword or book to
-				browse.
-			</p>
+			<!-- Empty until a query: the controls above are the whole prompt. -->
 		{:else if results.items.length === 0}
 			<p class="state">No recipes match your search.</p>
 		{:else}
@@ -355,14 +469,59 @@
 		margin-bottom: 1.25rem;
 	}
 
+	.keywords {
+		margin: 0 0 2.5rem;
+		padding: 1.5rem 0 0;
+		border-top: 2px solid var(--line-strong);
+	}
+
+	.keywords-head {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 1rem;
+		margin-bottom: 1rem;
+	}
+
+	/* A touch larger and darker than the standard control label — the keyword
+	   facets are the primary way to explore the archive, so they lead. */
+	.kw-label {
+		font-size: 0.8rem;
+		letter-spacing: 0.1em;
+		color: var(--ink);
+	}
+
+	.clear-kw {
+		font-family: var(--f-mono);
+		font-size: 0.72rem;
+		letter-spacing: 0.02em;
+		color: var(--muted);
+		background: none;
+		border: none;
+		padding: 0;
+		cursor: pointer;
+		text-decoration: underline;
+		text-underline-offset: 3px;
+		transition: color 0.16s var(--ease-out);
+	}
+
+	.clear-kw:hover {
+		color: var(--clay-deep);
+	}
+
 	.chips {
 		display: flex;
 		flex-wrap: wrap;
 		gap: 0.5rem;
 		list-style: none;
-		margin: 0 0 2.25rem;
-		padding: 1.25rem 0 0;
-		border-top: var(--border);
+		margin: 0;
+		padding: 0;
+	}
+
+	/* Clamped to a fixed number of rows by measurement; overflow chips stay in
+	   flow (so they remain measurable) but are clipped and made inert. */
+	.chips.clamped {
+		overflow: hidden;
 	}
 
 	.chip {
@@ -370,13 +529,13 @@
 		align-items: center;
 		gap: 0.4rem;
 		font-family: var(--f-mono);
-		font-size: 0.72rem;
+		font-size: 0.76rem;
 		letter-spacing: 0.02em;
 		color: var(--muted);
 		background: var(--bg-warm);
 		border: var(--border);
 		border-radius: 999px;
-		padding: 0.25rem 0.7rem;
+		padding: 0.3rem 0.78rem;
 		cursor: pointer;
 		transition:
 			border-color 0.16s var(--ease-out),

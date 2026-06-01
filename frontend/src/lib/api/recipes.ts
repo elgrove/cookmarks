@@ -10,14 +10,17 @@ export const recipeSummarySchema = z.object({
 	keywords: z.array(z.string())
 });
 
-export const recipeSearchResultsSchema = z.object({
-	total: z.number().int().nonnegative(),
-	items: z.array(recipeSummarySchema)
-});
-
 export const keywordSummarySchema = z.object({
 	name: z.string(),
 	recipe_count: z.number().int().nonnegative()
+});
+
+export const recipeSearchResultsSchema = z.object({
+	total: z.number().int().nonnegative(),
+	items: z.array(recipeSummarySchema),
+	// Keywords most common among the matching recipes (selected ones excluded),
+	// so the chips can re-rank to what narrows the search further.
+	facets: z.array(keywordSummarySchema)
 });
 
 export const keywordsResponseSchema = z.array(keywordSummarySchema);
@@ -26,7 +29,7 @@ export type RecipeSummary = z.infer<typeof recipeSummarySchema>;
 export type RecipeSearchResults = z.infer<typeof recipeSearchResultsSchema>;
 export type KeywordSummary = z.infer<typeof keywordSummarySchema>;
 
-export type SortKey = 'name' | 'recent';
+export type SortKey = 'random' | 'name' | 'recent';
 
 export type SearchCriteria = {
 	q?: string;
@@ -34,6 +37,8 @@ export type SearchCriteria = {
 	bookId?: string;
 	author?: string;
 	sort?: SortKey;
+	// Stable shuffle seed for `sort: 'random'`, so pagination keeps one ordering.
+	seed?: number;
 	limit?: number;
 	offset?: number;
 };
@@ -50,6 +55,7 @@ function toParams(c: SearchCriteria): URLSearchParams {
 	if (c.bookId) p.set('book_id', c.bookId);
 	if (c.author) p.set('author', c.author);
 	if (c.sort) p.set('sort', c.sort);
+	if (c.seed != null) p.set('seed', String(c.seed));
 	if (c.limit != null) p.set('limit', String(c.limit));
 	if (c.offset != null) p.set('offset', String(c.offset));
 	return p;

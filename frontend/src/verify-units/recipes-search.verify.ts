@@ -26,6 +26,13 @@ const chips = [
 	{ name: 'baking', recipe_count: 14 }
 ];
 
+// Facets re-ranked around a selected "quick": the chosen keyword is gone (the
+// server drops selected keywords), so the component must pin it back on top.
+const cooccurring = [
+	{ name: 'weeknight', recipe_count: 7 },
+	{ name: 'one-pot', recipe_count: 4 }
+];
+
 const SEARCH = 'input[type="search"]';
 const CHIP = '.chip';
 
@@ -48,7 +55,7 @@ const unit: VerifiableUnit<Props> = {
 			props: {
 				status: 'results',
 				criteria: { q: 'dal', limit: 2, offset: 0 },
-				results: { total: 5, items: twoResults },
+				results: { total: 5, items: twoResults, facets: chips },
 				keywords: chips
 			}
 		},
@@ -58,7 +65,7 @@ const unit: VerifiableUnit<Props> = {
 			props: {
 				status: 'empty',
 				criteria: { q: 'zzzznope' },
-				results: { total: 0, items: [] },
+				results: { total: 0, items: [], facets: [] },
 				keywords: chips
 			}
 		},
@@ -68,9 +75,33 @@ const unit: VerifiableUnit<Props> = {
 			props: {
 				status: 'results',
 				criteria: { keywords: ['quick'] },
-				results: { total: 1, items: [recipe({ keywords: ['quick'] })] },
+				results: { total: 1, items: [recipe({ keywords: ['quick'] })], facets: chips },
 				keywords: chips
 			}
+		},
+		{
+			id: 'facet-narrowed',
+			description:
+				'a selected keyword absent from the facets is still pinned, pressed and deselectable',
+			props: {
+				status: 'results',
+				criteria: { keywords: ['quick'] },
+				results: { total: 1, items: [recipe({ keywords: ['quick'] })], facets: cooccurring },
+				// The facet list (re-ranked by the server) no longer contains the
+				// selected "quick" — the component must pin it on top.
+				keywords: cooccurring
+			}
+		},
+		{
+			id: 'clear-selection',
+			description: 'the clear button deselects every chosen keyword at once',
+			props: {
+				status: 'results',
+				criteria: { keywords: ['quick', 'baking'] },
+				results: { total: 1, items: [recipe({ keywords: ['quick'] })], facets: chips },
+				keywords: chips
+			},
+			act: ({ click }) => click('.clear-kw')
 		},
 		{
 			id: 'type-query',
@@ -99,7 +130,8 @@ const unit: VerifiableUnit<Props> = {
 							name: 'Slow-Roasted Pork Shoulder with Crème Fraîche, Pommes Purée, Sauce Gribiche & Far More Than Will Ever Fit On A Single Line — 你好',
 							keywords: ['pork', 'slow', 'french', 'roast', 'dinner', 'feast', 'sunday']
 						})
-					]
+					],
+					facets: chips
 				},
 				keywords: chips
 			}
@@ -108,13 +140,17 @@ const unit: VerifiableUnit<Props> = {
 			id: 'contract-lie',
 			description: 'sentinel: a deliberately-failing invariant proves the harness reports truthfully',
 			expectFail: true,
-			props: { status: 'results', results: { total: 1, items: [recipe()] }, keywords: chips }
+			props: {
+				status: 'results',
+				results: { total: 1, items: [recipe()], facets: [] },
+				keywords: chips
+			}
 		}
 	],
 	invariants: [
 		{
 			id: 'resting-empty',
-			description: 'the resting state is inactive, shows nothing, and prompts to search',
+			description: 'the resting state is inactive and shows no results',
 			onlyFixtures: ['resting'],
 			check: ({ contract, root }) => {
 				if (contract.status !== 'resting' || contract.resting !== 'true')
@@ -122,7 +158,7 @@ const unit: VerifiableUnit<Props> = {
 				if (contract.active !== 'false') return `active=${contract.active}`;
 				if (contract.shown !== '0' || contract.total !== '0')
 					return `shown=${contract.shown} total=${contract.total}`;
-				return (root.textContent ?? '').includes('Search your archive') || 'no resting prompt';
+				return root.querySelector('.rows') === null || 'resting should render no result rows';
 			}
 		},
 		{
@@ -163,6 +199,33 @@ const unit: VerifiableUnit<Props> = {
 					(c) => c.getAttribute('aria-pressed') === 'true'
 				);
 				return pressed?.textContent?.includes('quick') || 'no pressed chip for "quick"';
+			}
+		},
+		{
+			id: 'facet-pins-selected',
+			description: 'a selected keyword absent from the facets is pinned first and pressed',
+			onlyFixtures: ['facet-narrowed'],
+			check: ({ contract, root }) => {
+				if (contract.chips !== 'quick|weeknight|one-pot') return `chips=${contract.chips}`;
+				const all = [...root.querySelectorAll('.chip')];
+				const first = all[0];
+				if (first?.getAttribute('aria-pressed') !== 'true') return 'pinned chip not pressed';
+				if (!first?.textContent?.includes('quick')) return 'first chip is not "quick"';
+				const facetPressed = all.slice(1).some((c) => c.getAttribute('aria-pressed') === 'true');
+				return !facetPressed || 'a facet chip is pressed but should not be';
+			}
+		},
+		{
+			id: 'clears-selection',
+			description: 'clicking clear empties the selection and deactivates the keyword filter',
+			onlyFixtures: ['clear-selection'],
+			check: ({ contract, root }) => {
+				if (contract.keywords !== '') return `keywords=${contract.keywords}`;
+				const pressed = [...root.querySelectorAll('.chip')].some(
+					(c) => c.getAttribute('aria-pressed') === 'true'
+				);
+				if (pressed) return 'a chip is still pressed after clear';
+				return root.querySelector('.clear-kw') === null || 'clear button should disappear';
 			}
 		},
 		{

@@ -26,15 +26,26 @@ class RecipeSummary(BaseModel):
     keywords: list[str]
 
 
-class RecipeSearchResults(BaseModel):
-    """A page of search results plus the unpaged total (for the result count)."""
-
-    total: int
-    items: list[RecipeSummary]
-
-
 class KeywordSummary(BaseModel):
-    """A keyword and how many recipes carry it — drives the filter chips."""
+    """A keyword and how many recipes carry it — drives the filter chips.
+
+    On the global endpoint ``recipe_count`` is the keyword's total reach; in a
+    search's ``facets`` it's the count *within the current result set* — how
+    often the keyword co-occurs with the active criteria.
+    """
 
     name: str
     recipe_count: int
+
+
+class RecipeSearchResults(BaseModel):
+    """A page of search results, the unpaged total, and the co-occurrence facets.
+
+    ``facets`` are the keywords most common among the recipes matching the
+    current criteria (selected keywords excluded), so the chip list can re-rank
+    to what narrows the search further. Empty on the resting state.
+    """
+
+    total: int
+    items: list[RecipeSummary]
+    facets: list[KeywordSummary] = []

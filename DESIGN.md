@@ -193,7 +193,7 @@ so it can mount in isolation in the verification harness (§9). Routes do the fe
 | **Books library** | The collection: book-card grid with search + sort + author filter and a total count. |
 | **Book detail** | Cover plate + title + author + a metadata table (publisher, ISBN, pages, recipe count, added, last extraction run); a **recipe index** of the book's recipes; actions (Read book / Re-extract / Add to list). |
 | **Recipe detail** | The reading view (see masthead, §5): with an image it appears as a bordered figure with a mono caption; **without an image, the no-image treatment of §7 applies**. Ingredients; full numbered method; any cooking-guide table; provenance; add-to-list; prev/next; similar recipes. |
-| **Search / browse** | A prominent search field; a **semantic / natural-language search** affordance ("Describe what you fancy…"); filters (keywords, book, author, favourites); sort; a result count; results as text-first list rows; pagination. **The list is empty until a query is entered** — the resting state is a calm prompt to search, not a dump of every recipe. |
+| **Search / browse** | A prominent search field; a **semantic / natural-language search** affordance ("Describe what you fancy…"); filters (keywords, book, author, favourites); sort; a result count; results as text-first list rows; pagination. **The list is empty until a query is entered** — the resting state shows only the search controls, not a dump of every recipe. |
 | **Lists** | Collections, including a default **Favourites**; a grid of lists; create / rename / delete; opening a list shows its recipes as a filtered index. |
 
 Features the UI must accommodate: **Favourites** (a default list, toggled by the ★ on a recipe),
