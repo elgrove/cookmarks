@@ -663,3 +663,13 @@ Verify: `make check`, `make test` (55 backend incl. 2 new contract tests, 33 fro
 `make verify` matrix green. Live: with a `book_id` filter → 3 concurrent requests, search fires,
 `status="results"`, no console errors; resting `/recipes` → books/filters + keywords only, 101
 keyword chips, `status="resting"`.
+
+## 2026-06-02 — Keep the verify harness off every page's critical path
+
+A Chrome HAR of `/recipes` showed the API calls didn't start until ~224ms in — not network, but module loading. `onMount` couldn't fire until a cascade of ~80 modules resolved, including the **entire verify harness and every page's components** (`home-landing.verify.ts`, `BooksLibrary.svelte`, …) on the recipes page.
+
+**Root cause.** The root `+layout.svelte` installs `window.__verify` via a *static* import chain: `handle.ts` → `runner.ts` → `registry.ts` → `import.meta.glob('/src/**/*.verify.ts', { eager: true })` → every unit → every component. So loading any page eagerly loaded the whole harness. A prod build confirmed it wasn't dev-only: node 0 (the layout, on every page) statically imported a **37 KB chunk** of verify tooling — shipped to every visitor on first paint.
+
+**Fix.** Made `handle.ts` import `./runner` **dynamically**, inside the `manifest`/`runAll` closures, rather than at module top. The layout still installs `window.__verify` everywhere, but the registry (and its glob over all units + components) loads only when verification is actually invoked — or when a `/verify` route is visited, since those routes import the runner directly. `VerifyHandle.manifest` is now async (like `runAll` already was); nothing in the app or the matrix calls it — only a live agent does.
+
+**Verified.** Prod build: the 37 KB registry+units bundle is no longer statically reachable from the layout — it's reached only via a dynamic `import()` (code-split). Dev (Playwright, warm): the recipes page loads **0** verify/cross-page modules (was ~30+), and the first API call starts at **~116ms** instead of ~224ms. Harness still works: `window.__verify.runAll()` on a normal page dynamically loads and returns 37 PASS + the 5 `expectFail` sentinels; the `/verify` dashboard renders "42 fixtures · 37 pass · 5 fail". `make check`/`make test` (55 backend, 37 frontend)/`make verify` all green.
