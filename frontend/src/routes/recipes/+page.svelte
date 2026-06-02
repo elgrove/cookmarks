@@ -86,8 +86,8 @@
 			// Show the most-used keywords as quick filter chips; rarer keywords are
 			// still reachable by typing (search matches keyword names too). Once a
 			// search is active these give way to co-occurrence facets. The component
-			// clamps the rendered chips to a few lines, so hand over a generous pool.
-			globalKeywords = (await fetchKeywords()).slice(0, 50);
+			// clamps the rendered chips to a few lines, so 50 is a generous pool.
+			globalKeywords = await fetchKeywords(50);
 			keywords = globalKeywords;
 		} catch (err) {
 			console.error('failed to load keywords', err);

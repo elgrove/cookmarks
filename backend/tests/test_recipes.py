@@ -162,6 +162,13 @@ def test_keywords_endpoint(client: TestClient) -> None:
     ]
 
 
+def test_keywords_limit_caps_result(client: TestClient) -> None:
+    # The client only renders the most-used keywords; the limit keeps the endpoint
+    # from serialising the whole corpus. Ordered by count desc, name asc → Pasta.
+    body = client.get("/api/keywords", params={"limit": 1}).json()
+    assert body == [{"name": "Pasta", "recipe_count": 1}]
+
+
 # --- Recipe detail + prev/next navigation --------------------------------------
 
 

@@ -576,3 +576,22 @@ recipes** action: it opens the Recipes search pre-filtered to that book and sort
   filter + "Book order" selected, *1–30 of 136* in book sequence; the empty-book state shows only
   "Read book".
 
+## 2026-06-02 — Faster keyword chips on the Recipes page
+
+The keyword block lagged on a hard refresh. Two causes, on real data (~13.4k recipes, ~78k
+recipe-keyword links, **4,968** distinct keywords):
+
+- **No index for the group-by.** `/api/keywords` and the search facets group `recipe_keywords` by
+  `keyword_id`, but the only index was the `(recipe_id, keyword_id)` PK — useless for a `keyword_id`
+  group-by, so SQLite rebuilt a *transient* index on every call (`EXPLAIN`: "USING AUTOMATIC
+  COVERING INDEX"). Added a standing index `ix_recipe_keywords_keyword_id` (declared on the
+  association `Table`, so `create_all` gives the tests it too; migration `c4867b517317` for real
+  DBs). Aggregation dropped ~270ms → ~110ms.
+- **Shipping the whole corpus.** The endpoint returned all 4,968 keywords (~190KB) though the client
+  renders only the most-used ~50 (`.slice(0, 50)`), so it parsed ~5,000 Zod objects per load. Added
+  a `limit` (default 50, ≤500) to `GET /api/keywords`; `fetchKeywords(50)` requests it and drops the
+  client slice.
+
+End to end the endpoint went **~425ms → ~178ms** and the payload **~190KB → ~1.9KB** (50 rows);
+the top chips are unchanged (Main 4617, Vegetarian 3337, …). Tests: `?limit=1` returns the single
+top keyword; the existing exact-list assertion still holds (under the cap).

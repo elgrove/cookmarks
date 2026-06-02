@@ -154,12 +154,19 @@ def search_recipes(
 
 
 @router.get("/keywords", response_model=list[KeywordSummary])
-def list_keywords(session: SessionDep) -> list[KeywordSummary]:
+def list_keywords(
+    session: SessionDep,
+    limit: Annotated[int, Query(ge=1, le=500)] = 50,
+) -> list[KeywordSummary]:
+    # The client shows only the most-used keywords as resting-state chips, so cap
+    # the result — the corpus has thousands, and shipping them all is the bulk of
+    # this endpoint's cost (serialising every row) for keywords nobody renders.
     rows = session.execute(
         select(Keyword.name, func.count(recipe_keywords.c.recipe_id))
         .outerjoin(recipe_keywords, recipe_keywords.c.keyword_id == Keyword.id)
         .group_by(Keyword.id)
         .order_by(func.count(recipe_keywords.c.recipe_id).desc(), Keyword.name)
+        .limit(limit)
     ).all()
     return [KeywordSummary(name=name, recipe_count=count) for name, count in rows]
 

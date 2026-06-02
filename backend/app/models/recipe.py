@@ -16,7 +16,15 @@ recipe_keywords = Table(
     "recipe_keywords",
     Base.metadata,
     Column("recipe_id", ForeignKey("recipes.id", ondelete="CASCADE"), primary_key=True),
-    Column("keyword_id", ForeignKey("keywords.id", ondelete="CASCADE"), primary_key=True),
+    # Indexed independently of the (recipe_id, keyword_id) PK: the keyword facets and
+    # the /api/keywords global list group by keyword_id, which the PK (led by recipe_id)
+    # can't serve — without this SQLite rebuilds a transient index on every call.
+    Column(
+        "keyword_id",
+        ForeignKey("keywords.id", ondelete="CASCADE"),
+        primary_key=True,
+        index=True,
+    ),
 )
 
 

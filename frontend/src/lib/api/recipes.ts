@@ -145,9 +145,14 @@ export async function searchRecipes(
 	return recipeSearchResultsSchema.parse(await res.json());
 }
 
-/** Fetch the keyword filter chips (name + how many recipes carry it). */
-export async function fetchKeywords(fetchFn: typeof fetch = fetch): Promise<KeywordSummary[]> {
-	const res = await fetchFn('/api/keywords');
+/** Fetch the most-used keyword filter chips (name + how many recipes carry it).
+ *  `limit` caps the result server-side — the corpus has thousands and only the top
+ *  few are ever rendered. `fetchFn` is injectable for SSR/tests. */
+export async function fetchKeywords(
+	limit = 50,
+	fetchFn: typeof fetch = fetch
+): Promise<KeywordSummary[]> {
+	const res = await fetchFn(`/api/keywords?limit=${limit}`);
 	if (!res.ok) throw new Error(`GET /api/keywords → ${res.status}`);
 	return keywordsResponseSchema.parse(await res.json());
 }
