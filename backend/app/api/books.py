@@ -8,6 +8,7 @@ from sqlalchemy.orm import selectinload
 from app.config import settings
 from app.covers import cover_path, has_cover
 from app.db import SessionDep
+from app.epub import epub_path, has_epub
 from app.models.book import Book
 from app.models.recipe import Recipe
 from app.schemas.book import BookDetail, BookFilter, BookSummary
@@ -78,6 +79,7 @@ def get_book(book_id: uuid.UUID, session: SessionDep) -> BookDetail:
         description=book.description,
         recipe_count=total,
         has_cover=has_cover(book),
+        has_epub=has_epub(book),
         added=book.calibre_added_at,
         recipes=[
             RecipeRow(id=r.id, name=r.name, keywords=sorted(k.name for k in r.keywords))
@@ -97,3 +99,19 @@ def book_cover(book_id: uuid.UUID, session: SessionDep) -> FileResponse:
     if not cover.is_relative_to(library) or not cover.is_file():
         raise HTTPException(status_code=404, detail="cover not found")
     return FileResponse(cover, media_type="image/jpeg")
+
+
+@router.get("/books/{book_id}/epub")
+def book_epub(book_id: uuid.UUID, session: SessionDep) -> FileResponse:
+    book = session.get(Book, book_id)
+    if book is None:
+        raise HTTPException(status_code=404, detail="book not found")
+    epub = epub_path(book)
+    if epub is None:
+        raise HTTPException(status_code=404, detail="epub not found")
+    epub = epub.resolve()
+    library = settings.calibre_library_path.resolve()
+    # Same traversal guard as the cover endpoint, before streaming bytes off disk.
+    if not epub.is_relative_to(library) or not epub.is_file():
+        raise HTTPException(status_code=404, detail="epub not found")
+    return FileResponse(epub, media_type="application/epub+zip")

@@ -25,6 +25,7 @@
 				description: b.description,
 				recipeCount: b.recipe_count,
 				hasCover: b.has_cover,
+				hasEpub: b.has_epub,
 				added: b.added,
 				recipes: b.recipes
 			};

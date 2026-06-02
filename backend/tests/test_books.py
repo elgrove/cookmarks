@@ -1,6 +1,10 @@
 import uuid
+from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
+
+from app.config import settings
 
 EXPECTED_KEYS = {"id", "title", "author", "recipe_count", "has_cover", "pubdate"}
 DETAIL_KEYS = {
@@ -12,6 +16,7 @@ DETAIL_KEYS = {
     "description",
     "recipe_count",
     "has_cover",
+    "has_epub",
     "added",
     "recipes",
 }
@@ -88,3 +93,39 @@ def test_book_detail_empty_recipes(client: TestClient) -> None:
 
 def test_book_detail_404_for_unknown_book(client: TestClient) -> None:
     assert client.get(f"/api/books/{uuid.uuid4()}").status_code == 404
+
+
+@pytest.fixture
+def library_with_epub(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """A temp Calibre root holding an .epub for the seeded "With Recipes" book."""
+    book_dir = tmp_path / "Author One" / "With Recipes (1)"
+    book_dir.mkdir(parents=True)
+    (book_dir / "book.epub").write_bytes(b"PK\x03\x04 not a real epub, just bytes")
+    monkeypatch.setattr(settings, "calibre_library_path", tmp_path)
+    return tmp_path
+
+
+def test_has_epub_false_without_files(client: TestClient) -> None:
+    book_id = _book_id(client, "With Recipes")
+    assert client.get(f"/api/books/{book_id}").json()["has_epub"] is False
+
+
+def test_has_epub_true_when_present(client: TestClient, library_with_epub: Path) -> None:
+    book_id = _book_id(client, "With Recipes")
+    assert client.get(f"/api/books/{book_id}").json()["has_epub"] is True
+
+
+def test_epub_served_when_present(client: TestClient, library_with_epub: Path) -> None:
+    book_id = _book_id(client, "With Recipes")
+    resp = client.get(f"/api/books/{book_id}/epub")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/epub+zip"
+
+
+def test_epub_404_when_file_missing(client: TestClient) -> None:
+    book_id = _book_id(client, "With Recipes")
+    assert client.get(f"/api/books/{book_id}/epub").status_code == 404
+
+
+def test_epub_404_for_unknown_book(client: TestClient) -> None:
+    assert client.get(f"/api/books/{uuid.uuid4()}/epub").status_code == 404

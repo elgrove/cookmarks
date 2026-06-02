@@ -683,3 +683,59 @@ A Chrome HAR of `/recipes` showed the API calls didn't start until ~224ms in —
 **Invalidation.** Today only the import script (a separate process) and, later, the extraction task write keywords — so a running server's cache is never stale mid-life in the current scaffold. The extraction task will call `_clear_keyword_cache()` on write when it lands (in-process); if it ends up cross-process, the fallback is staleness-until-restart (consistent with how `_SEARCH_ORDER_CACHE` already behaves) or a TTL. Keyword "popularity" chips are approximate by nature, so this is tolerable — which is why the cache was chosen over denormalising a `recipe_count` column.
 
 **Verified.** New test pins the contract: a keyword added after the first call isn't reflected until `_clear_keyword_cache()`. Live on real data (192 books / 13.4k recipes / 4,968 keywords): first call **184ms** (computes top-500), subsequent calls **~1.5ms** (cache hit); top chips unchanged (Main 4617, Vegetarian 3337, Quick 2882), and `limit=5` is a true prefix of `limit=50`. `make check` (backend) + `pytest` (56 passed, +1) green.
+
+## 2026-06-02 — Read a book as an EPUB (in-app reader)
+
+A book can now be **read as an EPUB** in-app, from a new "Read epub" action on the book detail
+page. The EPUB files already sit on disk in the Calibre library (the same place covers come from),
+so this is mostly plumbing them to a browser renderer.
+
+**Decisions.** Renderer is **foliate-js** (the engine behind Foliate; MIT). It's not on npm and
+upstream's unstable, so it's **vendored as a pinned copy** under `frontend/src/lib/vendor/foliate-js/`
+(commit `78914ae`; `PROVENANCE.md` records source + the two deviations) rather than a submodule —
+this project develops in git worktrees, where submodules are awkward, and a committed copy needs no
+init step. The 11 MB `pdfjs` is omitted and `pdf.js` replaced with a stub: we read EPUB only, and
+`view.js` imports `pdf.js` solely for files that sniff as PDF. **Out of scope (deliberately):**
+reading-position/bookmark persistence (opens at the start each time) and recipe→EPUB-location
+deep-linking (no data for it yet).
+
+**Backend.** `app/epub.py` (`epub_path`/`has_epub`, mirroring `covers.py`) globs `*.epub` in the
+book's Calibre dir. `GET /api/books/{id}/epub` streams it (`application/epub+zip`) with the same
+path-traversal guard as the cover route. `has_epub` is added to `BookDetail` **only** — not the
+library list, which would stat the filesystem ~192×.
+
+**Frontend.** Split for verifiability: **`ReaderChrome.svelte`** is presentational (top bar ·
+progress · page nav · slide-in TOC drawer · font-size · theme toggle) with a `data-verify-*`
+contract and a full verify unit (`reader-chrome`, 8 fixtures incl. probe + sentinel). **`EpubReader.svelte`**
+is the effectful half: mounts `<foliate-view>` in `onMount`, fetches the EPUB as a named `File`
+(not a bare Blob — foliate's loader sniffs the filename), opens it, builds the TOC, wires prev/next
++ arrow keys, and tracks progress via the `relocate` event. New immersive route `/books/[id]/read`;
+the root layout's `showChrome` now also suppresses the global nav/footer on `/read` (alongside the
+existing `?chrome=0`).
+
+**Relaxed verifiability (per CLAUDE.md).** The effectful reader can't run in the jsdom matrix
+(iframe rendering, a third-party engine), so `ReaderChrome` carries the harness contract and
+`EpubReader` is verified live (below). `EpubReader` composes the verified chrome.
+
+**Theming.** The book's content lives in a cross-document iframe, so the app's CSS variables don't
+reach it — `EpubReader` injects concrete colours (DESIGN tokens) via `renderer.setStyles`, re-applied
+on theme/font-size change. Dark mode forces text colour + transparent backgrounds with `!important`,
+because the book's own stylesheet wins on specificity (without it, text stayed dark-on-dark).
+
+**Tooling.** Vendoring an untyped JS engine meant turning `checkJs` off in `frontend/tsconfig.json`
+(the project is TS/Svelte — it has no first-party JS to lose checking on) and excluding the vendor
+dir from the program; first-party types + a loader live in `src/lib/reader/foliate.ts`, so our own
+code stays fully typed.
+
+**Known limitation.** foliate-js requires a CSP blocking scripts to be safe against EPUBs with
+embedded JS; we don't set one yet. The library here is the user's own trusted, single-user
+self-hosted Calibre collection, so the risk is low — a CSP on the static/app responses is a sensible
+follow-up.
+
+**Verified.** `make check` (ruff + ty + svelte-check, 0 errors), `make test` (61 backend incl. epub
+endpoint + `has_epub` tests; 41 frontend), `make verify` matrix green (incl. `reader-chrome`),
+`make build` resolves the vendored dynamic-import graph (incl. the pdf stub). Live (Playwright on
+real data, "1,000 Indian Recipes"): book detail shows "Read epub"; the reader parses the EPUB (26
+sections, 22 TOC entries), renders the cover then reflowable two-column text, the TOC drawer lists
+all 22 entries with the current one in clay, light/dark themes both read well (dark text now forced
+legible), and the layout reflows to one column at 390px. No console errors.
