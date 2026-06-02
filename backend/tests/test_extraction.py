@@ -226,6 +226,33 @@ def test_stub_extract_unique_names_and_image_match() -> None:
     assert r1[0].name != r2[0].name
 
 
+def test_check_if_can_match_images_model_override(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An explicit model overrides the provider's IMAGE_MATCH default; omitting it
+    falls back to that default. This is what lets the eval pin one model end-to-end."""
+    provider = StubProvider(api_key="")
+    seen: list[str] = []
+    real = provider._complete
+
+    def spy(prompt: str, model: str, *, schema: dict | None = None, temp: float = 0) -> Any:
+        seen.append(model)
+        return real(prompt, model, schema=schema, temp=temp)
+
+    monkeypatch.setattr(provider, "_complete", spy)
+    provider.check_if_can_match_images("sample", model="custom-vision")
+    provider.check_if_can_match_images("sample")
+    assert seen == ["custom-vision", provider.model_for(ModelRole.IMAGE_MATCH)]
+
+
+def test_model_for_respects_per_role_overrides() -> None:
+    """A per-role override replaces only that role's model; the rest keep defaults."""
+    provider = StubProvider(api_key="", model_overrides={"one_recipe_per_file": "custom-model"})
+    assert provider.model_for(ModelRole.ONE_RECIPE_PER_FILE) == "custom-model"
+    assert provider.model_for(ModelRole.MANY_RECIPES_PER_FILE) == "stub-extract"
+
+    plain = StubProvider(api_key="")
+    assert plain.model_for(ModelRole.ONE_RECIPE_PER_FILE) == "stub-extract"
+
+
 # --------------------------------------------------------------------------- #
 # Nodes (DB-backed, mocked EPUB/provider)
 # --------------------------------------------------------------------------- #
@@ -279,6 +306,37 @@ def test_analyse_epub_block_path(
         assert run is not None
         assert run.extraction_method == ExtractionMethod.BLOCK
         assert run.images_can_be_matched is True
+
+
+def test_analyse_epub_respects_preset_image_match(
+    db: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A pre-set images_can_be_matched short-circuits the (fallible) model check: the
+    eval uses this to force the block path for a book the check misjudges."""
+    with db() as s:
+        book = _make_book(s)
+        run = _make_run(s, book)
+        run.images_can_be_matched = True  # forced
+        s.commit()
+        run_id, book_id = str(run.id), str(book.id)
+
+    monkeypatch.setattr(
+        graph, "get_chapterlike_files_from_epub", lambda _p: [f"c{i}.xhtml" for i in range(200)]
+    )
+    monkeypatch.setattr(graph, "has_separate_image_chapters", lambda _f: True)
+
+    def _should_not_run(*_a: object, **_k: object) -> str:
+        raise AssertionError("image-match check must be skipped when pre-set")
+
+    monkeypatch.setattr(graph, "get_sample_chapters_content", _should_not_run)
+
+    result = graph.analyse_epub({"report_id": run_id, "book_id": book_id, "epub_path": "/x/y.epub"})
+    assert result["extraction_type"] == "block"
+
+    with db() as s:
+        run = s.get(ExtractionRun, uuid.UUID(run_id))
+        assert run is not None
+        assert run.extraction_method == ExtractionMethod.BLOCK
 
 
 def test_resolve_images_sets_book_fields(

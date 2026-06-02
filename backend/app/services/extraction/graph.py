@@ -82,12 +82,19 @@ def analyse_epub(state: ExtractionState) -> dict:
         logger.info(f"Found {len(chapter_files)} chapters, images_in_separate={images_in_separate}")
 
         if images_in_separate:
-            sample_content = get_sample_chapters_content(epub_path, chapter_files)
-            provider = _require_provider(session)
-
-            images_can_be_matched, usage = provider.check_if_can_match_images(sample_content)
-            _apply_usage(run, usage)
-            run.images_can_be_matched = images_can_be_matched
+            if run.images_can_be_matched is not None:
+                # A pre-set decision (e.g. from the eval) overrides the model check,
+                # which can misjudge a book and force a wasteful fallback extraction.
+                images_can_be_matched = run.images_can_be_matched
+                logger.info(f"Using pre-set image-match decision: {images_can_be_matched}")
+            else:
+                sample_content = get_sample_chapters_content(epub_path, chapter_files)
+                provider = _require_provider(session)
+                images_can_be_matched, usage = provider.check_if_can_match_images(
+                    sample_content, model=run.model_name
+                )
+                _apply_usage(run, usage)
+                run.images_can_be_matched = images_can_be_matched
 
             extraction_type = "block" if images_can_be_matched else "file"
             logger.info(
@@ -111,6 +118,7 @@ def analyse_epub(state: ExtractionState) -> dict:
 def extract_file(state: ExtractionState) -> dict:
     with SessionLocal() as session:
         run = _load_run(session, state["report_id"])
+        run.extraction_method = ExtractionMethod.FILE
         epub_path = Path(state["epub_path"])
         chapter_files = state["chapter_files"]
 
@@ -184,6 +192,7 @@ def extract_file(state: ExtractionState) -> dict:
 def extract_block(state: ExtractionState) -> dict:
     with SessionLocal() as session:
         run = _load_run(session, state["report_id"])
+        run.extraction_method = ExtractionMethod.BLOCK
         epub_path = Path(state["epub_path"])
         chapter_files = state["chapter_files"]
 

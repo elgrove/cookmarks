@@ -82,8 +82,10 @@ class AIProvider(abc.ABC):
     models: ClassVar[dict[ModelRole, str]]
     requires_api_key: ClassVar[bool] = True
 
-    def __init__(self, api_key: str) -> None:
+    def __init__(self, api_key: str, model_overrides: dict[str, str] | None = None) -> None:
         self.api_key = api_key
+        # {ModelRole value: model name}; overrides the per-role default when present.
+        self._model_overrides = model_overrides or {}
 
     @abc.abstractmethod
     def _complete(
@@ -93,11 +95,14 @@ class AIProvider(abc.ABC):
         the provider may use to constrain output; `temp` is the sampling temperature."""
 
     def model_for(self, role: ModelRole) -> str:
-        return self.models[role]
+        return self._model_overrides.get(role.value) or self.models[role]
 
-    def check_if_can_match_images(self, sample_content: str) -> tuple[bool, Usage]:
+    def check_if_can_match_images(
+        self, sample_content: str, model: str | None = None
+    ) -> tuple[bool, Usage]:
+        model = model or self.model_for(ModelRole.IMAGE_MATCH)
         prompt = IMAGE_MATCH_CHECK_PROMPT.format(sample_content=sample_content)
-        response, usage = self._complete(prompt, self.model_for(ModelRole.IMAGE_MATCH), temp=0)
+        response, usage = self._complete(prompt, model, temp=0)
 
         if not response:
             logger.warning("Failed to check image matching, assuming no")

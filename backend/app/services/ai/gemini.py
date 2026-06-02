@@ -27,8 +27,8 @@ class GeminiProvider(AIProvider):
         ModelRole.BLOCKS_OF_FILES: "gemini-2.5-flash",
     }
 
-    def __init__(self, api_key: str) -> None:
-        super().__init__(api_key)
+    def __init__(self, api_key: str, model_overrides: dict[str, str] | None = None) -> None:
+        super().__init__(api_key, model_overrides)
         self.client = genai.Client(
             api_key=api_key,
             http_options={

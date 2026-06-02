@@ -17,6 +17,12 @@ _PROVIDERS: dict[str, type[AIProvider]] = {
 }
 
 
+def provider_requires_api_key(name: str) -> bool:
+    """Whether the named provider needs an API key (unknown providers assumed to)."""
+    provider_cls = _PROVIDERS.get(name)
+    return provider_cls.requires_api_key if provider_cls else True
+
+
 def get_config(session: Session) -> Config:
     """Return the singleton Config row (id=1), creating it if absent."""
     config = session.get(Config, 1)
@@ -43,4 +49,4 @@ def get_ai_provider(session: Session) -> AIProvider | None:
         logger.warning(f"AI provider {config.ai_provider} configured without an API key")
         return None
 
-    return provider_cls(config.api_key or "")
+    return provider_cls(config.api_key or "", config.model_overrides)
