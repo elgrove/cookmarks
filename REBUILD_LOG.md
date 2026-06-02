@@ -297,3 +297,56 @@ Merged the concurrent critical-review work (above) in: migrated the verify unit 
 (1280×800 + 390×844): real cover + count circle, random-10 reshuffling, empty state, §7
 no-cover plate, single-line tags, footer pinned on short pages, mobile reflow without
 horizontal scroll.
+
+## 2026-06-02 — Recipe extraction ported (LangGraph pipeline + AI providers)
+
+v1's proven extraction stack ported onto the v2 backend — faithful in behaviour, re-fitted
+to SQLAlchemy / Celery / typed-Python. Scope is the core extract-and-save flow; embeddings
+(search milestone), keyword dedup (maintenance), and the HTTP trigger/resume endpoints (API
+milestone) are deliberately out.
+
+- **Plumbing.** New runtime deps `langgraph` / `langgraph-checkpoint-sqlite` / `lxml` /
+  `google-genai`; `httpx` promoted dev→runtime (the OpenRouter client). New
+  `Config.extraction_rate_limit_per_minute` column (default 256; migration `bcc69efeffc5`,
+  `server_default='256'` backfills existing singleton rows) and `Settings.extraction_threads`
+  (16, v1's default). `epub_path(book)` helper beside `cover_path` in `app/covers.py`.
+- **Pure modules** under `app/services/`: `epub.py`, `rate_limiter.py`, `prompts.py`,
+  `recipe_schema.json`, `extraction/{state,utils}.py` — near drop-ins. `RecipeData` (Pydantic
+  v2: aliases + `capwords`/yields normalisation) at `app/schemas/extraction.py`.
+- **AI provider package** `app/services/ai/` — greenfield for "more providers later": adding
+  one is subclass + a `models` map + one `_complete`. `AIProvider` ABC with shared
+  `extract_recipes` / `check_if_can_match_images`; a `ModelRole` enum decouples model choice
+  from the stored file/block method; a typed frozen `Usage` (None-preserving `__add__`)
+  replaces v1's usage dicts. `GeminiProvider`, `OpenRouterProvider` (retry/backoff on httpx),
+  `StubProvider` (offline, keyless, content-varying recipe names so chapters don't collapse
+  on dedupe). `get_config` / `get_ai_provider(session)` registry keyed on each provider's
+  `name` — so the runtime ABC and the `AIProvider` *enum* never clash; a `requires_api_key`
+  gate lets STUB through keyless while a network provider without a key resolves to `None`.
+- **Graph** `app/services/extraction/graph.py` — the StateGraph ported verbatim in shape
+  (analyse → file|block → validate → [await_human] → resolve_images → finalise, keeping the
+  human-review `interrupt()` + SQLite checkpointer). v2 adaptations: each node opens its own
+  `SessionLocal()` (JSON list columns reassigned so SQLAlchemy detects the change); usage
+  accrues via `Usage.__add__`, cost rounded at the report boundary; `provider.model_for(...)`
+  instead of class constants; a cached lazy `get_extraction_graph()` replaces v1's import-time
+  `sqlite3.connect`, so importing the module touches no DB. Threading stays safe — the provider
+  is built once on the main thread; worker threads only do network+parse.
+- **Task layer** `app/tasks/extraction.py` — `extract_recipes_from_book(book_id, run_id?)` and
+  `resume_extraction(run_id, response)` (the `update_state(as_node="await_human")` + re-invoke
+  path), with thin `@celery_app.task` wrappers. `save_recipes_from_graph_state` reconciles by
+  normalised name within the book (update-in-place → stable recipe identity, so favourites/list
+  membership survive a re-run); a no-op `generate_recipe_embeddings` hook marks the search
+  milestone's seam. The deterministic `thread_id = run_<id>` needs no stored column.
+- **Tests** `tests/test_extraction.py` (23): routes; RecipeData/Usage/registry; DB-backed nodes
+  (mocked epub/provider, `SessionLocal` patched onto a tmp DB); save-reconcile (stable id across
+  re-extraction); graph compilation; and a full **end-to-end** on the Stub provider that drives a
+  real compiled graph through the zero-images review pause and a `no_images` resume to two saved
+  recipes — exercising checkpointer + interrupt + resume on one tmp SQLite file.
+
+Decisions: keep LangGraph as-is (extraction is the one proven area carried over unchanged); httpx
+over requests for v2 alignment; rate limit on `Config` (user-tunable), threads on `Settings`. Two
+minor calls: the dedup prompt's non-breaking hyphen kept verbatim (a deliberate variant example —
+`RUF001` ignored for that file), and lxml's compiled `etree` import suppressed for `ty`, both as
+v1 did.
+
+Green: backend `ruff` + `ty` clean, `pytest` **40 passed** (17 prior + 23 new). Frontend untouched
+(its `make check` / `make test` need `npm install` in the worktree).

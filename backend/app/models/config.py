@@ -17,3 +17,5 @@ class Config(Base):
         Enum(AIProvider, values_callable=enum_values)
     )
     api_key: Mapped[str | None] = mapped_column(String(200))
+    # Shared per-minute request budget for extraction across all worker threads.
+    extraction_rate_limit_per_minute: Mapped[int] = mapped_column(default=256)

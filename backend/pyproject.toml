@@ -12,12 +12,16 @@ dependencies = [
     "pydantic>=2.10",
     "pydantic-settings>=2.6",
     "sqlite-vec>=0.1.6",
+    "httpx>=0.28",
+    "langgraph>=0.3.0",
+    "langgraph-checkpoint-sqlite>=3.0.1",
+    "lxml>=6.0.2",
+    "google-genai>=1.3.0",
 ]
 
 [dependency-groups]
 dev = [
     "pytest>=8.3",
-    "httpx>=0.28",
     "ruff>=0.8",
     "ty>=0.0.1a1",
 ]
@@ -33,6 +37,11 @@ ignore = ["E501"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["app"]
+
+[tool.ruff.lint.per-file-ignores]
+# The deduplication prompt deliberately includes a non-breaking hyphen as an
+# example of a keyword variant to be normalised; keep the proven prompt verbatim.
+"app/services/prompts.py" = ["RUF001"]
 
 [tool.ty.environment]
 python-version = "3.11"
