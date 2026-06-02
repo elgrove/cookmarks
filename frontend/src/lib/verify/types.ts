@@ -97,7 +97,9 @@ export interface ManifestEntry {
 }
 
 export interface VerifyHandle {
-	manifest: () => ManifestEntry[];
+	// async: the manifest is built from the lazily-imported runner/registry, so the
+	// verify harness stays off the critical path of normal pages (see handle.ts).
+	manifest: () => Promise<ManifestEntry[]>;
 	current: () => VerifyResult | null;
 	runAll: () => Promise<VerifyResult[]>;
 	version: string;
