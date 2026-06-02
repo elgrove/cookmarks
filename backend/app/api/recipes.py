@@ -153,22 +153,41 @@ def search_recipes(
     return RecipeSearchResults(total=total, items=items, facets=facets)
 
 
+# The global most-used keywords are identical for every caller until the corpus
+# changes (only the import script and, later, the extraction task write keywords),
+# so compute them once per process and serve from memory: the grouped count over
+# ~5k keywords against ~78k links is otherwise this endpoint's whole cost (~170ms).
+# Cache the top _CAP and slice per request — the ordering is fixed, so any limit up
+# to _CAP is a prefix of it. Module-global, so the test suite clears it (conftest)
+# the way it does the search-order cache; the extraction task clears it on write.
+_KEYWORD_CACHE_CAP = 500
+_top_keywords: list[KeywordSummary] | None = None
+
+
+def _clear_keyword_cache() -> None:
+    global _top_keywords
+    _top_keywords = None
+
+
 @router.get("/keywords", response_model=list[KeywordSummary])
 def list_keywords(
     session: SessionDep,
-    limit: Annotated[int, Query(ge=1, le=500)] = 50,
+    limit: Annotated[int, Query(ge=1, le=_KEYWORD_CACHE_CAP)] = 50,
 ) -> list[KeywordSummary]:
-    # The client shows only the most-used keywords as resting-state chips, so cap
-    # the result — the corpus has thousands, and shipping them all is the bulk of
-    # this endpoint's cost (serialising every row) for keywords nobody renders.
-    rows = session.execute(
-        select(Keyword.name, func.count(recipe_keywords.c.recipe_id))
-        .outerjoin(recipe_keywords, recipe_keywords.c.keyword_id == Keyword.id)
-        .group_by(Keyword.id)
-        .order_by(func.count(recipe_keywords.c.recipe_id).desc(), Keyword.name)
-        .limit(limit)
-    ).all()
-    return [KeywordSummary(name=name, recipe_count=count) for name, count in rows]
+    # Resting-state filter chips: the client renders only the most-used few. Served
+    # from the per-process cache; `limit` is a prefix of the cached top-_CAP since
+    # the ordering is fixed (count desc, then name).
+    global _top_keywords
+    if _top_keywords is None:
+        rows = session.execute(
+            select(Keyword.name, func.count(recipe_keywords.c.recipe_id))
+            .outerjoin(recipe_keywords, recipe_keywords.c.keyword_id == Keyword.id)
+            .group_by(Keyword.id)
+            .order_by(func.count(recipe_keywords.c.recipe_id).desc(), Keyword.name)
+            .limit(_KEYWORD_CACHE_CAP)
+        ).all()
+        _top_keywords = [KeywordSummary(name=name, recipe_count=count) for name, count in rows]
+    return _top_keywords[:limit]
 
 
 def _book_neighbours(

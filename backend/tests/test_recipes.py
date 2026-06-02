@@ -1,6 +1,10 @@
 import uuid
 
 from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
+
+from app.api.recipes import _clear_keyword_cache
+from app.models import Keyword
 
 RECIPE_KEYS = {
     "id",
@@ -167,6 +171,18 @@ def test_keywords_limit_caps_result(client: TestClient) -> None:
     # from serialising the whole corpus. Ordered by count desc, name asc → Pasta.
     body = client.get("/api/keywords", params={"limit": 1}).json()
     assert body == [{"name": "Pasta", "recipe_count": 1}]
+
+
+def test_keywords_endpoint_is_cached_until_cleared(client: TestClient, session: Session) -> None:
+    # Computed once per process, then served from memory.
+    assert [k["name"] for k in client.get("/api/keywords").json()] == ["Pasta", "Quick"]
+    # A keyword added afterwards isn't reflected — the cached top-N is served as-is.
+    session.add(Keyword(name="Zzz"))
+    session.commit()
+    assert [k["name"] for k in client.get("/api/keywords").json()] == ["Pasta", "Quick"]
+    # Clearing the cache (as the extraction task will on write) picks it up.
+    _clear_keyword_cache()
+    assert "Zzz" in [k["name"] for k in client.get("/api/keywords").json()]
 
 
 # --- Recipe detail + prev/next navigation --------------------------------------

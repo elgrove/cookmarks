@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.api.recipes import _clear_search_order_cache
+from app.api.recipes import _clear_keyword_cache, _clear_search_order_cache
 from app.db import get_session
 from app.main import app
 from app.models import Base, Book, Keyword, Recipe
@@ -17,11 +17,13 @@ from app.models import Base, Book, Keyword, Recipe
 
 @pytest.fixture(autouse=True)
 def _reset_caches() -> Iterator[None]:
-    # The search-order cache is module-global; clear it so each test's fresh DB
-    # (with fresh recipe ids) never reads a previous test's cached ordering.
+    # These caches are module-global; clear them so each test's fresh DB (with fresh
+    # recipe ids / its own keyword set) never reads a previous test's cached values.
     _clear_search_order_cache()
+    _clear_keyword_cache()
     yield
     _clear_search_order_cache()
+    _clear_keyword_cache()
 
 
 def _seed(session: Session) -> None:
