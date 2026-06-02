@@ -94,6 +94,14 @@ def test_sort_name(client: TestClient) -> None:
     assert [r["name"] for r in items] == ["Recipe 0", "Recipe 1", "Recipe 2"]
 
 
+def test_sort_book_follows_stored_order(client: TestClient) -> None:
+    # Book order is the recipe's stored sequence within its book — what the
+    # book-detail "Browse recipes" action lands on.
+    book_id = _book_id(client, "With Recipes")
+    items = client.get("/api/recipes", params={"book_id": book_id, "sort": "book"}).json()["items"]
+    assert [r["name"] for r in items] == ["Recipe 0", "Recipe 1", "Recipe 2"]
+
+
 def test_default_sort_is_random(client: TestClient) -> None:
     # The default returns the full set; order is the shuffle, so assert membership.
     body = client.get("/api/recipes", params={"q": "recipe"}).json()

@@ -20,7 +20,7 @@ from app.schemas.recipe import (
 
 router = APIRouter(tags=["recipes"])
 
-Sort = Literal["random", "name", "recent"]
+Sort = Literal["random", "name", "recent", "book"]
 
 # How many co-occurrence facets to return. The client renders these (plus any
 # pinned selected chips) and clamps the block to a few lines by measurement, so
@@ -39,18 +39,22 @@ _SHUFFLE_HASH = 2654435761
 SUPPORTED_CONTEXTS = {"book", "search"}
 
 
-def _search_order(sort: Sort, seed: int):
-    """The ORDER BY for a search, shared by the result page and prev/next so a
-    recipe's neighbours match exactly what the search showed."""
+def _search_order(sort: Sort, seed: int) -> list:
+    """The ORDER BY clauses for a search, shared by the result page and prev/next
+    so a recipe's neighbours match exactly what the search showed."""
     if sort == "name":
-        return func.lower(Recipe.name).asc()
+        return [func.lower(Recipe.name).asc()]
     if sort == "recent":
-        return Recipe.created_at.desc()
+        return [Recipe.created_at.desc()]
+    if sort == "book":
+        # The book's own sequence. Filtered to one book this is exactly its stored
+        # order; across books (unfiltered) it groups by book, title-ordered.
+        return [Book.title.asc(), Recipe.order.asc()]
     # Seeded shuffle: a fixed permutation of the rows for a given seed, so the
     # ordering is stable across pagination but varies between searches. The
     # multiplier is coprime to the prime modulus, making it a bijection.
     multiplier = 1 + (seed * _SHUFFLE_HASH) % (_SHUFFLE_MODULUS - 1)
-    return ((literal_column("recipes.rowid") * multiplier) % _SHUFFLE_MODULUS).asc()
+    return [((literal_column("recipes.rowid") * multiplier) % _SHUFFLE_MODULUS).asc()]
 
 
 def _search_conditions(
@@ -108,7 +112,7 @@ def search_recipes(
         select(Recipe, Book)
         .join(Book, Recipe.book_id == Book.id)
         .where(*conditions)
-        .order_by(_search_order(sort, seed), Recipe.id)
+        .order_by(*_search_order(sort, seed), Recipe.id)
         .offset(offset)
         .limit(limit)
         .options(selectinload(Recipe.keywords))
@@ -222,7 +226,7 @@ def _ordered_search_ids(
             select(Recipe.id)
             .join(Book, Recipe.book_id == Book.id)
             .where(*conditions)
-            .order_by(_search_order(sort, seed), Recipe.id)
+            .order_by(*_search_order(sort, seed), Recipe.id)
         ).all()
     )
     _SEARCH_ORDER_CACHE[key] = ids

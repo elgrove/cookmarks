@@ -31,7 +31,8 @@
 	const sortOptions: { key: SortKey; label: string }[] = [
 		{ key: 'random', label: 'Random' },
 		{ key: 'name', label: 'Name A–Z' },
-		{ key: 'recent', label: 'Recently added' }
+		{ key: 'recent', label: 'Recently added' },
+		{ key: 'book', label: 'Book order' }
 	];
 
 	// The component owns the live criteria so it stays interactive in isolation

@@ -192,6 +192,23 @@ const unit: VerifiableUnit<Props> = {
 				root.querySelector('.subtitle') === null || 'subtitle rendered for a plain title'
 		},
 		{
+			id: 'browse-link',
+			description: 'an extracted book links to its recipes, book-filtered and in book order',
+			onlyFixtures: ['populated', 'no-cover', 'no-subtitle', 'long-title'],
+			check: ({ root, props }) => {
+				const href = root.querySelector('a.browse')?.getAttribute('href');
+				const want = `/recipes?book_id=${props.book.id}&sort=book`;
+				return href === want || `browse href=${href} expected ${want}`;
+			}
+		},
+		{
+			id: 'browse-hidden-when-empty',
+			description: 'a zero-recipe book offers no browse link',
+			onlyFixtures: ['no-recipes'],
+			check: ({ root }) =>
+				root.querySelector('a.browse') === null || 'browse link shown for an empty book'
+		},
+		{
 			id: 'intentional-fail',
 			description: 'always fails — the truthfulness sentinel (expectFail)',
 			onlyFixtures: ['contract-lie'],

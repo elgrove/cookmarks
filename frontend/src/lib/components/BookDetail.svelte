@@ -137,12 +137,11 @@
 
 			<div class="actions">
 				<button class="btn primary" type="button">Read book <span class="ar" aria-hidden="true">›</span></button>
-				<button class="btn ghost" type="button">
-					Action
-					<svg class="ico" viewBox="0 0 14 14" aria-hidden="true" focusable="false">
-						<path d="M7 1.5v11M1.5 7h11" stroke="currentColor" stroke-width="1.4" fill="none" />
-					</svg>
-				</button>
+				{#if book.recipeCount > 0}
+					<a class="btn ghost browse" href={`/recipes?book_id=${book.id}&sort=book`}>
+						Browse recipes <span class="ar" aria-hidden="true">›</span>
+					</a>
+				{/if}
 			</div>
 
 			<dl class="meta">
@@ -410,6 +409,7 @@
 		padding: 0.7rem 1rem;
 		border-radius: 3px;
 		text-align: center;
+		text-decoration: none;
 		cursor: pointer;
 		border: 1px solid transparent;
 		display: flex;
@@ -419,6 +419,9 @@
 			background 0.18s var(--ease-out),
 			border-color 0.18s var(--ease-out),
 			color 0.18s var(--ease-out);
+	}
+	.btn .ar {
+		font-weight: 400;
 	}
 	.btn.primary {
 		background: var(--ink);
@@ -439,10 +442,6 @@
 	.btn.ghost:hover {
 		border-color: var(--clay);
 		color: var(--clay-deep);
-	}
-	.ico {
-		width: 0.85rem;
-		height: 0.85rem;
 	}
 
 	dl.meta {

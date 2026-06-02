@@ -71,7 +71,7 @@ export type RecipeSummary = z.infer<typeof recipeSummarySchema>;
 export type RecipeSearchResults = z.infer<typeof recipeSearchResultsSchema>;
 export type KeywordSummary = z.infer<typeof keywordSummarySchema>;
 
-export type SortKey = 'random' | 'name' | 'recent';
+export type SortKey = 'random' | 'name' | 'recent' | 'book';
 
 export type SearchCriteria = {
 	q?: string;
@@ -127,7 +127,7 @@ export function criteriaFromParams(p: URLSearchParams): SearchCriteria {
 	const author = p.get('author');
 	if (author) c.author = author;
 	const sort = p.get('sort');
-	if (sort === 'name' || sort === 'recent' || sort === 'random') c.sort = sort;
+	if (sort === 'name' || sort === 'recent' || sort === 'random' || sort === 'book') c.sort = sort;
 	const seed = p.get('seed');
 	if (seed) c.seed = Number(seed);
 	const offset = p.get('offset');

@@ -555,3 +555,24 @@ Navigation felt laggy next to v1's HTMX. Two causes, both fixed:
 Result (Playwright, real data): arrow-key nav through a *chicken* search is **~30ms/step with no
 loading flash** (was ~300ms + a teardown/rebuild); book-order nav (already ~5ms) also loses the
 flash.
+
+## 2026-06-02 — "Browse recipes" from a book → book-ordered search
+
+The book-detail sidebar's second action was a placeholder ("Action"). Made it the real **Browse
+recipes** action: it opens the Recipes search pre-filtered to that book and sorted in book order.
+
+- **Backend:** added a `book` sort to `GET /api/recipes` (and the shared `_search_order`, so
+  prev/next would follow it too). Filtered to one book it's the recipe's stored `order`; unfiltered
+  it groups by book (`Book.title`, then `order`). `_search_order` now returns a list of ORDER BY
+  clauses (splatted at both call sites) so the book case can carry the title + sequence pair. Test:
+  book-filtered `sort=book` returns the recipes in stored order.
+- **Frontend:** `SortKey` and `criteriaFromParams` gained `'book'`; the sort `<select>` gained a
+  "Book order" option. The book-detail action is now an `<a class="btn ghost browse">` →
+  `/recipes?book_id={id}&sort=book` (a real link, not a button, so it routes/middle-clicks), shown
+  only when the book has recipes. The old placeholder's `.ico` style and unused SVG are gone.
+- **Verify:** `browse-link` asserts the href is `/recipes?book_id={id}&sort=book` on populated
+  fixtures; `browse-hidden-when-empty` asserts the zero-recipe book offers no link. Playwright on
+  real data: *West Winds* (136 recipes) → **Browse recipes** lands on `/recipes` with the book
+  filter + "Book order" selected, *1–30 of 136* in book sequence; the empty-book state shows only
+  "Read book".
+
