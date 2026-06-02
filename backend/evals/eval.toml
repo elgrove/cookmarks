@@ -46,8 +46,10 @@ fuzzy_threshold = 85
 
 [weights]
 # Per-recipe composite weights, renormalised over the fields actually present.
-name = 0.20
+# Yield is lightly weighted: it's a soft, heavily-formatted field that smaller models
+# often render tersely ('2' vs 'Serves 2') without that being a real quality miss.
+name = 0.25
 ingredients = 0.30
 instructions = 0.30
-yields = 0.15
-image = 0.05
+yields = 0.05
+image = 0.10
