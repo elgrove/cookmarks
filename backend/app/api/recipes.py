@@ -33,9 +33,23 @@ FACET_LIMIT = 50
 _SHUFFLE_MODULUS = 2147483647
 _SHUFFLE_HASH = 2654435761
 
-# Navigation orderings the recipe page can be reached through. Only "book" is wired
-# today; "search" / "list" arrive with those pages, so unknown contexts resolve to book.
-SUPPORTED_CONTEXTS = {"book"}
+# Navigation orderings the recipe page can be reached through; "list" arrives with
+# that page, so unknown contexts resolve to book.
+SUPPORTED_CONTEXTS = {"book", "search"}
+
+
+def _search_order(sort: Sort, seed: int):
+    """The ORDER BY for a search, shared by the result page and prev/next so a
+    recipe's neighbours match exactly what the search showed."""
+    if sort == "name":
+        return func.lower(Recipe.name).asc()
+    if sort == "recent":
+        return Recipe.created_at.desc()
+    # Seeded shuffle: a fixed permutation of the rows for a given seed, so the
+    # ordering is stable across pagination but varies between searches. The
+    # multiplier is coprime to the prime modulus, making it a bijection.
+    multiplier = 1 + (seed * _SHUFFLE_HASH) % (_SHUFFLE_MODULUS - 1)
+    return ((literal_column("recipes.rowid") * multiplier) % _SHUFFLE_MODULUS).asc()
 
 
 def _search_conditions(
@@ -89,22 +103,11 @@ def search_recipes(
     filtered = select(Recipe.id).join(Book, Recipe.book_id == Book.id).where(*conditions)
     total = session.scalar(select(func.count()).select_from(filtered.subquery())) or 0
 
-    if sort == "name":
-        order = func.lower(Recipe.name).asc()
-    elif sort == "recent":
-        order = Recipe.created_at.desc()
-    else:
-        # Seeded shuffle: a fixed permutation of the rows for a given seed, so the
-        # ordering is stable across pagination but varies between searches. The
-        # multiplier is coprime to the prime modulus, making it a bijection.
-        multiplier = 1 + (seed * _SHUFFLE_HASH) % (_SHUFFLE_MODULUS - 1)
-        order = ((literal_column("recipes.rowid") * multiplier) % _SHUFFLE_MODULUS).asc()
-
     rows = session.execute(
         select(Recipe, Book)
         .join(Book, Recipe.book_id == Book.id)
         .where(*conditions)
-        .order_by(order, Recipe.id)
+        .order_by(_search_order(sort, seed), Recipe.id)
         .offset(offset)
         .limit(limit)
         .options(selectinload(Recipe.keywords))
@@ -178,8 +181,57 @@ def _book_neighbours(
     )
 
 
+def _neighbour(session: Session, recipe_id: uuid.UUID | None) -> RecipeNeighbour | None:
+    if recipe_id is None:
+        return None
+    row = session.execute(select(Recipe.id, Recipe.name).where(Recipe.id == recipe_id)).first()
+    return RecipeNeighbour(id=row.id, name=row.name) if row else None
+
+
+def _search_neighbours(
+    session: Session,
+    recipe: Recipe,
+    q: str,
+    keywords: list[str],
+    book_id: uuid.UUID | None,
+    author: str | None,
+    sort: Sort,
+    seed: int,
+) -> tuple[RecipeNeighbour | None, RecipeNeighbour | None]:
+    """Previous/next in the *search* ordering. The result set can be large but a
+    single-user archive stays well within reach: fetch the ordered ids (the same
+    filter + sort + seed the search used) and index this recipe to find its
+    neighbours. Returns (None, None) if the recipe isn't in the result set."""
+    conditions = _search_conditions(q, keywords, book_id, author)
+    ids = list(
+        session.scalars(
+            select(Recipe.id)
+            .join(Book, Recipe.book_id == Book.id)
+            .where(*conditions)
+            .order_by(_search_order(sort, seed), Recipe.id)
+        ).all()
+    )
+    try:
+        idx = ids.index(recipe.id)
+    except ValueError:
+        return None, None
+    prev_id = ids[idx - 1] if idx > 0 else None
+    next_id = ids[idx + 1] if idx + 1 < len(ids) else None
+    return _neighbour(session, prev_id), _neighbour(session, next_id)
+
+
 @router.get("/recipes/{recipe_id}", response_model=RecipeDetail)
-def get_recipe(recipe_id: uuid.UUID, session: SessionDep, context: str = "book") -> RecipeDetail:
+def get_recipe(
+    recipe_id: uuid.UUID,
+    session: SessionDep,
+    context: str = "book",
+    q: Annotated[str, Query()] = "",
+    keyword: Annotated[list[str] | None, Query()] = None,
+    book_id: uuid.UUID | None = None,
+    author: Annotated[str | None, Query()] = None,
+    sort: Sort = "random",
+    seed: Annotated[int, Query(ge=0)] = 0,
+) -> RecipeDetail:
     recipe = session.scalar(
         select(Recipe)
         .where(Recipe.id == recipe_id)
@@ -189,7 +241,12 @@ def get_recipe(recipe_id: uuid.UUID, session: SessionDep, context: str = "book")
         raise HTTPException(status_code=404, detail="recipe not found")
     book = recipe.book
     resolved_context = context if context in SUPPORTED_CONTEXTS else "book"
-    previous, next_ = _book_neighbours(session, recipe)
+    if resolved_context == "search":
+        previous, next_ = _search_neighbours(
+            session, recipe, q.strip(), keyword or [], book_id, author, sort, seed
+        )
+    else:
+        previous, next_ = _book_neighbours(session, recipe)
     return RecipeDetail(
         id=recipe.id,
         book_id=book.id,

@@ -510,3 +510,27 @@ opening a recipe and pressing **back** reset the search to empty. Fix: make the 
 
 Still book-order only on recipe detail: search-order prev/next + a "back to search" breadcrumb (the
 `context=search` branch) is the remaining follow-up.
+
+## 2026-06-02 — Recipe prev/next follows search order (context=search)
+
+Wired the `context=search` branch promised above: a recipe opened from the Recipes search now pages
+through the **search result order** (filters + sort + seed), not its book order, and the breadcrumb
+links back to that search.
+
+- **Backend:** `GET /api/recipes/{id}` also accepts the search params (`q`, `keyword[]`, `book_id`,
+  `author`, `sort`, `seed`); for `context=search` it re-runs the same filtered + ordered query
+  (shared `_search_order` helper, so the order matches the result page exactly), indexes the recipe
+  and returns its neighbours — `None` at the ends or if it isn't in the set. `search` joins
+  `SUPPORTED_CONTEXTS`; unknown contexts (e.g. `list`) still fall back to book. Tests cover
+  search-order neighbours and that filters shrink the set (Recipe 0 alone under a Pasta filter → no
+  neighbours, vs a next in book order).
+- **Frontend:** search rows carry the criteria into their link (`searchContextQuery` →
+  `/recipes/{id}?context=search&q=…&sort=…&seed=…`); the detail route forwards the whole query
+  string to the API, derives the `contextQuery` the pager and ←/→ carry forward, and a `searchHref`
+  back to the search. The breadcrumb is **context-aware**: `Recipes › Search results › {name}` (the
+  "Search results" crumb links to the originating search) for search, the `Books › Author › Book`
+  trail otherwise. `fetchRecipeDetail` takes the raw context query string.
+- **Verify:** a `search-context` fixture + a `search-breadcrumb` invariant; `prev-link`/`next-link`
+  now assert the pager href carries the full `contextQuery`. Playwright on real data: searching
+  *chicken* by name, opening result #3, the pager's prev/next are results #2 and #4 (search order,
+  ≠ book order), the breadcrumb links back to the search, and **→** advances to #4 keeping context.

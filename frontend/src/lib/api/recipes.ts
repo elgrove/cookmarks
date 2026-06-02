@@ -27,14 +27,17 @@ export const recipeDetailSchema = z.object({
 
 export type RecipeDetailResponse = z.infer<typeof recipeDetailSchema>;
 
-/** Fetch and validate a single recipe's detail. `context` selects the prev/next
- *  ordering (defaults to book order). `fetchFn` is injectable for SSR/tests. */
+/** Fetch and validate a single recipe's detail. `contextParams` is the raw query
+ *  string selecting the prev/next ordering (e.g. `context=book`, or
+ *  `context=search&q=…&sort=…&seed=…`); empty defaults to book order on the
+ *  backend. `fetchFn` is injectable for SSR/tests. */
 export async function fetchRecipeDetail(
 	id: string,
 	fetchFn: typeof fetch = fetch,
-	context = 'book'
+	contextParams = ''
 ): Promise<RecipeDetailResponse> {
-	const res = await fetchFn(`/api/recipes/${id}?context=${encodeURIComponent(context)}`);
+	const qs = contextParams ? `?${contextParams}` : '';
+	const res = await fetchFn(`/api/recipes/${id}${qs}`);
 	if (!res.ok) throw new Error(`GET /api/recipes/${id} → ${res.status}`);
 	return recipeDetailSchema.parse(await res.json());
 }
@@ -98,6 +101,17 @@ export function criteriaToParams(c: SearchCriteria): URLSearchParams {
 	if (c.limit != null) p.set('limit', String(c.limit));
 	if (c.offset != null) p.set('offset', String(c.offset));
 	return p;
+}
+
+/** The query string that carries a search context into a recipe link, so the
+ *  recipe's prev/next follow the search ordering (filters + sort + seed). Page
+ *  size and offset are dropped — neighbours span the whole result set. */
+export function searchContextQuery(c: SearchCriteria): string {
+	const p = criteriaToParams(c);
+	p.delete('limit');
+	p.delete('offset');
+	p.set('context', 'search');
+	return p.toString();
 }
 
 /** Parse search criteria back out of URL query params — the inverse of

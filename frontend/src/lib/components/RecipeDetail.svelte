@@ -12,8 +12,12 @@
 		yields: string | null;
 		keywords: string[];
 		hasImage: boolean;
-		/** The navigation ordering this page was reached through (e.g. 'book'). */
+		/** The navigation ordering this page was reached through ('book' | 'search'). */
 		context: string;
+		/** The query string carried into prev/next links so they keep this ordering. */
+		contextQuery: string;
+		/** For a search context, the URL back to the originating search (else null). */
+		searchHref: string | null;
 		/** Adjacent recipes in `context` order, for the prev/next pager (null at the ends). */
 		previous: { id: string; name: string } | null;
 		next: { id: string; name: string } | null;
@@ -58,11 +62,17 @@
 >
 	<div class="topbar">
 		<nav class="crumb" aria-label="Breadcrumb">
-			<a href="/books">Books</a><span class="sep">›</span><a
-				href={`/books?author=${encodeURIComponent(recipe.bookAuthor)}`}>{recipe.bookAuthor}</a
-			><span class="sep">›</span><a href={`/books/${recipe.bookId}`}>{bookTitle}</a><span
-				class="sep">›</span
-			><span class="here">{recipe.name}</span>
+			{#if recipe.context === 'search' && recipe.searchHref}
+				<a href="/recipes">Recipes</a><span class="sep">›</span><a href={recipe.searchHref}
+					>Search results</a
+				><span class="sep">›</span><span class="here">{recipe.name}</span>
+			{:else}
+				<a href="/books">Books</a><span class="sep">›</span><a
+					href={`/books?author=${encodeURIComponent(recipe.bookAuthor)}`}>{recipe.bookAuthor}</a
+				><span class="sep">›</span><a href={`/books/${recipe.bookId}`}>{bookTitle}</a><span
+					class="sep">›</span
+				><span class="here">{recipe.name}</span>
+			{/if}
 		</nav>
 
 		{#if recipe.previous || recipe.next}
@@ -70,7 +80,7 @@
 				{#if recipe.previous}
 					<a
 						class="pg prev"
-						href={`/recipes/${recipe.previous.id}?context=${recipe.context}`}
+						href={`/recipes/${recipe.previous.id}?${recipe.contextQuery}`}
 						title={recipe.previous.name}
 						aria-label={`Previous recipe: ${recipe.previous.name}`}
 					>
@@ -80,7 +90,7 @@
 				{#if recipe.next}
 					<a
 						class="pg next"
-						href={`/recipes/${recipe.next.id}?context=${recipe.context}`}
+						href={`/recipes/${recipe.next.id}?${recipe.contextQuery}`}
 						title={recipe.next.name}
 						aria-label={`Next recipe: ${recipe.next.name}`}
 					>

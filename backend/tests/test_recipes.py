@@ -215,9 +215,32 @@ def test_recipe_nav_last_has_no_next(client: TestClient) -> None:
 
 
 def test_recipe_nav_unknown_context_falls_back_to_book(client: TestClient) -> None:
-    body = client.get(f"/api/recipes/{_recipe_id(client, 'Recipe 1')}?context=search").json()
+    # "list" isn't wired yet — an unsupported context resolves to book order.
+    body = client.get(f"/api/recipes/{_recipe_id(client, 'Recipe 1')}?context=list").json()
     assert body["context"] == "book"
     assert body["previous"]["name"] == "Recipe 0"
+
+
+def test_recipe_nav_search_order(client: TestClient) -> None:
+    # context=search re-runs the search ordering; q=recipe + sort=name gives
+    # Recipe 0,1,2, so the middle recipe's neighbours are 0 and 2.
+    rid = _recipe_id(client, "Recipe 1")
+    body = client.get(f"/api/recipes/{rid}", params={"context": "search", "q": "recipe", "sort": "name"}).json()
+    assert body["context"] == "search"
+    assert body["previous"]["name"] == "Recipe 0"
+    assert body["next"]["name"] == "Recipe 2"
+
+
+def test_recipe_nav_search_respects_filters(client: TestClient) -> None:
+    # Only Recipe 0 carries the Pasta keyword, so in that filtered search it is
+    # alone — no neighbours — even though in book order it has a next (Recipe 1).
+    rid = _recipe_id(client, "Recipe 0")
+    book = client.get(f"/api/recipes/{rid}", params={"context": "book"}).json()
+    assert book["next"]["name"] == "Recipe 1"
+    search = client.get(f"/api/recipes/{rid}", params={"context": "search", "keyword": "Pasta"}).json()
+    assert search["context"] == "search"
+    assert search["previous"] is None
+    assert search["next"] is None
 
 
 def test_recipe_404_for_unknown_id(client: TestClient) -> None:

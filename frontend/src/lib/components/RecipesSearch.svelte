@@ -16,6 +16,7 @@
 
 <script lang="ts">
 	import RecipeRow from './RecipeRow.svelte';
+	import { searchContextQuery } from '$lib/api/recipes';
 
 	let {
 		status = 'resting',
@@ -52,6 +53,19 @@
 
 	let active = $derived(
 		Boolean(query.trim() || selected.length || bookId || author)
+	);
+
+	// Carried into each result's link so the recipe page's prev/next follow this
+	// exact search (filters + sort + seed).
+	let contextQuery = $derived(
+		searchContextQuery({
+			q: query,
+			keywords: selected,
+			bookId: bookId || undefined,
+			author: author || undefined,
+			sort,
+			seed: sort === 'random' ? randomSeed : undefined
+		})
 	);
 
 	// The chips shown: selected keywords pinned first (so they stay deselectable
@@ -346,6 +360,7 @@
 						bookTitle={r.book_title}
 						bookAuthor={r.book_author}
 						keywords={r.keywords}
+						{contextQuery}
 					/>
 				{/each}
 			</ul>

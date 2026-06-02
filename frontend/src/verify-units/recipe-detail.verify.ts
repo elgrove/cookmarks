@@ -18,6 +18,8 @@ const recipeSchema = z.object({
 	keywords: z.array(z.string()),
 	hasImage: z.boolean(),
 	context: z.string(),
+	contextQuery: z.string(),
+	searchHref: z.string().nullable(),
 	previous: z.object({ id: z.string(), name: z.string() }).nullable(),
 	next: z.object({ id: z.string(), name: z.string() }).nullable()
 });
@@ -49,6 +51,8 @@ const trofie: RecipeDetailData = {
 	keywords: ['Pasta', 'Pesto', 'Vegetarian', 'Liguria'],
 	hasImage: false,
 	context: 'book',
+	contextQuery: 'context=book',
+	searchHref: null,
 	previous: { id: '11111111-1111-4111-8111-111111111111', name: "Cornelia's Pansotti with Walnut Pesto" },
 	next: { id: '22222222-2222-4222-8222-222222222222', name: "Angela's Busiate with Trapanese Pesto" }
 };
@@ -126,6 +130,18 @@ const unit: VerifiableUnit<Props> = {
 			id: 'only-recipe',
 			description: 'a lone recipe in its ordering: no pager at all',
 			props: { recipe: { ...trofie, previous: null, next: null } }
+		},
+		{
+			id: 'search-context',
+			description: 'reached from a search: pager carries the search query; breadcrumb links back to it',
+			props: {
+				recipe: {
+					...trofie,
+					context: 'search',
+					contextQuery: 'context=search&q=pesto&sort=name',
+					searchHref: '/recipes?q=pesto&sort=name'
+				}
+			}
 		},
 		{
 			id: 'long-content',
@@ -256,12 +272,12 @@ const unit: VerifiableUnit<Props> = {
 		},
 		{
 			id: 'prev-link',
-			description: 'a Previous link appears iff there is a previous recipe, carrying its id + context',
+			description: 'a Previous link appears iff there is a previous recipe, carrying the context query',
 			check: ({ root, props }) => {
 				const a = root.querySelector('.pager a.prev');
 				if (props.recipe.previous) {
 					if (!a) return 'previous recipe present but no Prev link';
-					const want = `/recipes/${props.recipe.previous.id}?context=${props.recipe.context}`;
+					const want = `/recipes/${props.recipe.previous.id}?${props.recipe.contextQuery}`;
 					return a.getAttribute('href') === want || `prev href=${a.getAttribute('href')} expected ${want}`;
 				}
 				return a === null || 'Prev link shown with no previous recipe';
@@ -269,15 +285,28 @@ const unit: VerifiableUnit<Props> = {
 		},
 		{
 			id: 'next-link',
-			description: 'a Next link appears iff there is a next recipe, carrying its id + context',
+			description: 'a Next link appears iff there is a next recipe, carrying the context query',
 			check: ({ root, props }) => {
 				const a = root.querySelector('.pager a.next');
 				if (props.recipe.next) {
 					if (!a) return 'next recipe present but no Next link';
-					const want = `/recipes/${props.recipe.next.id}?context=${props.recipe.context}`;
+					const want = `/recipes/${props.recipe.next.id}?${props.recipe.contextQuery}`;
 					return a.getAttribute('href') === want || `next href=${a.getAttribute('href')} expected ${want}`;
 				}
 				return a === null || 'Next link shown with no next recipe';
+			}
+		},
+		{
+			id: 'search-breadcrumb',
+			description: 'a search context shows a breadcrumb that links back to the originating search',
+			onlyFixtures: ['search-context'],
+			check: ({ root, props }) => {
+				const back = root.querySelector(`.crumb a[href="${props.recipe.searchHref}"]`);
+				if (!back) return `no breadcrumb link back to ${props.recipe.searchHref}`;
+				return (
+					(root.querySelector('.crumb')?.textContent ?? '').includes('Search results') ||
+					'breadcrumb missing "Search results"'
+				);
 			}
 		},
 		{

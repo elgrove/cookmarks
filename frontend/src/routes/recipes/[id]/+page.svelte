@@ -8,10 +8,26 @@
 	let status = $state<'loading' | 'error' | 'ready'>('loading');
 	let recipe = $state<RecipeDetailData | null>(null);
 
-	async function load(id: string, context: string) {
+	// The forward-carried context: the page's query params with a context ensured.
+	function contextQueryOf(params: URLSearchParams): string {
+		const p = new URLSearchParams(params);
+		if (!p.get('context')) p.set('context', 'book');
+		return p.toString();
+	}
+
+	async function load(id: string, params: URLSearchParams) {
 		status = 'loading';
 		try {
-			const r = await fetchRecipeDetail(id, fetch, context);
+			const contextQuery = contextQueryOf(params);
+			const r = await fetchRecipeDetail(id, fetch, contextQuery);
+			// For a search context, the breadcrumb links back to the originating search.
+			let searchHref: string | null = null;
+			if (r.context === 'search') {
+				const s = new URLSearchParams(params);
+				s.delete('context');
+				const qs = s.toString();
+				searchHref = qs ? `/recipes?${qs}` : '/recipes';
+			}
 			recipe = {
 				id: r.id,
 				bookId: r.book_id,
@@ -26,6 +42,8 @@
 				keywords: r.keywords,
 				hasImage: r.has_image,
 				context: r.context,
+				contextQuery,
+				searchHref,
 				previous: r.previous,
 				next: r.next
 			};
@@ -39,14 +57,14 @@
 	// Reload whenever the id or context query changes — prev/next reuses this route.
 	$effect(() => {
 		const id = $page.params.id;
-		const context = $page.url.searchParams.get('context') ?? 'book';
-		if (id) load(id, context);
+		const params = $page.url.searchParams;
+		if (id) load(id, params);
 		else status = 'error';
 	});
 
 	function retry() {
 		const id = $page.params.id;
-		if (id) load(id, $page.url.searchParams.get('context') ?? 'book');
+		if (id) load(id, $page.url.searchParams);
 	}
 
 	// ← / → page through the current ordering (ignored while typing in a field).
@@ -64,10 +82,10 @@
 		if (status !== 'ready' || !recipe) return;
 		if (e.key === 'ArrowLeft' && recipe.previous) {
 			e.preventDefault();
-			goto(`/recipes/${recipe.previous.id}?context=${recipe.context}`);
+			goto(`/recipes/${recipe.previous.id}?${recipe.contextQuery}`);
 		} else if (e.key === 'ArrowRight' && recipe.next) {
 			e.preventDefault();
-			goto(`/recipes/${recipe.next.id}?context=${recipe.context}`);
+			goto(`/recipes/${recipe.next.id}?${recipe.contextQuery}`);
 		}
 	}
 

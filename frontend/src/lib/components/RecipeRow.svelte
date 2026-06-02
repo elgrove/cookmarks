@@ -10,7 +10,17 @@
 </script>
 
 <script lang="ts">
-	let { id, name, bookId, bookTitle, bookAuthor, keywords }: RecipeRowData = $props();
+	// `contextQuery` carries the originating search (criteria + ordering) into the
+	// recipe link, so the detail page's prev/next follow the search order.
+	let {
+		id,
+		name,
+		bookId,
+		bookTitle,
+		bookAuthor,
+		keywords,
+		contextQuery = ''
+	}: RecipeRowData & { contextQuery?: string } = $props();
 
 	// Rotating chip tints (DESIGN §3.1).
 	const tints = ['clay', 'blue', 'green'] as const;
@@ -18,7 +28,7 @@
 
 <li class="row">
 	<div class="line">
-		<a class="name" href={`/recipes/${id}`}>{name}</a>
+		<a class="name" href={`/recipes/${id}${contextQuery ? `?${contextQuery}` : ''}`}>{name}</a>
 		<a class="source" href={`/books/${bookId}`}>
 			{bookTitle}<span class="sep" aria-hidden="true">·</span><span class="author">{bookAuthor}</span>
 		</a>
