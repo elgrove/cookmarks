@@ -91,4 +91,4 @@ Verdict rules (`runner.ts`): any `fail` check → `FAIL`; mount error → `BLOCK
 - **Maintain `REBUILD_LOG.md`** — the running journal of the rebuild. Append an entry (context, decisions, outcome) whenever a meaningful chunk of work lands. CLAUDE.md is the current-state snapshot; the log is the history.
 - Backend: ruff (line length 100), strict `ty`, British spelling. Imports at top of module only. Alembic migrations live in `backend/alembic/` (excluded from lint/typecheck).
 - Frontend: TypeScript strict; harness tests must stay free of SvelteKit (`$app/*`) imports so they run in plain vitest.
-- Celery: `app/tasks/celery_app.py` is a skeleton with a `ping` task; the broker (likely Redis) is wired when the real worker is ported.
+- Celery: `app/tasks/celery_app.py` holds the app; `app/tasks/extraction.py` is the first real worker — `extract_recipes_from_book` / `resume_extraction` tasks (callable inline; the LangGraph pipeline lives in `app/services/extraction/`). The broker is still `memory://`; a real broker (likely Redis) is wired when extraction runs in the background rather than inline.

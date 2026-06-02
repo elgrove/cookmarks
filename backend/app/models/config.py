@@ -1,4 +1,4 @@
-from sqlalchemy import Enum, String
+from sqlalchemy import JSON, Enum, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -17,3 +17,8 @@ class Config(Base):
         Enum(AIProvider, values_callable=enum_values)
     )
     api_key: Mapped[str | None] = mapped_column(String(200))
+    # Shared per-minute request budget for extraction across all worker threads.
+    extraction_rate_limit_per_minute: Mapped[int] = mapped_column(default=256)
+    # Optional per-role model overrides ({ModelRole value: model name}); a role left
+    # out falls back to the provider's default. Lets each task use a different model.
+    model_overrides: Mapped[dict[str, str] | None] = mapped_column(JSON, default=None)

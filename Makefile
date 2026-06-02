@@ -1,4 +1,4 @@
-.PHONY: install dev migrate build verify check test fmt
+.PHONY: install dev migrate build verify check test fmt eval
 
 install:
 	cd backend && uv sync
@@ -32,3 +32,9 @@ test:
 
 fmt:
 	cd backend && uv run ruff format .
+
+# Run the extraction eval against the gold cookbooks (real AI; see backend/evals).
+# Scope with ARGS, e.g. `make eval ARGS="--model gemini-flash --book curry-guy"`.
+# Summarise past runs without re-running: `uv run python -m evals report leaderboard`.
+eval:
+	cd backend && uv run python -m evals run $(ARGS)

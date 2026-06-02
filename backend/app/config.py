@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     # SvelteKit adapter-static output, served by FastAPI in production.
     frontend_dist: Path = BACKEND_ROOT.parent / "frontend" / "build"
 
+    # Worker threads per extraction node (chapters/blocks extracted concurrently).
+    # The per-minute request budget is a user-tunable Config column, not a setting.
+    extraction_threads: int = 16
+
     # Broker is deferred until the real worker is ported; defaults keep imports cheap.
     celery_broker_url: str = "memory://"
     celery_result_backend: str = "cache+memory://"
