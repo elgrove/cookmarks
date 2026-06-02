@@ -555,3 +555,41 @@ Navigation felt laggy next to v1's HTMX. Two causes, both fixed:
 Result (Playwright, real data): arrow-key nav through a *chicken* search is **~30ms/step with no
 loading flash** (was ~300ms + a teardown/rebuild); book-order nav (already ~5ms) also loses the
 flash.
+
+## 2026-06-02 — Dark mode ("Midnight")
+
+Added a light/dark theme that **defaults to the OS preference** and is overridable from a toggle in
+the top-right of the nav. The whole app already routed colour through CSS custom properties, so the
+theme is essentially one override block.
+
+**Ground choice.** DarkReader was auto-darkening the warm-ivory site into a muddy brown. Rather than
+fight the extension, we ship a real dark theme so it backs off. Mocked four candidate grounds (slate
+/ graphite / midnight / warm-stone) in a standalone switchable HTML preview rendered in the actual
+design language; picked **Midnight** (`#14181e`) — a cool blue-black that reads as slate, deliberately
+**not** a tinted inversion of the ivory. Clay is preserved (nudged brighter to carry on the dark
+field); chip tints lift with lighter labels; `--clay-deep` flips to a *lighter* clay since "more
+contrast" means lighter on a dark ground. Full palette is in `DESIGN.md §3.1` and the
+`[data-theme='dark']` block in `app.css`.
+
+**Mechanics.**
+- `theme.ts` — `preference` (`light`/`dark`/`system`, persisted to `localStorage` as `cookmarks-theme`;
+  `system` = key absent) and `resolvedTheme` (what the icon reflects). `initTheme()` persists changes,
+  applies `data-theme` to `<html>`, and follows the OS live while preference is `system`. `toggleTheme()`
+  pins an explicit light/dark (drops `system`).
+- A tiny inline script in `app.html` resolves the theme **before first paint** (no light-mode flash),
+  mirroring `theme.ts`'s logic.
+- `ThemeToggle.svelte` — presentational (props `theme` + `onToggle`), sun/moon icon, `aria-label`
+  naming the *action*. Wired in `+layout.svelte`; ships its own verifiable unit
+  (`theme-toggle.verify.ts`: light/dark fixtures, a rapid-click probe asserting `onToggle` fires
+  without the controlled icon drifting, and the truthfulness sentinel).
+- Replaced the two hard-coded `background: #000` primary-button hovers with a new `--ink-deep` token
+  (`#000` light / `#fff` dark) so the hover stays correct under both themes.
+
+**Gotcha fixed.** The toggle pushed the (not-yet-responsive) nav over 390px → 5px of horizontal
+scroll (violates DESIGN §8). First fix didn't take: the mobile `.nav` override was authored *above*
+the base `.nav` rule, so at equal specificity the base won. Moved it below the nav rules, tightened
+the mobile gap to `1rem`, and set the toggle `flex: none` so it holds its 32px tap target. A proper
+mobile drawer remains future work (pre-existing).
+
+Verified: `vitest` 35/35 (incl. the new unit), `svelte-check` clean, and Playwright screenshots of
+the books grid + recipe detail in both themes at 1280 and 390 — no overflow, light mode unchanged.

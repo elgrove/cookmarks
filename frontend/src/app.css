@@ -1,11 +1,14 @@
 :root {
+	color-scheme: light;
+
 	/* Verify-harness verdict colours — read by the /verify dashboard + isolation route. */
 	--pass: #1a7f37;
 	--fail: #cf222e;
 	--blocked: #9a6700;
 	--skip: #57606a;
 
-	/* Colour — DESIGN §3.1 (authoritative). Light theme only. */
+	/* Colour — DESIGN §3.1 (authoritative). Light is the default; dark overrides
+	   live in the [data-theme='dark'] block below. */
 	--bg: #faf9f5;
 	--bg-warm: #f3efe5;
 	--ink: #141413;
@@ -15,6 +18,8 @@
 	--line-strong: #d8d4c6;
 	--clay: #d97757;
 	--clay-deep: #c2613f;
+	/* Pushed-further ink for the primary-button hover (pure black on light). */
+	--ink-deep: #000;
 
 	--chip-clay: rgba(217, 119, 87, 0.11);
 	--chip-clay-c: #d97757;
@@ -43,6 +48,40 @@
 	:root {
 		--page-h: 1.25rem;
 	}
+}
+
+/* Warm-dark theme — the "Midnight" ground (DESIGN §3.1). Toggled by setting
+   data-theme="dark" on <html> (theme.ts + the no-flash script in app.html);
+   light is the :root default above. Every surface flows through these tokens,
+   so this block is the whole theme. Clay is preserved — nudged brighter so it
+   carries on a dark field — and chip tints lift with lighter labels. */
+:root[data-theme='dark'] {
+	color-scheme: dark;
+
+	--bg: #14181e;
+	--bg-warm: #1c222b;
+	--ink: #eef1f6;
+	--muted: #939ba7;
+	--faint: #565f6b;
+	--line: #28303a;
+	--line-strong: #354050;
+	--ink-deep: #fff;
+
+	--clay: #df8460;
+	--clay-deep: #ef9e7d;
+
+	--chip-clay: rgba(223, 132, 96, 0.16);
+	--chip-clay-c: #ec9d7d;
+	--chip-blue: rgba(120, 165, 210, 0.15);
+	--chip-blue-c: #92b6d8;
+	--chip-green: rgba(150, 175, 120, 0.15);
+	--chip-green-c: #a7c187;
+
+	/* Verify-dashboard verdict colours, lifted for legibility on the dark ground. */
+	--pass: #3fb950;
+	--fail: #f85149;
+	--blocked: #d29922;
+	--skip: #8b949e;
 }
 
 *,
@@ -135,6 +174,22 @@ a {
 .nav .navlink.active {
 	color: var(--ink);
 	border-bottom-color: var(--clay);
+}
+
+/* Theme toggle pins to the top-right of the nav (DESIGN §5 chrome). */
+.nav .theme-toggle {
+	margin-left: auto;
+	align-self: center;
+	flex: none;
+}
+
+/* Tighten the nav gap on mobile so the wordmark, links and toggle fit one row
+   without horizontal scroll (DESIGN §8) — a proper drawer is future work. This
+   sits after the base .nav rule so it wins at equal specificity. */
+@media (max-width: 760px) {
+	.nav {
+		gap: 1rem;
+	}
 }
 
 main {

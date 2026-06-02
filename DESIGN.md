@@ -74,8 +74,30 @@ Rotate chip colours by keyword for gentle variety; keep backgrounds at ~11% tint
 for the label only. (The clay/blue/green accents derive from Anthropic's accent set; chip label colours
 are darkened for legible contrast on the tint.)
 
-> **Theme:** light only. A future warm-dark mode would invert to an ink ground / ivory text with clay
-> preserved — out of scope until specified.
+#### Dark theme — "Midnight"
+
+A coordinated dark palette, applied by setting `data-theme="dark"` on `<html>`. It **defaults to the
+OS preference** (`prefers-color-scheme`) and is overridable by a toggle in the top-right of the nav
+(§5); the choice persists in `localStorage` (`cookmarks-theme`), and a tiny inline script in `app.html`
+resolves the theme before first paint so there is no light-mode flash. Light remains the `:root`
+default; these values override it under `[data-theme='dark']`. The ground is a cool blue-black — **not
+brown** — so it reads as slate rather than a tinted inversion of the ivory. **Clay is preserved**
+(nudged brighter to carry on the dark field) and chip tints lift with lighter labels.
+
+| Variable | Hex | Light counterpart |
+|---|---|---|
+| `--bg` | `#14181e` | `#faf9f5` |
+| `--bg-warm` | `#1c222b` | `#f3efe5` |
+| `--ink` | `#eef1f6` | `#141413` |
+| `--muted` | `#939ba7` | `#86847b` |
+| `--faint` | `#565f6b` | `#b0aea5` |
+| `--line` | `#28303a` | `#e8e6dc` |
+| `--line-strong` | `#354050` | `#d8d4c6` |
+| `--clay` | `#df8460` | `#d97757` |
+| `--clay-deep` | `#ef9e7d` | `#c2613f` (lighter on dark = more contrast) |
+
+Chip tints on dark: clay `rgba(223,132,96,.16)` / `#ec9d7d`, blue `rgba(120,165,210,.15)` / `#92b6d8`,
+green `rgba(150,175,120,.15)` / `#a7c187`.
 
 ### 3.2 Typography
 
@@ -154,7 +176,7 @@ so it can mount in isolation in the verification harness (§9). Routes do the fe
 
 - **App shell / top nav** — **Cookmarks** wordmark (grotesque); nav: Home · Books · Recipes (search) ·
   Lists. Active item = **clay underline**. Ivory background, hairline bottom border. Collapses to a
-  drawer on mobile.
+  drawer on mobile. A **light/dark theme toggle** (sun/moon icon button) pins to the top-right (§3.1).
 - **Book card** — cover as a small bordered "plate" (hairline border, `2:3`, `object-fit:cover`); a
   **recipe-count circle** in the cover's top-right corner (clay fill, ivory numeral) showing how many
   recipes were extracted — **unextracted books show no circle**; title (serif); author (`--muted`).
