@@ -10,11 +10,14 @@
 	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
 	import { installVerifyHandle } from '$lib/verify/handle';
+	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
+	import { initTheme, resolvedTheme, toggleTheme } from '$lib/theme';
 	import '../app.css';
 
 	let { children } = $props();
 
 	onMount(installVerifyHandle);
+	onMount(initTheme);
 
 	let showChrome = $derived($page.url.searchParams.get('chrome') !== '0');
 </script>
@@ -29,6 +32,7 @@
 			class:active={$page.url.pathname.startsWith('/recipes')}
 			href="/recipes">Recipes</a
 		>
+		<ThemeToggle theme={$resolvedTheme} onToggle={toggleTheme} />
 	</nav>
 {/if}
 

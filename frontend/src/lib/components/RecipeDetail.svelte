@@ -378,7 +378,7 @@
 		color: var(--bg);
 	}
 	.btn.primary:hover {
-		background: #000;
+		background: var(--ink-deep);
 	}
 	.btn.primary .ar {
 		color: var(--bg);
