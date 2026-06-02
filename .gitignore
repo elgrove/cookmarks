@@ -25,3 +25,8 @@ frontend/build/
 
 # Claude Code (local config + sub-worktrees)
 .claude/
+
+# Eval suite: throwaway DB (also matched by *.sqlite3) + bulky per-run artefacts.
+# The append-only ledger backend/evals/index.jsonl is kept (committable history).
+backend/evals/runs/
+backend/evals/eval.sqlite3

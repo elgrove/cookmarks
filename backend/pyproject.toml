@@ -25,6 +25,14 @@ dev = [
     "ruff>=0.8",
     "ty>=0.0.1a1",
 ]
+eval = [
+    "rapidfuzz>=3.10",
+]
+
+[tool.uv]
+# Sync the eval group by default so `make check`/`make test` can typecheck and run
+# the eval suite. The eval suite itself is dev tooling, not a runtime dependency.
+default-groups = ["dev", "eval"]
 
 [tool.ruff]
 line-length = 100

@@ -1,0 +1,53 @@
+# Extraction eval configuration — organised by pipeline task.
+#
+# Each [tasks.<role>] evaluates candidate models for one task: every model is pinned to
+# just that task (others stay at the provider default) and run against the books that
+# exercise it, then scored. Models are "PROVIDER:model". Secrets are resolved at run
+# time from the environment (GEMINI_API_KEY / OPENROUTER_API_KEY) or the app DB.
+
+[tasks.many_recipes_per_file]
+books  = ["craveable"]
+models = ["GEMINI:gemini-2.5-flash-lite", "GEMINI:gemini-2.5-flash"]
+
+[tasks.one_recipe_per_file]
+books  = ["curry-guy"]
+models = ["GEMINI:gemini-2.5-flash-lite", "GEMINI:gemini-2.5-flash", "OPENROUTER:openai/gpt-oss-120b"]
+
+[tasks.blocks_of_files]
+# nothing-fancy has matchable images the image-match check misjudges, so the blocks
+# task forces block extraction (skipping that check) for its books.
+books  = ["nothing-fancy"]
+models = ["GEMINI:gemini-2.5-flash", "GEMINI:gemini-2.5-flash-lite"]
+
+# Gold books. `calibre_id` resolves the EPUB from the Calibre library; `gold` is the
+# hand-curated truth (relative to this file).
+[[books]]
+slug = "craveable"
+calibre_id = 751
+gold = "gold/craveable/recipes.json"
+has_photos = true
+
+[[books]]
+slug = "curry-guy"
+calibre_id = 502
+gold = "gold/curry-guy/recipes.json"
+has_photos = true
+
+[[books]]
+slug = "nothing-fancy"
+calibre_id = 227
+gold = "gold/nothing-fancy/recipes.json"
+has_photos = true
+
+[matching]
+# rapidfuzz token_set_ratio (0-100): the minimum name similarity for a fuzzy match,
+# applied after an exact normalised-name pass.
+fuzzy_threshold = 85
+
+[weights]
+# Per-recipe composite weights, renormalised over the fields actually present.
+name = 0.20
+ingredients = 0.30
+instructions = 0.30
+yields = 0.15
+image = 0.05

@@ -350,3 +350,48 @@ v1 did.
 
 Green: backend `ruff` + `ty` clean, `pytest` **40 passed** (17 prior + 23 new). Frontend untouched
 (its `make check` / `make test` need `npm install` in the worktree).
+
+## 2026-06-02 — Extraction eval suite (task-first) + pipeline model/method controls
+
+A professional rebuild of v1's rudimentary `_eval/run_eval.py`, plus the pipeline controls it needs.
+The eval is organised **by task** (pipeline role): for each task, candidate models run against the
+gold books that exercise it and are scored, so you can pick the cheapest-good model *per task* rather
+than pin one model everywhere. (v1's eval *thought* it picked a model via `config.gemini_model`, but
+nothing read that field and it never set `report.model_name` — so every v1 run silently used the
+per-role defaults. v2 does it for real.)
+
+**Pipeline controls** (production-useful, not just eval scaffolding):
+- **Per-role model override** — `Config.model_overrides` (`{ModelRole value: model}`), consulted by
+  `AIProvider.model_for()`; `registry.get_ai_provider` threads it through. One task can use a
+  different model while others keep provider defaults. Migration `b9d0832aaea4`.
+- **Image-match override** — `check_if_can_match_images(model=...)`; `analyse_epub` passes the run's
+  model so a pinned model drives block-vs-file routing too.
+- **Force method** — `analyse_epub` honours a pre-set `run.images_can_be_matched`, skipping the
+  fallible check. The eval pre-sets it to run a book straight through blocks.
+- **Accurate method recording** — `extract_file`/`extract_block` now stamp `extraction_method`, so a
+  file→review→block run no longer mis-reports `file`.
+
+**Eval suite** `backend/evals/` (CLI `python -m evals run|report`, `make eval`):
+- `matching.py` — name-based match (exact then rapidfuzz fuzzy) with recipe-set precision/recall/F1,
+  catching misses *and* hallucinations that v1's order-matching could not.
+- `metrics.py` — per-field Jaccard (+missing/+extra), name/yield/image(by-basename)/keywords, a
+  renormalised composite. The scoring layer is app-free and unit-tested without a DB.
+- `environment.py` — isolated `eval.sqlite3` (current ORM schema), books resolved from the Calibre
+  library, key from env→app-DB, pipeline rebound onto it; prod data untouched.
+- `runner.py` — per task → candidate → book; pins the candidate via `model_overrides`, forces block
+  for the blocks task, captures cost/tokens/method/latency, scores, writes artefacts.
+- `report.py` + append-only `index.jsonl` ledger (git-friendly, one row per run/task/model/book,
+  stamped with `git_sha`); per-task leaderboards + a `task` history view.
+- `eval.toml` — three tasks over the v1 gold books: many-per-file→craveable, one-per-file→curry-guy,
+  blocks→nothing-fancy (forced).
+
+A first real run (single all-flash, pre-rebuild) already paid off: the eval caught the image-match
+model **misrouting nothing-fancy** — a 273-chapter wasted file pass before falling through review into
+blocks, most of its $1.25 — which is exactly why the blocks task forces the method.
+
+Decisions: rapidfuzz added as an `eval` dependency group (synced by default so `make check`/`test`
+cover evals); the ledger is committable history while bulky per-run artefacts under `runs/` are
+gitignored; `eval.sqlite3` is throwaway.
+
+Green: backend `ruff` + `ty` clean, `pytest` **62 passed** (40 prior + 22 new); full task-first path
+validated offline on the Stub provider (incl. forced block) before any billable run.
