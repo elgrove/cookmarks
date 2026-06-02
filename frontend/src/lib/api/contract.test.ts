@@ -1,7 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { booksResponseSchema, bookSummarySchema } from './books';
+import {
+	bookFiltersResponseSchema,
+	bookFilterSchema,
+	booksResponseSchema,
+	bookSummarySchema
+} from './books';
 import { homeSchema } from './home';
 import { keywordSummarySchema, recipeDetailSchema, recipeSearchResultsSchema } from './recipes';
 
@@ -25,6 +30,19 @@ describe('api wire contract', () => {
 		const { recipe_count, ...rest } = example;
 		const drifted = { ...rest, recipeCount: recipe_count };
 		expect(() => bookSummarySchema.parse(drifted)).toThrow();
+	});
+
+	it('accepts the book filters example and the list wrapper', () => {
+		const example = load('bookfilters.example.json');
+		expect(() => bookFilterSchema.parse(example)).not.toThrow();
+		expect(() => bookFiltersResponseSchema.parse([example])).not.toThrow();
+	});
+
+	it('rejects a book filters example with a drifted field name', () => {
+		const example = load('bookfilters.example.json');
+		const { title, ...rest } = example;
+		const drifted = { ...rest, bookTitle: title };
+		expect(() => bookFilterSchema.parse(drifted)).toThrow();
 	});
 
 	it('accepts the home example', () => {

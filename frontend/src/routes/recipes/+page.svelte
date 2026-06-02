@@ -3,7 +3,7 @@
 	import { page } from '$app/stores';
 	import { replaceState } from '$app/navigation';
 	import RecipesSearch, { type SearchStatus } from '$lib/components/RecipesSearch.svelte';
-	import { fetchBooks } from '$lib/api/books';
+	import { fetchBookFilters } from '$lib/api/books';
 	import {
 		criteriaFromParams,
 		criteriaToParams,
@@ -47,8 +47,9 @@
 		replaceState(qs ? `/recipes?${qs}` : '/recipes', {});
 	}
 
-	async function run(criteria: SearchCriteria): Promise<void> {
-		syncUrl(criteria);
+	// Run a search and reflect it into page state. No URL writes — safe to call
+	// during mount, before SvelteKit's router (and thus replaceState) is ready.
+	async function execute(criteria: SearchCriteria): Promise<void> {
 		if (!hasCriteria(criteria)) {
 			status = 'resting';
 			results = { total: 0, items: [], facets: [] };
@@ -72,28 +73,43 @@
 		}
 	}
 
-	onMount(async () => {
-		try {
-			const bs = await fetchBooks();
-			books = bs
-				.map((b) => ({ id: b.id, title: b.title }))
-				.sort((a, b) => a.title.localeCompare(b.title));
-			authors = [...new Set(bs.map((b) => b.author))].sort((a, b) => a.localeCompare(b));
-		} catch (err) {
-			console.error('failed to load books for filters', err);
-		}
-		try {
-			// Show the most-used keywords as quick filter chips; rarer keywords are
-			// still reachable by typing (search matches keyword names too). Once a
-			// search is active these give way to co-occurrence facets. The component
-			// clamps the rendered chips to a few lines, so 50 is a generous pool.
-			globalKeywords = await fetchKeywords(50);
-			keywords = globalKeywords;
-		} catch (err) {
-			console.error('failed to load keywords', err);
-		}
-		// Restore the search the URL describes (if any) once the filters are loaded.
-		if (hasCriteria(initialCriteria)) run(initialCriteria);
+	// User-initiated search: mirror it in the URL, then run it.
+	function run(criteria: SearchCriteria): Promise<void> {
+		syncUrl(criteria);
+		return execute(criteria);
+	}
+
+	onMount(() => {
+		// These three requests are independent — fire them concurrently rather than
+		// in series. The search in particular depends on neither the books nor the
+		// keywords, so it must not wait behind them.
+		fetchBookFilters()
+			.then((bs) => {
+				books = bs
+					.map((b) => ({ id: b.id, title: b.title }))
+					.sort((a, b) => a.title.localeCompare(b.title));
+				authors = [...new Set(bs.map((b) => b.author))].sort((a, b) => a.localeCompare(b));
+			})
+			.catch((err) => console.error('failed to load books for filters', err));
+
+		// Show the most-used keywords as quick filter chips; rarer keywords are still
+		// reachable by typing (search matches keyword names too). Once a search is
+		// active these give way to co-occurrence facets. The component clamps the
+		// rendered chips to a few lines, so 50 is a generous pool.
+		fetchKeywords(50)
+			.then((kw) => {
+				globalKeywords = kw;
+				// Reflect into the visible chips only while resting — an active search
+				// owns the chips (its co-occurrence facets), and now that this resolves
+				// concurrently it could otherwise clobber them.
+				if (status === 'resting') keywords = kw;
+			})
+			.catch((err) => console.error('failed to load keywords', err));
+
+		// Restore the search the URL describes (if any) straight away. The URL
+		// already reflects these criteria, so run without syncing it back —
+		// replaceState would throw this early, before the router is initialised.
+		if (hasCriteria(initialCriteria)) execute(initialCriteria);
 	});
 </script>
 

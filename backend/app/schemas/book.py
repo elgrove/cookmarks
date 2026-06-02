@@ -6,6 +6,17 @@ from pydantic import BaseModel, ConfigDict
 from app.schemas.recipe import RecipeRow
 
 
+class BookFilter(BaseModel):
+    """Minimal book row for the recipes-search filter controls: id/title/author
+    only — no recipe count or cover stat, so the query stays a plain, cheap select."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    title: str
+    author: str
+
+
 class BookSummary(BaseModel):
     """One row of the books library: enough to render a book card."""
 
