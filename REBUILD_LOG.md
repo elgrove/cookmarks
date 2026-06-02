@@ -534,3 +534,24 @@ links back to that search.
   now assert the pager href carries the full `contextQuery`. Playwright on real data: searching
   *chicken* by name, opening result #3, the pager's prev/next are results #2 and #4 (search order,
   ≠ book order), the breadcrumb links back to the search, and **→** advances to #4 keeping context.
+
+## 2026-06-02 — Snappier recipe prev/next
+
+Navigation felt laggy next to v1's HTMX. Two causes, both fixed:
+
+- **Search-order neighbours re-ran the whole search on every arrow press** (~300ms: a `LIKE` scan
+  over 13k recipes' JSON ingredients, ordered, all ids fetched). Added a small process-global **LRU
+  cache** of the ordered result ids keyed by the exact criteria + seed, so stepping through one
+  search computes the order once (~300ms) then costs ~4ms/step. Cleared per test (an autouse
+  fixture, since it's module-global); re-extraction can leave an entry stale until eviction or a new
+  seed — acceptable for a single user.
+- **A loading flash on every navigation**: the route set `status='loading'`, tearing the recipe
+  down to a "Loading recipe…" message before the next rendered. Now the current recipe stays on
+  screen until the next arrives, then swaps (like an HTMX partial) — the loading state shows only on
+  a cold start. A monotonic `seq` guard drops superseded fetches, and `{#key recipe.id}` remounts
+  per recipe so component-local state (cover-failed, read-more) resets, but only once the new data
+  is in.
+
+Result (Playwright, real data): arrow-key nav through a *chicken* search is **~30ms/step with no
+loading flash** (was ~300ms + a teardown/rebuild); book-order nav (already ~5ms) also loses the
+flash.

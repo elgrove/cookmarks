@@ -7,6 +7,8 @@
 
 	let status = $state<'loading' | 'error' | 'ready'>('loading');
 	let recipe = $state<RecipeDetailData | null>(null);
+	// Monotonic guard so a slow earlier fetch can't overwrite a newer navigation.
+	let seq = 0;
 
 	// The forward-carried context: the page's query params with a context ensured.
 	function contextQueryOf(params: URLSearchParams): string {
@@ -16,10 +18,14 @@
 	}
 
 	async function load(id: string, params: URLSearchParams) {
-		status = 'loading';
+		const mine = ++seq;
+		// Keep the current recipe on screen while the next loads (swap when ready,
+		// like the old HTMX partial) — only show the loading state on a cold start.
+		if (!recipe) status = 'loading';
 		try {
 			const contextQuery = contextQueryOf(params);
 			const r = await fetchRecipeDetail(id, fetch, contextQuery);
+			if (mine !== seq) return;
 			// For a search context, the breadcrumb links back to the originating search.
 			let searchHref: string | null = null;
 			if (r.context === 'search') {
@@ -49,8 +55,10 @@
 			};
 			status = 'ready';
 		} catch (err) {
+			if (mine !== seq) return;
 			console.error('failed to load recipe', err);
-			status = 'error';
+			// Keep any recipe already shown; only surface the error on a cold start.
+			if (!recipe) status = 'error';
 		}
 	}
 
@@ -95,16 +103,18 @@
 	});
 </script>
 
-{#if status === 'ready' && recipe}
-	<RecipeDetail {recipe} />
+{#if recipe}
+	<!-- Remount per recipe so component-local state (cover-failed, read-more) resets,
+	     but only once the next recipe's data has arrived — the old one stays until then. -->
+	{#key recipe.id}
+		<RecipeDetail {recipe} />
+	{/key}
+{:else if status === 'loading'}
+	<div class="status"><p class="msg">Loading recipe…</p></div>
 {:else}
 	<div class="status">
-		{#if status === 'loading'}
-			<p class="msg">Loading recipe…</p>
-		{:else}
-			<p class="msg">Couldn’t load this recipe.</p>
-			<button class="retry" onclick={retry}>Try again</button>
-		{/if}
+		<p class="msg">Couldn’t load this recipe.</p>
+		<button class="retry" onclick={retry}>Try again</button>
 	</div>
 {/if}
 

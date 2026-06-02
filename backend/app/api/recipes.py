@@ -1,4 +1,5 @@
 import uuid
+from collections import OrderedDict
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, HTTPException, Query
@@ -188,6 +189,49 @@ def _neighbour(session: Session, recipe_id: uuid.UUID | None) -> RecipeNeighbour
     return RecipeNeighbour(id=row.id, name=row.name) if row else None
 
 
+# Cache of ordered result ids per search, so stepping prev/next through a search
+# doesn't re-run the (relatively costly) query on every press. Keyed by the exact
+# criteria + seed, which the client holds stable across one search; a small LRU is
+# plenty for a single user. Re-extraction can leave an entry stale until it's
+# evicted or the seed changes — acceptable for now.
+_SEARCH_ORDER_CACHE: OrderedDict[tuple, list[uuid.UUID]] = OrderedDict()
+_SEARCH_ORDER_CACHE_MAX = 32
+
+
+def _clear_search_order_cache() -> None:
+    _SEARCH_ORDER_CACHE.clear()
+
+
+def _ordered_search_ids(
+    session: Session,
+    q: str,
+    keywords: list[str],
+    book_id: uuid.UUID | None,
+    author: str | None,
+    sort: Sort,
+    seed: int,
+) -> list[uuid.UUID]:
+    key = (q, tuple(keywords), str(book_id) if book_id else None, author, sort, seed)
+    cached = _SEARCH_ORDER_CACHE.get(key)
+    if cached is not None:
+        _SEARCH_ORDER_CACHE.move_to_end(key)
+        return cached
+    conditions = _search_conditions(q, keywords, book_id, author)
+    ids = list(
+        session.scalars(
+            select(Recipe.id)
+            .join(Book, Recipe.book_id == Book.id)
+            .where(*conditions)
+            .order_by(_search_order(sort, seed), Recipe.id)
+        ).all()
+    )
+    _SEARCH_ORDER_CACHE[key] = ids
+    _SEARCH_ORDER_CACHE.move_to_end(key)
+    while len(_SEARCH_ORDER_CACHE) > _SEARCH_ORDER_CACHE_MAX:
+        _SEARCH_ORDER_CACHE.popitem(last=False)
+    return ids
+
+
 def _search_neighbours(
     session: Session,
     recipe: Recipe,
@@ -198,19 +242,9 @@ def _search_neighbours(
     sort: Sort,
     seed: int,
 ) -> tuple[RecipeNeighbour | None, RecipeNeighbour | None]:
-    """Previous/next in the *search* ordering. The result set can be large but a
-    single-user archive stays well within reach: fetch the ordered ids (the same
-    filter + sort + seed the search used) and index this recipe to find its
-    neighbours. Returns (None, None) if the recipe isn't in the result set."""
-    conditions = _search_conditions(q, keywords, book_id, author)
-    ids = list(
-        session.scalars(
-            select(Recipe.id)
-            .join(Book, Recipe.book_id == Book.id)
-            .where(*conditions)
-            .order_by(_search_order(sort, seed), Recipe.id)
-        ).all()
-    )
+    """Previous/next in the *search* ordering — the ordered ids (cached per search)
+    indexed to this recipe. Returns (None, None) if it isn't in the result set."""
+    ids = _ordered_search_ids(session, q, keywords, book_id, author, sort, seed)
     try:
         idx = ids.index(recipe.id)
     except ValueError:
