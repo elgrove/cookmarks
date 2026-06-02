@@ -595,3 +595,33 @@ recipe-keyword links, **4,968** distinct keywords):
 End to end the endpoint went **~425ms → ~178ms** and the payload **~190KB → ~1.9KB** (50 rows);
 the top chips are unchanged (Main 4617, Vegetarian 3337, …). Tests: `?limit=1` returns the single
 top keyword; the existing exact-list assertion still holds (under the cap).
+
+## 2026-06-02 — Recipes page: parallel loads + a lightweight books endpoint
+
+The Recipes page loaded its data in a serial waterfall — `fetchBooks()` → `fetchKeywords()` →
+the search — so the result list (the thing you actually want) waited behind two filter requests it
+doesn't depend on. Over Tailscale that's three round-trips stacked. Profiling on real data: books
+~57ms, keywords ~211ms, then the search.
+
+- **Parallelised `onMount`.** The three requests now fire concurrently rather than via sequential
+  `await`s, and the URL's search is restored immediately instead of after the filters resolve.
+  Verified live (Playwright, real data): all three start within a **2ms** window; results render as
+  soon as the search returns rather than after keywords.
+- **Subtlety — `replaceState` before router init.** Firing the search straight away first surfaced
+  as a silent regression: `run()` called `syncUrl()` → `replaceState()` as its first step, which
+  throws *"Cannot call replaceState before router is initialized"* this early in mount, so the
+  search never fired. (The old code dodged it only because `run()` ran after two awaited
+  round-trips.) Split `run()` into `execute()` (pure search, no URL writes) and `run()` (syncUrl +
+  execute); the initial restore calls `execute()` — the URL already reflects those criteria, so
+  there's nothing to sync back.
+- **Lightweight `GET /books/filters`.** The dropdown reused the rich `/books`, paying ~30ms to
+  `COUNT` 13.4k recipes per book for counts it discards (the query plan was already optimal — it's
+  just the inherent cost of aggregating). Added `/books/filters` → `{id, title, author}` only
+  (~4ms, no count, no per-book cover stat), declared before `/books/{book_id}` so the literal path
+  wins over the UUID matcher. `/books` keeps its counts for the home and library pages. New
+  `BookFilter` schema + `contract/bookfilters.example.json` pinned from both sides.
+
+Verify: `make check`, `make test` (55 backend incl. 2 new contract tests, 33 frontend incl. 2 new),
+`make verify` matrix green. Live: with a `book_id` filter → 3 concurrent requests, search fires,
+`status="results"`, no console errors; resting `/recipes` → books/filters + keywords only, 101
+keyword chips, `status="resting"`.

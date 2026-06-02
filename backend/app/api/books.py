@@ -10,7 +10,7 @@ from app.covers import cover_path, has_cover
 from app.db import SessionDep
 from app.models.book import Book
 from app.models.recipe import Recipe
-from app.schemas.book import BookDetail, BookSummary
+from app.schemas.book import BookDetail, BookFilter, BookSummary
 from app.schemas.recipe import RecipeRow
 
 router = APIRouter(tags=["books"])
@@ -37,6 +37,17 @@ def list_books(session: SessionDep) -> list[BookSummary]:
         )
         for book, recipe_count in rows
     ]
+
+
+# Declared before /books/{book_id} so the literal path wins — otherwise the UUID
+# matcher would claim "filters" and 422 on it.
+@router.get("/books/filters", response_model=list[BookFilter])
+def list_book_filters(session: SessionDep) -> list[BookFilter]:
+    # The recipes-search controls need only id/title/author. Skipping the per-book
+    # recipe COUNT (the bulk of /books' cost) makes this a plain column select; the
+    # caller sorts client-side, so order here is immaterial.
+    rows = session.execute(select(Book.id, Book.title, Book.author)).all()
+    return [BookFilter(id=row.id, title=row.title, author=row.author) for row in rows]
 
 
 @router.get("/books/{book_id}", response_model=BookDetail)

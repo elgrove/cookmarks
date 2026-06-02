@@ -21,6 +21,27 @@ export async function fetchBooks(fetchFn: typeof fetch = fetch): Promise<BookSum
 	return booksResponseSchema.parse(await res.json());
 }
 
+// Mirrors the BookFilter wire shape from GET /api/books/filters (snake_case): the
+// minimal id/title/author the recipes-search controls need, with no recipe-count
+// aggregation behind it.
+export const bookFilterSchema = z.object({
+	id: z.string().uuid(),
+	title: z.string(),
+	author: z.string()
+});
+
+export const bookFiltersResponseSchema = z.array(bookFilterSchema);
+
+export type BookFilter = z.infer<typeof bookFilterSchema>;
+
+/** Fetch the lightweight book list for the recipes-search filter controls (id,
+ *  title, author only). `fetchFn` is injectable for SSR/tests. */
+export async function fetchBookFilters(fetchFn: typeof fetch = fetch): Promise<BookFilter[]> {
+	const res = await fetchFn('/api/books/filters');
+	if (!res.ok) throw new Error(`GET /api/books/filters → ${res.status}`);
+	return bookFiltersResponseSchema.parse(await res.json());
+}
+
 // Mirrors the RecipeRow / BookDetail wire shapes from GET /api/books/{id} (snake_case).
 export const recipeRowSchema = z.object({
 	id: z.string().uuid(),

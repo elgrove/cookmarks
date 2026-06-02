@@ -11,7 +11,7 @@ from typing import Any
 
 from fastapi.testclient import TestClient
 
-from app.schemas.book import BookSummary
+from app.schemas.book import BookFilter, BookSummary
 from app.schemas.home import HomeData
 from app.schemas.recipe import KeywordSummary, RecipeDetail, RecipeSearchResults
 
@@ -40,9 +40,21 @@ def test_recipe_detail_model_matches_contract() -> None:
     assert dumped == example
 
 
+def test_book_filter_model_matches_contract() -> None:
+    example = _example("bookfilters.example.json")
+    dumped = BookFilter.model_validate(example).model_dump(mode="json")
+    assert dumped == example
+
+
 def test_books_endpoint_keys_match_contract(client: TestClient) -> None:
     example = _example("books.example.json")
     item = client.get("/api/books").json()[0]
+    assert set(item.keys()) == set(example.keys())
+
+
+def test_book_filters_endpoint_keys_match_contract(client: TestClient) -> None:
+    example = _example("bookfilters.example.json")
+    item = client.get("/api/books/filters").json()[0]
     assert set(item.keys()) == set(example.keys())
 
 
