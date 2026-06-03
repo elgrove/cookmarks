@@ -58,6 +58,7 @@ export const bookDetailSchema = z.object({
 	description: z.string(),
 	recipe_count: z.number().int().nonnegative(),
 	has_cover: z.boolean(),
+	has_epub: z.boolean(),
 	added: z.string().nullable(),
 	recipes: z.array(recipeRowSchema)
 });
@@ -73,3 +74,6 @@ export async function fetchBookDetail(
 	if (!res.ok) throw new Error(`GET /api/books/${id} → ${res.status}`);
 	return bookDetailSchema.parse(await res.json());
 }
+
+/** URL of the raw EPUB stream for a book (served by GET /api/books/{id}/epub). */
+export const epubUrl = (id: string): string => `/api/books/${id}/epub`;

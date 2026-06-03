@@ -19,7 +19,11 @@
 	onMount(installVerifyHandle);
 	onMount(initTheme);
 
-	let showChrome = $derived($page.url.searchParams.get('chrome') !== '0');
+	// The EPUB reader is an immersive, full-viewport view with its own chrome — suppress the
+	// global nav/footer there (as the verify harness already does via ?chrome=0).
+	let showChrome = $derived(
+		$page.url.searchParams.get('chrome') !== '0' && !$page.url.pathname.endsWith('/read')
+	);
 </script>
 
 {#if showChrome}

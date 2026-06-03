@@ -14,6 +14,7 @@
 		description: string;
 		recipeCount: number;
 		hasCover: boolean;
+		hasEpub: boolean;
 		added: string | null;
 		recipes: BookDetailRecipe[];
 	};
@@ -67,6 +68,7 @@
 	data-verify-recipe-count={book.recipeCount}
 	data-verify-shown={shown}
 	data-verify-has-cover={book.hasCover ? 'true' : 'false'}
+	data-verify-has-epub={book.hasEpub ? 'true' : 'false'}
 	data-verify-empty={book.recipeCount === 0 ? 'true' : 'false'}
 >
 	<nav class="crumb" aria-label="Breadcrumb">
@@ -137,6 +139,11 @@
 
 			<div class="actions">
 				<button class="btn primary" type="button">Read book <span class="ar" aria-hidden="true">›</span></button>
+				{#if book.hasEpub}
+					<a class="btn ghost read-epub" href={`/books/${book.id}/read`}>
+						Read epub <span class="ar" aria-hidden="true">›</span>
+					</a>
+				{/if}
 				{#if book.recipeCount > 0}
 					<a class="btn ghost browse" href={`/recipes?book_id=${book.id}&sort=book`}>
 						Browse recipes <span class="ar" aria-hidden="true">›</span>

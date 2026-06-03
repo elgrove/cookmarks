@@ -19,6 +19,7 @@ const bookSchema = z.object({
 	description: z.string(),
 	recipeCount: z.number().int().nonnegative(),
 	hasCover: z.boolean(),
+	hasEpub: z.boolean(),
 	added: z.string().nullable(),
 	recipes: z.array(recipeSchema)
 });
@@ -54,6 +55,7 @@ const pastaGrannies: BookDetailData = {
 		'Learn how to make pasta like Italian nonnas do. Inspired by the hugely popular YouTube channel of the same name, Pasta Grannies is a collection of time-perfected Italian recipes from the people who have spent a lifetime cooking for love, not a living: Italian grandmothers. Featuring easy, accessible recipes from all over Italy, you will be transported into the very heart of the Italian home.',
 	recipeCount: 49,
 	hasCover: true,
+	hasEpub: true,
 	added: '2025-05-22T20:56:10Z',
 	recipes: recipes(10)
 };
@@ -102,6 +104,11 @@ const unit: VerifiableUnit<Props> = {
 					recipeCount: 3
 				}
 			}
+		},
+		{
+			id: 'no-epub',
+			description: 'a book with no EPUB on disk offers no "Read epub" action',
+			props: { book: { ...pastaGrannies, hasEpub: false } }
 		},
 		{
 			id: 'long-title',
@@ -190,6 +197,26 @@ const unit: VerifiableUnit<Props> = {
 			onlyFixtures: ['no-subtitle'],
 			check: ({ root }) =>
 				root.querySelector('.subtitle') === null || 'subtitle rendered for a plain title'
+		},
+		{
+			id: 'read-epub-link',
+			description: 'a book with an EPUB offers a "Read epub" action linking to its reader',
+			onlyFixtures: ['populated', 'no-cover', 'no-subtitle', 'long-title'],
+			check: ({ root, contract, props }) => {
+				if (contract['has-epub'] !== 'true') return `has-epub contract=${contract['has-epub']}`;
+				const href = root.querySelector('a.read-epub')?.getAttribute('href');
+				const want = `/books/${props.book.id}/read`;
+				return href === want || `read-epub href=${href} expected ${want}`;
+			}
+		},
+		{
+			id: 'read-epub-hidden',
+			description: 'a book without an EPUB shows no "Read epub" action',
+			onlyFixtures: ['no-epub'],
+			check: ({ root, contract }) => {
+				if (contract['has-epub'] !== 'false') return `has-epub contract=${contract['has-epub']}`;
+				return root.querySelector('a.read-epub') === null || 'read-epub link shown without an epub';
+			}
 		},
 		{
 			id: 'browse-link',
