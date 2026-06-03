@@ -85,6 +85,7 @@ class RecipeDetail(BaseModel):
     yields: str | None
     keywords: list[str]
     has_image: bool
+    is_favourite: bool
     context: str
     previous: RecipeNeighbour | None
     next: RecipeNeighbour | None

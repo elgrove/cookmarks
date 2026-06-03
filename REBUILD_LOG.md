@@ -683,3 +683,81 @@ A Chrome HAR of `/recipes` showed the API calls didn't start until ~224ms in —
 **Invalidation.** Today only the import script (a separate process) and, later, the extraction task write keywords — so a running server's cache is never stale mid-life in the current scaffold. The extraction task will call `_clear_keyword_cache()` on write when it lands (in-process); if it ends up cross-process, the fallback is staleness-until-restart (consistent with how `_SEARCH_ORDER_CACHE` already behaves) or a TTL. Keyword "popularity" chips are approximate by nature, so this is tolerable — which is why the cache was chosen over denormalising a `recipe_count` column.
 
 **Verified.** New test pins the contract: a keyword added after the first call isn't reflected until `_clear_keyword_cache()`. Live on real data (192 books / 13.4k recipes / 4,968 keywords): first call **184ms** (computes top-500), subsequent calls **~1.5ms** (cache hit); top chips unchanged (Main 4617, Vegetarian 3337, Quick 2882), and `limit=5` is a true prefix of `limit=50`. `make check` (backend) + `pytest` (56 passed, +1) green.
+
+## 2026-06-02 — Lists: favourites + custom collections, end to end
+
+The first feature built on top of the read-only slices: the full **Lists** vertical — a
+default **Favourites** plus arbitrary named collections, a Lists index, a list-detail index, the
+favourite ★ on a recipe, and an add-to-list control. Models (`RecipeList`/`RecipeListItem`) already
+existed from the initial schema, so no migration; this slice wired the API, the wire contract, the
+components/verify units, the routes, and the recipe-detail integration.
+
+**Backend** (`app/api/lists.py`, `app/schemas/recipe_list.py`). Endpoints: `GET/POST /lists`,
+`GET/PATCH/DELETE /lists/{id}`, `POST /lists/{id}/recipes` + `DELETE /lists/{id}/recipes/{recipe_id}`
+(both idempotent), `GET /recipes/{id}/lists` (membership map for the picker), and
+`POST /recipes/{id}/favourite` (toggle). The default Favourites list is created lazily by
+`get_or_create_favourites()` from the list reads — mirroring v1's `get_favourites` — so it always
+exists even on a fresh DB; this is a deliberate write-on-read, acceptable for a local single-user
+app and the only way to honour DESIGN's "a default Favourites" without a startup hook or seed
+dependency. Guards: the default list rejects rename/delete with **409**. Lists order with the
+default pinned first, then by name. `RecipeDetail` gained `is_favourite`, computed by a *pure* read
+(`_is_favourite`, never creates the list) so an unstarred recipe on a fresh DB reads `false`.
+
+**Wire contract.** The deliberate three-step edit: `is_favourite` added to `recipe.example.json` +
+the Pydantic model + the Zod schema; new `listsummary`/`listdetail`/`listmembership` examples pinned
+from both sides (`test_contract.py` model-dump + endpoint-key assertions; `contract.test.ts`
+accept-the-example + reject-a-drifted-field). `test_lists.py` covers create/rename/delete, the
+default guards, membership idempotency, the favourite toggle, the membership map and the 404s.
+
+**Frontend.** Four presentational components, each with a co-located `*.verify.ts`
+(`favourite-toggle`, `add-to-list`, `lists-index`, `list-detail`): a real `button[aria-pressed]`
+star; a disclosure picker (membership toggles + inline create); a searchable card grid (Favourites
+pinned, "Default" badge, no rename/delete on it); and a list index of removable recipe rows.
+`RecipeRow` grew an optional `onRemove` (renders a labelled Remove button only when passed, so
+search/book-detail usage is untouched). Action controls use explicit `onclick` + Enter-key handlers
+rather than `<form onsubmit>` + a submit button, so the harness's `click()` drives them
+deterministically under jsdom. Routes `/lists` and `/lists/[id]` do the fetching; `recipes/[id]`
+wires the ★ + picker (creating a list from the picker also adds the current recipe, as v1 did);
+the nav gained a **Lists** item.
+
+**Pre-existing bug found via live network inspection.** Driving the recipe page in Playwright, the
+network showed `/api/recipes/{id}` and `/api/recipes/{id}/lists` each fired **8,182×** — a
+render→fetch feedback loop. The route's `$effect` calls `load()`, whose synchronous prefix reads
+`recipe` (`if (!recipe) …`), and `load()` then reassigns `recipe`; because the write lands in a
+microtask after `await`, Svelte's synchronous depth-guard never trips, so the effect re-triggered
+itself forever (silent — the page still rendered). `git show v2:` confirmed the trunk route is
+structurally identical, so the loop **predates this work**; the new membership fetch merely rode
+inside it and made it visible. Fixed by wrapping the `load()` call in `untrack()` so the effect
+depends only on the route id + query string.
+
+**Mobile nav overflow.** The fourth nav item (Lists) tipped the single-row nav past 390px
+(`scrollWidth` 410 > 390), violating DESIGN §8 "no horizontal scroll". Added a `≤480px` rule
+tightening the gap and trimming the wordmark/links so it stays single-row (a proper drawer remains
+future work).
+
+**Verified.** `make check` (ruff + ty + svelte-check, 0/0), `make test`/`make verify`
+(82 backend incl. the new lists + contract tests; 58 frontend incl. the four new units' matrix
+fixtures), all green. Live on real data (Playwright): `/lists` shows Favourites (★, "Default", no
+rename/delete) + custom lists with rename/delete; `/lists/{id}` lists removable recipe rows; the
+recipe masthead shows the ★ and add-to-list, the picker opens with the correct membership
+(Sauces ✓), and clicking Favourites persists to the backend (`Favourites:true`) and flips the star
+to "Favourited". No horizontal scroll at 390px on any new screen. (Pixel inspection of the
+screenshots wasn't possible — the Playwright browser is sandboxed from the host filesystem — so
+verification was via accessibility snapshots, live interaction, overflow measurements and the
+verify matrix.)
+
+**Polish (same session, on review).** A few UX refinements after eyeballing the live pages:
+- **Equal-height list cards.** The default Favourites card was taller because its ★ sat on its own
+  line; moved the ★ inline before the name and made cards fill their grid cell (`height: 100%`) so
+  every card in a row shares one height.
+- **Recipe masthead order.** Favourite ★ now sits *above* Add-to-list (swapped the two in `.actions`).
+- **Picker dismissal.** The add-to-list panel now closes on a click anywhere outside it (a capture
+  -phase `pointerdown` listener attached only while open, ignoring clicks within the picker so list
+  toggles and the create field keep working). Verified live: outside-click closes, toggle keeps open.
+- **Create via modal.** The Lists index's inline "new list" textbox became a **New list** button that
+  opens a centred modal (dim scrim as a labelled `<button>` for keyboard/a11y, focused name field,
+  Enter/Escape, Cancel/Create). Its entrance uses a dedicated `modalIn` keyframe — `fadeUp`'s
+  `transform: none` would otherwise clobber the `translate(-50%,-50%)` centring (caught in a
+  screenshot: the dialog rendered off-centre until fixed). The `lists-index` verify unit's create
+  fixture now opens the modal first; a new `open-create-modal` fixture asserts the dialog appears.
+  `make check`/`make verify` green; no horizontal scroll at 390px.

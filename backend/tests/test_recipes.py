@@ -19,6 +19,7 @@ RECIPE_KEYS = {
     "yields",
     "keywords",
     "has_image",
+    "is_favourite",
     "context",
     "previous",
     "next",

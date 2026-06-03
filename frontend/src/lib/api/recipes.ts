@@ -20,6 +20,7 @@ export const recipeDetailSchema = z.object({
 	yields: z.string().nullable(),
 	keywords: z.array(z.string()),
 	has_image: z.boolean(),
+	is_favourite: z.boolean(),
 	context: z.string(),
 	previous: recipeNeighbourSchema.nullable(),
 	next: recipeNeighbourSchema.nullable()
