@@ -5,7 +5,9 @@ import {
 	bookFiltersResponseSchema,
 	bookFilterSchema,
 	booksResponseSchema,
-	bookSummarySchema
+	bookSummarySchema,
+	recipeIndexEntrySchema,
+	recipeIndexResponseSchema
 } from './books';
 import { homeSchema } from './home';
 import { keywordSummarySchema, recipeDetailSchema, recipeSearchResultsSchema } from './recipes';
@@ -37,6 +39,19 @@ describe('api wire contract', () => {
 		const example = load('bookfilters.example.json');
 		expect(() => bookFilterSchema.parse(example)).not.toThrow();
 		expect(() => bookFiltersResponseSchema.parse([example])).not.toThrow();
+	});
+
+	it('accepts the recipe-index example and the list wrapper', () => {
+		const example = load('recipeindex.example.json');
+		expect(() => recipeIndexEntrySchema.parse(example)).not.toThrow();
+		expect(() => recipeIndexResponseSchema.parse([example])).not.toThrow();
+	});
+
+	it('rejects a recipe-index example with a drifted field name', () => {
+		const example = load('recipeindex.example.json');
+		const { is_favourite, ...rest } = example;
+		const drifted = { ...rest, isFavourite: is_favourite };
+		expect(() => recipeIndexEntrySchema.parse(drifted)).toThrow();
 	});
 
 	it('rejects a book filters example with a drifted field name', () => {

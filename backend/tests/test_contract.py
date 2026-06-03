@@ -11,7 +11,7 @@ from typing import Any
 
 from fastapi.testclient import TestClient
 
-from app.schemas.book import BookFilter, BookSummary
+from app.schemas.book import BookFilter, BookSummary, RecipeIndexEntry
 from app.schemas.home import HomeData
 from app.schemas.recipe import KeywordSummary, RecipeDetail, RecipeSearchResults
 from app.schemas.recipe_list import ListDetail, ListMembership, ListSummary
@@ -44,6 +44,12 @@ def test_recipe_detail_model_matches_contract() -> None:
 def test_book_filter_model_matches_contract() -> None:
     example = _example("bookfilters.example.json")
     dumped = BookFilter.model_validate(example).model_dump(mode="json")
+    assert dumped == example
+
+
+def test_recipe_index_entry_model_matches_contract() -> None:
+    example = _example("recipeindex.example.json")
+    dumped = RecipeIndexEntry.model_validate(example).model_dump(mode="json")
     assert dumped == example
 
 

@@ -11,7 +11,8 @@ from app.db import SessionDep
 from app.epub import epub_path, has_epub
 from app.models.book import Book
 from app.models.recipe import Recipe
-from app.schemas.book import BookDetail, BookFilter, BookSummary
+from app.models.recipe_list import RecipeList, RecipeListItem
+from app.schemas.book import BookDetail, BookFilter, BookSummary, RecipeIndexEntry
 from app.schemas.recipe import RecipeRow
 
 router = APIRouter(tags=["books"])
@@ -115,3 +116,27 @@ def book_epub(book_id: uuid.UUID, session: SessionDep) -> FileResponse:
     if not epub.is_relative_to(library) or not epub.is_file():
         raise HTTPException(status_code=404, detail="epub not found")
     return FileResponse(epub, media_type="application/epub+zip")
+
+
+@router.get("/books/{book_id}/recipe-index", response_model=list[RecipeIndexEntry])
+def book_recipe_index(book_id: uuid.UUID, session: SessionDep) -> list[RecipeIndexEntry]:
+    """Every recipe in the book (id · name · favourite state), in book order — the in-book
+    EPUB reader matches headings against this to offer a save-to-favourites button."""
+    if session.get(Book, book_id) is None:
+        raise HTTPException(status_code=404, detail="book not found")
+    fav_list_id = session.scalar(select(RecipeList.id).where(RecipeList.is_default.is_(True)))
+    fav_ids: set[uuid.UUID] = set()
+    if fav_list_id is not None:
+        fav_ids = set(
+            session.scalars(
+                select(RecipeListItem.recipe_id)
+                .join(Recipe, Recipe.id == RecipeListItem.recipe_id)
+                .where(RecipeListItem.recipe_list_id == fav_list_id, Recipe.book_id == book_id)
+            ).all()
+        )
+    rows = session.execute(
+        select(Recipe.id, Recipe.name).where(Recipe.book_id == book_id).order_by(Recipe.order)
+    ).all()
+    return [
+        RecipeIndexEntry(id=rid, name=name, is_favourite=rid in fav_ids) for rid, name in rows
+    ]

@@ -129,3 +129,28 @@ def test_epub_404_when_file_missing(client: TestClient) -> None:
 
 def test_epub_404_for_unknown_book(client: TestClient) -> None:
     assert client.get(f"/api/books/{uuid.uuid4()}/epub").status_code == 404
+
+
+def test_recipe_index_lists_all_in_order(client: TestClient) -> None:
+    book_id = _book_id(client, "With Recipes")
+    idx = client.get(f"/api/books/{book_id}/recipe-index").json()
+    assert [e["name"] for e in idx] == ["Recipe 0", "Recipe 1", "Recipe 2"]
+    assert all(e["is_favourite"] is False for e in idx)
+    assert set(idx[0].keys()) == {"id", "name", "is_favourite"}
+
+
+def test_recipe_index_reflects_favourite(client: TestClient) -> None:
+    book_id = _book_id(client, "With Recipes")
+    rid = client.get(f"/api/books/{book_id}/recipe-index").json()[0]["id"]
+    assert client.post(f"/api/recipes/{rid}/favourite").json()["is_favourite"] is True
+    idx = {e["id"]: e["is_favourite"] for e in client.get(f"/api/books/{book_id}/recipe-index").json()}
+    assert idx[rid] is True
+
+
+def test_recipe_index_empty_for_bookless(client: TestClient) -> None:
+    book_id = _book_id(client, "No Recipes Yet")
+    assert client.get(f"/api/books/{book_id}/recipe-index").json() == []
+
+
+def test_recipe_index_404_for_unknown_book(client: TestClient) -> None:
+    assert client.get(f"/api/books/{uuid.uuid4()}/recipe-index").status_code == 404

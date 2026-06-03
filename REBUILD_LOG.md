@@ -915,3 +915,42 @@ verify matrix.)
   screenshot: the dialog rendered off-centre until fixed). The `lists-index` verify unit's create
   fixture now opens the modal first; a new `open-create-modal` fixture asserts the dialog appears.
   `make check`/`make verify` green; no horizontal scroll at 390px.
+
+## 2026-06-03 — Match recipes in the EPUB reader → in-page "save to favourites"
+
+While reading a book, the reader now recognises which recipe a rendered title names and injects a
+**save-to-favourites pill right next to that title** in the page. Builds on the EPUB reader + the
+favourites API (both now on `v2`).
+
+**Backend.** New lean `GET /api/books/{id}/recipe-index` → `[{id, name, is_favourite}]` for *every*
+recipe in the book, in book order (the search endpoint caps at 100; the matcher wants the full set).
+Favourite state is read from the default list, scoped to the book. New `RecipeIndexEntry` schema,
+pinned both sides via `contract/recipeindex.example.json` (+ `test_contract` / `contract.test`).
+
+**Matcher (`src/lib/reader/match.ts`).** Pure, dependency-free (so it unit-tests in plain vitest):
+`normaliseTitle` (lowercase, strip accents/apostrophes, drop leading "Chapter N:"/numbering,
+alphanumeric-collapse), `buildRecipeIndex` (by normalised name, first-wins), and `matchHeading`
+(exact match, then a *guarded* whole-phrase prefix fallback for trailing qualifiers). It returns
+null rather than guess — a wrong favourite is worse than a missed one. 15 unit tests.
+
+**Reader integration (`EpubReader.svelte`).** Fetches the recipe index alongside the EPUB; on each
+foliate `load` event it scans the section's content document and injects a clay `☆ Save` / `★ Saved`
+pill after any line that names a recipe, wired to `toggleFavourite`. Key discovery from live
+inspection: cookbook EPUBs (Calibre-converted) rarely use semantic headings — titles are **bold
+lines** (`<p class="calibre1"><b class="calibre3">PIERINA'S CRESCIA SFOGLIATA</b></p>`). So
+candidates are `h1–h6` **and** `b/strong`; cross-reference `<a>` links with the same text are
+excluded; bold candidates require an *exact* name match (headings may use the prefix fallback);
+nested duplicates are de-duped. The pill is injected into the same-origin content doc and styled via
+the existing `setStyles` content-CSS (so it themes with light/dark and resists the title's
+uppercase/italic).
+
+**Verified.** `make check` (ruff + ty + svelte-check, 0 errors), `make test` (backend incl. the
+recipe-index endpoint + favourite-reflection tests; frontend incl. 15 matcher + 2 new contract
+tests), `make verify` matrix green, `make build` ok. Live (Playwright, *Pasta Grannies*): paged to a
+recipe, the `☆ Save` pill appeared on the matched title, clicking it drove the Favourites list 4 → 5
+and flipped the pill to `★ Saved`; cross-reference links got no pill.
+
+**Limits / not done.** Matching is heuristic and title-markup-dependent (works on bold-line and
+heading titles; books that style titles only via positioning/size won't match). No reverse link
+(recipe → page) and no stored recipe↔location index — that remains future work. Reading position
+still isn't persisted.
