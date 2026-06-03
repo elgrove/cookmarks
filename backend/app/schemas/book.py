@@ -46,3 +46,14 @@ class BookDetail(BaseModel):
     has_epub: bool
     added: datetime | None
     recipes: list[RecipeRow]
+
+
+class RecipeIndexEntry(BaseModel):
+    """A book's recipe reduced to what the in-book reader matcher needs: id, name,
+    favourite state. The full set (uncapped), so headings can be matched to recipes."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+    is_favourite: bool

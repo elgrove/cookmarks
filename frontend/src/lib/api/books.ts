@@ -77,3 +77,25 @@ export async function fetchBookDetail(
 
 /** URL of the raw EPUB stream for a book (served by GET /api/books/{id}/epub). */
 export const epubUrl = (id: string): string => `/api/books/${id}/epub`;
+
+// Mirrors RecipeIndexEntry from GET /api/books/{id}/recipe-index (snake_case): every recipe in
+// the book (id · name · favourite state), used by the in-book reader to match headings to recipes.
+export const recipeIndexEntrySchema = z.object({
+	id: z.string().uuid(),
+	name: z.string(),
+	is_favourite: z.boolean()
+});
+
+export const recipeIndexResponseSchema = z.array(recipeIndexEntrySchema);
+
+export type RecipeIndexEntry = z.infer<typeof recipeIndexEntrySchema>;
+
+/** Fetch every recipe (id · name · favourite) for a book, in book order. */
+export async function fetchRecipeIndex(
+	bookId: string,
+	fetchFn: typeof fetch = fetch
+): Promise<RecipeIndexEntry[]> {
+	const res = await fetchFn(`/api/books/${bookId}/recipe-index`);
+	if (!res.ok) throw new Error(`GET /api/books/${bookId}/recipe-index → ${res.status}`);
+	return recipeIndexResponseSchema.parse(await res.json());
+}

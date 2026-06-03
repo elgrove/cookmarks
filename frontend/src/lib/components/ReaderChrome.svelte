@@ -165,6 +165,9 @@
 	.bar.top {
 		height: 3.4rem;
 		border-bottom: var(--border);
+		/* Equal side columns so the title is centred against the bar, not the gap between buttons. */
+		display: grid;
+		grid-template-columns: 1fr minmax(0, auto) 1fr;
 	}
 	.bar.bottom {
 		height: 3rem;
@@ -173,6 +176,7 @@
 	}
 
 	.back {
+		justify-self: start;
 		font-family: var(--f-grotesk);
 		font-size: 0.85rem;
 		font-weight: 500;
@@ -186,8 +190,9 @@
 	}
 
 	.title {
-		flex: 1;
+		justify-self: center;
 		min-width: 0;
+		max-width: 100%;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
@@ -211,6 +216,7 @@
 	}
 
 	.controls {
+		justify-self: end;
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
