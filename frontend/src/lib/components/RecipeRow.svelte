@@ -10,6 +10,8 @@
 </script>
 
 <script lang="ts">
+	import { cleanTitle } from '$lib/title';
+
 	// `contextQuery` carries the originating search (criteria + ordering) into the
 	// recipe link, so the detail page's prev/next follow the search order.
 	let {
@@ -23,6 +25,9 @@
 		onRemove
 	}: RecipeRowData & { contextQuery?: string; onRemove?: () => void } = $props();
 
+	// Calibre titles carry a subtitle after a colon; show the clean pre-colon title.
+	let displayTitle = $derived(cleanTitle(bookTitle));
+
 	// Rotating chip tints (DESIGN §3.1).
 	const tints = ['clay', 'blue', 'green'] as const;
 </script>
@@ -31,7 +36,7 @@
 	<div class="line">
 		<a class="name" href={`/recipes/${id}${contextQuery ? `?${contextQuery}` : ''}`}>{name}</a>
 		<a class="source" href={`/books/${bookId}`}>
-			{bookTitle}<span class="sep" aria-hidden="true">·</span><span class="author">{bookAuthor}</span>
+			{displayTitle}<span class="sep" aria-hidden="true">·</span><span class="author">{bookAuthor}</span>
 		</a>
 		{#if onRemove}
 			<button

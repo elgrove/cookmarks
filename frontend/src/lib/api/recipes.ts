@@ -68,9 +68,32 @@ export const recipeSearchResultsSchema = z.object({
 
 export const keywordsResponseSchema = z.array(keywordSummarySchema);
 
+// Mirrors GET /api/recipes/{id}/similar. `basis` records how the neighbours were
+// found: 'vector' = nearest by embedding; 'keyword' = the shared-keyword fallback
+// for recipes that carry no embedding.
+export const similarRecipesSchema = z.object({
+	basis: z.enum(['vector', 'keyword']),
+	items: z.array(recipeSummarySchema)
+});
+
 export type RecipeSummary = z.infer<typeof recipeSummarySchema>;
 export type RecipeSearchResults = z.infer<typeof recipeSearchResultsSchema>;
 export type KeywordSummary = z.infer<typeof keywordSummarySchema>;
+export type SimilarRecipesResponse = z.infer<typeof similarRecipesSchema>;
+
+/** Fetch recipes similar to `id` — embedding nearest-neighbours, with a shared-keyword
+ *  fallback server-side. Omit `limit` to take the server default (the full browse set);
+ *  pass it for a small slice (e.g. the recipe-page footer's 5). `fetchFn` is injectable. */
+export async function fetchSimilarRecipes(
+	id: string,
+	fetchFn: typeof fetch = fetch,
+	limit?: number
+): Promise<SimilarRecipesResponse> {
+	const qs = limit != null ? `?limit=${limit}` : '';
+	const res = await fetchFn(`/api/recipes/${id}/similar${qs}`);
+	if (!res.ok) throw new Error(`GET /api/recipes/${id}/similar → ${res.status}`);
+	return similarRecipesSchema.parse(await res.json());
+}
 
 export type SortKey = 'random' | 'name' | 'recent' | 'book';
 

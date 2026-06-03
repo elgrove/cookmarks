@@ -17,7 +17,9 @@ from app.schemas.recipe import (
     RecipeNeighbour,
     RecipeSearchResults,
     RecipeSummary,
+    SimilarRecipes,
 )
+from app.services.vector_store import VectorStore
 
 router = APIRouter(tags=["recipes"])
 
@@ -38,6 +40,18 @@ _SHUFFLE_HASH = 2654435761
 # Navigation orderings the recipe page can be reached through; "list" arrives with
 # that page, so unknown contexts resolve to book.
 SUPPORTED_CONTEXTS = {"book", "search"}
+
+
+def _summary(recipe: Recipe, book: Book) -> RecipeSummary:
+    """A recipe as a text-first list row (search results, similar-recipe lists)."""
+    return RecipeSummary(
+        id=recipe.id,
+        name=recipe.name,
+        book_id=book.id,
+        book_title=book.title,
+        book_author=book.author,
+        keywords=sorted(k.name for k in recipe.keywords),
+    )
 
 
 def _search_order(sort: Sort, seed: int) -> list:
@@ -119,17 +133,7 @@ def search_recipes(
         .options(selectinload(Recipe.keywords))
     ).all()
 
-    items = [
-        RecipeSummary(
-            id=recipe.id,
-            name=recipe.name,
-            book_id=book.id,
-            book_title=book.title,
-            book_author=book.author,
-            keywords=sorted(k.name for k in recipe.keywords),
-        )
-        for recipe, book in rows
-    ]
+    items = [_summary(recipe, book) for recipe, book in rows]
 
     # Facets: the keywords most common among the matching recipes, so the chips
     # can re-rank to what narrows further. Already-selected keywords are dropped
@@ -347,3 +351,73 @@ def get_recipe(
         previous=previous,
         next=next_,
     )
+
+
+# Similar recipes: nearest by embedding, with a shared-keyword fallback for the ~1%
+# of recipes that carry no vector. Computed on demand — no AI call, the recipe's own
+# stored embedding drives the KNN — and fetched lazily by the page, off its critical path.
+# The default fills the "Similar to <recipe>" browse page; the recipe-detail footer asks
+# for a small slice (limit=5) explicitly.
+SIMILAR_LIMIT_DEFAULT = 30
+
+
+def _load_ordered(session: Session, ids: list[uuid.UUID]) -> list[RecipeSummary]:
+    """Recipe summaries for `ids`, in that order — the KNN ranking is the order."""
+    if not ids:
+        return []
+    rows = session.execute(
+        select(Recipe, Book)
+        .join(Book, Recipe.book_id == Book.id)
+        .where(Recipe.id.in_(ids))
+        .options(selectinload(Recipe.keywords))
+    ).all()
+    by_id = {recipe.id: (recipe, book) for recipe, book in rows}
+    out: list[RecipeSummary] = []
+    for rid in ids:
+        pair = by_id.get(rid)
+        if pair is not None:
+            out.append(_summary(pair[0], pair[1]))
+    return out
+
+
+def _keyword_neighbours(session: Session, recipe: Recipe, limit: int) -> list[RecipeSummary]:
+    """Recipes sharing the most keywords with `recipe` (itself excluded) — the fallback
+    when there's no embedding. Empty when the recipe carries no keywords to match on."""
+    keyword_ids = [k.id for k in recipe.keywords]
+    if not keyword_ids:
+        return []
+    shared = func.count(recipe_keywords.c.keyword_id)
+    rows = session.execute(
+        select(Recipe, Book)
+        .join(Book, Recipe.book_id == Book.id)
+        .join(recipe_keywords, recipe_keywords.c.recipe_id == Recipe.id)
+        .where(recipe_keywords.c.keyword_id.in_(keyword_ids), Recipe.id != recipe.id)
+        .group_by(Recipe.id)
+        .order_by(shared.desc(), func.lower(Recipe.name))
+        .limit(limit)
+        .options(selectinload(Recipe.keywords))
+    ).all()
+    return [_summary(recipe, book) for recipe, book in rows]
+
+
+@router.get("/recipes/{recipe_id}/similar", response_model=SimilarRecipes)
+def similar_recipes(
+    recipe_id: uuid.UUID,
+    session: SessionDep,
+    limit: Annotated[int, Query(ge=1, le=50)] = SIMILAR_LIMIT_DEFAULT,
+) -> SimilarRecipes:
+    recipe = session.scalar(
+        select(Recipe).where(Recipe.id == recipe_id).options(selectinload(Recipe.keywords))
+    )
+    if recipe is None:
+        raise HTTPException(status_code=404, detail="recipe not found")
+
+    store = VectorStore(session)
+    embedding = store.get_embedding(recipe_id)
+    if embedding is not None:
+        neighbours = store.search_excluding(embedding, recipe_id, limit=limit)
+        return SimilarRecipes(
+            basis="vector",
+            items=_load_ordered(session, [nid for nid, _ in neighbours]),
+        )
+    return SimilarRecipes(basis="keyword", items=_keyword_neighbours(session, recipe, limit))

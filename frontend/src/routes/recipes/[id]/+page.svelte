@@ -3,7 +3,10 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import RecipeDetail, { type RecipeDetailData } from '$lib/components/RecipeDetail.svelte';
-	import { fetchRecipeDetail } from '$lib/api/recipes';
+	import SimilarRecipes, {
+		type SimilarRecipesData
+	} from '$lib/components/SimilarRecipes.svelte';
+	import { fetchRecipeDetail, fetchSimilarRecipes } from '$lib/api/recipes';
 	import {
 		addRecipeToList,
 		createList,
@@ -17,6 +20,9 @@
 	let recipe = $state<RecipeDetailData | null>(null);
 	// List memberships for the add-to-list control, loaded alongside the recipe.
 	let memberships = $state<ListMembership[] | undefined>(undefined);
+	// Similar recipes, fetched lazily after the page paints (KNN is off the critical
+	// path); undefined until they arrive, so the section only appears once loaded.
+	let similar = $state<SimilarRecipesData | undefined>(undefined);
 	// Monotonic guard so a slow earlier fetch can't overwrite a newer navigation.
 	let seq = 0;
 
@@ -37,13 +43,41 @@
 		if (def) recipe.isFavourite = def.contains;
 	}
 
+	// Load the similar-recipe neighbours. Guarded by the recipe id so a stale fetch
+	// from a previous navigation can't apply to the recipe now on screen.
+	// The footer shows a small slice (5); when it comes back full there are more to
+	// see, so we link on to the "/recipes?similar=<id>" browse page for the full set.
+	const SIMILAR_FOOTER_LIMIT = 5;
+
+	async function refreshSimilar(id: string) {
+		const r = await fetchSimilarRecipes(id, fetch, SIMILAR_FOOTER_LIMIT);
+		if (!recipe || recipe.id !== id) return;
+		similar = {
+			basis: r.basis,
+			recipes: r.items.map((it) => ({
+				id: it.id,
+				name: it.name,
+				bookId: it.book_id,
+				bookTitle: it.book_title,
+				bookAuthor: it.book_author,
+				keywords: it.keywords
+			})),
+			moreHref:
+				r.items.length >= SIMILAR_FOOTER_LIMIT
+					? `/recipes?similar=${encodeURIComponent(id)}`
+					: undefined
+		};
+	}
+
 	async function load(id: string, params: URLSearchParams) {
 		const mine = ++seq;
 		// Keep the current recipe on screen while the next loads (swap when ready,
 		// like the old HTMX partial) — only show the loading state on a cold start.
 		if (!recipe) status = 'loading';
-		// Hide the add-to-list control until this recipe's memberships arrive.
+		// Hide the add-to-list control and the similar section until this recipe's
+		// own data arrives, so neither lingers from the recipe just navigated away from.
 		memberships = undefined;
+		similar = undefined;
 		try {
 			const contextQuery = contextQueryOf(params);
 			const r = await fetchRecipeDetail(id, fetch, contextQuery);
@@ -80,6 +114,7 @@
 			refreshMemberships(id).catch((err) =>
 				console.error('failed to load list memberships', err)
 			);
+			refreshSimilar(id).catch((err) => console.error('failed to load similar recipes', err));
 		} catch (err) {
 			if (mine !== seq) return;
 			console.error('failed to load recipe', err);
@@ -180,6 +215,13 @@
 			{onToggleList}
 			{onCreateList}
 		/>
+		{#if similar}
+			<SimilarRecipes
+					recipes={similar.recipes}
+					basis={similar.basis}
+					moreHref={similar.moreHref}
+				/>
+		{/if}
 	{/key}
 {:else if status === 'loading'}
 	<div class="status"><p class="msg">Loading recipe…</p></div>

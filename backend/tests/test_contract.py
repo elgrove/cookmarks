@@ -13,7 +13,12 @@ from fastapi.testclient import TestClient
 
 from app.schemas.book import BookFilter, BookSummary, RecipeIndexEntry
 from app.schemas.home import HomeData
-from app.schemas.recipe import KeywordSummary, RecipeDetail, RecipeSearchResults
+from app.schemas.recipe import (
+    KeywordSummary,
+    RecipeDetail,
+    RecipeSearchResults,
+    SimilarRecipes,
+)
 from app.schemas.recipe_list import ListDetail, ListMembership, ListSummary
 
 CONTRACT_DIR = Path(__file__).resolve().parents[2] / "contract"
@@ -84,6 +89,12 @@ def test_home_endpoint_keys_match_contract(client: TestClient) -> None:
 def test_recipe_search_model_matches_contract() -> None:
     example = _example("recipes.example.json")
     dumped = RecipeSearchResults.model_validate(example).model_dump(mode="json")
+    assert dumped == example
+
+
+def test_similar_recipes_model_matches_contract() -> None:
+    example = _example("similar.example.json")
+    dumped = SimilarRecipes.model_validate(example).model_dump(mode="json")
     assert dumped == example
 
 
