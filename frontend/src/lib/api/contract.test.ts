@@ -9,6 +9,7 @@ import {
 } from './books';
 import { homeSchema } from './home';
 import { keywordSummarySchema, recipeDetailSchema, recipeSearchResultsSchema } from './recipes';
+import { listDetailSchema, listMembershipSchema, listSummarySchema } from './lists';
 
 // Frontend half of the API wire contract (see /contract/README.md): the Zod
 // schemas must accept the shared example the backend pins itself to, and reject
@@ -73,5 +74,32 @@ describe('api wire contract', () => {
 
 	it('accepts the keywords example', () => {
 		expect(() => keywordSummarySchema.parse(load('keywords.example.json'))).not.toThrow();
+	});
+
+	it('accepts the list summary example and the list wrapper', () => {
+		const example = load('listsummary.example.json');
+		expect(() => listSummarySchema.parse(example)).not.toThrow();
+	});
+
+	it('rejects a list summary example with a drifted field name', () => {
+		const example = load('listsummary.example.json');
+		const { recipe_count, ...rest } = example;
+		const drifted = { ...rest, recipeCount: recipe_count };
+		expect(() => listSummarySchema.parse(drifted)).toThrow();
+	});
+
+	it('accepts the list detail example', () => {
+		expect(() => listDetailSchema.parse(load('listdetail.example.json'))).not.toThrow();
+	});
+
+	it('accepts the list membership example', () => {
+		expect(() => listMembershipSchema.parse(load('listmembership.example.json'))).not.toThrow();
+	});
+
+	it('rejects a list membership example with a drifted field name', () => {
+		const example = load('listmembership.example.json');
+		const { contains, ...rest } = example;
+		const drifted = { ...rest, inList: contains };
+		expect(() => listMembershipSchema.parse(drifted)).toThrow();
 	});
 });

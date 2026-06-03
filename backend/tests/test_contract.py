@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 from app.schemas.book import BookFilter, BookSummary
 from app.schemas.home import HomeData
 from app.schemas.recipe import KeywordSummary, RecipeDetail, RecipeSearchResults
+from app.schemas.recipe_list import ListDetail, ListMembership, ListSummary
 
 CONTRACT_DIR = Path(__file__).resolve().parents[2] / "contract"
 
@@ -96,4 +97,50 @@ def test_recipes_endpoint_keys_match_contract(client: TestClient) -> None:
 def test_keywords_endpoint_keys_match_contract(client: TestClient) -> None:
     example = _example("keywords.example.json")
     item = client.get("/api/keywords").json()[0]
+    assert set(item.keys()) == set(example.keys())
+
+
+def test_list_summary_model_matches_contract() -> None:
+    example = _example("listsummary.example.json")
+    dumped = ListSummary.model_validate(example).model_dump(mode="json")
+    assert dumped == example
+
+
+def test_list_detail_model_matches_contract() -> None:
+    example = _example("listdetail.example.json")
+    dumped = ListDetail.model_validate(example).model_dump(mode="json")
+    assert dumped == example
+
+
+def test_list_membership_model_matches_contract() -> None:
+    example = _example("listmembership.example.json")
+    dumped = ListMembership.model_validate(example).model_dump(mode="json")
+    assert dumped == example
+
+
+def _a_recipe_id(client: TestClient) -> str:
+    book = next(b for b in client.get("/api/books").json() if b["title"] == "With Recipes")
+    return client.get(f"/api/books/{book['id']}").json()["recipes"][0]["id"]
+
+
+def test_lists_endpoint_keys_match_contract(client: TestClient) -> None:
+    example = _example("listsummary.example.json")
+    item = client.get("/api/lists").json()[0]
+    assert set(item.keys()) == set(example.keys())
+
+
+def test_list_detail_endpoint_keys_match_contract(client: TestClient) -> None:
+    example = _example("listdetail.example.json")
+    recipe_id = _a_recipe_id(client)
+    list_id = client.post("/api/lists", json={"name": "Test"}).json()["id"]
+    client.post(f"/api/lists/{list_id}/recipes", json={"recipe_id": recipe_id})
+    body = client.get(f"/api/lists/{list_id}").json()
+    assert set(body.keys()) == set(example.keys())
+    assert set(body["recipes"][0].keys()) == set(example["recipes"][0].keys())
+
+
+def test_recipe_lists_endpoint_keys_match_contract(client: TestClient) -> None:
+    example = _example("listmembership.example.json")
+    recipe_id = _a_recipe_id(client)
+    item = client.get(f"/api/recipes/{recipe_id}/lists").json()[0]
     assert set(item.keys()) == set(example.keys())

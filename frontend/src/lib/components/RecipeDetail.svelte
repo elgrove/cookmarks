@@ -12,6 +12,7 @@
 		yields: string | null;
 		keywords: string[];
 		hasImage: boolean;
+		isFavourite: boolean;
 		/** The navigation ordering this page was reached through ('book' | 'search'). */
 		context: string;
 		/** The query string carried into prev/next links so they keep this ordering. */
@@ -35,8 +36,24 @@
 <script lang="ts">
 	import { plainText } from '$lib/html';
 	import { cleanTitle } from '$lib/title';
+	import type { ListMembership } from '$lib/api/lists';
+	import FavouriteToggle from './FavouriteToggle.svelte';
+	import ListPicker from './ListPicker.svelte';
 
-	let { recipe }: { recipe: RecipeDetailData } = $props();
+	let {
+		recipe,
+		lists,
+		onToggleFavourite,
+		onToggleList,
+		onCreateList
+	}: {
+		recipe: RecipeDetailData;
+		/** List memberships for the add-to-list control; the picker is shown once loaded. */
+		lists?: ListMembership[];
+		onToggleFavourite?: () => void;
+		onToggleList?: (listId: string, contains: boolean) => void;
+		onCreateList?: (name: string) => void;
+	} = $props();
 
 	let coverFailed = $state(false);
 	let expanded = $state(false);
@@ -56,6 +73,7 @@
 	data-verify-steps={recipe.instructions.length}
 	data-verify-keywords={recipe.keywords.length}
 	data-verify-has-image={recipe.hasImage ? 'true' : 'false'}
+	data-verify-favourite={recipe.isFavourite ? 'true' : 'false'}
 	data-verify-context={recipe.context}
 	data-verify-prev={recipe.previous?.id ?? ''}
 	data-verify-next={recipe.next?.id ?? ''}
@@ -125,15 +143,14 @@
 				{/if}
 			</div>
 			<div class="actions">
-				<button class="btn primary" type="button">
-					Add to list <span class="ar" aria-hidden="true">›</span>
-				</button>
-				<button class="btn ghost" type="button">
-					Action
-					<svg class="ico" viewBox="0 0 14 14" aria-hidden="true" focusable="false">
-						<path d="M7 1.5v11M1.5 7h11" stroke="currentColor" stroke-width="1.4" fill="none" />
-					</svg>
-				</button>
+				<FavouriteToggle
+					isFavourite={recipe.isFavourite}
+					recipeName={recipe.name}
+					onToggle={onToggleFavourite}
+				/>
+				{#if lists}
+					<ListPicker {lists} onToggle={onToggleList} onCreate={onCreateList} />
+				{/if}
 			</div>
 		</div>
 	</header>
@@ -351,51 +368,11 @@
 		border-bottom-color: var(--clay);
 	}
 
+	/* Favourite ★ over the add-to-list control, stacked in the masthead rail. */
 	.actions {
 		display: flex;
 		flex-direction: column;
 		gap: 0.6rem;
-	}
-	.btn {
-		font-family: var(--f-grotesk);
-		font-weight: 600;
-		font-size: 0.9rem;
-		padding: 0.7rem 1rem;
-		border-radius: 3px;
-		text-align: center;
-		cursor: pointer;
-		border: 1px solid transparent;
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		transition:
-			background 0.18s var(--ease-out),
-			border-color 0.18s var(--ease-out),
-			color 0.18s var(--ease-out);
-	}
-	.btn.primary {
-		background: var(--ink);
-		color: var(--bg);
-	}
-	.btn.primary:hover {
-		background: var(--ink-deep);
-	}
-	.btn.primary .ar {
-		color: var(--bg);
-		font-weight: 400;
-	}
-	.btn.ghost {
-		background: transparent;
-		color: var(--ink);
-		border-color: var(--line-strong);
-	}
-	.btn.ghost:hover {
-		border-color: var(--clay);
-		color: var(--clay-deep);
-	}
-	.ico {
-		width: 0.85rem;
-		height: 0.85rem;
 	}
 
 	/* Body — ingredients rail + a wide method column fills the desktop width. */
@@ -530,9 +507,6 @@
 		}
 		.actions {
 			flex-direction: row;
-		}
-		.actions .btn {
-			flex: 1;
 		}
 		.body {
 			grid-template-columns: 1fr;

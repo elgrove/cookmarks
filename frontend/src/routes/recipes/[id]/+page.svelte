@@ -1,12 +1,22 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import RecipeDetail, { type RecipeDetailData } from '$lib/components/RecipeDetail.svelte';
 	import { fetchRecipeDetail } from '$lib/api/recipes';
+	import {
+		addRecipeToList,
+		createList,
+		fetchRecipeLists,
+		removeRecipeFromList,
+		toggleFavourite,
+		type ListMembership
+	} from '$lib/api/lists';
 
 	let status = $state<'loading' | 'error' | 'ready'>('loading');
 	let recipe = $state<RecipeDetailData | null>(null);
+	// List memberships for the add-to-list control, loaded alongside the recipe.
+	let memberships = $state<ListMembership[] | undefined>(undefined);
 	// Monotonic guard so a slow earlier fetch can't overwrite a newer navigation.
 	let seq = 0;
 
@@ -17,11 +27,23 @@
 		return p.toString();
 	}
 
+	// Refresh the add-to-list memberships and keep the favourite star in step with
+	// the default list. Guarded by the recipe id so a stale fetch can't apply.
+	async function refreshMemberships(id: string) {
+		const m = await fetchRecipeLists(id);
+		if (!recipe || recipe.id !== id) return;
+		memberships = m;
+		const def = m.find((l) => l.is_default);
+		if (def) recipe.isFavourite = def.contains;
+	}
+
 	async function load(id: string, params: URLSearchParams) {
 		const mine = ++seq;
 		// Keep the current recipe on screen while the next loads (swap when ready,
 		// like the old HTMX partial) — only show the loading state on a cold start.
 		if (!recipe) status = 'loading';
+		// Hide the add-to-list control until this recipe's memberships arrive.
+		memberships = undefined;
 		try {
 			const contextQuery = contextQueryOf(params);
 			const r = await fetchRecipeDetail(id, fetch, contextQuery);
@@ -47,6 +69,7 @@
 				yields: r.yields,
 				keywords: r.keywords,
 				hasImage: r.has_image,
+				isFavourite: r.is_favourite,
 				context: r.context,
 				contextQuery,
 				searchHref,
@@ -54,6 +77,9 @@
 				next: r.next
 			};
 			status = 'ready';
+			refreshMemberships(id).catch((err) =>
+				console.error('failed to load list memberships', err)
+			);
 		} catch (err) {
 			if (mine !== seq) return;
 			console.error('failed to load recipe', err);
@@ -62,12 +88,52 @@
 		}
 	}
 
+	async function onToggleFavourite() {
+		if (!recipe) return;
+		const id = recipe.id;
+		try {
+			const fav = await toggleFavourite(id);
+			if (recipe && recipe.id === id) recipe.isFavourite = fav;
+			await refreshMemberships(id);
+		} catch (err) {
+			console.error('failed to toggle favourite', err);
+		}
+	}
+
+	async function onToggleList(listId: string, contains: boolean) {
+		if (!recipe) return;
+		const id = recipe.id;
+		try {
+			if (contains) await removeRecipeFromList(listId, id);
+			else await addRecipeToList(listId, id);
+			await refreshMemberships(id);
+		} catch (err) {
+			console.error('failed to update list membership', err);
+		}
+	}
+
+	async function onCreateList(name: string) {
+		if (!recipe) return;
+		const id = recipe.id;
+		try {
+			const list = await createList(name);
+			await addRecipeToList(list.id, id);
+			await refreshMemberships(id);
+		} catch (err) {
+			console.error('failed to create list', err);
+		}
+	}
+
 	// Reload whenever the id or context query changes — prev/next reuses this route.
+	// Depend only on the route id + query string; run load() untracked so its reads
+	// and writes of `recipe`/`memberships` can't feed back and re-trigger the effect.
 	$effect(() => {
 		const id = $page.params.id;
-		const params = $page.url.searchParams;
-		if (id) load(id, params);
-		else status = 'error';
+		const search = $page.url.search;
+		untrack(() => {
+			if (id) load(id, new URLSearchParams(search));
+			else status = 'error';
+		});
 	});
 
 	function retry() {
@@ -107,7 +173,13 @@
 	<!-- Remount per recipe so component-local state (cover-failed, read-more) resets,
 	     but only once the next recipe's data has arrived — the old one stays until then. -->
 	{#key recipe.id}
-		<RecipeDetail {recipe} />
+		<RecipeDetail
+			{recipe}
+			lists={memberships}
+			{onToggleFavourite}
+			{onToggleList}
+			{onCreateList}
+		/>
 	{/key}
 {:else if status === 'loading'}
 	<div class="status"><p class="msg">Loading recipe…</p></div>

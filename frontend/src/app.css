@@ -192,6 +192,24 @@ a {
 	}
 }
 
+/* Smallest phones: a fourth nav item (Lists) no longer fits the comfortable row,
+   so tighten the gap, trim the wordmark and shrink the links to stay single-row
+   without horizontal scroll (DESIGN §8) — a proper drawer is future work. */
+@media (max-width: 480px) {
+	.nav {
+		gap: 0.6rem;
+		padding-left: 1rem;
+		padding-right: 1rem;
+	}
+	.nav .wordmark {
+		font-size: 1.15rem;
+		margin-right: 0;
+	}
+	.nav .navlink {
+		font-size: 0.82rem;
+	}
+}
+
 main {
 	/* Grow to fill the viewport so the footer pins to the bottom on short pages. */
 	flex: 1 0 auto;

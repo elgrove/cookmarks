@@ -19,8 +19,9 @@
 		bookTitle,
 		bookAuthor,
 		keywords,
-		contextQuery = ''
-	}: RecipeRowData & { contextQuery?: string } = $props();
+		contextQuery = '',
+		onRemove
+	}: RecipeRowData & { contextQuery?: string; onRemove?: () => void } = $props();
 
 	// Rotating chip tints (DESIGN §3.1).
 	const tints = ['clay', 'blue', 'green'] as const;
@@ -32,6 +33,16 @@
 		<a class="source" href={`/books/${bookId}`}>
 			{bookTitle}<span class="sep" aria-hidden="true">·</span><span class="author">{bookAuthor}</span>
 		</a>
+		{#if onRemove}
+			<button
+				class="remove"
+				type="button"
+				aria-label={`Remove ${name} from this list`}
+				onclick={() => onRemove?.()}
+			>
+				Remove
+			</button>
+		{/if}
 	</div>
 	{#if keywords.length}
 		<ul class="chips">
@@ -85,6 +96,24 @@
 	.sep {
 		margin: 0 0.4rem;
 		color: var(--faint);
+	}
+
+	.remove {
+		font-family: var(--f-grotesk);
+		font-size: 0.75rem;
+		font-weight: 600;
+		color: var(--muted);
+		background: none;
+		border: none;
+		border-bottom: 1px solid transparent;
+		padding: 0;
+		cursor: pointer;
+		white-space: nowrap;
+		transition: color 0.18s var(--ease-out);
+	}
+	.remove:hover {
+		color: var(--clay-deep);
+		border-bottom-color: var(--clay);
 	}
 
 	.chips {

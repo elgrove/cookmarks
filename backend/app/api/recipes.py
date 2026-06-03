@@ -10,6 +10,7 @@ from app.covers import has_cover
 from app.db import SessionDep
 from app.models.book import Book
 from app.models.recipe import Keyword, Recipe, recipe_keywords
+from app.models.recipe_list import RecipeList, RecipeListItem
 from app.schemas.recipe import (
     KeywordSummary,
     RecipeDetail,
@@ -219,6 +220,23 @@ def _neighbour(session: Session, recipe_id: uuid.UUID | None) -> RecipeNeighbour
     return RecipeNeighbour(id=row.id, name=row.name) if row else None
 
 
+def _is_favourite(session: Session, recipe_id: uuid.UUID) -> bool:
+    """Whether the recipe sits in the default Favourites list. A pure read — it
+    never creates the list, so an unstarred recipe on a fresh DB reads False."""
+    fav_id = session.scalar(select(RecipeList.id).where(RecipeList.is_default.is_(True)))
+    if fav_id is None:
+        return False
+    return (
+        session.scalar(
+            select(RecipeListItem.id).where(
+                RecipeListItem.recipe_list_id == fav_id,
+                RecipeListItem.recipe_id == recipe_id,
+            )
+        )
+        is not None
+    )
+
+
 # Cache of ordered result ids per search, so stepping prev/next through a search
 # doesn't re-run the (relatively costly) query on every press. Keyed by the exact
 # criteria + seed, which the client holds stable across one search; a small LRU is
@@ -324,6 +342,7 @@ def get_recipe(
         yields=recipe.yields,
         keywords=sorted(k.name for k in recipe.keywords),
         has_image=recipe.image is not None,
+        is_favourite=_is_favourite(session, recipe.id),
         context=resolved_context,
         previous=previous,
         next=next_,
