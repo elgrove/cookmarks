@@ -1006,3 +1006,57 @@ recipes (accepted, by choice). No precomputed neighbours table (the ~149ms KNN i
 path); the browse view shows a single ranked page of 30 with no pagination. The search milestone
 still owns query-embedding *generation* and the embedding write-path for new extractions; this slice
 only *reads* the imported vectors.
+## 2026-06-03 — AI (semantic) search on the Recipes page
+
+Wired the long-stubbed embedding hook into a working **semantic search**, sitting alongside the
+existing keyword/facet search on `/recipes` as a second affordance.
+
+**Shape.** Embedding-only — no generative LLM in the hot path. A query is embedded once and matched
+against recipe vectors by cosine KNN (sqlite-vec `vec0`); results come back ranked by distance. Each
+recipe is embedded from `recipe_to_text` = name + keywords + ingredients (v1 parity, so the 13,275
+Gemini vectors carried over by the import script are reused as-is — zero re-embedding).
+
+**Provider abstraction.** Added `embed()`/`embed_batch()` + `embedding_model`/`embedding_dimensions`
+to `AIProvider` (with an `EmbedTask.DOCUMENT|QUERY` hint). Only **Gemini** is wired now
+(`gemini-embedding-001`, 3072-dim); **Stub** returns deterministic BLAKE2b hash vectors so search
+runs offline in tests/dev; **OpenRouter** inherits the base `NotImplementedError`. The shape is ready
+for more providers + a re-embed-on-switch flow, but that's deferred — the `vec0` width is fixed at
+3072 and switching embedding models would mean a full re-embed.
+
+**Service + endpoint.** `app/services/embeddings.py` is the embedding *generation* layer on top of
+`app/services/vector_store.py` (the `VectorStore` that owns the vec0 table, shared with similar
+recipes): `recipe_to_text`, `embed_recipes` (provider → `VectorStore.upsert`), `search` (embed the
+query → `VectorStore.search`), `backfill` (over `VectorStore.embedded_ids`). `GET
+/api/recipes/semantic?q&limit` returns
+`SemanticSearchResults {available, query, total, items}` where each item is a `RecipeSummary` +
+`distance`; declared before `/recipes/{recipe_id}` so "semantic" isn't parsed as an id.
+`available:false` (no embedding-capable provider) is kept distinct from an available search that
+matched nothing, so the UI prompts to configure a provider rather than implying the library is empty.
+The extraction hook (`generate_recipe_embeddings`) now calls `embed_recipes`, so newly-extracted
+recipes are searchable; `scripts/backfill_embeddings.py` fills any gaps.
+
+Query embeddings are served from a small in-process LRU (256 entries, keyed by `(model, query)`), so a
+repeated query — back-navigation, re-pressing AI search, a reopened shared URL — skips the provider
+round-trip while the vec0 KNN still runs against live data (results never go stale). Measured on the
+full library: a cold query ~690 ms (incl. the Gemini call) vs ~220 ms cached. The cost saving is
+negligible at single-user volume — this is a latency/resilience win, not a cost one.
+
+**UI — one box, two icon buttons.** After reviewing five layout mockups, settled on a single search
+input on `/recipes` with two inline icon triggers: a **magnifier** (keyword, ink-filled) and a
+**spark** — "AI search", clay-outlined: a single drawn 4-point star, not the emoji ✨ cluster, kept
+restrained per DESIGN. Typing / Enter / the magnifier run the live keyword search; the spark runs the
+AI search on the current text. The box owns a live `mode` (internally `keyword`/`semantic`); in AI-search
+mode the keyword filters (book/author/sort/chips) fade back — they don't shape the results — but stay
+live (touching one returns to keyword), and the count line reads "N results · most relevant first"
+with no pager. `?mode=ai` in the URL restores AI-search mode. Results open recipes in book context (no
+AI-search prev/next ordering — deferred), and the truthful unavailable state ("Semantic search needs an
+AI provider configured.") shows when no provider can embed.
+
+**Verified.** `make check` (ruff + ty + svelte-check, 0/0); 141 backend tests — new
+`test_semantic_search` exercises the full HTTP endpoint + vec0 search with the stub provider
+(exact-text ranks first at distance 0; unavailable without a provider; backfill embeds only what's
+missing) — plus the contract pin (`semanticsearch.example.json`, both sides); 64 frontend tests incl.
+the verify matrix's new `semantic-results` / `semantic-unavailable` / `switch-to-ai` fixtures. Live
+end-to-end (headless Chrome on a seeded stub DB): `/recipes?mode=ai` ranks results with dimmed
+filters, `?q=dal` does keyword search with facets, and the unavailable + 390px mobile states render
+per DESIGN.

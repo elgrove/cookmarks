@@ -13,6 +13,7 @@ from app.models.extraction import ExtractionRun
 from app.models.recipe import Keyword, Recipe
 from app.schemas.extraction import RecipeData
 from app.services.ai import get_config
+from app.services.embeddings import embed_recipes
 from app.services.extraction.graph import get_extraction_graph
 from app.tasks.celery_app import celery_app
 
@@ -28,9 +29,10 @@ def _thread_id(run_id: str) -> str:
 
 
 def generate_recipe_embeddings(session: Session, recipes: list[Recipe]) -> None:
-    """Hook for recipe embedding generation, wired in the search milestone. Extraction
-    completes without embeddings today; search backfills them when it lands."""
-    return None
+    """Embed the just-saved recipes so they're semantically searchable. Best-effort:
+    a no-op when no embedding-capable provider is configured, so extraction always
+    completes. Writes ride the caller's transaction (committed by save_recipes...)."""
+    embed_recipes(session, recipes)
 
 
 def _get_or_create_keyword(session: Session, name: str) -> Keyword:

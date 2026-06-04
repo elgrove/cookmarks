@@ -5,7 +5,7 @@ from typing import ClassVar
 from google import genai
 from google.genai.types import GenerateContentConfigDict
 
-from app.services.ai.base import AIProvider, ModelRole, Usage
+from app.services.ai.base import AIProvider, EmbedTask, ModelRole, Usage
 
 logger = logging.getLogger(__name__)
 logging.getLogger("google.genai").setLevel(logging.ERROR)
@@ -26,6 +26,8 @@ class GeminiProvider(AIProvider):
         ModelRole.ONE_RECIPE_PER_FILE: "gemini-2.5-flash-lite",
         ModelRole.BLOCKS_OF_FILES: "gemini-2.5-flash",
     }
+    embedding_model: ClassVar[str] = "gemini-embedding-001"
+    embedding_dimensions: ClassVar[int] = 3072
 
     def __init__(self, api_key: str, model_overrides: dict[str, str] | None = None) -> None:
         super().__init__(api_key, model_overrides)
@@ -68,3 +70,26 @@ class GeminiProvider(AIProvider):
             )
 
         return response.text or "", usage
+
+    def embed(self, text: str, task: EmbedTask) -> list[float]:
+        response = self.client.models.embed_content(
+            model=self.embedding_model, contents=text, config={"task_type": task.value}
+        )
+        embeddings = response.embeddings or []
+        if not embeddings or embeddings[0].values is None:
+            raise RuntimeError("Gemini returned no embedding")
+        return list(embeddings[0].values)
+
+    def embed_batch(self, texts: list[str], task: EmbedTask) -> list[list[float]]:
+        response = self.client.models.embed_content(
+            model=self.embedding_model, contents=texts, config={"task_type": task.value}
+        )
+        embeddings = response.embeddings or []
+        if len(embeddings) != len(texts):
+            raise RuntimeError(f"Gemini returned {len(embeddings)} embeddings for {len(texts)} texts")
+        out: list[list[float]] = []
+        for embedding in embeddings:
+            if embedding.values is None:
+                raise RuntimeError("Gemini returned an empty embedding")
+            out.append(list(embedding.values))
+        return out

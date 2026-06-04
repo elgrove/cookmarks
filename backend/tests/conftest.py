@@ -13,6 +13,7 @@ from app.api.recipes import _clear_keyword_cache, _clear_search_order_cache
 from app.db import get_session
 from app.main import app
 from app.models import Base, Book, Keyword, Recipe
+from app.services.embeddings import _clear_query_embed_cache
 
 
 @pytest.fixture(autouse=True)
@@ -21,9 +22,11 @@ def _reset_caches() -> Iterator[None]:
     # recipe ids / its own keyword set) never reads a previous test's cached values.
     _clear_search_order_cache()
     _clear_keyword_cache()
+    _clear_query_embed_cache()
     yield
     _clear_search_order_cache()
     _clear_keyword_cache()
+    _clear_query_embed_cache()
 
 
 def _seed(session: Session) -> None:

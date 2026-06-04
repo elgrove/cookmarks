@@ -17,6 +17,7 @@ from app.schemas.recipe import (
     KeywordSummary,
     RecipeDetail,
     RecipeSearchResults,
+    SemanticSearchResults,
     SimilarRecipes,
 )
 from app.schemas.recipe_list import ListDetail, ListMembership, ListSummary
@@ -115,6 +116,21 @@ def test_keywords_endpoint_keys_match_contract(client: TestClient) -> None:
     example = _example("keywords.example.json")
     item = client.get("/api/keywords").json()[0]
     assert set(item.keys()) == set(example.keys())
+
+
+def test_semantic_search_model_matches_contract() -> None:
+    example = _example("semanticsearch.example.json")
+    dumped = SemanticSearchResults.model_validate(example).model_dump(mode="json")
+    assert dumped == example
+
+
+def test_semantic_endpoint_keys_match_contract(client: TestClient) -> None:
+    # No provider is configured in tests, so this returns the unavailable shape — but
+    # the top-level keys are the contract regardless; item keys are pinned by the
+    # model round-trip above and exercised live in test_semantic_search.
+    example = _example("semanticsearch.example.json")
+    body = client.get("/api/recipes/semantic", params={"q": "pasta"}).json()
+    assert set(body.keys()) == set(example.keys())
 
 
 def test_list_summary_model_matches_contract() -> None:
