@@ -3,8 +3,24 @@ import json
 from decimal import Decimal
 from typing import ClassVar
 
-from app.services.ai.base import AIProvider, ModelRole, Usage
+from app.services.ai.base import AIProvider, EmbedTask, ModelRole, Usage
 from app.services.prompts import DEDUPLICATE_KEYWORDS_PROMPT, IMAGE_MATCH_CHECK_PROMPT
+
+
+def _hash_vector(text: str, dim: int) -> list[float]:
+    """A deterministic pseudo-random vector for `text`: identical text yields an
+    identical vector (so a query equal to a document is distance 0), different text
+    diverges. No semantic meaning — enough to exercise the vec0 search path offline."""
+    out: list[float] = []
+    counter = 0
+    while len(out) < dim:
+        digest = hashlib.blake2b(f"{text}:{counter}".encode(), digest_size=64).digest()
+        for i in range(0, len(digest), 4):
+            if len(out) >= dim:
+                break
+            out.append(int.from_bytes(digest[i : i + 4], "big") / 0xFFFFFFFF * 2 - 1)
+        counter += 1
+    return out
 
 
 class StubProvider(AIProvider):
@@ -21,6 +37,8 @@ class StubProvider(AIProvider):
         ModelRole.ONE_RECIPE_PER_FILE: "stub-extract",
         ModelRole.BLOCKS_OF_FILES: "stub-extract",
     }
+    # Matches the production (Gemini) width so stub vectors share the vec0 table.
+    embedding_dimensions: ClassVar[int] = 3072
 
     def _complete(
         self, prompt: str, model: str, *, schema: dict | None = None, temp: float = 0
@@ -45,3 +63,9 @@ class StubProvider(AIProvider):
             "keywords": ["Stub", "Dev"],
         }
         return json.dumps([recipe]), usage
+
+    def embed(self, text: str, task: EmbedTask) -> list[float]:
+        return _hash_vector(text, self.embedding_dimensions)
+
+    def embed_batch(self, texts: list[str], task: EmbedTask) -> list[list[float]]:
+        return [_hash_vector(text, self.embedding_dimensions) for text in texts]

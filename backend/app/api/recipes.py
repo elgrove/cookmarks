@@ -17,8 +17,11 @@ from app.schemas.recipe import (
     RecipeNeighbour,
     RecipeSearchResults,
     RecipeSummary,
+    SemanticResult,
+    SemanticSearchResults,
     SimilarRecipes,
 )
+from app.services import embeddings
 from app.services.vector_store import VectorStore
 
 router = APIRouter(tags=["recipes"])
@@ -156,6 +159,55 @@ def search_recipes(
     ]
 
     return RecipeSearchResults(total=total, items=items, facets=facets)
+
+
+# Declared before GET /recipes/{recipe_id} so "semantic" isn't parsed as a recipe id.
+@router.get("/recipes/semantic", response_model=SemanticSearchResults)
+def semantic_search(
+    session: SessionDep,
+    q: Annotated[str, Query()] = "",
+    limit: Annotated[int, Query(ge=1, le=100)] = 30,
+) -> SemanticSearchResults:
+    # Empty query → the resting state: available, nothing asked for yet.
+    query = q.strip()
+    if not query:
+        return SemanticSearchResults(available=True, query="", total=0, items=[])
+
+    matches = embeddings.search(session, query, limit)
+    if matches is None:
+        # No embedding-capable provider configured — the UI prompts to set one up
+        # rather than implying the library is empty.
+        return SemanticSearchResults(available=False, query=query, total=0, items=[])
+
+    ids = [recipe_id for recipe_id, _ in matches]
+    rows = session.execute(
+        select(Recipe, Book)
+        .join(Book, Recipe.book_id == Book.id)
+        .where(Recipe.id.in_(ids))
+        .options(selectinload(Recipe.keywords))
+    ).all()
+    by_id = {recipe.id: (recipe, book) for recipe, book in rows}
+
+    # Walk `matches` (already distance-ordered) so the response preserves relevance
+    # order — the SELECT above returns rows in id order, not distance order.
+    items: list[SemanticResult] = []
+    for recipe_id, distance in matches:
+        pair = by_id.get(recipe_id)
+        if pair is None:
+            continue
+        recipe, book = pair
+        items.append(
+            SemanticResult(
+                id=recipe.id,
+                name=recipe.name,
+                book_id=book.id,
+                book_title=book.title,
+                book_author=book.author,
+                keywords=sorted(k.name for k in recipe.keywords),
+                distance=distance,
+            )
+        )
+    return SemanticSearchResults(available=True, query=query, total=len(items), items=items)
 
 
 # The global most-used keywords are identical for every caller until the corpus

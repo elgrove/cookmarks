@@ -2,15 +2,23 @@
 	import type { KeywordSummary, RecipeSearchResults, SearchCriteria, SortKey } from '$lib/api/recipes';
 
 	export type SearchStatus = 'resting' | 'loading' | 'results' | 'empty' | 'error';
+	// Which search the box last ran. Keyword = literal match shaped by the filters;
+	// semantic = ranked by meaning, with the filters set aside.
+	export type SearchMode = 'keyword' | 'semantic';
 
 	export type RecipesSearchProps = {
 		status?: SearchStatus;
+		mode?: SearchMode;
 		results?: RecipeSearchResults;
+		// False when semantic search can't run (no embedding-capable provider): the
+		// results area says so instead of implying nothing matched.
+		semanticAvailable?: boolean;
 		keywords?: KeywordSummary[];
 		books?: { id: string; title: string }[];
 		authors?: string[];
 		criteria?: SearchCriteria;
 		onSearch?: (criteria: SearchCriteria) => void;
+		onSemanticSearch?: (query: string) => void;
 	};
 </script>
 
@@ -20,12 +28,15 @@
 
 	let {
 		status = 'resting',
+		mode = 'keyword',
 		results = { total: 0, items: [], facets: [] },
+		semanticAvailable = true,
 		keywords = [],
 		books = [],
 		authors = [],
 		criteria = {},
-		onSearch
+		onSearch,
+		onSemanticSearch
 	}: RecipesSearchProps = $props();
 
 	const sortOptions: { key: SortKey; label: string }[] = [
@@ -47,17 +58,21 @@
 	let author = $state(seed.author ?? '');
 	let sort = $state<SortKey>(seed.sort ?? 'random');
 	let offset = $state(seed.offset ?? 0);
+	// The active search mode is live in the box (a button press flips it); seeded
+	// from the prop so a restored ?mode=idea URL opens in semantic mode.
+	// svelte-ignore state_referenced_locally
+	let searchMode = $state<SearchMode>(mode);
 
 	// Random sort is seeded so a result set keeps its order across pagination; a
 	// fresh seed is minted each time a *new* search starts (not on prev/next).
 	let randomSeed = seed.seed ?? 0;
 
-	let active = $derived(
-		Boolean(query.trim() || selected.length || bookId || author)
-	);
+	let active = $derived(Boolean(query.trim() || selected.length || bookId || author));
+	let isSemantic = $derived(searchMode === 'semantic');
 
 	// Carried into each result's link so the recipe page's prev/next follow this
-	// exact search (filters + sort + seed).
+	// exact search (keyword filters + sort + seed). Semantic results have no such
+	// ordering wired, so they open in the recipe's own book context.
 	let contextQuery = $derived(
 		searchContextQuery({
 			q: query,
@@ -157,7 +172,11 @@
 	let canPrev = $derived(offset > 0);
 	let canNext = $derived(offset + limit < results.total);
 
-	function emit(resetOffset = true): void {
+	// Run the keyword search. Any keyword-side interaction (typing, a chip, a
+	// filter, the magnifier) routes through here and switches the box to keyword
+	// mode, so the filters always describe what's on screen.
+	function emitKeyword(resetOffset = true): void {
+		searchMode = 'keyword';
 		if (resetOffset) {
 			offset = 0;
 			// New search → reshuffle. Pagination (resetOffset=false) keeps the seed
@@ -176,33 +195,58 @@
 		});
 	}
 
+	// Run the semantic search on the current text — the only path into semantic
+	// mode (the lightbulb / Enter-on-the-idea side). Disabled while the box is empty.
+	function runSemantic(): void {
+		if (!query.trim()) return;
+		// Cancel any pending debounced keyword search from earlier typing.
+		clearTimeout(debounce);
+		searchMode = 'semantic';
+		onSemanticSearch?.(query.trim());
+	}
+
 	let debounce: ReturnType<typeof setTimeout>;
 	function onQueryInput(value: string): void {
 		query = value;
 		clearTimeout(debounce);
-		debounce = setTimeout(() => emit(), 250);
+		// Typing is the live keyword search; semantic is always an explicit press.
+		debounce = setTimeout(() => emitKeyword(), 250);
+	}
+
+	function onSearchKeydown(e: KeyboardEvent): void {
+		if (e.key === 'Enter') {
+			e.preventDefault();
+			clearTimeout(debounce);
+			emitKeyword();
+		}
+	}
+
+	function clearSearch(): void {
+		query = '';
+		clearTimeout(debounce);
+		emitKeyword();
 	}
 
 	function toggleKeyword(name: string): void {
 		selected = selected.includes(name)
 			? selected.filter((k) => k !== name)
 			: [...selected, name];
-		emit();
+		emitKeyword();
 	}
 
 	function clearKeywords(): void {
 		if (!selected.length) return;
 		selected = [];
-		emit();
+		emitKeyword();
 	}
 
 	function prev(): void {
 		offset = Math.max(0, offset - limit);
-		emit(false);
+		emitKeyword(false);
 	}
 	function next(): void {
 		offset = offset + limit;
-		emit(false);
+		emitKeyword(false);
 	}
 </script>
 
@@ -210,8 +254,10 @@
 	class="search"
 	data-verify-unit="recipes-search"
 	data-verify-status={status}
+	data-verify-mode={searchMode}
 	data-verify-resting={status === 'resting' ? 'true' : 'false'}
 	data-verify-active={active ? 'true' : 'false'}
+	data-verify-available={semanticAvailable ? 'true' : 'false'}
 	data-verify-total={results.total}
 	data-verify-shown={results.items.length}
 	data-verify-query={query}
@@ -225,47 +271,40 @@
 		<h1 class="display">Recipes</h1>
 	</header>
 
-	<div class="controls">
-		<div class="searchbox">
-			<input
-				type="search"
-				class="search-input"
-				placeholder="Search by name, ingredient, keyword, book or author…"
-				aria-label="Search recipes"
-				value={query}
-				oninput={(e) => onQueryInput(e.currentTarget.value)}
-			/>
-			{#if query}
-				<button
-					class="clear"
-					aria-label="Clear search"
-					onclick={() => {
-						query = '';
-						emit();
-					}}>×</button
-				>
-			{/if}
-		</div>
-
-		<label class="sort">
-			<span class="label">Sort</span>
-			<select
-				class="select"
-				aria-label="Sort recipes"
-				value={sort}
-				oninput={(e) => {
-					sort = e.currentTarget.value as SortKey;
-					emit();
-				}}
-			>
-				{#each sortOptions as opt (opt.key)}
-					<option value={opt.key}>{opt.label}</option>
-				{/each}
-			</select>
-		</label>
+	<div class="searchrow">
+		<input
+			type="search"
+			class="search-input"
+			placeholder="Search recipes, or describe a dish…"
+			aria-label="Search recipes"
+			value={query}
+			oninput={(e) => onQueryInput(e.currentTarget.value)}
+			onkeydown={onSearchKeydown}
+		/>
+		{#if query}
+			<button class="clear" aria-label="Clear search" onclick={clearSearch}>×</button>
+		{/if}
+		<button
+			class="iconbtn ib-search"
+			type="button"
+			aria-label="Search"
+			title="Search"
+			onclick={() => emitKeyword()}
+		>
+			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7.5" /><line x1="16.8" y1="16.8" x2="21" y2="21" /></svg>
+		</button>
+		<button
+			class="iconbtn ib-ai"
+			type="button"
+			aria-label="AI search"
+			title="AI search — describe a dish"
+			onclick={runSemantic}
+		>
+			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3-1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3L12 3Z" /></svg>
+		</button>
 	</div>
 
-	<div class="filters">
+	<div class="filters" class:dimmed={isSemantic}>
 		<label class="filter">
 			<span class="label">Book</span>
 			<select
@@ -274,7 +313,7 @@
 				value={bookId}
 				oninput={(e) => {
 					bookId = e.currentTarget.value;
-					emit();
+					emitKeyword();
 				}}
 			>
 				<option value="">All books</option>
@@ -292,7 +331,7 @@
 				value={author}
 				oninput={(e) => {
 					author = e.currentTarget.value;
-					emit();
+					emitKeyword();
 				}}
 			>
 				<option value="">All authors</option>
@@ -301,10 +340,27 @@
 				{/each}
 			</select>
 		</label>
+
+		<label class="filter">
+			<span class="label">Sort</span>
+			<select
+				class="select"
+				aria-label="Sort recipes"
+				value={sort}
+				oninput={(e) => {
+					sort = e.currentTarget.value as SortKey;
+					emitKeyword();
+				}}
+			>
+				{#each sortOptions as opt (opt.key)}
+					<option value={opt.key}>{opt.label}</option>
+				{/each}
+			</select>
+		</label>
 	</div>
 
 	{#if chips.length}
-		<section class="keywords">
+		<section class="keywords" class:dimmed={isSemantic}>
 			<div class="keywords-head">
 				<p class="label kw-label">Keywords</p>
 				{#if selected.length}
@@ -346,12 +402,22 @@
 			</ul>
 		{:else if status === 'error'}
 			<p class="state">Couldn’t run the search. Try again.</p>
+		{:else if isSemantic && !semanticAvailable}
+			<p class="state">Semantic search needs an AI provider configured.</p>
 		{:else if status === 'resting'}
 			<!-- Empty until a query: the controls above are the whole prompt. -->
 		{:else if results.items.length === 0}
-			<p class="state">No recipes match your search.</p>
+			<p class="state">
+				{isSemantic ? 'No recipes match your description.' : 'No recipes match your search.'}
+			</p>
 		{:else}
-			<p class="count mono">{rangeStart}–{rangeEnd} of {results.total}</p>
+			<p class="count mono">
+				{#if isSemantic}
+					{results.total} {results.total === 1 ? 'result' : 'results'} · most relevant first
+				{:else}
+					{rangeStart}–{rangeEnd} of {results.total}
+				{/if}
+			</p>
 			<ul class="rows">
 				{#each results.items as r (r.id)}
 					<RecipeRow
@@ -361,11 +427,11 @@
 						bookTitle={r.book_title}
 						bookAuthor={r.book_author}
 						keywords={r.keywords}
-						{contextQuery}
+						contextQuery={isSemantic ? '' : contextQuery}
 					/>
 				{/each}
 			</ul>
-			{#if canPrev || canNext}
+			{#if !isSemantic && (canPrev || canNext)}
 				<nav class="pager" aria-label="Pagination">
 					<button class="page-btn" disabled={!canPrev} onclick={prev}>← Previous</button>
 					<button class="page-btn" disabled={!canNext} onclick={next}>Next →</button>
@@ -396,31 +462,24 @@
 		margin: 0.2rem 0 0;
 	}
 
-	.controls {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: 1rem 1.5rem;
-		margin-bottom: 1.1rem;
-	}
-
-	.searchbox {
-		position: relative;
+	/* One box, two inline icon triggers — magnifier (keyword) + lightbulb (idea). */
+	.searchrow {
 		display: flex;
 		align-items: center;
-		flex: 1 1 22rem;
-		min-width: 0;
+		gap: 0.55rem;
+		margin-bottom: 1.4rem;
 	}
 
 	.search-input {
-		width: 100%;
+		flex: 1 1 auto;
+		min-width: 0;
 		font-family: var(--f-grotesk);
 		font-size: 1.05rem;
 		color: var(--ink);
 		background: transparent;
 		border: none;
 		border-bottom: 1px solid var(--line-strong);
-		padding: 0.6rem 1.5rem 0.6rem 0;
+		padding: 0.6rem 0.25rem 0.6rem 0;
 		transition: border-color 0.18s var(--ease-out);
 	}
 
@@ -435,12 +494,12 @@
 	}
 
 	.search-input:focus {
+		outline: none;
 		border-bottom-color: var(--clay);
 	}
 
 	.clear {
-		position: absolute;
-		right: 0;
+		flex: none;
 		display: flex;
 		background: none;
 		border: none;
@@ -455,7 +514,62 @@
 		color: var(--clay-deep);
 	}
 
-	.sort,
+	.iconbtn {
+		flex: none;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 2.65rem;
+		height: 2.65rem;
+		border-radius: 3px;
+		cursor: pointer;
+		transition:
+			background 0.18s var(--ease-out),
+			border-color 0.18s var(--ease-out),
+			color 0.18s var(--ease-out),
+			opacity 0.18s var(--ease-out);
+	}
+
+	.iconbtn svg {
+		display: block;
+		width: 1.15rem;
+		height: 1.15rem;
+	}
+
+	.ib-search {
+		background: var(--ink);
+		color: var(--bg);
+		border: 1px solid var(--ink);
+	}
+
+	.ib-search:hover {
+		opacity: 0.85;
+	}
+
+	.ib-ai {
+		background: none;
+		color: var(--clay-deep);
+		border: 1px solid var(--clay);
+	}
+
+	.ib-ai:hover {
+		background: var(--chip-clay);
+	}
+
+	/* In semantic mode the keyword filters don't shape the results — fade them back
+	   so that reads, while leaving them live (touching one returns to keyword). */
+	.dimmed {
+		opacity: 0.45;
+		transition: opacity 0.18s var(--ease-out);
+	}
+
+	.filters {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 1rem 1.5rem;
+		margin-bottom: 1.25rem;
+	}
+
 	.filter {
 		display: inline-flex;
 		align-items: center;
@@ -476,13 +590,6 @@
 		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M1 1.5l4 4 4-4' fill='none' stroke='%2386847b' stroke-width='1.5'/%3E%3C/svg%3E");
 		background-repeat: no-repeat;
 		background-position: right 0.65rem center;
-	}
-
-	.filters {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 1rem 1.5rem;
-		margin-bottom: 1.25rem;
 	}
 
 	.keywords {

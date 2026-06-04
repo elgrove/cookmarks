@@ -91,3 +91,8 @@ class VectorStore:
             text("INSERT INTO recipe_embeddings (recipe_id, embedding) VALUES (:rid, :emb)"),
             {"rid": key, "emb": sqlite_vec.serialize_float32(embedding)},
         )
+
+    def embedded_ids(self) -> set[uuid.UUID]:
+        """The ids of every recipe that already has a stored vector (for backfill)."""
+        rows = self._session.execute(text("SELECT recipe_id FROM recipe_embeddings")).all()
+        return {uuid.UUID(row[0]) for row in rows}

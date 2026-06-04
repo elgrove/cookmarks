@@ -116,6 +116,38 @@ const unit: VerifiableUnit<Props> = {
 			act: ({ click }) => click(CHIP)
 		},
 		{
+			id: 'semantic-results',
+			description: 'a By idea search: relevance-ranked rows, no pager, filters dimmed',
+			props: {
+				status: 'results',
+				mode: 'semantic',
+				criteria: { q: 'cosy autumn braise' },
+				results: { total: 2, items: twoResults, facets: [] },
+				keywords: chips
+			}
+		},
+		{
+			id: 'semantic-unavailable',
+			description: 'By idea with no embedding provider: a clear unavailable message, not "no matches"',
+			props: {
+				status: 'empty',
+				mode: 'semantic',
+				semanticAvailable: false,
+				criteria: { q: 'anything' },
+				results: { total: 0, items: [], facets: [] },
+				keywords: chips
+			}
+		},
+		{
+			id: 'switch-to-ai',
+			description: 'typing then pressing the AI-search button switches the box into semantic mode',
+			props: { status: 'resting', keywords: chips },
+			act: ({ type, click }) => {
+				type(SEARCH, 'something warming');
+				click('.ib-ai');
+			}
+		},
+		{
 			id: 'long-name',
 			description: 'probe: an overlong unicode name with many keywords renders in full',
 			probe: true,
@@ -256,6 +288,38 @@ const unit: VerifiableUnit<Props> = {
 				const name = root.querySelector('.rows .name')?.textContent?.trim() ?? '';
 				return name === props.results?.items[0].name || `name not rendered in full: ${name}`;
 			}
+		},
+		{
+			id: 'semantic-results-rendered',
+			description: 'semantic results render as ranked rows with no pager',
+			onlyFixtures: ['semantic-results'],
+			check: ({ contract, root, props }) => {
+				if (contract.mode !== 'semantic') return `mode=${contract.mode}`;
+				const items = props.results?.items ?? [];
+				const rows = root.querySelectorAll('.rows .row').length;
+				if (rows !== items.length) return `expected ${items.length} rows, saw ${rows}`;
+				if (!(root.textContent ?? '').includes('most relevant first'))
+					return 'relevance label missing';
+				return root.querySelector('.pager') === null || 'semantic results must not paginate';
+			}
+		},
+		{
+			id: 'semantic-unavailable-message',
+			description: 'an unavailable semantic search says so rather than implying no matches',
+			onlyFixtures: ['semantic-unavailable'],
+			check: ({ contract, root }) => {
+				if (contract.mode !== 'semantic') return `mode=${contract.mode}`;
+				if (contract.available !== 'false') return `available=${contract.available}`;
+				return (root.textContent ?? '').includes('AI provider') || 'no unavailable message shown';
+			}
+		},
+		{
+			id: 'ai-switches-mode',
+			description: 'pressing the AI-search button after typing puts the box in semantic mode',
+			onlyFixtures: ['switch-to-ai'],
+			check: ({ contract }) =>
+				(contract.mode === 'semantic' && contract.query === 'something warming') ||
+				`mode=${contract.mode} query=${contract.query}`
 		},
 		{
 			id: 'intentional-fail',

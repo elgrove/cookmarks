@@ -14,6 +14,7 @@ import {
 	keywordSummarySchema,
 	recipeDetailSchema,
 	recipeSearchResultsSchema,
+	semanticSearchResultsSchema,
 	similarRecipesSchema
 } from './recipes';
 import { listDetailSchema, listMembershipSchema, listSummarySchema } from './lists';
@@ -105,6 +106,19 @@ describe('api wire contract', () => {
 		const { book_author, ...rest } = example.items[0];
 		const drifted = { ...example, items: [{ ...rest, bookAuthor: book_author }] };
 		expect(() => similarRecipesSchema.parse(drifted)).toThrow();
+	});
+
+	it('accepts the semantic search example', () => {
+		expect(() =>
+			semanticSearchResultsSchema.parse(load('semanticsearch.example.json'))
+		).not.toThrow();
+	});
+
+	it('rejects a semantic search example with a drifted field name', () => {
+		const example = load('semanticsearch.example.json');
+		const { distance, ...rest } = example.items[0];
+		const drifted = { ...example, items: [{ ...rest, score: distance }] };
+		expect(() => semanticSearchResultsSchema.parse(drifted)).toThrow();
 	});
 
 	it('accepts the list summary example and the list wrapper', () => {

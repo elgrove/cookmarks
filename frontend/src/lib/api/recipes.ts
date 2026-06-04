@@ -95,6 +95,24 @@ export async function fetchSimilarRecipes(
 	return similarRecipesSchema.parse(await res.json());
 }
 
+// Mirrors SemanticSearchResults from GET /api/recipes/semantic (snake_case): a
+// semantic result is a recipe summary plus its cosine distance from the query.
+export const semanticResultSchema = recipeSummarySchema.extend({
+	distance: z.number()
+});
+
+export const semanticSearchResultsSchema = z.object({
+	// False when no embedding-capable AI provider is configured — the UI prompts to
+	// set one up rather than reporting "no matches".
+	available: z.boolean(),
+	query: z.string(),
+	total: z.number().int().nonnegative(),
+	items: z.array(semanticResultSchema)
+});
+
+export type SemanticResult = z.infer<typeof semanticResultSchema>;
+export type SemanticSearchResults = z.infer<typeof semanticSearchResultsSchema>;
+
 export type SortKey = 'random' | 'name' | 'recent' | 'book';
 
 export type SearchCriteria = {
@@ -167,6 +185,19 @@ export async function searchRecipes(
 	const res = await fetchFn(`/api/recipes?${criteriaToParams(criteria)}`);
 	if (!res.ok) throw new Error(`GET /api/recipes → ${res.status}`);
 	return recipeSearchResultsSchema.parse(await res.json());
+}
+
+/** Semantic search: recipes ranked by meaning for a natural-language query. `limit`
+ *  caps the result set; `fetchFn` is injectable for SSR/tests. */
+export async function searchSemantic(
+	q: string,
+	limit = 30,
+	fetchFn: typeof fetch = fetch
+): Promise<SemanticSearchResults> {
+	const params = new URLSearchParams({ q: q.trim(), limit: String(limit) });
+	const res = await fetchFn(`/api/recipes/semantic?${params}`);
+	if (!res.ok) throw new Error(`GET /api/recipes/semantic → ${res.status}`);
+	return semanticSearchResultsSchema.parse(await res.json());
 }
 
 /** Fetch the most-used keyword filter chips (name + how many recipes carry it).

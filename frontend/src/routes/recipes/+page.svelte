@@ -2,7 +2,10 @@
 	import { onMount, untrack } from 'svelte';
 	import { page } from '$app/stores';
 	import { replaceState } from '$app/navigation';
-	import RecipesSearch, { type SearchStatus } from '$lib/components/RecipesSearch.svelte';
+	import RecipesSearch, {
+		type SearchStatus,
+		type SearchMode
+	} from '$lib/components/RecipesSearch.svelte';
 	import SimilarBrowse, { type SimilarBrowseData } from '$lib/components/SimilarBrowse.svelte';
 	import { fetchBookFilters } from '$lib/api/books';
 	import {
@@ -13,6 +16,7 @@
 		fetchSimilarRecipes,
 		hasCriteria,
 		searchRecipes,
+		searchSemantic,
 		type KeywordSummary,
 		type RecipeSearchResults,
 		type SearchCriteria
@@ -23,10 +27,17 @@
 	// client back-navigation the page store lags a tick behind the real URL, which
 	// would otherwise restore an empty search.
 	const initialSearch = typeof window !== 'undefined' ? window.location.search : $page.url.search;
-	const initialCriteria = criteriaFromParams(new URLSearchParams(initialSearch));
+	const initialParams = new URLSearchParams(initialSearch);
+	const initialCriteria = criteriaFromParams(initialParams);
+	// `?mode=ai` opens directly in AI-search mode (the spark), restored from a shared URL.
+	const initialMode: SearchMode = initialParams.get('mode') === 'ai' ? 'semantic' : 'keyword';
+	// AI search returns a single relevance-ranked page; keep it modest.
+	const SEMANTIC_LIMIT = 30;
 
 	let status = $state<SearchStatus>('resting');
+	let mode = $state<SearchMode>(initialMode);
 	let results = $state<RecipeSearchResults>({ total: 0, items: [], facets: [] });
+	let semanticAvailable = $state(true);
 	let keywords = $state<KeywordSummary[]>([]);
 	let books = $state<{ id: string; title: string }[]>([]);
 	let authors = $state<string[]>([]);
@@ -35,8 +46,8 @@
 	// so we can restore them when the search is cleared back to resting.
 	let globalKeywords: KeywordSummary[] = [];
 
-	// Monotonic guard: drop stale responses so a slow earlier search can't
-	// overwrite the results of a newer one.
+	// Monotonic guard: drop stale responses so a slow earlier search (of either
+	// mode) can't overwrite the results of a newer one.
 	let seq = 0;
 
 	// "Similar to <recipe>" mode: when the URL carries `?similar=<id>`, this page
@@ -88,8 +99,8 @@
 		});
 	});
 
-	// Mirror the live criteria in the URL — one history entry that updates as you
-	// search (replaceState), so leaving for a recipe and coming back restores it.
+	// Mirror the live keyword criteria in the URL — one history entry that updates as
+	// you search (replaceState), so leaving for a recipe and coming back restores it.
 	function syncUrl(criteria: SearchCriteria): void {
 		const p = criteriaToParams(criteria);
 		p.delete('limit'); // constant page size — keep the URL clean
@@ -99,9 +110,19 @@
 		replaceState(qs ? `/recipes?${qs}` : '/recipes', {});
 	}
 
-	// Run a search and reflect it into page state. No URL writes — safe to call
+	// AI searches carry just the query and a mode marker, so the URL restores
+	// straight back into AI-search mode.
+	function syncSemanticUrl(query: string): void {
+		const p = new URLSearchParams();
+		if (query.trim()) p.set('q', query.trim());
+		p.set('mode', 'ai');
+		replaceState(`/recipes?${p.toString()}`, {});
+	}
+
+	// Run a keyword search and reflect it into page state. No URL writes — safe to call
 	// during mount, before SvelteKit's router (and thus replaceState) is ready.
 	async function execute(criteria: SearchCriteria): Promise<void> {
+		mode = 'keyword';
 		if (!hasCriteria(criteria)) {
 			status = 'resting';
 			results = { total: 0, items: [], facets: [] };
@@ -125,16 +146,48 @@
 		}
 	}
 
-	// User-initiated search: mirror it in the URL, then run it.
+	// Run an AI (semantic) search. The keyword chips stay (dimmed in the component) as
+	// the resting set, since semantic results carry no co-occurrence facets.
+	async function executeSemantic(query: string): Promise<void> {
+		const q = query.trim();
+		if (!q) {
+			mode = 'keyword';
+			status = 'resting';
+			results = { total: 0, items: [], facets: [] };
+			keywords = globalKeywords;
+			return;
+		}
+		mode = 'semantic';
+		const mine = ++seq;
+		status = 'loading';
+		try {
+			const data = await searchSemantic(q, SEMANTIC_LIMIT);
+			if (mine !== seq) return;
+			semanticAvailable = data.available;
+			results = { total: data.total, items: data.items, facets: [] };
+			if (globalKeywords.length) keywords = globalKeywords;
+			status = data.available && data.items.length ? 'results' : 'empty';
+		} catch (err) {
+			if (mine !== seq) return;
+			console.error('semantic search failed', err);
+			status = 'error';
+		}
+	}
+
+	// User-initiated searches: mirror them in the URL, then run.
 	function run(criteria: SearchCriteria): Promise<void> {
 		syncUrl(criteria);
 		return execute(criteria);
 	}
 
+	function runSemantic(query: string): Promise<void> {
+		syncSemanticUrl(query);
+		return executeSemantic(query);
+	}
+
 	onMount(() => {
-		// These three requests are independent — fire them concurrently rather than
-		// in series. The search in particular depends on neither the books nor the
-		// keywords, so it must not wait behind them.
+		// These requests are independent — fire them concurrently. The search in
+		// particular depends on neither the books nor the keywords.
 		fetchBookFilters()
 			.then((bs) => {
 				books = bs
@@ -144,24 +197,22 @@
 			})
 			.catch((err) => console.error('failed to load books for filters', err));
 
-		// Show the most-used keywords as quick filter chips; rarer keywords are still
-		// reachable by typing (search matches keyword names too). Once a search is
-		// active these give way to co-occurrence facets. The component clamps the
-		// rendered chips to a few lines, so 50 is a generous pool.
+		// Show the most-used keywords as quick filter chips; once a search is active
+		// these give way to co-occurrence facets. The component clamps to a few lines.
 		fetchKeywords(50)
 			.then((kw) => {
 				globalKeywords = kw;
-				// Reflect into the visible chips only while resting — an active search
-				// owns the chips (its co-occurrence facets), and now that this resolves
-				// concurrently it could otherwise clobber them.
 				if (status === 'resting') keywords = kw;
 			})
 			.catch((err) => console.error('failed to load keywords', err));
 
-		// Restore the search the URL describes (if any) straight away. The URL
-		// already reflects these criteria, so run without syncing it back —
-		// replaceState would throw this early, before the router is initialised.
-		if (hasCriteria(initialCriteria)) execute(initialCriteria);
+		// Restore the search the URL describes (if any). The URL already reflects
+		// these, so run without syncing back — replaceState would throw this early.
+		if (initialMode === 'semantic' && initialCriteria.q) {
+			executeSemantic(initialCriteria.q);
+		} else if (hasCriteria(initialCriteria)) {
+			execute(initialCriteria);
+		}
 	});
 </script>
 
@@ -176,12 +227,15 @@
 {:else}
 	<RecipesSearch
 		{status}
+		{mode}
 		{results}
+		{semanticAvailable}
 		{keywords}
 		{books}
 		{authors}
 		criteria={initialCriteria}
 		onSearch={run}
+		onSemanticSearch={runSemantic}
 	/>
 {/if}
 

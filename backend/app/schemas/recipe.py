@@ -64,6 +64,29 @@ class SimilarRecipes(BaseModel):
     items: list[RecipeSummary]
 
 
+class SemanticResult(RecipeSummary):
+    """A semantic-search result row: a recipe summary plus its cosine distance from
+    the query (smaller is closer). Same shape as a keyword result, so the frontend
+    renders both as the same text-first row."""
+
+    distance: float
+
+
+class SemanticSearchResults(BaseModel):
+    """Recipes ranked by meaning for a natural-language query, closest first.
+
+    ``available`` is False when semantic search can't run (no embedding-capable AI
+    provider configured) — distinct from an available search that simply matched
+    nothing (``available`` True, ``total`` 0), so the UI can prompt to configure a
+    provider rather than say "no matches".
+    """
+
+    available: bool
+    query: str
+    total: int
+    items: list[SemanticResult] = []
+
+
 class RecipeNeighbour(BaseModel):
     """The adjacent recipe in the current navigation context (for prev/next)."""
 

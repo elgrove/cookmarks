@@ -32,6 +32,14 @@ class ModelRole(Enum):
     BLOCKS_OF_FILES = "blocks_of_files"
 
 
+class EmbedTask(Enum):
+    """What an embedding is for. Providers that distinguish (Gemini does) optimise
+    the vector accordingly; the document and query sides of a search must agree."""
+
+    DOCUMENT = "RETRIEVAL_DOCUMENT"
+    QUERY = "RETRIEVAL_QUERY"
+
+
 _Num = TypeVar("_Num", Decimal, int)
 
 
@@ -81,11 +89,27 @@ class AIProvider(abc.ABC):
     name: ClassVar[str]
     models: ClassVar[dict[ModelRole, str]]
     requires_api_key: ClassVar[bool] = True
+    # Embedding capability. A provider that can embed sets both; the dimensions are
+    # the vec0 table's fixed width, so they must match what's already stored.
+    embedding_model: ClassVar[str | None] = None
+    embedding_dimensions: ClassVar[int | None] = None
 
     def __init__(self, api_key: str, model_overrides: dict[str, str] | None = None) -> None:
         self.api_key = api_key
         # {ModelRole value: model name}; overrides the per-role default when present.
         self._model_overrides = model_overrides or {}
+
+    @property
+    def supports_embeddings(self) -> bool:
+        return self.embedding_dimensions is not None
+
+    def embed(self, text: str, task: EmbedTask) -> list[float]:
+        """Embed one text into a vector. Raises if the provider can't embed."""
+        raise NotImplementedError(f"{self.name} does not support embeddings")
+
+    def embed_batch(self, texts: list[str], task: EmbedTask) -> list[list[float]]:
+        """Embed many texts in one call. Raises if the provider can't embed."""
+        raise NotImplementedError(f"{self.name} does not support embeddings")
 
     @abc.abstractmethod
     def _complete(
