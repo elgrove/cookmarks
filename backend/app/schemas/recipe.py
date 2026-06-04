@@ -1,4 +1,5 @@
 import uuid
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -49,6 +50,18 @@ class RecipeSearchResults(BaseModel):
     total: int
     items: list[RecipeSummary]
     facets: list[KeywordSummary] = []
+
+
+class SimilarRecipes(BaseModel):
+    """Recipes related to a given one, as text-first list rows (same shape as a
+    search result). ``basis`` records *how* they were found: ``vector`` = nearest by
+    embedding (cosine over the imported Gemini vectors); ``keyword`` = the fallback
+    by shared keywords, used when the recipe has no embedding. The distinction is for
+    honesty/verification — the list reads the same either way.
+    """
+
+    basis: Literal["vector", "keyword"]
+    items: list[RecipeSummary]
 
 
 class RecipeNeighbour(BaseModel):

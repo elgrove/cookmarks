@@ -10,7 +10,12 @@ import {
 	recipeIndexResponseSchema
 } from './books';
 import { homeSchema } from './home';
-import { keywordSummarySchema, recipeDetailSchema, recipeSearchResultsSchema } from './recipes';
+import {
+	keywordSummarySchema,
+	recipeDetailSchema,
+	recipeSearchResultsSchema,
+	similarRecipesSchema
+} from './recipes';
 import { listDetailSchema, listMembershipSchema, listSummarySchema } from './lists';
 
 // Frontend half of the API wire contract (see /contract/README.md): the Zod
@@ -89,6 +94,17 @@ describe('api wire contract', () => {
 
 	it('accepts the keywords example', () => {
 		expect(() => keywordSummarySchema.parse(load('keywords.example.json'))).not.toThrow();
+	});
+
+	it('accepts the similar-recipes example', () => {
+		expect(() => similarRecipesSchema.parse(load('similar.example.json'))).not.toThrow();
+	});
+
+	it('rejects a similar-recipes example with a drifted field name', () => {
+		const example = load('similar.example.json');
+		const { book_author, ...rest } = example.items[0];
+		const drifted = { ...example, items: [{ ...rest, bookAuthor: book_author }] };
+		expect(() => similarRecipesSchema.parse(drifted)).toThrow();
 	});
 
 	it('accepts the list summary example and the list wrapper', () => {

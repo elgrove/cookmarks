@@ -954,3 +954,55 @@ and flipped the pill to `★ Saved`; cross-reference links got no pill.
 heading titles; books that style titles only via positioning/size won't match). No reverse link
 (recipe → page) and no stored recipe↔location index — that remains future work. Reading position
 still isn't persisted.
+
+## 2026-06-04 — Similar recipes on the recipe page (embedding KNN + keyword fallback)
+
+The recipe page now closes with a **"Similar recipes"** section — related recipes found by nearest-
+neighbour over the imported Gemini embeddings. This is the **first read-consumer of the embeddings**
+in v2, so it also lands the `VectorStore` port (CLAUDE.md previously deferred it to the search
+milestone).
+
+**Grounding the data first.** Queried the real imported DB: 13,403 recipes / 192 books, **99.0%
+embedding coverage** (only 128 un-embedded), 3072-d float32 vectors, brute-force KNN ~149ms warm.
+The load-bearing discovery: **`recipes.id` is stored un-hyphenated (`57c4ef06…`) but
+`recipe_embeddings.recipe_id` is hyphenated (`1435bb15-…`)** — a raw join silently matches *nothing*.
+The bridge is `str(uuid.UUID(x))`, confined entirely to the store.
+
+**Decisions (re-thought from v1, which did a raw KNN strip of badge chips with no diversity/fallback):**
+pure cosine KNN (no diversity rerank — same-book neighbours are allowed to surface); a **footer
+section of editorial index rows** reusing `RecipeRow` (not v1's chips); computed **on demand** via a
+**lazy endpoint** (`GET /api/recipes/{id}/similar`) the page fetches *after paint* (no AI call — the
+recipe's own stored vector drives the KNN); a **shared-keyword fallback** for the ~1% with no
+embedding.
+
+**Backend.** `app/services/vector_store.py` — `VectorStore` bound to a session, self-creates the vec0
+table `IF NOT EXISTS`, bridges the id formats, exposes `get_embedding` / `search` / `search_excluding`
+/ `upsert`. New `GET /api/recipes/{id}/similar` → `SimilarRecipes {basis: 'vector'|'keyword', items:
+[RecipeSummary]}`; `basis` records how the list was found (honesty/verification, not surfaced to the
+reader). Pinned both sides via `contract/similar.example.json`. Factored a shared `_summary(recipe,
+book)` builder out of `search_recipes`.
+
+**Frontend.** `fetchSimilarRecipes` + Zod schema (optional `limit` — omit for the server default,
+pass for a slice). The recipe-detail footer (`SimilarRecipes.svelte` — mono heading, hairline-ruled
+`RecipeRow` list, designed empty state) requests a small slice of **5**, lazily after paint (guarded
+by recipe id, reset on navigation), and when that comes back full renders a **"More like this →"**
+link to a fuller browse view. That view — `SimilarBrowse.svelte` at **`/recipes?similar=<id>`**
+(breadcrumb · serif "Similar to *‹recipe›*" heading · the full ranked list, server default of 30) —
+the `/recipes` route branches into reactively on the `similar` param. Two verifiable units
+(`similar-recipes`, `similar-browse`), each with probes + a designed empty state.
+
+**Clean book titles.** `RecipeRow` now renders the **clean (pre-colon) title** via `cleanTitle`, so
+every recipe list — similar, search, lists — drops Calibre subtitles ("The Wok: Recipes and
+Techniques" → "The Wok"). It was the one title render that still showed the raw string.
+
+**Verified.** Backend 144 pytest / ruff / ty clean; frontend 89 vitest (incl. contract tests) /
+svelte-check / 53-fixture verify matrix green. **Live end-to-end against the real DB** (Playwright):
+"Kara-age" returns karaage / Japanese-fried-chicken variants across many authors (`basis: vector`) —
+genuinely strong semantic matching; the footer shows 5 + the link, `/recipes?similar=…` shows 30
+ranked rows under "Similar to *Kara-age*". No console errors.
+
+**Limits / not done.** Pure KNN means a recipe pulls its book-mates when a book has many similar
+recipes (accepted, by choice). No precomputed neighbours table (the ~149ms KNN is off the critical
+path); the browse view shows a single ranked page of 30 with no pagination. The search milestone
+still owns query-embedding *generation* and the embedding write-path for new extractions; this slice
+only *reads* the imported vectors.

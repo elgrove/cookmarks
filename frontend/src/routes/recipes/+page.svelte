@@ -1,13 +1,16 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import { page } from '$app/stores';
 	import { replaceState } from '$app/navigation';
 	import RecipesSearch, { type SearchStatus } from '$lib/components/RecipesSearch.svelte';
+	import SimilarBrowse, { type SimilarBrowseData } from '$lib/components/SimilarBrowse.svelte';
 	import { fetchBookFilters } from '$lib/api/books';
 	import {
 		criteriaFromParams,
 		criteriaToParams,
 		fetchKeywords,
+		fetchRecipeDetail,
+		fetchSimilarRecipes,
 		hasCriteria,
 		searchRecipes,
 		type KeywordSummary,
@@ -35,6 +38,55 @@
 	// Monotonic guard: drop stale responses so a slow earlier search can't
 	// overwrite the results of a newer one.
 	let seq = 0;
+
+	// "Similar to <recipe>" mode: when the URL carries `?similar=<id>`, this page
+	// becomes a browse of that recipe's nearest neighbours (the fuller server default)
+	// instead of the search UI. Reached from the recipe page's "More like this" link.
+	let inSimilarMode = $derived(!!$page.url.searchParams.get('similar'));
+	let similarBrowse = $state<SimilarBrowseData | null>(null);
+	let similarStatus = $state<'idle' | 'loading' | 'error'>('idle');
+	let browseSeq = 0;
+
+	async function loadSimilarBrowse(id: string): Promise<void> {
+		const mine = ++browseSeq;
+		similarStatus = 'loading';
+		try {
+			// The recipe's name (for the heading) and its neighbours, in parallel.
+			const [detail, sim] = await Promise.all([fetchRecipeDetail(id), fetchSimilarRecipes(id)]);
+			if (mine !== browseSeq) return;
+			similarBrowse = {
+				recipeId: id,
+				recipeName: detail.name,
+				basis: sim.basis,
+				recipes: sim.items.map((it) => ({
+					id: it.id,
+					name: it.name,
+					bookId: it.book_id,
+					bookTitle: it.book_title,
+					bookAuthor: it.book_author,
+					keywords: it.keywords
+				}))
+			};
+			similarStatus = 'idle';
+		} catch (err) {
+			if (mine !== browseSeq) return;
+			console.error('failed to load similar browse', err);
+			similarStatus = 'error';
+		}
+	}
+
+	// Enter/leave similar mode as the `similar` param changes (incl. client nav between
+	// recipes). Untracked so the loader's state writes don't re-trigger the effect.
+	$effect(() => {
+		const sid = $page.url.searchParams.get('similar');
+		untrack(() => {
+			if (sid) loadSimilarBrowse(sid);
+			else {
+				similarBrowse = null;
+				similarStatus = 'idle';
+			}
+		});
+	});
 
 	// Mirror the live criteria in the URL — one history entry that updates as you
 	// search (replaceState), so leaving for a recipe and coming back restores it.
@@ -113,12 +165,37 @@
 	});
 </script>
 
-<RecipesSearch
-	{status}
-	{results}
-	{keywords}
-	{books}
-	{authors}
-	criteria={initialCriteria}
-	onSearch={run}
-/>
+{#if inSimilarMode}
+	{#if similarBrowse}
+		<SimilarBrowse {...similarBrowse} />
+	{:else if similarStatus === 'error'}
+		<div class="status"><p class="msg">Couldn’t load similar recipes.</p></div>
+	{:else}
+		<div class="status"><p class="msg">Finding similar recipes…</p></div>
+	{/if}
+{:else}
+	<RecipesSearch
+		{status}
+		{results}
+		{keywords}
+		{books}
+		{authors}
+		criteria={initialCriteria}
+		onSearch={run}
+	/>
+{/if}
+
+<style>
+	.status {
+		max-width: var(--max-w);
+		margin: 0 auto;
+		padding: 4rem var(--page-h);
+	}
+	.msg {
+		font-family: var(--f-serif);
+		font-style: italic;
+		font-size: 1.4rem;
+		color: var(--muted);
+		margin: 0;
+	}
+</style>
