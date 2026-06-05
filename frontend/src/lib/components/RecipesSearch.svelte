@@ -70,6 +70,27 @@
 	let active = $derived(Boolean(query.trim() || selected.length || bookId || author));
 	let isSemantic = $derived(searchMode === 'semantic');
 
+	// Mobile collapses the book/author/sort/keyword controls behind a "Filters"
+	// disclosure to save vertical space; the count keeps applied filters visible
+	// while collapsed. Desktop shows everything and ignores `filtersOpen` (CSS).
+	let filtersOpen = $state(false);
+	let activeFilterCount = $derived((bookId ? 1 : 0) + (author ? 1 : 0) + selected.length);
+
+	// A concise placeholder on narrow screens — the full prompt overflows the box
+	// once the magnifier + AI buttons claim their width.
+	let narrow = $state(false);
+	$effect(() => {
+		if (typeof window === 'undefined' || !window.matchMedia) return;
+		const mq = window.matchMedia('(max-width: 560px)');
+		const sync = () => (narrow = mq.matches);
+		sync();
+		mq.addEventListener('change', sync);
+		return () => mq.removeEventListener('change', sync);
+	});
+	let placeholder = $derived(
+		narrow ? 'Search or describe a dish…' : 'Search recipes, or describe a dish…'
+	);
+
 	// Carried into each result's link so the recipe page's prev/next follow this
 	// exact search (keyword filters + sort + seed). Semantic results have no such
 	// ordering wired, so they open in the recipe's own book context.
@@ -143,6 +164,7 @@
 
 	$effect(() => {
 		chips; // re-clamp whenever the chip set changes
+		filtersOpen; // ...and when the mobile filter panel reveals the chips
 		clampChips();
 	});
 
@@ -275,7 +297,7 @@
 		<input
 			type="search"
 			class="search-input"
-			placeholder="Search recipes, or describe a dish…"
+			{placeholder}
 			aria-label="Search recipes"
 			value={query}
 			oninput={(e) => onQueryInput(e.currentTarget.value)}
@@ -304,9 +326,31 @@
 		</button>
 	</div>
 
-	<div class="filters" class:dimmed={isSemantic}>
-		<label class="filter">
-			<span class="label">Book</span>
+	<button
+		class="filters-toggle"
+		class:dimmed={isSemantic}
+		type="button"
+		aria-expanded={filtersOpen}
+		onclick={() => (filtersOpen = !filtersOpen)}
+	>
+		<span class="ft-label"
+			>Filters{#if activeFilterCount}<span class="ft-count">{activeFilterCount}</span>{/if}</span
+		>
+		<svg
+			class="ft-chev"
+			class:open={filtersOpen}
+			viewBox="0 0 10 7"
+			aria-hidden="true"
+			fill="none"
+			stroke="currentColor"
+			stroke-width="1.5"><path d="M1 1.5l4 4 4-4" /></svg
+		>
+	</button>
+
+	<div class="filter-panel" class:open={filtersOpen}>
+		<div class="filters" class:dimmed={isSemantic}>
+			<label class="filter">
+				<span class="label">Book</span>
 			<select
 				class="select"
 				aria-label="Filter by book"
@@ -392,6 +436,7 @@
 			</ul>
 		</section>
 	{/if}
+	</div>
 
 	<div class="results">
 		{#if status === 'loading'}
@@ -561,6 +606,17 @@
 	.dimmed {
 		opacity: 0.45;
 		transition: opacity 0.18s var(--ease-out);
+	}
+
+	/* Filters disclosure. Desktop: the toggle is hidden and the panel is
+	   display:contents (invisible to layout — controls flow exactly as before).
+	   Mobile (≤760): the toggle appears and the panel collapses behind it. */
+	.filters-toggle {
+		display: none;
+	}
+
+	.filter-panel {
+		display: contents;
 	}
 
 	.filters {
@@ -772,6 +828,84 @@
 	@media (max-width: 760px) {
 		.search {
 			padding: 2rem var(--page-h) 3rem;
+		}
+
+		/* Tighter search row so the box keeps room beside the two icon triggers. */
+		.search-input {
+			font-size: 1rem;
+		}
+		.searchrow {
+			gap: 0.4rem;
+		}
+		.iconbtn {
+			width: 2.4rem;
+			height: 2.4rem;
+		}
+
+		/* The filters disclosure. */
+		.filters-toggle {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.55rem;
+			margin-bottom: 1.25rem;
+			padding: 0;
+			background: none;
+			border: none;
+			cursor: pointer;
+			font-family: var(--f-mono);
+			font-size: 0.72rem;
+			letter-spacing: 0.1em;
+			text-transform: uppercase;
+			color: var(--ink);
+		}
+		.ft-label {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.4rem;
+		}
+		.ft-count {
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			min-width: 1.25rem;
+			height: 1.25rem;
+			padding: 0 0.3rem;
+			border-radius: 999px;
+			background: var(--clay);
+			color: var(--bg);
+			font-size: 0.66rem;
+			letter-spacing: 0;
+		}
+		.ft-chev {
+			width: 0.7rem;
+			height: 0.7rem;
+			color: var(--muted);
+			transition: transform 0.18s var(--ease-out);
+		}
+		.ft-chev.open {
+			transform: rotate(180deg);
+		}
+
+		.filter-panel {
+			display: none;
+		}
+		.filter-panel.open {
+			display: block;
+		}
+
+		/* Stacked, full-width controls when the panel is open. */
+		.filters {
+			flex-direction: column;
+			align-items: stretch;
+			gap: 0.85rem;
+		}
+		.filter {
+			justify-content: space-between;
+		}
+		.select {
+			flex: 1 1 auto;
+			max-width: none;
+			margin-left: 1rem;
 		}
 	}
 </style>

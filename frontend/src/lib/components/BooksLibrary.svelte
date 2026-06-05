@@ -269,9 +269,16 @@
 		}
 	}
 
-	@media (max-width: 420px) {
+	/* Mobile: text-first rows instead of a cover grid — a continuous hairline
+	   list (BookCard reshapes each cell into a row at the same breakpoint). */
+	@media (max-width: 560px) {
 		.grid {
 			grid-template-columns: 1fr;
+			gap: 0;
+			border-top: var(--border);
+		}
+		.cell {
+			border-bottom: var(--border);
 		}
 	}
 </style>

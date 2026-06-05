@@ -205,12 +205,23 @@
 		}
 	}
 
-	@media (max-width: 520px) {
+	@media (max-width: 560px) {
+		/* Mobile: drop the cover entirely so the feature reads as a text-led
+		   "book of the day" — the archive is text-first (DESIGN §7), and a lone
+		   full-width cover left the page feeling lopsided. */
 		.feature {
 			grid-template-columns: 1fr;
+			gap: 0;
 		}
 		.feature-plate {
-			max-width: 200px;
+			display: none;
+		}
+		.feature-meta {
+			max-width: none;
+		}
+		.feature-title {
+			font-size: clamp(2.3rem, 9vw, 3rem);
+			margin-top: 0.2rem;
 		}
 	}
 </style>
