@@ -15,6 +15,7 @@
 		toggleFavourite,
 		type ListMembership
 	} from '$lib/api/lists';
+	import { pageTitle } from '$lib/title';
 
 	let status = $state<'loading' | 'error' | 'ready'>('loading');
 	let recipe = $state<RecipeDetailData | null>(null);
@@ -202,7 +203,13 @@
 		window.addEventListener('keydown', onKey);
 		return () => window.removeEventListener('keydown', onKey);
 	});
+
+	const docTitle = $derived(pageTitle(recipe?.name));
 </script>
+
+<svelte:head>
+	<title>{docTitle}</title>
+</svelte:head>
 
 {#if recipe}
 	<!-- Remount per recipe so component-local state (cover-failed, read-more) resets,

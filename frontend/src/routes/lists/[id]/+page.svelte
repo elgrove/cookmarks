@@ -8,6 +8,7 @@
 		removeRecipeFromList,
 		renameList
 	} from '$lib/api/lists';
+	import { pageTitle } from '$lib/title';
 
 	let status = $state<'loading' | 'error' | 'ready'>('loading');
 	let list = $state<ListDetailData | null>(null);
@@ -79,7 +80,13 @@
 		if (id) load(id);
 		else status = 'error';
 	});
+
+	const docTitle = $derived(pageTitle(list?.name));
 </script>
+
+<svelte:head>
+	<title>{docTitle}</title>
+</svelte:head>
 
 {#if list}
 	<ListDetail {list} onRename={rename} onDelete={remove} onRemoveRecipe={removeRecipe} />

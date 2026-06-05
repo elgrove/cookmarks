@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import BooksLibrary, { type LibraryBook } from '$lib/components/BooksLibrary.svelte';
 	import { fetchBooks } from '$lib/api/books';
+	import { pageTitle } from '$lib/title';
 
 	let status = $state<'loading' | 'error' | 'ready'>('loading');
 	let books = $state<LibraryBook[]>([]);
@@ -26,6 +27,10 @@
 
 	onMount(load);
 </script>
+
+<svelte:head>
+	<title>{pageTitle('Books')}</title>
+</svelte:head>
 
 {#if status === 'ready'}
 	<BooksLibrary {books} />

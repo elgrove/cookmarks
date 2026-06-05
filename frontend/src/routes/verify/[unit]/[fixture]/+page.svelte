@@ -5,6 +5,7 @@
 	import { getUnit } from '$lib/verify/registry';
 	import { runFixture } from '$lib/verify/runner';
 	import type { VerifyResult } from '$lib/verify/types';
+	import { pageTitle } from '$lib/title';
 
 	const unitId = $page.params.unit ?? '';
 	const fixtureId = $page.params.fixture ?? '';
@@ -24,6 +25,10 @@
 		}
 	});
 </script>
+
+<svelte:head>
+	<title>{pageTitle('Verify')}</title>
+</svelte:head>
 
 {#if unit && fixture}
 	<div bind:this={target} data-verify-target></div>

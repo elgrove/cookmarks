@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { buildManifest, runAll } from '$lib/verify/runner';
 	import type { Verdict, VerifyResult } from '$lib/verify/types';
+	import { pageTitle } from '$lib/title';
 
 	let results = $state<VerifyResult[]>([]);
 	let running = $state(true);
@@ -28,6 +29,10 @@
 			.join('; ');
 	}
 </script>
+
+<svelte:head>
+	<title>{pageTitle('Verify')}</title>
+</svelte:head>
 
 <h1>Verification</h1>
 

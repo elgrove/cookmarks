@@ -18,10 +18,12 @@ frontend/build/
 .env
 .DS_Store
 
-# Playwright MCP (screenshots, traces) + ad-hoc review screenshots at repo root
+# Playwright MCP (screenshots, traces) + ad-hoc review screenshots at repo root.
+# Screenshots are for PR review only — never committed to the repo.
 .playwright-mcp/
 /*-desktop.png
 /*-mobile.png
+docs/screenshots/
 
 # Claude Code (local config + sub-worktrees)
 .claude/
