@@ -3,7 +3,7 @@
 	import { page } from '$app/stores';
 	import EpubReader from '$lib/components/EpubReader.svelte';
 	import { fetchBookDetail } from '$lib/api/books';
-	import { cleanTitle } from '$lib/title';
+	import { cleanTitle, pageTitle } from '$lib/title';
 
 	let status = $state<'loading' | 'error' | 'no-epub' | 'ready'>('loading');
 	let book = $state<{ id: string; title: string; author: string } | null>(null);
@@ -26,7 +26,13 @@
 	}
 
 	onMount(load);
+
+	const docTitle = $derived(pageTitle(book?.title));
 </script>
+
+<svelte:head>
+	<title>{docTitle}</title>
+</svelte:head>
 
 {#if status === 'ready' && book}
 	<EpubReader bookId={book.id} title={book.title} author={book.author} />

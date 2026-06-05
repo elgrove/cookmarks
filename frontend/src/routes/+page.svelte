@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import HomeLanding, { type BookOfTheDay } from '$lib/components/HomeLanding.svelte';
 	import { fetchHome } from '$lib/api/home';
+	import { pageTitle } from '$lib/title';
 
 	let status = $state<'loading' | 'error' | 'ready'>('loading');
 	let bookOfTheDay = $state<BookOfTheDay | null>(null);
@@ -29,6 +30,10 @@
 
 	onMount(load);
 </script>
+
+<svelte:head>
+	<title>{pageTitle()}</title>
+</svelte:head>
 
 {#if status === 'ready'}
 	<HomeLanding {bookOfTheDay} />

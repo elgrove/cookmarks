@@ -1,3 +1,10 @@
+/** Document title pattern: brand first, middot separator (e.g. "Cookmarks · Recipes").
+ *  Bare "Cookmarks" on the home page; `section` carries a page name or entity title. */
+export function pageTitle(section?: string | null): string {
+	const trimmed = section?.trim();
+	return trimmed ? `Cookmarks · ${trimmed}` : 'Cookmarks';
+}
+
 /** Calibre titles pack a subtitle behind a colon (e.g. "Persiana: Recipes from…").
  *  The clean title is the part before the first colon. */
 export function cleanTitle(title: string): string {
