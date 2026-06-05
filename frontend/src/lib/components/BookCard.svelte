@@ -46,6 +46,12 @@
 		<h3 class="title">{title}</h3>
 		<p class="author">{author}</p>
 	</div>
+	<!-- Mobile rows only (hidden on the desktop cover grid): recipe count + chevron. -->
+	<span class="row-aside" aria-hidden="true">
+		{#if recipeCount > 0}<span class="row-count">{recipeCount}</span>{/if}<span class="chev"
+			>›</span
+		>
+	</span>
 </article>
 
 <style>
@@ -149,5 +155,57 @@
 		font-size: 0.82rem;
 		color: var(--muted);
 		margin: 0;
+	}
+
+	/* Mobile-only count + chevron, sitting to the right of a text row. */
+	.row-aside {
+		display: none;
+		flex: none;
+		align-items: center;
+		gap: 0.55rem;
+		margin-left: 0.5rem;
+		font-family: var(--f-mono);
+		font-size: 0.72rem;
+		letter-spacing: 0.04em;
+		color: var(--muted);
+		white-space: nowrap;
+	}
+
+	.chev {
+		font-size: 1.1rem;
+		line-height: 1;
+		color: var(--faint);
+	}
+
+	/* Mobile: the cover grid collapses to text-first rows — a small cover
+	   thumbnail, title + author, and the recipe count on the right. */
+	@media (max-width: 560px) {
+		.card {
+			flex-direction: row;
+			align-items: center;
+			gap: 0.9rem;
+			padding: 0.85rem 0.1rem;
+		}
+		.card-link {
+			flex: 0 0 auto;
+			width: 46px;
+		}
+		.plate {
+			border-radius: 2px;
+		}
+		.count-badge {
+			display: none;
+		}
+		.meta {
+			flex: 1 1 auto;
+			min-width: 0;
+			gap: 0.15rem;
+		}
+		.title {
+			font-size: 1.02rem;
+		}
+		.row-aside {
+			display: inline-flex;
+		}
 	}
 </style>

@@ -389,4 +389,12 @@
 			grid-template-columns: 1fr;
 		}
 	}
+	/* Mobile: a continuous hairline list of compact rows (ListCard reshapes each
+	   card into a row at the same breakpoint). */
+	@media (max-width: 560px) {
+		.grid {
+			gap: 0;
+			border-top: var(--border);
+		}
+	}
 </style>

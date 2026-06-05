@@ -217,4 +217,46 @@
 		display: flex;
 		gap: 1rem;
 	}
+
+	/* Mobile: drop the boxed card for a compact hairline row — name + count on
+	   one line, with Rename/Delete as small secondary actions beneath. */
+	@media (max-width: 560px) {
+		.card {
+			height: auto;
+			min-height: 0;
+			gap: 0.4rem;
+			padding: 0.85rem 0.1rem;
+			background: none;
+			border: none;
+			border-bottom: var(--border);
+			border-radius: 0;
+		}
+		.card.default {
+			border-color: var(--line);
+		}
+		.link {
+			flex-direction: row;
+			align-items: baseline;
+			justify-content: space-between;
+			gap: 0.75rem;
+		}
+		.name {
+			font-size: 1.1rem;
+		}
+		.count {
+			flex: none;
+			white-space: nowrap;
+		}
+		.footer {
+			gap: 1.1rem;
+		}
+		.act {
+			font-size: 0.72rem;
+		}
+		/* Keep the rename/confirm editors readable at full height. */
+		.rename,
+		.confirm {
+			gap: 0.7rem;
+		}
+	}
 </style>
