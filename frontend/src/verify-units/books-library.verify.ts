@@ -137,6 +137,23 @@ const unit: VerifiableUnit<Props> = {
 				contract.first === props.books[0].title || `first=${contract.first}`
 		},
 		{
+			id: 'whole-card-clickable',
+			description:
+				'each book card exposes exactly one stretched nav link to its detail page (whole surface clickable)',
+			onlyFixtures: ['populated'],
+			check: ({ root }) => {
+				const cards = [...root.querySelectorAll('.card')];
+				for (const card of cards) {
+					const links = card.querySelectorAll('a[href^="/books/"]');
+					if (links.length !== 1)
+						return `card has ${links.length} nav link(s), expected exactly 1`;
+					const href = links[0].getAttribute('href') ?? '';
+					if (!/^\/books\/.+/.test(href)) return `nav href not a book detail page: ${href}`;
+				}
+				return true;
+			}
+		},
+		{
 			id: 'empty-state',
 			description: 'an empty library flags empty and a zero count',
 			onlyFixtures: ['empty'],
