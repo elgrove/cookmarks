@@ -67,7 +67,7 @@
 			</div>
 		</div>
 	{:else}
-		<a class="link" href={`/lists/${id}`}>
+		<a class="link" href={`/lists/${id}`} aria-label={`Open list ${name}`}>
 			<span class="title">
 				{#if isDefault}<span class="star" aria-hidden="true">★</span>{/if}<span class="name"
 					>{name}</span
@@ -88,6 +88,8 @@
 
 <style>
 	.card {
+		/* Anchor for the stretched-link overlay so the whole surface navigates. */
+		position: relative;
 		display: flex;
 		flex-direction: column;
 		justify-content: space-between;
@@ -103,7 +105,7 @@
 		transition: border-color 0.18s var(--ease-out);
 	}
 	.card:hover {
-		border-color: var(--line-strong);
+		border-color: var(--clay);
 	}
 	.card.default {
 		border-color: var(--clay);
@@ -114,6 +116,15 @@
 		flex-direction: column;
 		gap: 0.35rem;
 		text-decoration: none;
+	}
+	/* Stretched link: the anchor's ::after covers the whole card, so a click
+	   anywhere on the surface navigates — without nesting the footer buttons
+	   inside the <a> (which would be invalid HTML). */
+	.link::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		border-radius: 4px;
 	}
 	.title {
 		display: flex;
@@ -133,7 +144,7 @@
 		color: var(--ink);
 		transition: color 0.18s var(--ease-out);
 	}
-	.link:hover .name {
+	.card:hover .name {
 		color: var(--clay-deep);
 	}
 	.count {
@@ -146,6 +157,10 @@
 		display: flex;
 		align-items: center;
 		gap: 1rem;
+		/* Sit above the stretched-link overlay so Rename / Delete stay clickable
+		   and never trigger navigation. */
+		position: relative;
+		z-index: 1;
 	}
 	.act {
 		font-family: var(--f-grotesk);

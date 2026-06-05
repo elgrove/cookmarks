@@ -1060,3 +1060,35 @@ the verify matrix's new `semantic-results` / `semantic-unavailable` / `switch-to
 end-to-end (headless Chrome on a seeded stub DB): `/recipes?mode=ai` ranks results with dimmed
 filters, `?q=dal` does keyword search with facets, and the unavailable + 390px mobile states render
 per DESIGN.
+
+## 2026-06-05 — List & book cards clickable across their whole surface (MY-7)
+
+**Context.** On `/lists` and `/books`, only the title (and, on books, the cover plate) navigated; the
+rest of each card was dead space. MY-7 asks for the whole card surface to be one click target, while
+keeping genuine action controls (Rename / Delete) independently clickable.
+
+**Decision — the stretched-link pattern, not a wrapping `<a>`.** Nesting the footer buttons inside a
+card-spanning anchor would be invalid HTML and would trip the load-bearing a11y verifier. Instead the
+card root is `position: relative` and the single primary nav `<a>` carries a `::after { inset: 0 }`
+overlay that covers the whole card. `ListCard`'s footer (`.rename-btn` / `.delete-btn`) gets
+`position: relative; z-index: 1` so it sits above the overlay and stays clickable without navigating.
+`BookCard` had two `<a>`s to the same place (cover plate + title); these collapse into one `.card-link`
+whose stretched overlay spans the plate *and* the meta block, and the title heading drops its inner
+`<a>` (now plain text under the overlay). The default Favourites card and the rename/confirm modes
+render no nav link, so they're untouched. Recipes (rendered as `RecipeRow`) are deliberately out of
+scope — a row has two distinct destinations (recipe + source book) plus a remove button, so
+whole-surface click is ambiguous by design.
+
+**Hover affordance.** Hovering anywhere on a card now applies to the whole card: border →
+`var(--clay)`, title/name → `var(--clay-deep)`. No shadow / no lift, per DESIGN's near-flat
+treatment. The hover moved from `.link:hover .name` / `.plate-link:hover .plate` to `.card:hover …`.
+
+**Verified.** `make verify` (53 matrix fixtures), `make check` (ruff + ty + svelte-check, 0/0), and
+`make test` (154 backend + 91 frontend) all green. New invariants assert each card exposes exactly one
+stretched nav link to its detail page and that no `<button>` is nested inside an `<a>`; existing
+selectors (`.card`, `.rename-btn`, `.delete-btn`, `.title`, `.count-badge`) and the expectFail
+sentinels are preserved. Live (Playwright on the verify isolation routes): clicking the card body
+navigates (`/lists/wk`, `/books/a1`) — Playwright reports the stretched overlay intercepts pointer
+events over the title/meta area — while clicking Delete does not navigate, it enters the confirm step.
+Desktop/mobile/hover screenshots under `docs/screenshots/my-7/`.
+
