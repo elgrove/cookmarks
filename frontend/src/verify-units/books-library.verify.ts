@@ -24,6 +24,16 @@ const populated: LibraryBook[] = [
 
 const SEARCH = 'input[type="search"]';
 const SORT = 'select[aria-label="Sort books"]';
+const EXTRACTED = '.extracted-checkbox';
+
+// A deliberate mix of extracted (recipeCount > 0) and unextracted (recipeCount === 0)
+// books, so the "Extracted only" filter visibly drops the pending ones.
+const mixed: LibraryBook[] = [
+	{ id: 'm1', title: 'Salt, Fat, Acid, Heat', author: 'Samin Nosrat', recipeCount: 100, hasCover: false },
+	{ id: 'm2', title: 'Just added, not yet extracted', author: 'Unknown', recipeCount: 0, hasCover: false },
+	{ id: 'm3', title: 'Persiana', author: 'Sabrina Ghayour', recipeCount: 92, hasCover: true },
+	{ id: 'm4', title: 'Another pending import', author: 'Unknown', recipeCount: 0, hasCover: false }
+];
 
 const unit: VerifiableUnit<Props> = {
 	id: 'books-library',
@@ -85,6 +95,29 @@ const unit: VerifiableUnit<Props> = {
 			description: 'sentinel: a deliberately-failing invariant proves the harness reports truthfully',
 			expectFail: true,
 			props: { books: populated.slice(0, 2) }
+		},
+		{
+			id: 'extracted-only-mixed',
+			description: 'a mix of extracted and unextracted books, "Extracted only" left unchecked',
+			props: { books: mixed }
+		},
+		{
+			id: 'extracted-only-on',
+			description: 'ticking "Extracted only" drops the zero-recipe (pending) books',
+			props: { books: mixed },
+			act: ({ click }) => click(EXTRACTED)
+		},
+		{
+			id: 'extracted-only-empty',
+			description: 'probe: "Extracted only" with no extracted books shows the calm empty state',
+			probe: true,
+			props: {
+				books: [
+					{ id: 'p1', title: 'Pending import one', author: 'Unknown', recipeCount: 0, hasCover: false },
+					{ id: 'p2', title: 'Pending import two', author: 'Unknown', recipeCount: 0, hasCover: false }
+				]
+			},
+			act: ({ click }) => click(EXTRACTED)
 		}
 	],
 	invariants: [
@@ -177,6 +210,37 @@ const unit: VerifiableUnit<Props> = {
 			description: 'always fails — the truthfulness sentinel (expectFail)',
 			onlyFixtures: ['contract-lie'],
 			check: () => 'intentional failure: this sentinel must surface as FAIL'
+		},
+		{
+			id: 'extracted-only-off-shows-all',
+			description: 'with the filter off the whole mixed library renders and the contract reads off',
+			onlyFixtures: ['extracted-only-mixed'],
+			check: ({ contract, props }) =>
+				(contract['extracted-only'] === 'false' && Number(contract.count) === props.books.length) ||
+				`expected extracted-only=false count=${props.books.length}, saw ${contract['extracted-only']}/${contract.count}`
+		},
+		{
+			id: 'extracted-only-filters',
+			description: 'ticking the filter renders only books with recipeCount > 0',
+			onlyFixtures: ['extracted-only-on'],
+			check: ({ contract, root, props }) => {
+				const extracted = props.books.filter((b) => b.recipeCount > 0).length;
+				if (contract['extracted-only'] !== 'true') return `extracted-only=${contract['extracted-only']}`;
+				if (Number(contract.count) !== extracted) return `expected ${extracted} extracted, saw ${contract.count}`;
+				const badges = root.querySelectorAll('.count-badge').length;
+				return badges === extracted || `expected ${extracted} count circles, saw ${badges}`;
+			}
+		},
+		{
+			id: 'extracted-only-empty-state',
+			description: 'the filter with no extracted books flags empty and a zero count',
+			onlyFixtures: ['extracted-only-empty'],
+			check: ({ contract, root }) =>
+				(contract['extracted-only'] === 'true' &&
+					contract.empty === 'true' &&
+					Number(contract.count) === 0 &&
+					(root.textContent ?? '').includes('No extracted books yet')) ||
+				`extracted-only=${contract['extracted-only']} empty=${contract.empty} count=${contract.count}`
 		}
 	]
 };

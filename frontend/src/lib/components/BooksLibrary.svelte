@@ -17,6 +17,7 @@
 
 	let search = $state('');
 	let sort = $state<SortKey>('recent');
+	let extractedOnly = $state(false);
 
 	const sortOptions: { key: SortKey; label: string }[] = [
 		{ key: 'recent', label: 'Recently added' },
@@ -33,6 +34,9 @@
 			list = list.filter(
 				(b) => b.title.toLowerCase().includes(query) || b.author.toLowerCase().includes(query)
 			);
+		}
+		if (extractedOnly) {
+			list = list.filter((b) => b.recipeCount > 0);
 		}
 		const sorted = [...list];
 		switch (sort) {
@@ -51,7 +55,8 @@
 	});
 
 	let pendingCount = $derived(visible.filter((b) => b.recipeCount === 0).length);
-	let countLabel = $derived(query ? `${visible.length} of ${books.length}` : `${books.length}`);
+	let filtered = $derived(Boolean(query) || extractedOnly);
+	let countLabel = $derived(filtered ? `${visible.length} of ${books.length}` : `${books.length}`);
 </script>
 
 <section
@@ -63,6 +68,7 @@
 	data-verify-pending={pendingCount}
 	data-verify-sort={sort}
 	data-verify-query={query}
+	data-verify-extracted-only={extractedOnly ? 'true' : 'false'}
 	data-verify-first={visible[0]?.title ?? ''}
 >
 	<header class="head">
@@ -98,12 +104,23 @@
 			</select>
 		</label>
 
+		<label class="extracted">
+			<input
+				type="checkbox"
+				class="extracted-checkbox"
+				aria-label="Show only books with extracted recipes"
+				checked={extractedOnly}
+				onchange={(e) => (extractedOnly = e.currentTarget.checked)}
+			/>
+			<span class="label">Extracted only</span>
+		</label>
+
 		<p class="count mono">{countLabel} {books.length === 1 ? 'book' : 'books'}</p>
 	</div>
 
 	{#if visible.length === 0}
 		<p class="empty">
-			{#if books.length === 0}No books yet.{:else}No books match “{search.trim()}”.{/if}
+			{#if books.length === 0}No books yet.{:else if query}No books match “{search.trim()}”.{:else}No extracted books yet.{/if}
 		</p>
 	{:else}
 		<ul class="grid">
@@ -218,6 +235,41 @@
 		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M1 1.5l4 4 4-4' fill='none' stroke='%2386847b' stroke-width='1.5'/%3E%3C/svg%3E");
 		background-repeat: no-repeat;
 		background-position: right 0.65rem center;
+	}
+
+	.extracted {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		cursor: pointer;
+		user-select: none;
+	}
+
+	.extracted-checkbox {
+		appearance: none;
+		width: 1rem;
+		height: 1rem;
+		margin: 0;
+		border: 1px solid var(--line-strong);
+		border-radius: 3px;
+		background-color: var(--bg);
+		cursor: pointer;
+		transition:
+			border-color 0.18s var(--ease-out),
+			background-color 0.18s var(--ease-out);
+	}
+
+	.extracted-checkbox:checked {
+		border-color: var(--clay);
+		background-color: var(--clay);
+		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='8' viewBox='0 0 10 8'%3E%3Cpath d='M1 4l3 3 5-6' fill='none' stroke='%23faf9f5' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+		background-repeat: no-repeat;
+		background-position: center;
+	}
+
+	.extracted-checkbox:focus-visible {
+		outline: 2px solid var(--clay);
+		outline-offset: 2px;
 	}
 
 	.count {
