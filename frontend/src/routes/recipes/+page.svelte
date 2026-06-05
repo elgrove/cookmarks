@@ -21,6 +21,7 @@
 		type RecipeSearchResults,
 		type SearchCriteria
 	} from '$lib/api/recipes';
+	import { pageTitle } from '$lib/title';
 
 	// Seed the controls from the URL, so the search is shareable and survives a
 	// round-trip into a recipe and back. Read window.location, not $page.url: on a
@@ -215,6 +216,10 @@
 		}
 	});
 </script>
+
+<svelte:head>
+	<title>{pageTitle('Recipes')}</title>
+</svelte:head>
 
 {#if inSimilarMode}
 	{#if similarBrowse}

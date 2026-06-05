@@ -1061,6 +1061,31 @@ end-to-end (headless Chrome on a seeded stub DB): `/recipes?mode=ai` ranks resul
 filters, `?q=dal` does keyword search with facets, and the unavailable + 390px mobile states render
 per DESIGN.
 
+## 2026-06-05 — Favicon + per-page document titles (MY-33)
+
+**Context.** The shell had a placeholder frying-pan emoji favicon and no `<title>` at all — every tab
+read blank, and there was no brand mark in the tab strip.
+
+**Favicon.** Replaced `static/favicon.svg` with a hand-authored **bookmark/ribbon glyph** (rounded-top,
+notched-bottom silhouette) in brand clay `#d97757`. It's **dark-mode aware** via an inline
+`@media (prefers-color-scheme: dark)`: on a dark tab the mark lifts to the dark-clay `#df8460` and gains
+an ivory `#faf9f5` ground so it stays legible against a slate tab strip (the same clay-on-dark treatment
+DESIGN §3.1 prescribes). Verified the deployed SVG flips correctly by reading computed fills under each
+emulated colour-scheme. A 64×64 `favicon.png` (rasterised from the same path) is referenced as a legacy
+fallback; `app.html` wires both with `type` hints plus an `apple-touch-icon`.
+
+**Titles.** Pattern is **brand-first with a middot** — `Cookmarks · {Section}`, bare `Cookmarks` on
+home. A base `<title>Cookmarks</title>` in `app.html` guarantees a title pre-hydration; each route then
+sets its own via `<svelte:head>`. The pattern lives in one place — `pageTitle(section?)` in
+`$lib/title.ts`. Detail routes derive the title reactively from the loaded entity (`$derived`), falling
+back to bare `Cookmarks` while loading; book titles reuse `cleanTitle` so the tab matches the displayed
+(subtitle-stripped) name.
+
+**Verified.** `make check` (ruff + ty + svelte-check, 0/0), `make verify` (91), `make test`
+(154 backend + 91 frontend) all green. Live on a seeded DB, every route's `document.title` confirmed via
+Playwright `browser_evaluate` — including `/recipes/{id}` → `Cookmarks · Sumiso`, `/books/{id}` →
+`Cookmarks · A Modern Way to Cook` (subtitle stripped), and `/lists/{id}` → `Cookmarks · Favourites`.
+
 ## 2026-06-05 — List & book cards clickable across their whole surface (MY-7)
 
 **Context.** On `/lists` and `/books`, only the title (and, on books, the cover plate) navigated; the
@@ -1091,4 +1116,3 @@ sentinels are preserved. Live (Playwright on the verify isolation routes): click
 navigates (`/lists/wk`, `/books/a1`) — Playwright reports the stretched overlay intercepts pointer
 events over the title/meta area — while clicking Delete does not navigate, it enters the confirm step.
 Desktop/mobile/hover screenshots under `docs/screenshots/my-7/`.
-
