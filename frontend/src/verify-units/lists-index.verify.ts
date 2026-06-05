@@ -125,6 +125,38 @@ const unit: VerifiableUnit<Props> = {
 			}
 		},
 		{
+			id: 'whole-card-clickable',
+			description:
+				'each card exposes exactly one stretched nav link to its detail page (whole surface clickable)',
+			onlyFixtures: ['populated'],
+			check: ({ root }) => {
+				const cards = [...root.querySelectorAll('.card')];
+				for (const card of cards) {
+					const links = card.querySelectorAll('a[href^="/lists/"]');
+					if (links.length !== 1)
+						return `card has ${links.length} nav link(s), expected exactly 1`;
+					const href = links[0].getAttribute('href') ?? '';
+					if (!/^\/lists\/.+/.test(href)) return `nav href not a list detail page: ${href}`;
+				}
+				return true;
+			}
+		},
+		{
+			id: 'actions-not-nested-in-link',
+			description:
+				'Rename / Delete are real controls outside the nav link, so they click without navigating',
+			onlyFixtures: ['populated'],
+			check: ({ root }) => {
+				if (root.querySelector('a button')) return 'a button is nested inside the nav link';
+				const card = [...root.querySelectorAll('.card')].find(
+					(c) => c.querySelector('.rename-btn') !== null
+				);
+				if (!card) return 'no custom card with action buttons found';
+				if (!card.querySelector('.rename-btn')) return 'rename button missing';
+				return card.querySelector('.delete-btn') !== null || 'delete button missing';
+			}
+		},
+		{
 			id: 'empty-state',
 			description: 'no lists shows the empty message and no cards',
 			onlyFixtures: ['empty'],

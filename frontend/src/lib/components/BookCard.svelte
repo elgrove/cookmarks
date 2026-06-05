@@ -21,7 +21,9 @@
 </script>
 
 <article class="card">
-	<a class="plate-link" href={`/books/${id}`} aria-label={linkLabel}>
+	<!-- A single stretched link covers the whole card surface (cover plate + meta),
+	     so a click anywhere navigates to the book. -->
+	<a class="card-link" href={`/books/${id}`} aria-label={linkLabel}>
 		<div class="plate">
 			{#if showCover}
 				<img
@@ -41,21 +43,30 @@
 		</div>
 	</a>
 	<div class="meta">
-		<h3 class="title"><a href={`/books/${id}`}>{title}</a></h3>
+		<h3 class="title">{title}</h3>
 		<p class="author">{author}</p>
 	</div>
 </article>
 
 <style>
 	.card {
+		/* Anchor for the stretched-link overlay so the whole surface navigates. */
+		position: relative;
 		display: flex;
 		flex-direction: column;
 		gap: 0.7rem;
 	}
 
-	.plate-link {
+	.card-link {
 		display: block;
 		text-decoration: none;
+	}
+	/* Stretched link: the anchor's ::after covers the whole card (plate + meta),
+	   so a click anywhere navigates to the book. */
+	.card-link::after {
+		content: '';
+		position: absolute;
+		inset: 0;
 	}
 
 	.plate {
@@ -71,7 +82,7 @@
 		transition: border-color 0.2s var(--ease-out);
 	}
 
-	.plate-link:hover .plate {
+	.card:hover .plate {
 		border-color: var(--clay);
 	}
 
@@ -126,14 +137,10 @@
 		font-size: 1.02rem;
 		line-height: 1.25;
 		margin: 0;
-	}
-
-	.title a {
-		text-decoration: none;
 		transition: color 0.18s var(--ease-out);
 	}
 
-	.title a:hover {
+	.card:hover .title {
 		color: var(--clay-deep);
 	}
 
