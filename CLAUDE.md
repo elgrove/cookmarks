@@ -42,7 +42,7 @@ Run from the repo root unless noted.
 
 - `make install` — `uv sync` (backend) + `npm install` (frontend).
 - `make migrate` — apply Alembic migrations (`uv run python -m alembic upgrade head`). The `alembic` console script isn't installed; use the `python -m alembic` module form for revisions too.
-- `make dev` — both dev servers via honcho (`uvx honcho start`, reads `Procfile`).
+- `make dev` — the four dev processes via honcho (`uvx honcho start`, reads `Procfile`): `redis`, `api` (uvicorn), `web` (vite), `worker` (Celery). Background work (extraction) runs on the worker. Needs a local Redis binary: `sudo apt install redis-server`; if the package auto-starts a systemd `redis-server` on :6379, `sudo systemctl disable --now redis-server` so honcho owns the port. Broker/backend default to `redis://localhost:6379/{0,1}` (override via `COOKMARKS_CELERY_BROKER_URL` / `_RESULT_BACKEND`).
 - `make verify` — **the headless verification matrix** (`vitest run`): every unit × fixture, prints verdicts. Fast inner loop.
 - `make check` — backend `ruff check` + `ty check`; frontend `svelte-check`.
 - `make test` — backend `pytest`; frontend `vitest`.
@@ -91,4 +91,4 @@ Verdict rules (`runner.ts`): any `fail` check → `FAIL`; mount error → `BLOCK
 - **Maintain `REBUILD_LOG.md`** — the running journal of the rebuild. Append an entry (context, decisions, outcome) whenever a meaningful chunk of work lands. CLAUDE.md is the current-state snapshot; the log is the history.
 - Backend: ruff (line length 100), strict `ty`, British spelling. Imports at top of module only. Alembic migrations live in `backend/alembic/` (excluded from lint/typecheck).
 - Frontend: TypeScript strict; harness tests must stay free of SvelteKit (`$app/*`) imports so they run in plain vitest.
-- Celery: `app/tasks/celery_app.py` holds the app; `app/tasks/extraction.py` is the first real worker — `extract_recipes_from_book` / `resume_extraction` tasks (callable inline; the LangGraph pipeline lives in `app/services/extraction/`). The broker is still `memory://`; a real broker (likely Redis) is wired when extraction runs in the background rather than inline.
+- Celery: `app/tasks/celery_app.py` holds the app (broker + result backend on **Redis**, `include`s the task modules so a worker registers them); `app/tasks/extraction.py` holds the `extract_recipes_from_book` / `resume_extraction` tasks (still callable inline for the eval/tests; the LangGraph pipeline lives in `app/services/extraction/`). The trigger endpoint `POST /api/books/{id}/extract` (`app/api/extraction.py`) creates a `QUEUED` `ExtractionRun` then dispatches via `enqueue_extract_recipes`, so the run executes on the worker off the request thread. The task wrapper marks the run `FAILED` (records the error, stamps `completed_at`) on a crash. Tests stub the dispatch (`dispatched` fixture in `tests/conftest.py`) and never reach Redis. The live "watch it run" view is a later slice (MY-11) on top of `ExtractionRunRead`.

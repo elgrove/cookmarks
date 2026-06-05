@@ -22,6 +22,30 @@ logger = logging.getLogger(__name__)
 _VALID_HUMAN_RESPONSES = ("has_images", "no_images")
 
 
+def enqueue_extract_recipes(book_id: str, run_id: str) -> None:
+    """Dispatch the extraction task to the Celery worker. The single seam the trigger
+    endpoint goes through (and tests stub) so a queued run never blocks the request
+    thread and the dispatch stays out of the API and contract layers."""
+    extract_recipes_from_book_task.delay(book_id, run_id)
+
+
+def _mark_run_failed(extraction_id: str, exc: Exception) -> None:
+    """Record a crashed run on its row: status FAILED, the error appended, completed
+    stamped — so a worker exception leaves an honest record instead of a run wedged
+    in RUNNING forever. Best-effort: a failure here must not mask the original."""
+    try:
+        with SessionLocal() as session:
+            run = session.get(ExtractionRun, uuid.UUID(extraction_id))
+            if run is None:
+                return
+            run.status = ExtractionStatus.FAILED
+            run.errors = [*run.errors, str(exc)]
+            run.completed_at = datetime.now(UTC)
+            session.commit()
+    except Exception:
+        logger.exception(f"Failed to mark run {extraction_id} as failed")
+
+
 def _thread_id(run_id: str) -> str:
     """Deterministic LangGraph checkpoint thread id for a run, so a later resume
     finds the saved state without persisting the id on the row."""
@@ -178,7 +202,14 @@ def resume_extraction(extraction_id: str, human_response: str) -> str:
 
 @celery_app.task(name="extract_recipes_from_book")
 def extract_recipes_from_book_task(book_id: str, extraction_id: str | None = None) -> str:
-    return extract_recipes_from_book(book_id, extraction_id)
+    try:
+        return extract_recipes_from_book(book_id, extraction_id)
+    except Exception as exc:
+        # The trigger endpoint always supplies the run id, so a crash is recorded on
+        # the row; re-raise so Celery also captures the traceback in the backend.
+        if extraction_id:
+            _mark_run_failed(extraction_id, exc)
+        raise
 
 
 @celery_app.task(name="resume_extraction")

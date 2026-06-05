@@ -12,6 +12,7 @@ from typing import Any
 from fastapi.testclient import TestClient
 
 from app.schemas.book import BookFilter, BookSummary, RecipeIndexEntry
+from app.schemas.extraction import ExtractionRunRead
 from app.schemas.home import HomeData
 from app.schemas.recipe import (
     KeywordSummary,
@@ -177,3 +178,16 @@ def test_recipe_lists_endpoint_keys_match_contract(client: TestClient) -> None:
     recipe_id = _a_recipe_id(client)
     item = client.get(f"/api/recipes/{recipe_id}/lists").json()[0]
     assert set(item.keys()) == set(example.keys())
+
+
+def test_extraction_run_model_matches_contract() -> None:
+    example = _example("extractionrun.example.json")
+    dumped = ExtractionRunRead.model_validate(example).model_dump(mode="json")
+    assert dumped == example
+
+
+def test_extract_endpoint_keys_match_contract(client: TestClient) -> None:
+    example = _example("extractionrun.example.json")
+    book = next(b for b in client.get("/api/books").json() if b["title"] == "No Recipes Yet")
+    body = client.post(f"/api/books/{book['id']}/extract").json()
+    assert set(body.keys()) == set(example.keys())

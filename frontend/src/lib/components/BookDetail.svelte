@@ -43,8 +43,12 @@
 <script lang="ts">
 	import { plainText } from '$lib/html';
 	import { cleanTitle, titleSubtitle } from '$lib/title';
+	import ExtractButton from '$lib/components/ExtractButton.svelte';
 
-	let { book }: { book: BookDetailData } = $props();
+	let {
+		book,
+		onExtract
+	}: { book: BookDetailData; onExtract?: () => Promise<void> | void } = $props();
 
 	let coverFailed = $state(false);
 	let expanded = $state(false);
@@ -149,6 +153,7 @@
 						Browse recipes <span class="ar" aria-hidden="true">›</span>
 					</a>
 				{/if}
+				<ExtractButton recipeCount={book.recipeCount} {onExtract} />
 			</div>
 
 			<dl class="meta">

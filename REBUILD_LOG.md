@@ -1060,3 +1060,50 @@ the verify matrix's new `semantic-results` / `semantic-unavailable` / `switch-to
 end-to-end (headless Chrome on a seeded stub DB): `/recipes?mode=ai` ranks results with dimmed
 filters, `?q=dal` does keyword search with facets, and the unavailable + 390px mobile states render
 per DESIGN.
+
+## 2026-06-05 — Extract a book: trigger + real Redis-backed background execution (MY-9)
+
+The vertical slice that turns extraction into something you start from the running app. Until now
+extraction only ran *inline* via a direct function call; the Celery wrappers existed but nothing
+dispatched them, the broker was `memory://`, there was no trigger and no UI control, and a crash left
+a run wedged in `RUNNING`. This wires the trigger end to end and folds in the deferred broker ticket
+(MY-8). **Scope call:** the live "watch it run" view is *out of scope* here — deferred to MY-11, which
+builds on the run schema this slice lands. So the trigger is **fire-and-forget**.
+
+**Background execution (the MY-8 fold-in).** Broker + result backend now default to Redis
+(`redis://localhost:6379/{0,1}`, overridable via env) — construction still doesn't connect, so imports
+stay cheap. `celery_app` gained `include=["app.tasks.extraction"]` so a worker registers the tasks.
+`Procfile` grew two processes — `redis: redis-server --save '' --appendonly no` and `worker: … celery
+… --concurrency=1` (each task already fans chapters across 16 threads, and SQLite is single-writer, so
+one task at a time). Dev needs a local `redis-server` (apt); prod is a later single s6/supervisord
+container (not this slice). This is shared infra — future backfills/sync reuse it; extraction is its
+first consumer.
+
+**Trigger (UI + API).** `POST /api/books/{id}/extract` (`app/api/extraction.py`, mirrors v1
+`POST /book/<id>/extract/`) creates a `QUEUED` `ExtractionRun` up front — so a trigger is recorded
+even before a worker picks it up — then dispatches through the single `enqueue_extract_recipes` seam
+and returns `202` with the run. Plain Extract: provider comes from `Config`, method/model are chosen
+by the graph. On the book page the `ExtractButton` (clay accent — extraction is a "key action" per
+DESIGN) labels **Extract recipes** / **Re-extract** by recipe count and runs idle → posting → "Queued
+✓" → idle; a rejected dispatch surfaces an honest **error** state, never a false queued. It's a pure,
+network-free component (handler injected, à la `FavouriteToggle`); the page wires `onExtract` to
+`triggerExtraction`. Re-extraction reconciles recipes by normalised name (existing task contract), so
+favourites/list membership survive a re-run.
+
+**Correctness.** The task wrapper now marks a crashed run `FAILED` — error appended, `completed_at`
+stamped — then re-raises so Celery captures the traceback. (No double-trigger guard and no incremental
+progress commits this slice — deliberately deferred; there's no live view to feed yet.)
+
+**Harness.** New `ExtractionRunRead` (a complete, honest run record — status, strategy, progress as a
+`chapters_processed` count, cost/tokens, errors, timestamps; reused by MY-11) pinned both sides via
+`contract/extractionrun.example.json` (`cost_usd` a string, datetimes ISO `Z` — the example was dumped
+from the model so it round-trips exactly). New verify unit `extract-button` (idle/relabel/queued/error
+fixtures + a reject probe + the `expectFail` sentinel).
+
+**Verified.** `make check` (ruff + ty + svelte-check, 0/0); 160 backend tests — new
+`test_extraction_api` (queued run + 202 + dispatched once + 404) and a FAILED-on-error task test, plus
+the contract pin both sides; 97 frontend tests incl. the verify matrix's six new `extract-button`
+fixtures. Live end-to-end (`redis-server` + honcho worker, seeded stub DB): clicking **Extract** queues
+a run, the worker log shows it execute, and the `extraction_runs` row advances QUEUED → running → done
+(a file-method book instead pauses at REVIEW — that resume UI is MY-10); a run pointed at a missing
+epub lands FAILED with the error recorded.
