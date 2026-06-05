@@ -1061,6 +1061,35 @@ end-to-end (headless Chrome on a seeded stub DB): `/recipes?mode=ai` ranks resul
 filters, `?q=dal` does keyword search with facets, and the unavailable + 390px mobile states render
 per DESIGN.
 
+## 2026-06-05 — "Extracted only" filter on the Books library (MY-5)
+
+The Books page (`BooksLibrary.svelte`) gained a checkbox in the controls bar that, when
+ticked, narrows the grid to books with extracted recipes (`recipeCount > 0`) — the inverse
+of the `pendingCount` the component already derives. It's a frontend-only concern: plain
+session-local `$state` (`extractedOnly`), applied inside the existing `visible` derived
+alongside the search filter and before sort, exactly mirroring how `search` and `sort`
+work. No URL param, no localStorage, no backend change.
+
+The count line was generalised: `countLabel` now shows "X of Y" whenever the visible set
+is narrowed by **search OR** the extracted-only filter (a new `filtered` derived), and just
+"Y" when nothing is filtered — previously it only reacted to a search query. The empty
+state distinguishes three cases: no books at all, no search match, and (filter on) "No
+extracted books yet." The filter state is exposed on the contract as
+`data-verify-extracted-only`.
+
+**Styling.** A custom `appearance:none` checkbox — hairline `--line-strong` square,
+filling to `--clay` with a white tick when checked — with a mono uppercase "Extracted only"
+label reusing the global `.label` style, so it sits flush beside the Sort control. The
+input carries an `aria-label` (not just a wrapping `<label>`): the a11y verifier only
+recognises `label[for]`/`aria-label`, so the wrapper alone would have failed the verdict.
+
+**Verified.** `make check` clean (ruff + ty + svelte-check 0/0); `make test` green (154
+backend, 91 frontend); `make verify` green. Added three additive fixtures to
+`books-library.verify.ts` (`extracted-only-mixed`, `extracted-only-on`,
+`extracted-only-empty` probe) with matching invariants — leaving the existing entries and
+the `expectFail` sentinel untouched. Screenshotted on/off at 1280×800 and 390×844 via the
+verify isolation route.
+
 ## 2026-06-05 — Favicon + per-page document titles (MY-33)
 
 **Context.** The shell had a placeholder frying-pan emoji favicon and no `<title>` at all — every tab
