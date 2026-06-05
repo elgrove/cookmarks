@@ -312,8 +312,10 @@
 		.controls {
 			gap: 0.75rem 1rem;
 		}
+		/* Hidden on mobile: with the filter checkbox added the count wraps to its own
+		   line, wasting vertical space; the total is non-essential at this width. */
 		.count {
-			margin-left: 0;
+			display: none;
 		}
 		.grid {
 			grid-template-columns: repeat(2, 1fr);
