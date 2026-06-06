@@ -18,6 +18,7 @@ import {
 	similarRecipesSchema
 } from './recipes';
 import { listDetailSchema, listMembershipSchema, listSummarySchema } from './lists';
+import { extractionRunSchema } from './extraction';
 
 // Frontend half of the API wire contract (see /contract/README.md): the Zod
 // schemas must accept the shared example the backend pins itself to, and reject
@@ -146,5 +147,16 @@ describe('api wire contract', () => {
 		const { contains, ...rest } = example;
 		const drifted = { ...rest, inList: contains };
 		expect(() => listMembershipSchema.parse(drifted)).toThrow();
+	});
+
+	it('accepts the extraction-run example', () => {
+		expect(() => extractionRunSchema.parse(load('extractionrun.example.json'))).not.toThrow();
+	});
+
+	it('rejects an extraction-run example with a drifted field name', () => {
+		const example = load('extractionrun.example.json');
+		const { chapters_processed, ...rest } = example;
+		const drifted = { ...rest, chaptersProcessed: chapters_processed };
+		expect(() => extractionRunSchema.parse(drifted)).toThrow();
 	});
 });

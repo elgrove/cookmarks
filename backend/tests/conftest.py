@@ -17,6 +17,23 @@ from app.services.embeddings import _clear_query_embed_cache
 
 
 @pytest.fixture(autouse=True)
+def dispatched(monkeypatch: pytest.MonkeyPatch) -> list[tuple[Any, ...]]:
+    """Stub the Celery dispatch so tests never reach a real broker. Records the
+    (book_id, run_id) of each enqueued task; request it by name to assert a trigger
+    dispatched exactly once. The end-to-end extraction tests call the task function
+    directly (not `.delay`), so they're unaffected."""
+    from app.tasks.extraction import extract_recipes_from_book_task
+
+    calls: list[tuple[Any, ...]] = []
+
+    def _record(*args: Any, **_kwargs: Any) -> None:
+        calls.append(args)
+
+    monkeypatch.setattr(extract_recipes_from_book_task, "delay", _record)
+    return calls
+
+
+@pytest.fixture(autouse=True)
 def _reset_caches() -> Iterator[None]:
     # These caches are module-global; clear them so each test's fresh DB (with fresh
     # recipe ids / its own keyword set) never reads a previous test's cached values.

@@ -6,6 +6,9 @@ celery_app = Celery(
     "cookmarks",
     broker=settings.celery_broker_url,
     backend=settings.celery_result_backend,
+    # The worker imports the task modules listed here so @celery_app.task names
+    # register; without it the worker starts but knows no extraction tasks.
+    include=["app.tasks.extraction"],
 )
 
 

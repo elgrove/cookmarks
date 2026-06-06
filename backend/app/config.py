@@ -24,9 +24,12 @@ class Settings(BaseSettings):
     # The per-minute request budget is a user-tunable Config column, not a setting.
     extraction_threads: int = 16
 
-    # Broker is deferred until the real worker is ported; defaults keep imports cheap.
-    celery_broker_url: str = "memory://"
-    celery_result_backend: str = "cache+memory://"
+    # Celery broker + result backend. Redis in dev/prod (a separate worker process
+    # runs extraction off the request thread, surviving restarts); overridable via
+    # COOKMARKS_CELERY_BROKER_URL / _RESULT_BACKEND. Construction never connects, so
+    # importing this stays cheap; tests stub the task dispatch and never reach Redis.
+    celery_broker_url: str = "redis://localhost:6379/0"
+    celery_result_backend: str = "redis://localhost:6379/1"
 
 
 settings = Settings()

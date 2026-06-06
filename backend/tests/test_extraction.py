@@ -24,6 +24,7 @@ from app.services.extraction.graph import get_extraction_graph
 from app.services.extraction.state import ExtractionState
 from app.tasks.extraction import (
     extract_recipes_from_book,
+    extract_recipes_from_book_task,
     resume_extraction,
     save_recipes_from_graph_state,
 )
@@ -526,3 +527,30 @@ def test_end_to_end_stub_review_then_resume(e2e: tuple[sessionmaker[Session], Pa
 def test_resume_rejects_invalid_response() -> None:
     with pytest.raises(ValueError):
         resume_extraction(str(uuid.uuid4()), "maybe")
+
+
+def test_task_marks_run_failed_on_error(
+    db: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A crash inside the worker task records FAILED + the error on the run row (and
+    stamps completed_at) rather than leaving it wedged in RUNNING, then re-raises so
+    Celery captures the traceback."""
+    with db() as s:
+        book = _make_book(s)
+        run = _make_run(s, book)
+        run_id, book_id = str(run.id), str(book.id)
+
+    def boom(*_a: object, **_k: object) -> str:
+        raise RuntimeError("kaboom")
+
+    monkeypatch.setattr("app.tasks.extraction.extract_recipes_from_book", boom)
+
+    with pytest.raises(RuntimeError, match="kaboom"):
+        extract_recipes_from_book_task(book_id, run_id)
+
+    with db() as s:
+        run = s.get(ExtractionRun, uuid.UUID(run_id))
+        assert run is not None
+        assert run.status == ExtractionStatus.FAILED
+        assert run.completed_at is not None
+        assert any("kaboom" in e for e in run.errors)

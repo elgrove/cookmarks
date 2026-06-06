@@ -4,6 +4,7 @@
 	import BookDetail, { type BookDetailData } from '$lib/components/BookDetail.svelte';
 	import { fetchBookDetail } from '$lib/api/books';
 	import { cleanTitle, pageTitle } from '$lib/title';
+	import { triggerExtraction } from '$lib/api/extraction';
 
 	let status = $state<'loading' | 'error' | 'ready'>('loading');
 	let book = $state<BookDetailData | null>(null);
@@ -47,7 +48,12 @@
 </svelte:head>
 
 {#if status === 'ready' && book}
-	<BookDetail {book} />
+	<BookDetail
+		{book}
+		onExtract={async () => {
+			await triggerExtraction(book!.id);
+		}}
+	/>
 {:else}
 	<div class="status">
 		{#if status === 'loading'}

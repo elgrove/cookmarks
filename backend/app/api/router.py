@@ -1,10 +1,11 @@
 from fastapi import APIRouter
 
-from app.api import books, health, home, lists, recipes
+from app.api import books, extraction, health, home, lists, recipes
 
 api_router = APIRouter(prefix="/api")
 api_router.include_router(health.router)
 api_router.include_router(books.router)
+api_router.include_router(extraction.router)
 api_router.include_router(home.router)
 api_router.include_router(recipes.router)
 api_router.include_router(lists.router)
