@@ -3,6 +3,7 @@
 	import { page } from '$app/stores';
 	import BookDetail, { type BookDetailData } from '$lib/components/BookDetail.svelte';
 	import { fetchBookDetail } from '$lib/api/books';
+	import { cleanTitle, pageTitle } from '$lib/title';
 
 	let status = $state<'loading' | 'error' | 'ready'>('loading');
 	let book = $state<BookDetailData | null>(null);
@@ -37,7 +38,13 @@
 	}
 
 	onMount(load);
+
+	const docTitle = $derived(pageTitle(book ? cleanTitle(book.title) : undefined));
 </script>
+
+<svelte:head>
+	<title>{docTitle}</title>
+</svelte:head>
 
 {#if status === 'ready' && book}
 	<BookDetail {book} />

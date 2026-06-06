@@ -8,6 +8,7 @@
 		renameList,
 		type ListSummary
 	} from '$lib/api/lists';
+	import { pageTitle } from '$lib/title';
 
 	let status = $state<'loading' | 'error' | 'ready'>('loading');
 	let lists = $state<ListSummary[]>([]);
@@ -53,6 +54,10 @@
 
 	onMount(load);
 </script>
+
+<svelte:head>
+	<title>{pageTitle('Lists')}</title>
+</svelte:head>
 
 {#if status === 'ready'}
 	<ListsIndex {lists} onCreate={create} onRename={rename} onDelete={remove} />

@@ -1061,6 +1061,60 @@ end-to-end (headless Chrome on a seeded stub DB): `/recipes?mode=ai` ranks resul
 filters, `?q=dal` does keyword search with facets, and the unavailable + 390px mobile states render
 per DESIGN.
 
+## 2026-06-05 — "Extracted only" filter on the Books library (MY-5)
+
+The Books page (`BooksLibrary.svelte`) gained a checkbox in the controls bar that, when
+ticked, narrows the grid to books with extracted recipes (`recipeCount > 0`) — the inverse
+of the `pendingCount` the component already derives. It's a frontend-only concern: plain
+session-local `$state` (`extractedOnly`), applied inside the existing `visible` derived
+alongside the search filter and before sort, exactly mirroring how `search` and `sort`
+work. No URL param, no localStorage, no backend change.
+
+The count line was generalised: `countLabel` now shows "X of Y" whenever the visible set
+is narrowed by **search OR** the extracted-only filter (a new `filtered` derived), and just
+"Y" when nothing is filtered — previously it only reacted to a search query. The empty
+state distinguishes three cases: no books at all, no search match, and (filter on) "No
+extracted books yet." The filter state is exposed on the contract as
+`data-verify-extracted-only`.
+
+**Styling.** A custom `appearance:none` checkbox — hairline `--line-strong` square,
+filling to `--clay` with a white tick when checked — with a mono uppercase "Extracted only"
+label reusing the global `.label` style, so it sits flush beside the Sort control. The
+input carries an `aria-label` (not just a wrapping `<label>`): the a11y verifier only
+recognises `label[for]`/`aria-label`, so the wrapper alone would have failed the verdict.
+
+**Verified.** `make check` clean (ruff + ty + svelte-check 0/0); `make test` green (154
+backend, 91 frontend); `make verify` green. Added three additive fixtures to
+`books-library.verify.ts` (`extracted-only-mixed`, `extracted-only-on`,
+`extracted-only-empty` probe) with matching invariants — leaving the existing entries and
+the `expectFail` sentinel untouched. Screenshotted on/off at 1280×800 and 390×844 via the
+verify isolation route.
+
+## 2026-06-05 — Favicon + per-page document titles (MY-33)
+
+**Context.** The shell had a placeholder frying-pan emoji favicon and no `<title>` at all — every tab
+read blank, and there was no brand mark in the tab strip.
+
+**Favicon.** Replaced `static/favicon.svg` with a hand-authored **bookmark/ribbon glyph** (rounded-top,
+notched-bottom silhouette) in brand clay `#d97757`. It's **dark-mode aware** via an inline
+`@media (prefers-color-scheme: dark)`: on a dark tab the mark lifts to the dark-clay `#df8460` and gains
+an ivory `#faf9f5` ground so it stays legible against a slate tab strip (the same clay-on-dark treatment
+DESIGN §3.1 prescribes). Verified the deployed SVG flips correctly by reading computed fills under each
+emulated colour-scheme. A 64×64 `favicon.png` (rasterised from the same path) is referenced as a legacy
+fallback; `app.html` wires both with `type` hints plus an `apple-touch-icon`.
+
+**Titles.** Pattern is **brand-first with a middot** — `Cookmarks · {Section}`, bare `Cookmarks` on
+home. A base `<title>Cookmarks</title>` in `app.html` guarantees a title pre-hydration; each route then
+sets its own via `<svelte:head>`. The pattern lives in one place — `pageTitle(section?)` in
+`$lib/title.ts`. Detail routes derive the title reactively from the loaded entity (`$derived`), falling
+back to bare `Cookmarks` while loading; book titles reuse `cleanTitle` so the tab matches the displayed
+(subtitle-stripped) name.
+
+**Verified.** `make check` (ruff + ty + svelte-check, 0/0), `make verify` (91), `make test`
+(154 backend + 91 frontend) all green. Live on a seeded DB, every route's `document.title` confirmed via
+Playwright `browser_evaluate` — including `/recipes/{id}` → `Cookmarks · Sumiso`, `/books/{id}` →
+`Cookmarks · A Modern Way to Cook` (subtitle stripped), and `/lists/{id}` → `Cookmarks · Favourites`.
+
 ## 2026-06-05 — List & book cards clickable across their whole surface (MY-7)
 
 **Context.** On `/lists` and `/books`, only the title (and, on books, the cover plate) navigated; the
@@ -1091,4 +1145,3 @@ sentinels are preserved. Live (Playwright on the verify isolation routes): click
 navigates (`/lists/wk`, `/books/a1`) — Playwright reports the stretched overlay intercepts pointer
 events over the title/meta area — while clicking Delete does not navigate, it enters the confirm step.
 Desktop/mobile/hover screenshots under `docs/screenshots/my-7/`.
-
