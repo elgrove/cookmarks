@@ -28,6 +28,7 @@ from app.services.epub import (
     has_separate_image_chapters,
     split_chapters_into_blocks,
 )
+from app.services.extraction.review import REVIEW_QUESTION
 from app.services.extraction.state import ExtractionState
 from app.services.extraction.utils import (
     build_image_path_lookup,
@@ -286,7 +287,7 @@ def await_human_decision(state: ExtractionState) -> dict:
 
     response = interrupt(
         {
-            "question": "Zero images found. Does this cookbook have photos?",
+            "question": REVIEW_QUESTION,
             "book_id": state["book_id"],
             "report_id": state["report_id"],
         }

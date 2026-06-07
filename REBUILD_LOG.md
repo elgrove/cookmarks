@@ -1195,3 +1195,42 @@ out tokens) and finished `done` — the run row carries the cost/token totals. (
 back image-less on the file path instead pauses at REVIEW — that resume UI is MY-10; the FAILED path is
 covered by the task test.) Caught and fixed a real gap on the way: the Redis client wasn't a dependency
 (`celery[redis]`).
+
+## 2026-06-07 — Resolve the human-in-the-loop image question (MY-10)
+
+**Goal.** Make the one human-in-the-loop decision actionable from the app: when a file-method run finds
+zero images it pauses at the graph's `await_human` interrupt (status `REVIEW`) and asks *"Zero images
+found. Does this cookbook have photos?"* — the operator answers and the run resumes to completion. The
+backend pause/checkpoint/resume machinery was already ported from v1 (`await_human_decision`, the SQLite
+checkpointer, `resume_extraction`); what was missing was the API + UI to act on it.
+
+**Scope.** The live "watch it run" view is descoped (still MY-11), so MY-10 doesn't build a run-detail
+surface — it hangs the question off the **book page** instead. Fire-and-forget throughout, matching MY-9:
+no polling, no live status.
+
+**Single source of truth.** The question text, the choices offered, and the answers accepted now live in
+one place — `app/services/extraction/review.py` (`REVIEW_QUESTION`, `REVIEW_CHOICES`,
+`VALID_HUMAN_RESPONSES`) — shared by the graph (raises the interrupt), `resume_extraction` (validates the
+answer), and the new `ReviewQuestion` schema (surfaces it). The graph and the UI can never drift on what
+is asked, and `test_review_question_current_matches_contract` pins the *actual* graph question to the
+contract example.
+
+**Surface.** `GET /api/books/{id}/extraction` returns the book's latest run (`ExtractionRunRead | null`);
+`ExtractionRunRead` gains `pending_question`, populated only while the run is `REVIEW`. On load the book
+page fetches it; if paused, `BookDetail` renders the new `ReviewPrompt` unit (the question + one button
+per choice). **Answer.** `POST /api/books/{id}/extract/{run_id}/resume` validates the run belongs to the
+book (404), the answer is a graph choice (422) and the run is actually awaiting review (409), then
+dispatches `enqueue_resume_extraction` to the worker and returns `202` — the prompt clears optimistically.
+
+**Harness.** `ReviewQuestion` pinned both sides via `contract/reviewquestion.example.json`;
+`extractionrun.example.json` gains `pending_question: null`. New verify unit `review-prompt` covers the
+pending question, a successful answer, the **no-pending-question** and **already-answered** (submitted)
+states, a reject probe (failed resume → error, never a false submitted), an odd-choice a11y probe, and
+the `expectFail` sentinel.
+
+**Verified.** `make check` clean (ruff + ty + svelte-check, 0/0); 171 backend tests (new latest-run +
+resume API tests covering 202/404/409/422 and a cross-book run, plus the two contract pins); the verify
+matrix and 104 frontend tests green incl. the six new `review-prompt` fixtures. Per the visual-verify
+rule, no screenshots this round (not requested). Snag fixed on the way: naming a `$derived` variable
+`state` (alongside the `$state` rune) made svelte-check collapse the runes to `any` — renamed to
+`displayState`.
