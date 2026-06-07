@@ -16,7 +16,8 @@
 				title: b.title,
 				author: b.author,
 				recipeCount: b.recipe_count,
-				hasCover: b.has_cover
+				hasCover: b.has_cover,
+				keywords: b.keywords
 			}));
 			status = 'ready';
 		} catch (err) {

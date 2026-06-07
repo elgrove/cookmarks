@@ -72,7 +72,11 @@ def _seed(session: Session) -> None:
     # have something to match.
     pasta = Keyword(name="Pasta")
     quick = Keyword(name="Quick")
-    session.add_all([pasta, quick])
+    italian = Keyword(name="Italian")
+    session.add_all([pasta, quick, italian])
+    # The extracted book carries its own book-level keywords, one shared with a
+    # recipe ("Pasta") to exercise the single shared vocabulary.
+    with_recipes.keywords = [italian, pasta]
     for i in range(3):
         recipe = Recipe(
             book_id=with_recipes.id,

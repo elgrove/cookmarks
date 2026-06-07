@@ -236,9 +236,11 @@ def list_keywords(
     # the ordering is fixed (count desc, then name).
     global _top_keywords
     if _top_keywords is None:
+        # Inner join, not outer: these are recipe filter chips, so a keyword used
+        # only on books (the shared vocabulary now spans both) must not appear here.
         rows = session.execute(
             select(Keyword.name, func.count(recipe_keywords.c.recipe_id))
-            .outerjoin(recipe_keywords, recipe_keywords.c.keyword_id == Keyword.id)
+            .join(recipe_keywords, recipe_keywords.c.keyword_id == Keyword.id)
             .group_by(Keyword.id)
             .order_by(func.count(recipe_keywords.c.recipe_id).desc(), Keyword.name)
             .limit(_KEYWORD_CACHE_CAP)

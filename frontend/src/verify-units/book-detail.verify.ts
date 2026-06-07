@@ -21,6 +21,7 @@ const bookSchema = z.object({
 	hasCover: z.boolean(),
 	hasEpub: z.boolean(),
 	added: z.string().nullable(),
+	keywords: z.array(z.string()),
 	recipes: z.array(recipeSchema)
 });
 
@@ -57,6 +58,7 @@ const pastaGrannies: BookDetailData = {
 	hasCover: true,
 	hasEpub: true,
 	added: '2025-05-22T20:56:10Z',
+	keywords: ['Italian', 'Pasta', 'Regional', 'Traditional'],
 	recipes: recipes(10)
 };
 
@@ -81,13 +83,14 @@ const unit: VerifiableUnit<Props> = {
 		},
 		{
 			id: 'no-recipes',
-			description: 'a book with nothing extracted: empty state, no count circle',
+			description: 'a book with nothing extracted: empty state, no count circle, no tags',
 			props: {
 				book: {
 					...pastaGrannies,
 					recipeCount: 0,
 					recipes: [],
-					hasCover: false
+					hasCover: false,
+					keywords: []
 				}
 			}
 		},
@@ -112,13 +115,25 @@ const unit: VerifiableUnit<Props> = {
 		},
 		{
 			id: 'long-title',
-			description: 'probe: an overlong title + many keywords must not break layout',
+			description: 'probe: an overlong title + many book and recipe keywords must not break layout',
 			probe: true,
 			props: {
 				book: {
 					...pastaGrannies,
 					title:
 						'A Very Long Cookbook Title That Goes On: With An Equally Unreasonable Subtitle That Should Wrap Gracefully Across Several Lines Without Breaking',
+					keywords: [
+						'Italian',
+						'Pasta',
+						'Regional',
+						'Traditional',
+						'Vegetarian',
+						'Slow Cooking',
+						'Mediterranean',
+						'Comfort Food',
+						'Family',
+						'Rustic'
+					],
 					recipes: [
 						{
 							id: 'rx',
@@ -150,6 +165,17 @@ const unit: VerifiableUnit<Props> = {
 			check: ({ contract, props }) =>
 				Number(contract['recipe-count']) === props.book.recipeCount ||
 				`count=${contract['recipe-count']} expected ${props.book.recipeCount}`
+		},
+		{
+			id: 'book-keywords',
+			description: 'book-level keyword chips render — one per keyword — and match the contract count',
+			check: ({ contract, root, props }) => {
+				const want = props.book.keywords.length;
+				if (Number(contract.keywords) !== want)
+					return `contract keywords=${contract.keywords} expected ${want}`;
+				const chips = root.querySelectorAll('.book-tags li').length;
+				return chips === want || `rendered ${chips} book-keyword chips, expected ${want}`;
+			}
 		},
 		{
 			id: 'rows-match-shown',

@@ -5,6 +5,7 @@
 		author: string;
 		recipeCount: number;
 		hasCover: boolean;
+		keywords?: string[];
 	};
 
 	type SortKey = 'recent' | 'title' | 'author' | 'recipes';
@@ -132,6 +133,7 @@
 						author={book.author}
 						recipeCount={book.recipeCount}
 						hasCover={book.hasCover}
+						keywords={book.keywords ?? []}
 					/>
 				</li>
 			{/each}

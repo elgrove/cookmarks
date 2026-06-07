@@ -1195,3 +1195,46 @@ out tokens) and finished `done` — the run row carries the cost/token totals. (
 back image-less on the file path instead pauses at REVIEW — that resume UI is MY-10; the FAILED path is
 covered by the task test.) Caught and fixed a real gap on the way: the Redis client wasn't a dependency
 (`celery[redis]`).
+
+## 2026-06-07 — Book-level keywords (AI-generated, shared vocabulary)
+
+Books gain keywords — book-level tags (cuisine/theme/style) that say what a whole cookbook is about,
+shown on the library cards and the book detail page. **Decisions** (all from first principles): tags are
+**AI-generated per book**, not imported from Calibre; they draw from the **same shared `Keyword`
+vocabulary** as recipes (one `chicken`, one row, counts unify), so this is a new association, not a new
+vocabulary; UI surfaces are the **library cards** and the **detail masthead** (no filtering UI this
+slice).
+
+**Data.** New `book_keywords` association (book_id, keyword_id PK; `keyword_id` indexed like
+`recipe_keywords`, both FKs `ON DELETE CASCADE`) with `Book.keywords` ↔ `Keyword.books`. The migration
+`a1b2c3d4e5f6` also **merges the two divergent heads** the repo had drifted into (the keyword-index
+branch and the config-overrides branch) back to one. Unlinking a book leaves the shared keyword in
+place.
+
+**Generation.** New `ModelRole.BOOK_KEYWORDS` (mapped on Gemini/OpenRouter/Stub) + `BOOK_KEYWORDS_PROMPT`
+and `AIProvider.generate_book_keywords(digest)` (parses a JSON string array, cleaned/deduped/capped at
+`MAX_BOOK_KEYWORDS=10`). `app/services/book_keywords.py` builds the digest from the book's metadata plus
+a sample of its recipe names and the most-common recipe tags — enough signal to infer cuisine/theme even
+when the blurb is thin — then assigns via a shared `get_or_create_keyword` (extracted to
+`app/services/keywords.py`, now used by both recipe and book paths). Population: best-effort at the end
+of a successful extraction (a no-op without a provider, never fails the run, like embeddings) +
+`scripts/backfill_book_keywords.py` for existing books (`--all` to regenerate). The **Stub** returns
+deterministic, per-book offline tags so tests/dev work without a network.
+
+**Read surfaces.** `keywords` added to `BookSummary` and `BookDetail` (endpoints eager-load with
+`selectinload` to avoid an N+1); `BookCard` shows up to three chips (desktop grid only — hidden on the
+mobile row list), `BookDetail` shows the full set under the byline. A real correctness catch:
+`/api/keywords` (the recipe filter chips) was an **outer** join over `keywords`, so book-only tags would
+have leaked in as recipe filters — switched to an **inner** join so it stays recipe-scoped. The home
+`keywords` stat counts the whole shared vocabulary (recipe + book).
+
+**Harness.** `contract/books.example.json` gained `keywords` (pins `BookSummary` both sides). Verify
+units extended: `book-detail` has a `data-verify-keywords` count + a chip invariant (and the long-title
+probe now stresses many book tags); `books-library` asserts each card renders up to three chips, with a
+mixed fixture (one book over the cap, one with none).
+
+**Verified.** `make check` (ruff + ty + svelte-check, 0/0); 164 backend tests (new `test_book_keywords`:
+read surfaces + the generation service reusing the shared vocabulary + the no-provider no-op; updated
+the books/home/keyword shape tests for the new field and the inner-join scoping); 97 frontend tests incl.
+the verify matrix. Migration applies cleanly to a single head on a fresh DB. Not yet run against the
+real Gemini provider on prod data — the Stub path is the verified one this slice.

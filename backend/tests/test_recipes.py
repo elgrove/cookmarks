@@ -1,10 +1,11 @@
 import uuid
 
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.recipes import _clear_keyword_cache
-from app.models import Keyword
+from app.models import Keyword, Recipe
 
 RECIPE_KEYS = {
     "id",
@@ -178,7 +179,10 @@ def test_keywords_endpoint_is_cached_until_cleared(client: TestClient, session: 
     # Computed once per process, then served from memory.
     assert [k["name"] for k in client.get("/api/keywords").json()] == ["Pasta", "Quick"]
     # A keyword added afterwards isn't reflected — the cached top-N is served as-is.
-    session.add(Keyword(name="Zzz"))
+    # It must be on a recipe to qualify: /api/keywords is recipe-scoped.
+    recipe = session.scalars(select(Recipe)).first()
+    assert recipe is not None
+    recipe.keywords.append(Keyword(name="Zzz"))
     session.commit()
     assert [k["name"] for k in client.get("/api/keywords").json()] == ["Pasta", "Quick"]
     # Clearing the cache (as the extraction task will on write) picks it up.

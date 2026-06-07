@@ -8,7 +8,9 @@ def test_home_shape(client: TestClient) -> None:
     assert resp.status_code == 200
     body = resp.json()
     assert set(body["stats"].keys()) == {"books", "recipes", "keywords"}
-    assert body["stats"] == {"books": 2, "recipes": 3, "keywords": 2}
+    # 3 distinct keywords in the shared vocabulary: "Pasta" + "Quick" on a recipe,
+    # plus "Italian" carried only on the book.
+    assert body["stats"] == {"books": 2, "recipes": 3, "keywords": 3}
 
 
 def test_home_book_of_the_day(client: TestClient) -> None:

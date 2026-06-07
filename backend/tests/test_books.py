@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 
 from app.config import settings
 
-EXPECTED_KEYS = {"id", "title", "author", "recipe_count", "has_cover", "pubdate"}
+EXPECTED_KEYS = {"id", "title", "author", "recipe_count", "has_cover", "pubdate", "keywords"}
 DETAIL_KEYS = {
     "id",
     "title",
@@ -18,6 +18,7 @@ DETAIL_KEYS = {
     "has_cover",
     "has_epub",
     "added",
+    "keywords",
     "recipes",
 }
 

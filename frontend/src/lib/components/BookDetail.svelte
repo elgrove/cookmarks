@@ -16,6 +16,7 @@
 		hasCover: boolean;
 		hasEpub: boolean;
 		added: string | null;
+		keywords: string[];
 		recipes: BookDetailRecipe[];
 	};
 
@@ -74,6 +75,7 @@
 	data-verify-has-cover={book.hasCover ? 'true' : 'false'}
 	data-verify-has-epub={book.hasEpub ? 'true' : 'false'}
 	data-verify-empty={book.recipeCount === 0 ? 'true' : 'false'}
+	data-verify-keywords={book.keywords.length}
 >
 	<nav class="crumb" aria-label="Breadcrumb">
 		<a href="/books">Books</a><span class="sep">›</span><a
@@ -86,6 +88,13 @@
 			<h1 class="display">{mainTitle}</h1>
 			{#if subtitle}<p class="subtitle">{subtitle}</p>{/if}
 			<p class="byline">by <b>{book.author}</b></p>
+			{#if book.keywords.length}
+				<ul class="book-tags" aria-label="Book keywords">
+					{#each book.keywords as kw (kw)}
+						<li class="chip {chipClass(kw)}">{kw}</li>
+					{/each}
+				</ul>
+			{/if}
 		</header>
 
 		<main class="reading">
@@ -230,6 +239,17 @@
 	.byline b {
 		color: var(--ink);
 		font-weight: 500;
+	}
+
+	/* Book-level theme chips under the byline — few enough to show in full (they
+	   reuse the recipe-index .chip styles below, without the single-line clip). */
+	.book-tags {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.45rem;
+		list-style: none;
+		margin: 1.1rem 0 0;
+		padding: 0;
 	}
 
 	.cols {

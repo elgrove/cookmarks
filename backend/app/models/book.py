@@ -1,14 +1,29 @@
 from datetime import date, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, String, Text
+from sqlalchemy import Column, DateTime, ForeignKey, String, Table, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import UUIDAuditBase
+from app.models.base import Base, UUIDAuditBase
 
 if TYPE_CHECKING:
     from app.models.extraction import ExtractionRun
-    from app.models.recipe import Recipe
+    from app.models.recipe import Keyword, Recipe
+
+
+book_keywords = Table(
+    "book_keywords",
+    Base.metadata,
+    Column("book_id", ForeignKey("books.id", ondelete="CASCADE"), primary_key=True),
+    # Indexed like recipe_keywords.keyword_id: the shared-keyword joins and any
+    # group-by on keyword_id can't be served by the (book_id, keyword_id) PK.
+    Column(
+        "keyword_id",
+        ForeignKey("keywords.id", ondelete="CASCADE"),
+        primary_key=True,
+        index=True,
+    ),
+)
 
 
 class Book(UUIDAuditBase):
@@ -32,4 +47,9 @@ class Book(UUIDAuditBase):
     )
     extraction_runs: Mapped[list["ExtractionRun"]] = relationship(
         back_populates="book", cascade="all, delete-orphan"
+    )
+    # AI-generated book-level tags (cuisine/theme/style), drawn from the same shared
+    # Keyword vocabulary as recipes — unlinking a book leaves the keyword in place.
+    keywords: Mapped[list["Keyword"]] = relationship(
+        secondary=book_keywords, back_populates="books"
     )

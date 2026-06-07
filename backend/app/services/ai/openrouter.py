@@ -23,6 +23,7 @@ class OpenRouterProvider(AIProvider):
         ModelRole.MANY_RECIPES_PER_FILE: "google/gemini-2.5-flash",
         ModelRole.ONE_RECIPE_PER_FILE: "openai/gpt-oss-120b",
         ModelRole.BLOCKS_OF_FILES: "google/gemini-2.5-flash",
+        ModelRole.BOOK_KEYWORDS: "google/gemini-2.5-flash",
     }
 
     def _complete(

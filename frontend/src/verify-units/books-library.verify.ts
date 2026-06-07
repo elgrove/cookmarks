@@ -9,17 +9,19 @@ const bookSchema = z.object({
 	title: z.string(),
 	author: z.string(),
 	recipeCount: z.number().int().nonnegative(),
-	hasCover: z.boolean()
+	hasCover: z.boolean(),
+	keywords: z.array(z.string()).optional()
 });
 
 // Incoming (recently-added) order is deliberately NOT alphabetical, so a title
-// sort visibly reorders the list.
+// sort visibly reorders the list. Keyword counts vary (one over the 3-chip cap, one
+// with none) so the card chip behaviour is exercised across the grid.
 const populated: LibraryBook[] = [
-	{ id: 'a1', title: 'Salt, Fat, Acid, Heat', author: 'Samin Nosrat', recipeCount: 100, hasCover: false },
-	{ id: 'a2', title: 'A Modern Way to Eat', author: 'Anna Jones', recipeCount: 200, hasCover: false },
-	{ id: 'a3', title: 'The Nordic Baking Book', author: 'Magnus Nilsson', recipeCount: 84, hasCover: true },
-	{ id: 'a4', title: 'A Modern Way to Cook', author: 'Anna Jones', recipeCount: 150, hasCover: false },
-	{ id: 'a5', title: 'Persiana', author: 'Sabrina Ghayour', recipeCount: 92, hasCover: true }
+	{ id: 'a1', title: 'Salt, Fat, Acid, Heat', author: 'Samin Nosrat', recipeCount: 100, hasCover: false, keywords: ['Fundamentals', 'Technique', 'Mediterranean', 'Reference'] },
+	{ id: 'a2', title: 'A Modern Way to Eat', author: 'Anna Jones', recipeCount: 200, hasCover: false, keywords: ['Vegetarian', 'Weeknight'] },
+	{ id: 'a3', title: 'The Nordic Baking Book', author: 'Magnus Nilsson', recipeCount: 84, hasCover: true, keywords: ['Baking', 'Nordic', 'Bread'] },
+	{ id: 'a4', title: 'A Modern Way to Cook', author: 'Anna Jones', recipeCount: 150, hasCover: false, keywords: [] },
+	{ id: 'a5', title: 'Persiana', author: 'Sabrina Ghayour', recipeCount: 92, hasCover: true, keywords: ['Persian', 'Middle Eastern', 'Mezze'] }
 ];
 
 const SEARCH = 'input[type="search"]';
@@ -149,6 +151,22 @@ const unit: VerifiableUnit<Props> = {
 						return `card has ${links.length} nav link(s), expected exactly 1`;
 					const href = links[0].getAttribute('href') ?? '';
 					if (!/^\/books\/.+/.test(href)) return `nav href not a book detail page: ${href}`;
+				}
+				return true;
+			}
+		},
+		{
+			id: 'card-keyword-chips',
+			description: 'each card shows up to three book-keyword chips, in incoming order',
+			onlyFixtures: ['populated'],
+			check: ({ root, props }) => {
+				const cards = [...root.querySelectorAll('.card')];
+				if (cards.length !== props.books.length)
+					return `rendered ${cards.length} cards, expected ${props.books.length}`;
+				for (let i = 0; i < cards.length; i++) {
+					const expected = Math.min(3, props.books[i].keywords?.length ?? 0);
+					const chips = cards[i].querySelectorAll('.chips .chip').length;
+					if (chips !== expected) return `card ${i} shows ${chips} chips, expected ${expected}`;
 				}
 				return true;
 			}
