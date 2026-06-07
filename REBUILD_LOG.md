@@ -1195,3 +1195,43 @@ out tokens) and finished `done` — the run row carries the cost/token totals. (
 back image-less on the file path instead pauses at REVIEW — that resume UI is MY-10; the FAILED path is
 covered by the task test.) Caught and fixed a real gap on the way: the Redis client wasn't a dependency
 (`celery[redis]`).
+
+## 2026-06-07 — Show recipe images (MY-14)
+
+The data was always there — `recipe.image` records the image's path *inside the book's EPUB*, and
+`RecipeDetail.has_image` already reported its presence — but nothing served the bytes and the reading
+view never rendered one. This slice closes that loop, end to end, while leaving the deliberately
+text-first no-image default (the common case, DESIGN §7) exactly as it was.
+
+**Serve.** `GET /api/recipes/{id}/image` (`app/api/recipes.py`) streams the image straight out of the
+book's EPUB zip via a new `read_epub_image(book, member)` helper in `app/epub.py`. Two traversal guards,
+mirroring the cover/epub endpoints: the EPUB file is confined to the library root
+(`is_relative_to`), and the recorded member is only ever looked up against the archive's own entries and
+read into memory — never joined onto a filesystem path — so a crafted name can't escape the zip. Media
+type comes from the member's extension; 404 when the recipe carries no image, the EPUB is missing, or
+the member isn't in the archive.
+
+**No new wire field.** Followed the cover precedent exactly — `has_cover`/`has_image` booleans plus a
+client-constructed URL (`/api/recipes/{id}/image`, inlined in the component like the cover is), not a
+serialised `image_url`. So the contract is unchanged and already pinned both sides (`has_image` lives in
+`recipe.example.json`, asserted by `test_contract.py` and `contract.test.ts`).
+
+**Show.** When (and only when) `hasImage`, `RecipeDetail.svelte` switches the masthead into a **hero**
+layout: the image takes the right rail as a bordered `4:5` plate (no caption), the Favourite /
+add-to-list actions move to sit left under the keyword chips, and the yield drops down to head the
+ingredients column. The no-image default (the common case) is **untouched** — actions stay in the
+top-right rail, yield in the masthead. The shared action pair is a Svelte `{#snippet}` rendered in
+either slot, and the image keeps the book cover's graceful `onerror` fallback, so a recipe wrongly
+flagged degrades to the plain reading view rather than a broken box. The layout choice was settled by
+iterating throwaway static mocks (generated from this very recipe + its real photo) rather than
+guessing in-component.
+
+**Harness.** Extended the existing `recipe-detail` verify unit with an `image-figure` invariant — with
+an image, a `figure.recipe-figure` carries the API-backed `<img>` (correct `src`, non-empty `alt`);
+without one, no figure renders — exercised by the `image-in-source` (has-image) and the default
+(no-image) fixtures, so both states are covered.
+
+**Verified.** Backend `ruff` + `ty` clean, `pytest` green incl. five new `test_recipes` cases (served
++ 200/jpeg, and 404 for no-image-recorded / missing-EPUB / absent-member / unknown-recipe), each
+building a real EPUB zip for the seeded book. Frontend `svelte-check` 0/0; 97 vitest tests incl. the
+verify matrix with the new image invariant.
