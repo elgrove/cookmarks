@@ -35,6 +35,7 @@ The defining principle (inspired by Anthropic's "Verifiable React" workshop, re-
 - **Backend** (`backend/`): FastAPI · SQLAlchemy 2.0 + Alembic · Celery · SQLite · `uv` · Python 3.11. Type-checked with **ty**, linted/formatted with **ruff**, tested with **pytest**.
 - **Frontend** (`frontend/`): SvelteKit (`adapter-static`, SPA mode) · Vite · TypeScript · Zod. Tested with **vitest** (jsdom). Type-checked with **svelte-check**.
 - **Serving**: dev runs two processes — Vite (`:9789`, HMR) proxies `/api` → uvicorn (`:9788`). Prod builds the SPA to `frontend/build/`, which FastAPI serves with an SPA catch-all fallback (`app/static.py`) — single origin, no CORS.
+- **Port convention**: ports follow `<slot>789` (web) / `<slot>788` (api) / `<slot>787` (redis). Slot **8** = prod (`8789`), slot **9** = trunk (`9789`, plain `make dev`); slots **2–7** are ad-hoc dev servers handed out by `make dev-auto`. Each slot has its own Redis (broker db 0 / result db 1) so workers don't poach each other's tasks.
 
 ## Commands
 
@@ -42,7 +43,8 @@ Run from the repo root unless noted.
 
 - `make install` — `uv sync` (backend) + `npm install` (frontend).
 - `make migrate` — apply Alembic migrations (`uv run python -m alembic upgrade head`). The `alembic` console script isn't installed; use the `python -m alembic` module form for revisions too.
-- `make dev` — the four dev processes via honcho (`uvx honcho start`, reads `Procfile`): `redis`, `api` (uvicorn), `web` (vite), `worker` (Celery). Background work (extraction) runs on the worker. Needs a local Redis binary: `sudo apt install redis-server`; if the package auto-starts a systemd `redis-server` on :6379, `sudo systemctl disable --now redis-server` so honcho owns the port. Broker/backend default to `redis://localhost:6379/{0,1}` (override via `COOKMARKS_CELERY_BROKER_URL` / `_RESULT_BACKEND`).
+- `make dev` — the four dev processes via honcho (`uvx honcho start`, reads `Procfile`): `redis`, `api` (uvicorn), `web` (vite), `worker` (Celery). Background work (extraction) runs on the worker. Needs a local Redis binary: `sudo apt install redis-server`; if the package auto-starts a systemd `redis-server` on :6379, `sudo systemctl disable --now redis-server` so honcho owns the port. Broker/backend default to `redis://localhost:6379/{0,1}` (override via `COOKMARKS_CELERY_BROKER_URL` / `_RESULT_BACKEND`). The `Procfile` reads `COOKMARKS_{WEB,API,REDIS}_PORT` (honcho passes the env through to its `/bin/sh -c` children), defaulting to the trunk ports when unset.
+- `make dev-auto` — same stack on the **first free slot in 2–7** (`scripts/dev.sh`), so a second dev server runs alongside the trunk without port clashes. It exports the slot's `COOKMARKS_{WEB,API,REDIS}_PORT` + `COOKMARKS_CELERY_{BROKER_URL,RESULT_BACKEND}` and launches honcho. Force a slot with `make dev-auto SLOT=5`; preview the choice without launching via `scripts/dev.sh --print`.
 - `make verify` — **the headless verification matrix** (`vitest run`): every unit × fixture, prints verdicts. Fast inner loop.
 - `make check` — backend `ruff check` + `ty check`; frontend `svelte-check`.
 - `make test` — backend `pytest`; frontend `vitest`.

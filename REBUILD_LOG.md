@@ -1275,3 +1275,25 @@ than `$state(prop)`, which also clears the `state_referenced_locally` warnings.)
 `test_config`: defaults + catalogue, set/rotate/clear/omit the key, key never echoed, rate-limit < 1 →
 422) and 103 frontend tests incl. the verify matrix's eight new `config-settings` fixtures and the
 config contract pin both sides.
+
+## 2026-06-07 — Dev servers on a free port slot + house port convention
+
+**Context.** Working directly on the `v2` trunk (no worktree) means several dev servers want to
+coexist — the trunk on its usual ports plus whatever ad-hoc session is in flight — without stepping on
+each other. Formalised the port scheme and made the picker automatic.
+
+**Convention.** Ports are `<slot>789` (web) / `<slot>788` (api) / `<slot>787` (redis): slot **8** = prod
+(`8789`), slot **9** = trunk (`9789`, plain `make dev`), slots **2–7** = ad-hoc dev servers. Each slot
+carries its own Redis (broker db 0 / result db 1) so workers can't poach each other's extraction tasks.
+
+**Plumbing.** `Procfile` now reads `COOKMARKS_{WEB,API,REDIS}_PORT` via `${VAR:-default}` — honcho runs
+each line through `/bin/sh -c` (`shell=True`) and copies `os.environ` into the child env, so exported
+vars substitute and the defaults reproduce the old trunk behaviour byte-for-byte. `scripts/dev.sh`
+scans slots 2→7 (`ss` listening-port check, `/dev/tcp` fallback), picks the first whose web/api/redis are
+all free, exports the slot's `COOKMARKS_*` (incl. `CELERY_BROKER_URL` / `_RESULT_BACKEND`) and execs
+honcho; `--print` previews without launching, a digit arg forces a slot. `make dev-auto` (optional
+`SLOT=n`) wraps it.
+
+**Verified.** `scripts/dev.sh --print` correctly skipped the in-use slots 2/3 and chose 4
+(`http://localhost:4789`). Confirmed honcho expands both `${VAR:-default}` and inline `VITE_DEV_PORT=`
+through its shell — defaults fall through to 9789/9788/6379, exports override them.

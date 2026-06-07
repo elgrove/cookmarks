@@ -1,4 +1,4 @@
-.PHONY: install dev migrate build verify check test fmt eval
+.PHONY: install dev dev-auto migrate build verify check test fmt eval
 
 install:
 	cd backend && uv sync
@@ -8,9 +8,14 @@ install:
 migrate:
 	cd backend && uv run python -m alembic upgrade head
 
-# Dev: Vite (:9789, HMR, proxies /api) + uvicorn (:9788). The agent's live loop.
+# Dev (trunk): Vite (:9789, HMR, proxies /api) + uvicorn (:9788). The agent's live loop.
 dev:
 	uvx honcho start
+
+# Dev on a free port slot (2789, 3789, 4789 ...) so extra servers run side by side.
+# Force one with `make dev-auto SLOT=5`; preview the pick with `scripts/dev.sh --print`.
+dev-auto:
+	./scripts/dev.sh $(SLOT)
 
 # Headless verification matrix (units x fixtures). The agent's fast inner loop.
 verify:
