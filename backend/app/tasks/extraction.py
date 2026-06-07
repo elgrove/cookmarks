@@ -15,11 +15,10 @@ from app.schemas.extraction import RecipeData
 from app.services.ai import get_config
 from app.services.embeddings import embed_recipes
 from app.services.extraction.graph import get_extraction_graph
+from app.services.extraction.review import VALID_HUMAN_RESPONSES
 from app.tasks.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
-
-_VALID_HUMAN_RESPONSES = ("has_images", "no_images")
 
 
 def enqueue_extract_recipes(book_id: str, run_id: str) -> None:
@@ -27,6 +26,13 @@ def enqueue_extract_recipes(book_id: str, run_id: str) -> None:
     endpoint goes through (and tests stub) so a queued run never blocks the request
     thread and the dispatch stays out of the API and contract layers."""
     extract_recipes_from_book_task.delay(book_id, run_id)
+
+
+def enqueue_resume_extraction(run_id: str, human_response: str) -> None:
+    """Dispatch the resume of a paused run to the worker — the seam the resume endpoint
+    goes through (and tests stub) so answering the review question drives the graph to
+    completion off the request thread, mirroring the trigger dispatch."""
+    resume_extraction_task.delay(run_id, human_response)
 
 
 def _mark_run_failed(extraction_id: str, exc: Exception) -> None:
@@ -179,9 +185,9 @@ def extract_recipes_from_book(book_id: str, extraction_id: str | None = None) ->
 def resume_extraction(extraction_id: str, human_response: str) -> str:
     """Resume an extraction paused for human review, supplying the answer to the
     'does this cookbook have photos?' question and driving the graph to completion."""
-    if human_response not in _VALID_HUMAN_RESPONSES:
+    if human_response not in VALID_HUMAN_RESPONSES:
         raise ValueError(
-            f"Invalid response '{human_response}'; expected one of {_VALID_HUMAN_RESPONSES}"
+            f"Invalid response '{human_response}'; expected one of {sorted(VALID_HUMAN_RESPONSES)}"
         )
 
     with SessionLocal() as session:

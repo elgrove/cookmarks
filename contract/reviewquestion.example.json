@@ -1,0 +1,7 @@
+{
+  "question": "Zero images found. Does this cookbook have photos?",
+  "choices": [
+    { "value": "has_images", "label": "Yes, it has photos" },
+    { "value": "no_images", "label": "No photos" }
+  ]
+}

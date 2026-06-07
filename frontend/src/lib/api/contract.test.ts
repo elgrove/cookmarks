@@ -18,7 +18,7 @@ import {
 	similarRecipesSchema
 } from './recipes';
 import { listDetailSchema, listMembershipSchema, listSummarySchema } from './lists';
-import { extractionRunSchema } from './extraction';
+import { extractionRunSchema, reviewQuestionSchema } from './extraction';
 
 // Frontend half of the API wire contract (see /contract/README.md): the Zod
 // schemas must accept the shared example the backend pins itself to, and reject
@@ -158,5 +158,25 @@ describe('api wire contract', () => {
 		const { chapters_processed, ...rest } = example;
 		const drifted = { ...rest, chaptersProcessed: chapters_processed };
 		expect(() => extractionRunSchema.parse(drifted)).toThrow();
+	});
+
+	it('accepts the review-question example', () => {
+		expect(() => reviewQuestionSchema.parse(load('reviewquestion.example.json'))).not.toThrow();
+	});
+
+	it('rejects a review-question example with a drifted field name', () => {
+		const example = load('reviewquestion.example.json');
+		const { label, ...rest } = example.choices[0];
+		const drifted = { ...example, choices: [{ ...rest, text: label }] };
+		expect(() => reviewQuestionSchema.parse(drifted)).toThrow();
+	});
+
+	it('accepts an extraction run paused at review with a pending question', () => {
+		const example = {
+			...load('extractionrun.example.json'),
+			status: 'review',
+			pending_question: load('reviewquestion.example.json')
+		};
+		expect(() => extractionRunSchema.parse(example)).not.toThrow();
 	});
 });

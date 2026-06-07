@@ -44,11 +44,20 @@
 	import { plainText } from '$lib/html';
 	import { cleanTitle, titleSubtitle } from '$lib/title';
 	import ExtractButton from '$lib/components/ExtractButton.svelte';
+	import ReviewPrompt from '$lib/components/ReviewPrompt.svelte';
+	import type { ReviewQuestion } from '$lib/api/extraction';
 
 	let {
 		book,
-		onExtract
-	}: { book: BookDetailData; onExtract?: () => Promise<void> | void } = $props();
+		onExtract,
+		review = null,
+		onAnswer
+	}: {
+		book: BookDetailData;
+		onExtract?: () => Promise<void> | void;
+		review?: ReviewQuestion | null;
+		onAnswer?: (value: string) => Promise<void> | void;
+	} = $props();
 
 	let coverFailed = $state(false);
 	let expanded = $state(false);
@@ -80,6 +89,12 @@
 			href={`/books?author=${encodeURIComponent(book.author)}`}>{book.author}</a
 		><span class="sep">›</span><span class="here">{mainTitle}</span>
 	</nav>
+
+	{#if review}
+		<div class="review-slot">
+			<ReviewPrompt {review} {onAnswer} />
+		</div>
+	{/if}
 
 	<div class="cols">
 		<header class="masthead">
@@ -198,6 +213,10 @@
 	}
 	.crumb .here {
 		color: var(--ink);
+	}
+
+	.review-slot {
+		margin-bottom: 1.6rem;
 	}
 
 	.masthead {
