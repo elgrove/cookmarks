@@ -4,11 +4,16 @@
 	import ConfigSettings, {
 		type ConfigSettingsConfig
 	} from '$lib/components/ConfigSettings.svelte';
+	import TasksPanel from '$lib/components/TasksPanel.svelte';
 	import { fetchConfig, updateConfig, type Config, type ConfigUpdate } from '$lib/api/config';
+	import { triggerBookKeywords } from '$lib/api/tasks';
 	import { pageTitle } from '$lib/title';
 
-	// One tab today (Settings); the extraction reports (MY-11) slot in here as a second tab.
-	const tabs: AdminTab[] = [{ id: 'settings', label: 'Settings' }];
+	// Settings + Tasks today; the extraction reports (MY-11) slot in as a further tab.
+	const tabs: AdminTab[] = [
+		{ id: 'settings', label: 'Settings' },
+		{ id: 'tasks', label: 'Tasks' }
+	];
 	let active = $state('settings');
 
 	let status = $state<'loading' | 'error' | 'ready'>('loading');
@@ -60,15 +65,17 @@
 
 	<AdminTabs {tabs} {active} onSelect={(id) => (active = id)} />
 
-	{#if status === 'ready' && settingsConfig}
-		{#if active === 'settings'}
+	{#if active === 'settings'}
+		{#if status === 'ready' && settingsConfig}
 			<ConfigSettings config={settingsConfig} onSave={save} />
+		{:else if status === 'loading'}
+			<p class="msg">Loading settings…</p>
+		{:else}
+			<p class="msg">Couldn’t load settings.</p>
+			<button class="retry" onclick={load}>Try again</button>
 		{/if}
-	{:else if status === 'loading'}
-		<p class="msg">Loading settings…</p>
-	{:else}
-		<p class="msg">Couldn’t load settings.</p>
-		<button class="retry" onclick={load}>Try again</button>
+	{:else if active === 'tasks'}
+		<TasksPanel onRun={({ regenerate }) => triggerBookKeywords(regenerate)} />
 	{/if}
 </section>
 

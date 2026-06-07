@@ -50,6 +50,22 @@ def resume_dispatched(monkeypatch: pytest.MonkeyPatch) -> list[tuple[Any, ...]]:
 
 
 @pytest.fixture(autouse=True)
+def tasks_dispatched(monkeypatch: pytest.MonkeyPatch) -> list[tuple[Any, ...]]:
+    """Stub the book-keyword backfill dispatch so tests never reach a real broker.
+    Records the (regenerate,) of each enqueued task; request it by name to assert a
+    task dispatched exactly once."""
+    from app.tasks.book_keywords import backfill_book_keywords_task
+
+    calls: list[tuple[Any, ...]] = []
+
+    def _record(*args: Any, **_kwargs: Any) -> None:
+        calls.append(args)
+
+    monkeypatch.setattr(backfill_book_keywords_task, "delay", _record)
+    return calls
+
+
+@pytest.fixture(autouse=True)
 def _reset_caches() -> Iterator[None]:
     # These caches are module-global; clear them so each test's fresh DB (with fresh
     # recipe ids / its own keyword set) never reads a previous test's cached values.

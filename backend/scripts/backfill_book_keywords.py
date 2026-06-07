@@ -10,11 +10,7 @@ books that already have keywords (pass --all to regenerate every extracted book)
 import argparse
 import logging
 
-from sqlalchemy import select
-
-from app.db import SessionLocal
-from app.models.book import Book
-from app.services.book_keywords import generate_book_keywords
+from app.tasks.book_keywords import backfill_book_keywords
 
 
 def main() -> None:
@@ -27,19 +23,7 @@ def main() -> None:
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(message)s")
-
-    # Only books that have recipes — book keywords are inferred from extracted content.
-    stmt = select(Book).where(Book.recipes.any())
-    if not args.all:
-        stmt = stmt.where(~Book.keywords.any())
-
-    tagged = 0
-    with SessionLocal() as session:
-        for book in session.scalars(stmt).all():
-            if generate_book_keywords(session, book):
-                tagged += 1
-        session.commit()
-
+    tagged = backfill_book_keywords(regenerate=args.all)
     print(f"Tagged {tagged} book(s) with keywords.")
 
 

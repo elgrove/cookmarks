@@ -1318,3 +1318,35 @@ read surfaces + the generation service reusing the shared vocabulary + the no-pr
 the books/home/keyword shape tests for the new field and the inner-join scoping); 97 frontend tests incl.
 the verify matrix. Migration applies cleanly to a single head on a fresh DB. Not yet run against the
 real Gemini provider on prod data — the Stub path is the verified one this slice.
+
+## 2026-06-07 — Admin Tasks tab: on-demand book-keyword generation
+
+The operational counterpart to the book-keywords slice: a **Tasks** tab on `/admin` (the second tab after
+Settings, built on the MY-12 admin shell) with an on-demand **Generate book keywords** trigger. Extraction
+already tags new books; this fills in the rest — or re-tags everything — without re-extracting.
+
+**Backend.** A library-wide sweep, `app/tasks/book_keywords.py::backfill_book_keywords(regenerate)`, wraps
+the per-book `generate_book_keywords` over every extracted book missing keywords (or, with `regenerate`,
+every extracted book). One code path now serves all three callers — the CLI script (rewritten to call it),
+the Celery worker (`backfill_book_keywords_task`, registered via the celery `include`), and the new
+endpoint. `POST /api/tasks/book-keywords` (`app/api/tasks.py`) counts the eligible books, dispatches
+through the `enqueue_backfill_book_keywords` seam, and returns `202` + `TaskRunAck {task, status, queued}`
+— fire-and-forget, mirroring the extraction trigger (no live progress; MY-11 territory).
+
+**Frontend.** A presentational, network-free `TasksPanel.svelte` (the verifiable unit): a task card with a
+**Regenerate all** toggle and a Run button that drives idle → running → queued (showing how many books were
+queued, or a calm "everything's up to date" when zero) → idle, or → error on a rejected dispatch — the
+ExtractButton state-machine shape. The admin route adds the Tasks tab and wires `onRun` to a typed+Zod
+client (`lib/api/tasks.ts`); the tab renders independently of the Settings config load.
+
+**Harness.** `TaskRunAck` pinned both sides via `contract/taskrun.example.json`. New verify unit
+`tasks-panel` — idle / run / run-nothing / regenerate-passed fixtures (the last proves the flag reaches the
+handler), a reject probe and an absurd-count probe, plus the `expectFail` sentinel. (Re-hit the documented
+`state`-named-variable gotcha — a local `state` collapses the `$state` runes to `any` under svelte-check —
+renamed to `runState`.)
+
+**Verified.** `make check` (ruff + ty + svelte-check, 0/0); 192 backend tests (new `test_tasks_api`:
+trigger eligible-count for default vs regenerate + dispatched once, and the sweep against a patched
+`SessionLocal` — tags untagged books, no-op without a provider — plus the contract pin both sides); 116
+frontend tests incl. the verify matrix's seven new `tasks-panel` fixtures. Fire-and-forget dispatch stubbed
+in tests (new autouse `tasks_dispatched` fixture); not run against a live worker/Gemini this slice.
