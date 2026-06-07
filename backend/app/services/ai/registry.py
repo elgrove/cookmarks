@@ -23,6 +23,12 @@ def provider_requires_api_key(name: str) -> bool:
     return provider_cls.requires_api_key if provider_cls else True
 
 
+def provider_catalogue() -> list[tuple[str, bool]]:
+    """The selectable providers as (name, requires_api_key) pairs — what the settings UI
+    needs to render its provider dropdown and decide whether to show the API key field."""
+    return [(name, cls.requires_api_key) for name, cls in _PROVIDERS.items()]
+
+
 def get_config(session: Session) -> Config:
     """Return the singleton Config row (id=1), creating it if absent."""
     config = session.get(Config, 1)

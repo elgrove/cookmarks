@@ -19,6 +19,7 @@ import {
 } from './recipes';
 import { listDetailSchema, listMembershipSchema, listSummarySchema } from './lists';
 import { extractionRunSchema } from './extraction';
+import { configSchema } from './config';
 
 // Frontend half of the API wire contract (see /contract/README.md): the Zod
 // schemas must accept the shared example the backend pins itself to, and reject
@@ -158,5 +159,16 @@ describe('api wire contract', () => {
 		const { chapters_processed, ...rest } = example;
 		const drifted = { ...rest, chaptersProcessed: chapters_processed };
 		expect(() => extractionRunSchema.parse(drifted)).toThrow();
+	});
+
+	it('accepts the config example', () => {
+		expect(() => configSchema.parse(load('config.example.json'))).not.toThrow();
+	});
+
+	it('rejects a config example with a drifted field name', () => {
+		const example = load('config.example.json');
+		const { api_key_set, ...rest } = example;
+		const drifted = { ...rest, apiKeySet: api_key_set };
+		expect(() => configSchema.parse(drifted)).toThrow();
 	});
 });

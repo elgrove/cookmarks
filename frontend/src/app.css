@@ -192,21 +192,21 @@ a {
 	}
 }
 
-/* Smallest phones: a fourth nav item (Lists) no longer fits the comfortable row,
-   so tighten the gap, trim the wordmark and shrink the links to stay single-row
-   without horizontal scroll (DESIGN §8) — a proper drawer is future work. */
+/* Smallest phones: five nav items (Books · Recipes · Lists · Admin) no longer fit the
+   comfortable row, so tighten the gap, trim the wordmark and shrink the links to stay
+   single-row without horizontal scroll (DESIGN §8) — a proper drawer is future work. */
 @media (max-width: 480px) {
 	.nav {
-		gap: 0.6rem;
-		padding-left: 1rem;
-		padding-right: 1rem;
+		gap: 0.55rem;
+		padding-left: 0.85rem;
+		padding-right: 0.85rem;
 	}
 	.nav .wordmark {
-		font-size: 1.15rem;
+		font-size: 1.05rem;
 		margin-right: 0;
 	}
 	.nav .navlink {
-		font-size: 0.82rem;
+		font-size: 0.78rem;
 	}
 }
 
