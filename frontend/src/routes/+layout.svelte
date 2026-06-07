@@ -41,6 +41,11 @@
 			class:active={$page.url.pathname.startsWith('/lists')}
 			href="/lists">Lists</a
 		>
+		<a
+			class="navlink"
+			class:active={$page.url.pathname.startsWith('/admin')}
+			href="/admin">Admin</a
+		>
 		<ThemeToggle theme={$resolvedTheme} onToggle={toggleTheme} />
 	</nav>
 {/if}

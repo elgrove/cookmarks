@@ -12,6 +12,7 @@ from typing import Any
 from fastapi.testclient import TestClient
 
 from app.schemas.book import BookFilter, BookSummary, RecipeIndexEntry
+from app.schemas.config import ConfigRead
 from app.schemas.extraction import ExtractionRunRead, ReviewQuestion
 from app.schemas.home import HomeData
 from app.schemas.recipe import (
@@ -204,3 +205,16 @@ def test_review_question_current_matches_contract() -> None:
     # one the UI is pinned to, so the operator can never be shown a stale question.
     example = _example("reviewquestion.example.json")
     assert ReviewQuestion.current().model_dump(mode="json") == example
+
+
+def test_config_model_matches_contract() -> None:
+    example = _example("config.example.json")
+    dumped = ConfigRead.model_validate(example).model_dump(mode="json")
+    assert dumped == example
+
+
+def test_config_endpoint_keys_match_contract(client: TestClient) -> None:
+    example = _example("config.example.json")
+    body = client.get("/api/config").json()
+    assert set(body.keys()) == set(example.keys())
+    assert set(body["providers"][0].keys()) == set(example["providers"][0].keys())

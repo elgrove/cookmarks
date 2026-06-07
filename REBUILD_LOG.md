@@ -1234,3 +1234,44 @@ matrix and 104 frontend tests green incl. the six new `review-prompt` fixtures. 
 rule, no screenshots this round (not requested). Snag fixed on the way: naming a `$derived` variable
 `state` (alongside the `$state` rune) made svelte-check collapse the runes to `any` — renamed to
 `displayState`.
+
+## 2026-06-07 — Admin page + Config settings, first tab (MY-12)
+
+The first slice of the config/operations surface: an **`/admin` page with a tab strip**, landing
+**Settings** as the first tab over the `Config` singleton. The shell is built so the MY-11 extraction
+reports drop in later as a second tab with no rework. A fifth **Admin** link joins the top nav (clay
+active-underline; the `<480px` rule tightened so five items + wordmark + toggle stay single-row).
+
+**Scope, deliberately lean.** Settings covers **AI provider**, a **write-only API key**, and the
+**extraction rate limit**. Per-role `model_overrides` are deferred (the column stays, no UI yet); so are
+a live "test the key" provider check and any auth gate (this stays open, single-user, like the rest of
+the app). No migration — every column already exists on `Config`.
+
+**Backend.** `GET`/`PATCH /api/config` (`app/api/config.py`) over the singleton via the existing
+`get_config` seam. `ConfigRead` (`schemas/config.py`) exposes `ai_provider`, a derived **`api_key_set`**
+boolean (the key itself is **never serialised**), `extraction_rate_limit_per_minute`, and a `providers`
+catalogue (`provider_catalogue()` on the AI registry → `{name, requires_api_key}`) so the form can build
+its dropdown and decide whether to show the key field. `ConfigUpdate` is an all-optional PATCH applied
+with `model_dump(exclude_unset=True)`: an omitted field is untouched, and for `api_key` an empty string
+or null **clears** the stored key while a non-empty string **sets/rotates** it. `GET` doesn't commit, so
+a first read materialises defaults without a write.
+
+**Frontend.** A presentational, network-free `ConfigSettings.svelte` (the verifiable unit): provider
+`<select>`, a key field with a **set / not-set** state (`•••• set` + Replace/Clear, hidden for keyless
+providers like Stub), and a numeric rate limit; dirty-tracking gates Save, which drives idle → saving →
+saved (or → error on a rejected PATCH), mirroring `ExtractButton`. The route (`routes/admin/+page.svelte`)
+fetches via a typed+Zod client (`lib/api/config.ts`), maps the snake_case wire shape to the component's
+props, and re-seeds the form from the PATCH response on save. A small `AdminTabs.svelte` carries the
+(currently single-tab) strip.
+
+**Harness.** `ConfigRead` pinned both sides via `contract/config.example.json`. New verify unit
+`config-settings` — fixtures for unset / key-set / keyless-provider / edit-and-save, probes for a
+rejected save, a pending key-clear and an absurd rate limit, plus the `expectFail` truthfulness
+sentinel. (Gotcha fixed: a local variable named `state` made svelte2tsx read `$state` as a legacy
+store-subscription — renamed to `saveState`; editable fields seed from the config via an effect rather
+than `$state(prop)`, which also clears the `state_referenced_locally` warnings.)
+
+**Verified.** `make check` (ruff + ty + svelte-check, 0/0); `make test` — 171 backend tests (new
+`test_config`: defaults + catalogue, set/rotate/clear/omit the key, key never echoed, rate-limit < 1 →
+422) and 103 frontend tests incl. the verify matrix's eight new `config-settings` fixtures and the
+config contract pin both sides.

@@ -1,0 +1,10 @@
+{
+  "ai_provider": "GEMINI",
+  "api_key_set": true,
+  "extraction_rate_limit_per_minute": 256,
+  "providers": [
+    { "name": "GEMINI", "requires_api_key": true },
+    { "name": "OPENROUTER", "requires_api_key": true },
+    { "name": "STUB", "requires_api_key": false }
+  ]
+}
