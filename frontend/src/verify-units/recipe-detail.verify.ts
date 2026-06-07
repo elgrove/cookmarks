@@ -83,7 +83,7 @@ const unit: VerifiableUnit<Props> = {
 		},
 		{
 			id: 'image-in-source',
-			description: 'the source carried an image: the metadata says so, the plate still stands in',
+			description: 'the source carried an image: a bordered figure renders it from the API',
 			props: { recipe: { ...trofie, hasImage: true } }
 		},
 		{
@@ -256,6 +256,22 @@ const unit: VerifiableUnit<Props> = {
 					contract['has-image'] === flag ||
 					`has-image=${contract['has-image']} expected ${flag}`
 				);
+			}
+		},
+		{
+			id: 'image-figure',
+			description:
+				'with an image, a bordered figure shows the recipe image from the API (alt set); without one, no figure renders',
+			check: ({ root, props }) => {
+				const fig = root.querySelector('figure.recipe-figure');
+				if (!props.recipe.hasImage)
+					return fig === null || 'a no-image recipe rendered an image figure';
+				if (!fig) return 'hasImage but no image figure rendered';
+				const img = fig.querySelector('img.recipe-image');
+				const want = `/api/recipes/${props.recipe.id}/image`;
+				if (img?.getAttribute('src') !== want)
+					return `figure img src=${img?.getAttribute('src')} expected ${want}`;
+				return (img.getAttribute('alt')?.trim().length ?? 0) > 0 || 'recipe image has empty alt';
 			}
 		},
 		{

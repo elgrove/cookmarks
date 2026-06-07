@@ -1,10 +1,18 @@
 import uuid
+import zipfile
+from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.api.recipes import _clear_keyword_cache
+from app.config import settings
 from app.models import Keyword
+
+# Matches the image member recorded on the seeded "Recipe 0" (see tests/conftest.py).
+RECIPE0_IMAGE_MEMBER = "OPS/images/recipe-0.jpg"
+JPEG_MAGIC = b"\xff\xd8\xff"
 
 RECIPE_KEYS = {
     "id",
@@ -277,3 +285,59 @@ def test_recipe_nav_search_respects_filters(client: TestClient) -> None:
 
 def test_recipe_404_for_unknown_id(client: TestClient) -> None:
     assert client.get(f"/api/recipes/{uuid.uuid4()}").status_code == 404
+
+
+# --- Recipe image endpoint ------------------------------------------------------
+
+
+def _write_epub(library: Path, *members: str) -> None:
+    """Write a minimal EPUB for the seeded "With Recipes" book holding `members`."""
+    book_dir = library / "Author One" / "With Recipes (1)"
+    book_dir.mkdir(parents=True)
+    with zipfile.ZipFile(book_dir / "book.epub", "w") as archive:
+        for member in members:
+            archive.writestr(member, JPEG_MAGIC + b" jpeg-ish bytes")
+
+
+@pytest.fixture
+def library_with_recipe_image(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """A temp Calibre root whose EPUB carries the seeded recipe's image member."""
+    _write_epub(tmp_path, RECIPE0_IMAGE_MEMBER)
+    monkeypatch.setattr(settings, "calibre_library_path", tmp_path)
+    return tmp_path
+
+
+def test_recipe_image_served(client: TestClient, library_with_recipe_image: Path) -> None:
+    rid = _recipe_id(client, "Recipe 0")
+    resp = client.get(f"/api/recipes/{rid}/image")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "image/jpeg"
+    assert resp.content.startswith(JPEG_MAGIC)
+
+
+def test_recipe_image_404_when_no_image_recorded(
+    client: TestClient, library_with_recipe_image: Path
+) -> None:
+    # Recipe 1 was seeded without an image, so the client never asks — and is 404'd.
+    rid = _recipe_id(client, "Recipe 1")
+    assert client.get(f"/api/recipes/{rid}/image").status_code == 404
+
+
+def test_recipe_image_404_when_epub_missing(client: TestClient) -> None:
+    # The image member is recorded but no EPUB exists on disk.
+    rid = _recipe_id(client, "Recipe 0")
+    assert client.get(f"/api/recipes/{rid}/image").status_code == 404
+
+
+def test_recipe_image_404_when_member_absent(
+    client: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # An EPUB is present but doesn't contain the recorded member.
+    _write_epub(tmp_path, "OPS/images/something-else.jpg")
+    monkeypatch.setattr(settings, "calibre_library_path", tmp_path)
+    rid = _recipe_id(client, "Recipe 0")
+    assert client.get(f"/api/recipes/{rid}/image").status_code == 404
+
+
+def test_recipe_image_404_for_unknown_recipe(client: TestClient) -> None:
+    assert client.get(f"/api/recipes/{uuid.uuid4()}/image").status_code == 404

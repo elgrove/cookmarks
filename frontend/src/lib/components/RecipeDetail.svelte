@@ -56,14 +56,29 @@
 	} = $props();
 
 	let coverFailed = $state(false);
+	let imageFailed = $state(false);
 	let expanded = $state(false);
 	let showCover = $derived(recipe.bookHasCover && !coverFailed);
+	// Most recipes carry no image (DESIGN §7); show the figure only when the source
+	// had one, and fall back to the text-first default if the stream fails to load.
+	let showImage = $derived(recipe.hasImage && !imageFailed);
 
 	// The book's display title (pre-colon) for the breadcrumb and provenance.
 	let bookTitle = $derived(cleanTitle(recipe.bookTitle));
 	// Calibre descriptions carry HTML; render the intro as plain serif text.
 	let lede = $derived(plainText(recipe.description ?? ''));
 </script>
+
+{#snippet actionButtons()}
+	<FavouriteToggle
+		isFavourite={recipe.isFavourite}
+		recipeName={recipe.name}
+		onToggle={onToggleFavourite}
+	/>
+	{#if lists}
+		<ListPicker {lists} onToggle={onToggleList} onCreate={onCreateList} />
+	{/if}
+{/snippet}
 
 <article
 	class="recipe"
@@ -119,7 +134,7 @@
 		{/if}
 	</div>
 
-	<header class="masthead">
+	<header class="masthead" class:has-image={showImage}>
 		<div class="head">
 			<div class="head-main">
 				<h1 class="display">{recipe.name}</h1>
@@ -130,7 +145,13 @@
 						{/each}
 					</div>
 				{/if}
-				{#if recipe.yields}<p class="yields">{recipe.yields}</p>{/if}
+				{#if showImage}
+					<!-- The image takes the rail; the actions sit left under the chips and
+					     the yield drops down to head the ingredients (see the body). -->
+					<div class="actions inline">{@render actionButtons()}</div>
+				{:else if recipe.yields}
+					<p class="yields">{recipe.yields}</p>
+				{/if}
 				{#if lede}
 					<div class="lede" class:clamped={!expanded && lede.length > 360}>
 						<p>{lede}</p>
@@ -142,21 +163,24 @@
 					{/if}
 				{/if}
 			</div>
-			<div class="actions">
-				<FavouriteToggle
-					isFavourite={recipe.isFavourite}
-					recipeName={recipe.name}
-					onToggle={onToggleFavourite}
-				/>
-				{#if lists}
-					<ListPicker {lists} onToggle={onToggleList} onCreate={onCreateList} />
-				{/if}
-			</div>
+			{#if showImage}
+				<figure class="recipe-figure">
+					<img
+						class="recipe-image"
+						src={`/api/recipes/${recipe.id}/image`}
+						alt={`Image accompanying ${recipe.name}`}
+						onerror={() => (imageFailed = true)}
+					/>
+				</figure>
+			{:else}
+				<div class="actions">{@render actionButtons()}</div>
+			{/if}
 		</div>
 	</header>
 
 	<div class="body">
 		<section class="block">
+			{#if showImage && recipe.yields}<p class="yields yield-lead">{recipe.yields}</p>{/if}
 			<p class="label">Ingredients</p>
 			{#if recipe.ingredients.length}
 				<ul class="ingredients">
@@ -277,7 +301,8 @@
 		line-height: 1;
 	}
 
-	/* Masthead — full width, with the actions pulled to the top-right. */
+	/* Masthead — full width. No image: actions sit in the right rail (top-right).
+	   With an image: the rail becomes the photo and the actions ride the yield line. */
 	.masthead {
 		margin-bottom: 2.75rem;
 		padding-bottom: 2.25rem;
@@ -288,6 +313,9 @@
 		grid-template-columns: 1fr minmax(190px, 230px);
 		column-gap: 3.5rem;
 		align-items: start;
+	}
+	.masthead.has-image .head {
+		grid-template-columns: 1fr minmax(260px, 330px);
 	}
 	.head-main {
 		min-width: 0;
@@ -368,11 +396,37 @@
 		border-bottom-color: var(--clay);
 	}
 
-	/* Favourite ★ over the add-to-list control, stacked in the masthead rail. */
+	/* Favourite ★ + add-to-list. Stacked in the right rail for the no-image default;
+	   a horizontal pair riding the yield line when the rail holds the image. */
 	.actions {
 		display: flex;
 		flex-direction: column;
 		gap: 0.6rem;
+	}
+	.actions.inline {
+		flex-direction: row;
+		align-items: center;
+		gap: 0.6rem;
+		margin-top: 1.3rem;
+	}
+	/* Yield heads the ingredients column in the image layout. */
+	.yield-lead {
+		margin: 0 0 0.85rem;
+	}
+
+	/* Recipe image — a bordered editorial plate in the masthead rail (DESIGN §7).
+	   Absent for the no-image default, the common case. */
+	.recipe-figure {
+		margin: 0;
+	}
+	.recipe-image {
+		display: block;
+		width: 100%;
+		aspect-ratio: 4 / 5;
+		object-fit: cover;
+		border: var(--border);
+		border-radius: 2px;
+		background: var(--bg-warm);
 	}
 
 	/* Body — ingredients rail + a wide method column fills the desktop width. */
@@ -501,12 +555,17 @@
 	}
 
 	@media (max-width: 900px) {
-		.head {
+		.head,
+		.masthead.has-image .head {
 			grid-template-columns: 1fr;
 			row-gap: 1.85rem;
 		}
 		.actions {
 			flex-direction: row;
+		}
+		/* The hero plate stacks under the title — a gentler landscape crop on phones. */
+		.recipe-image {
+			aspect-ratio: 3 / 2;
 		}
 		.body {
 			grid-template-columns: 1fr;

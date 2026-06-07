@@ -2,12 +2,13 @@ import uuid
 from collections import OrderedDict
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Response
 from sqlalchemy import String, cast, func, literal_column, or_, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.covers import has_cover
 from app.db import SessionDep
+from app.epub import read_epub_image
 from app.models.book import Book
 from app.models.recipe import Keyword, Recipe, recipe_keywords
 from app.models.recipe_list import RecipeList, RecipeListItem
@@ -403,6 +404,24 @@ def get_recipe(
         previous=previous,
         next=next_,
     )
+
+
+@router.get("/recipes/{recipe_id}/image")
+def recipe_image(recipe_id: uuid.UUID, session: SessionDep) -> Response:
+    """Stream a recipe's image out of its book's EPUB. 404 when the recipe carries no
+    recorded image, its EPUB is missing, or the recorded member isn't in the archive
+    — the client only asks when `has_image` is true and otherwise keeps the no-image
+    reading view."""
+    recipe = session.scalar(
+        select(Recipe).where(Recipe.id == recipe_id).options(joinedload(Recipe.book))
+    )
+    if recipe is None or recipe.image is None:
+        raise HTTPException(status_code=404, detail="recipe image not found")
+    result = read_epub_image(recipe.book, recipe.image)
+    if result is None:
+        raise HTTPException(status_code=404, detail="recipe image not found")
+    data, media_type = result
+    return Response(content=data, media_type=media_type)
 
 
 # Similar recipes: nearest by embedding, with a shared-keyword fallback for the ~1%
