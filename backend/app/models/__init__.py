@@ -1,5 +1,5 @@
 from app.models.base import Base
-from app.models.book import Book
+from app.models.book import Book, book_keywords
 from app.models.config import Config
 from app.models.enums import AIProvider, ExtractionMethod, ExtractionStatus
 from app.models.extraction import ExtractionRun
@@ -18,5 +18,6 @@ __all__ = [
     "Recipe",
     "RecipeList",
     "RecipeListItem",
+    "book_keywords",
     "recipe_keywords",
 ]

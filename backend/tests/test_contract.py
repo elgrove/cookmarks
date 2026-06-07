@@ -23,6 +23,7 @@ from app.schemas.recipe import (
     SimilarRecipes,
 )
 from app.schemas.recipe_list import ListDetail, ListMembership, ListSummary
+from app.schemas.tasks import TaskRunAck
 
 CONTRACT_DIR = Path(__file__).resolve().parents[2] / "contract"
 
@@ -218,3 +219,15 @@ def test_config_endpoint_keys_match_contract(client: TestClient) -> None:
     body = client.get("/api/config").json()
     assert set(body.keys()) == set(example.keys())
     assert set(body["providers"][0].keys()) == set(example["providers"][0].keys())
+
+
+def test_task_run_ack_model_matches_contract() -> None:
+    example = _example("taskrun.example.json")
+    dumped = TaskRunAck.model_validate(example).model_dump(mode="json")
+    assert dumped == example
+
+
+def test_book_keywords_task_endpoint_keys_match_contract(client: TestClient) -> None:
+    example = _example("taskrun.example.json")
+    body = client.post("/api/tasks/book-keywords", json={}).json()
+    assert set(body.keys()) == set(example.keys())

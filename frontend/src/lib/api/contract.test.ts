@@ -20,6 +20,7 @@ import {
 import { listDetailSchema, listMembershipSchema, listSummarySchema } from './lists';
 import { extractionRunSchema, reviewQuestionSchema } from './extraction';
 import { configSchema } from './config';
+import { taskRunAckSchema } from './tasks';
 
 // Frontend half of the API wire contract (see /contract/README.md): the Zod
 // schemas must accept the shared example the backend pins itself to, and reject
@@ -190,5 +191,16 @@ describe('api wire contract', () => {
 		const { api_key_set, ...rest } = example;
 		const drifted = { ...rest, apiKeySet: api_key_set };
 		expect(() => configSchema.parse(drifted)).toThrow();
+	});
+
+	it('accepts the task-run example', () => {
+		expect(() => taskRunAckSchema.parse(load('taskrun.example.json'))).not.toThrow();
+	});
+
+	it('rejects a task-run example with a drifted field name', () => {
+		const example = load('taskrun.example.json');
+		const { queued, ...rest } = example;
+		const drifted = { ...rest, books_queued: queued };
+		expect(() => taskRunAckSchema.parse(drifted)).toThrow();
 	});
 });

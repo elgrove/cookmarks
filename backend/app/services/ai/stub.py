@@ -4,7 +4,11 @@ from decimal import Decimal
 from typing import ClassVar
 
 from app.services.ai.base import AIProvider, EmbedTask, ModelRole, Usage
-from app.services.prompts import DEDUPLICATE_KEYWORDS_PROMPT, IMAGE_MATCH_CHECK_PROMPT
+from app.services.prompts import (
+    BOOK_KEYWORDS_PROMPT,
+    DEDUPLICATE_KEYWORDS_PROMPT,
+    IMAGE_MATCH_CHECK_PROMPT,
+)
 
 
 def _hash_vector(text: str, dim: int) -> list[float]:
@@ -36,6 +40,7 @@ class StubProvider(AIProvider):
         ModelRole.MANY_RECIPES_PER_FILE: "stub-extract",
         ModelRole.ONE_RECIPE_PER_FILE: "stub-extract",
         ModelRole.BLOCKS_OF_FILES: "stub-extract",
+        ModelRole.BOOK_KEYWORDS: "stub-keywords",
     }
     # Matches the production (Gemini) width so stub vectors share the vec0 table.
     embedding_dimensions: ClassVar[int] = 3072
@@ -52,6 +57,13 @@ class StubProvider(AIProvider):
             # Echo each keyword as its own canonical form: no merging.
             keywords = json.loads(prompt[prompt.rfind("[") : prompt.rfind("]") + 1])
             return json.dumps({k: k for k in keywords}), usage
+
+        if prompt.startswith(BOOK_KEYWORDS_PROMPT[:40]):
+            # Deterministic book tags that vary per book, so distinct books get
+            # distinct keyword sets offline. A shared term ("Cookbook") plus a
+            # per-book token exercises the shared-vocabulary join either way.
+            token = hashlib.blake2b(prompt.encode("utf-8"), digest_size=3).hexdigest()
+            return json.dumps(["Cookbook", "Stub Cuisine", f"Theme {token}"]), usage
 
         suffix = hashlib.blake2b(prompt.encode("utf-8"), digest_size=4).hexdigest()
         recipe = {

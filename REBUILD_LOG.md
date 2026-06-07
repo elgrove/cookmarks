@@ -1337,3 +1337,79 @@ without one, no figure renders — exercised by the `image-in-source` (has-image
 + 200/jpeg, and 404 for no-image-recorded / missing-EPUB / absent-member / unknown-recipe), each
 building a real EPUB zip for the seeded book. Frontend `svelte-check` 0/0; 97 vitest tests incl. the
 verify matrix with the new image invariant.
+
+## 2026-06-07 — Book-level keywords (AI-generated, shared vocabulary)
+
+Books gain keywords — book-level tags (cuisine/theme/style) that say what a whole cookbook is about,
+shown on the library cards and the book detail page. **Decisions** (all from first principles): tags are
+**AI-generated per book**, not imported from Calibre; they draw from the **same shared `Keyword`
+vocabulary** as recipes (one `chicken`, one row, counts unify), so this is a new association, not a new
+vocabulary; UI surfaces are the **library cards** and the **detail masthead** (no filtering UI this
+slice).
+
+**Data.** New `book_keywords` association (book_id, keyword_id PK; `keyword_id` indexed like
+`recipe_keywords`, both FKs `ON DELETE CASCADE`) with `Book.keywords` ↔ `Keyword.books`. The migration
+`a1b2c3d4e5f6` also **merges the two divergent heads** the repo had drifted into (the keyword-index
+branch and the config-overrides branch) back to one. Unlinking a book leaves the shared keyword in
+place.
+
+**Generation.** New `ModelRole.BOOK_KEYWORDS` (mapped on Gemini/OpenRouter/Stub) + `BOOK_KEYWORDS_PROMPT`
+and `AIProvider.generate_book_keywords(digest)` (parses a JSON string array, cleaned/deduped/capped at
+`MAX_BOOK_KEYWORDS=10`). `app/services/book_keywords.py` builds the digest from the book's metadata plus
+a sample of its recipe names and the most-common recipe tags — enough signal to infer cuisine/theme even
+when the blurb is thin — then assigns via a shared `get_or_create_keyword` (extracted to
+`app/services/keywords.py`, now used by both recipe and book paths). Population: best-effort at the end
+of a successful extraction (a no-op without a provider, never fails the run, like embeddings) +
+`scripts/backfill_book_keywords.py` for existing books (`--all` to regenerate). The **Stub** returns
+deterministic, per-book offline tags so tests/dev work without a network.
+
+**Read surfaces.** `keywords` added to `BookSummary` and `BookDetail` (endpoints eager-load with
+`selectinload` to avoid an N+1); `BookCard` shows up to three chips (desktop grid only — hidden on the
+mobile row list), `BookDetail` shows the full set under the byline. A real correctness catch:
+`/api/keywords` (the recipe filter chips) was an **outer** join over `keywords`, so book-only tags would
+have leaked in as recipe filters — switched to an **inner** join so it stays recipe-scoped. The home
+`keywords` stat counts the whole shared vocabulary (recipe + book).
+
+**Harness.** `contract/books.example.json` gained `keywords` (pins `BookSummary` both sides). Verify
+units extended: `book-detail` has a `data-verify-keywords` count + a chip invariant (and the long-title
+probe now stresses many book tags); `books-library` asserts each card renders up to three chips, with a
+mixed fixture (one book over the cap, one with none).
+
+**Verified.** `make check` (ruff + ty + svelte-check, 0/0); 164 backend tests (new `test_book_keywords`:
+read surfaces + the generation service reusing the shared vocabulary + the no-provider no-op; updated
+the books/home/keyword shape tests for the new field and the inner-join scoping); 97 frontend tests incl.
+the verify matrix. Migration applies cleanly to a single head on a fresh DB. Not yet run against the
+real Gemini provider on prod data — the Stub path is the verified one this slice.
+
+## 2026-06-07 — Admin Tasks tab: on-demand book-keyword generation
+
+The operational counterpart to the book-keywords slice: a **Tasks** tab on `/admin` (the second tab after
+Settings, built on the MY-12 admin shell) with an on-demand **Generate book keywords** trigger. Extraction
+already tags new books; this fills in the rest — or re-tags everything — without re-extracting.
+
+**Backend.** A library-wide sweep, `app/tasks/book_keywords.py::backfill_book_keywords(regenerate)`, wraps
+the per-book `generate_book_keywords` over every extracted book missing keywords (or, with `regenerate`,
+every extracted book), **committing per book** so a long sweep updates the library incrementally (each
+book's chips appear as soon as the model returns) and a mid-run failure keeps the work already done. One code path now serves all three callers — the CLI script (rewritten to call it),
+the Celery worker (`backfill_book_keywords_task`, registered via the celery `include`), and the new
+endpoint. `POST /api/tasks/book-keywords` (`app/api/tasks.py`) counts the eligible books, dispatches
+through the `enqueue_backfill_book_keywords` seam, and returns `202` + `TaskRunAck {task, status, queued}`
+— fire-and-forget, mirroring the extraction trigger (no live progress; MY-11 territory).
+
+**Frontend.** A presentational, network-free `TasksPanel.svelte` (the verifiable unit): a task card with a
+**Regenerate all** toggle and a Run button that drives idle → running → queued (showing how many books were
+queued, or a calm "everything's up to date" when zero) → idle, or → error on a rejected dispatch — the
+ExtractButton state-machine shape. The admin route adds the Tasks tab and wires `onRun` to a typed+Zod
+client (`lib/api/tasks.ts`); the tab renders independently of the Settings config load.
+
+**Harness.** `TaskRunAck` pinned both sides via `contract/taskrun.example.json`. New verify unit
+`tasks-panel` — idle / run / run-nothing / regenerate-passed fixtures (the last proves the flag reaches the
+handler), a reject probe and an absurd-count probe, plus the `expectFail` sentinel. (Re-hit the documented
+`state`-named-variable gotcha — a local `state` collapses the `$state` runes to `any` under svelte-check —
+renamed to `runState`.)
+
+**Verified.** `make check` (ruff + ty + svelte-check, 0/0); 192 backend tests (new `test_tasks_api`:
+trigger eligible-count for default vs regenerate + dispatched once, and the sweep against a patched
+`SessionLocal` — tags untagged books, no-op without a provider — plus the contract pin both sides); 116
+frontend tests incl. the verify matrix's seven new `tasks-panel` fixtures. Fire-and-forget dispatch stubbed
+in tests (new autouse `tasks_dispatched` fixture); not run against a live worker/Gemini this slice.

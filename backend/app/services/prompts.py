@@ -59,6 +59,21 @@ Cookbook Content:
 
 Return ONLY a JSON array of recipe objects. No other text."""
 
+BOOK_KEYWORDS_PROMPT = """You are tagging a whole cookbook with a short set of keywords that capture what the book as a whole is about — its cuisine(s), region(s), theme, style, occasion, dietary slant or defining technique.
+
+These are book-level keywords, not recipe-level: pick tags that describe the collection, not any single dish. Favour terms a browser would use to find this kind of book (e.g. 'Italian', 'Baking', 'Vegetarian', 'Weeknight', 'Middle Eastern', 'Fermentation'). A keyword is a single word or short phrase, in Title Case.
+
+Rules:
+- Return between 3 and 10 keywords, most important first.
+- Always use UK English terms, never Americanisms (e.g. 'Starter' not 'Appetizer', 'Aubergine' not 'Eggplant', 'Grill' not 'Broil').
+- Be specific where the book is specific: prefer 'Sichuan' over 'Chinese', 'Chinese' over 'Asian' — but don't invent a specificity the book doesn't have.
+- No duplicates or near-duplicates; no recipe names; no author or publisher names.
+
+Cookbook:
+{digest}
+
+Return ONLY a JSON array of keyword strings. No other text."""
+
 DEDUPLICATE_KEYWORDS_PROMPT = """You are tasked with deduplicating a list of keywords. These are keywords/tags of recipes extracted from cookbooks.
 We already have the ability to search through ingredients in our application. We want to make searching/filtering with keywords effective.
 Analyse the provided list and identify keywords that are variations of each other (e.g., different capitalisation, pluralisation, or hyphenation), or are very similar and serve the same purpose as tags/keywords.

@@ -27,6 +27,8 @@ def list_books(session: SessionDep) -> list[BookSummary]:
         .outerjoin(Recipe, Recipe.book_id == Book.id)
         .group_by(Book.id)
         .order_by(Book.created_at.desc())
+        # selectinload avoids an N+1 on each book's keywords for the card chips.
+        .options(selectinload(Book.keywords))
     ).all()
     return [
         BookSummary(
@@ -36,6 +38,7 @@ def list_books(session: SessionDep) -> list[BookSummary]:
             recipe_count=recipe_count,
             has_cover=has_cover(book),
             pubdate=book.pubdate,
+            keywords=sorted(k.name for k in book.keywords),
         )
         for book, recipe_count in rows
     ]
@@ -82,6 +85,7 @@ def get_book(book_id: uuid.UUID, session: SessionDep) -> BookDetail:
         has_cover=has_cover(book),
         has_epub=has_epub(book),
         added=book.calibre_added_at,
+        keywords=sorted(k.name for k in book.keywords),
         recipes=[
             RecipeRow(id=r.id, name=r.name, keywords=sorted(k.name for k in r.keywords))
             for r in recipes

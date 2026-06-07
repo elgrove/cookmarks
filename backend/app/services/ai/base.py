@@ -10,12 +10,20 @@ from typing import ClassVar, TypeVar
 from pydantic import ValidationError
 
 from app.schemas.extraction import RecipeData
-from app.services.prompts import EXTRACT_RECIPES_PROMPT, IMAGE_MATCH_CHECK_PROMPT
+from app.services.prompts import (
+    BOOK_KEYWORDS_PROMPT,
+    EXTRACT_RECIPES_PROMPT,
+    IMAGE_MATCH_CHECK_PROMPT,
+)
 
 logger = logging.getLogger(__name__)
 
 # Generous ceiling: a single block extraction can be a very large prompt.
 MAX_TIMEOUT = 600
+
+# Upper bound on book-level keywords kept from a generation, regardless of how many
+# the model returns — book tags are a glance, not an index.
+MAX_BOOK_KEYWORDS = 10
 
 _SCHEMA_PATH = Path(__file__).resolve().parent.parent / "recipe_schema.json"
 RECIPE_SCHEMA = json.loads(_SCHEMA_PATH.read_text())
@@ -30,6 +38,7 @@ class ModelRole(Enum):
     MANY_RECIPES_PER_FILE = "many_recipes_per_file"
     ONE_RECIPE_PER_FILE = "one_recipe_per_file"
     BLOCKS_OF_FILES = "blocks_of_files"
+    BOOK_KEYWORDS = "book_keywords"
 
 
 class EmbedTask(Enum):
@@ -79,6 +88,24 @@ def _strip_json_fence(text: str) -> str:
     if text.endswith("```"):
         text = text[:-3]
     return text.strip()
+
+
+def _clean_keywords(raw: list[object], limit: int) -> list[str]:
+    """Tidy a model's keyword list: keep non-empty strings, trim whitespace, drop
+    case-insensitive duplicates (first spelling wins), and cap to `limit`."""
+    cleaned: list[str] = []
+    seen: set[str] = set()
+    for item in raw:
+        if not isinstance(item, str):
+            continue
+        name = item.strip()
+        if not name or name.casefold() in seen:
+            continue
+        seen.add(name.casefold())
+        cleaned.append(name)
+        if len(cleaned) >= limit:
+            break
+    return cleaned
 
 
 class AIProvider(abc.ABC):
@@ -157,3 +184,28 @@ class AIProvider(abc.ABC):
             except ValidationError as e:
                 logger.warning(f"Skipping invalid recipe at index {i}: {e}")
         return recipes, usage
+
+    def generate_book_keywords(
+        self, digest: str, model: str | None = None
+    ) -> tuple[list[str], Usage]:
+        """Generate book-level keywords (cuisine/theme/style) from a digest of the
+        book's metadata and its recipes. Returns the cleaned, deduplicated names —
+        an empty list if the model gives nothing usable."""
+        model = model or self.model_for(ModelRole.BOOK_KEYWORDS)
+        prompt = BOOK_KEYWORDS_PROMPT.format(digest=digest)
+        response, usage = self._complete(prompt, model, temp=0)
+
+        if not response:
+            return [], usage
+
+        try:
+            raw = json.loads(_strip_json_fence(response))
+        except json.JSONDecodeError:
+            logger.error(f"Failed to decode book-keyword JSON from AI response:\n{response}")
+            return [], usage
+
+        if not isinstance(raw, list):
+            logger.warning(f"Book-keyword response was not a JSON array: {raw!r}")
+            return [], usage
+
+        return _clean_keywords(raw, MAX_BOOK_KEYWORDS), usage

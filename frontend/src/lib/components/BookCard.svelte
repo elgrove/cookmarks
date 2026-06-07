@@ -4,13 +4,15 @@
 		title,
 		author,
 		recipeCount,
-		hasCover
+		hasCover,
+		keywords = []
 	}: {
 		id: string;
 		title: string;
 		author: string;
 		recipeCount: number;
 		hasCover: boolean;
+		keywords?: string[];
 	} = $props();
 
 	let coverFailed = $state(false);
@@ -18,6 +20,11 @@
 	// Extraction state lives on the cover as a count circle; fold the count into the
 	// link's accessible name since the circle itself is decorative.
 	let linkLabel = $derived(recipeCount > 0 ? `${title}, ${recipeCount} recipes` : title);
+
+	// A glance of the book's themes; the full set lives on the detail page. Rotating
+	// chip tints (DESIGN §3.1).
+	const tints = ['clay', 'blue', 'green'] as const;
+	let shownKeywords = $derived(keywords.slice(0, 3));
 </script>
 
 <article class="card">
@@ -45,6 +52,13 @@
 	<div class="meta">
 		<h3 class="title">{title}</h3>
 		<p class="author">{author}</p>
+		{#if shownKeywords.length}
+			<ul class="chips" aria-label="Keywords">
+				{#each shownKeywords as kw, i (kw)}
+					<li class={`chip chip-${tints[i % tints.length]}`}>{kw}</li>
+				{/each}
+			</ul>
+		{/if}
 	</div>
 	<!-- Mobile rows only (hidden on the desktop cover grid): recipe count + chevron. -->
 	<span class="row-aside" aria-hidden="true">
@@ -157,6 +171,38 @@
 		margin: 0;
 	}
 
+	/* A single line of theme chips; extras wrap and the second row clips away. */
+	.chips {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.35rem;
+		list-style: none;
+		margin: 0.35rem 0 0;
+		padding: 0;
+		max-height: 1.25rem;
+		overflow: hidden;
+	}
+	.chip {
+		font-family: var(--f-mono);
+		font-size: 0.62rem;
+		letter-spacing: 0.03em;
+		padding: 0.12rem 0.42rem;
+		border-radius: 3px;
+		white-space: nowrap;
+	}
+	.chip-clay {
+		background: var(--chip-clay);
+		color: var(--chip-clay-c);
+	}
+	.chip-blue {
+		background: var(--chip-blue);
+		color: var(--chip-blue-c);
+	}
+	.chip-green {
+		background: var(--chip-green);
+		color: var(--chip-green-c);
+	}
+
 	/* Mobile-only count + chevron, sitting to the right of a text row. */
 	.row-aside {
 		display: none;
@@ -203,6 +249,10 @@
 		}
 		.title {
 			font-size: 1.02rem;
+		}
+		/* Keep the text rows clean — chips are a desktop-grid affordance only. */
+		.chips {
+			display: none;
 		}
 		.row-aside {
 			display: inline-flex;

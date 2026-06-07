@@ -10,12 +10,14 @@ from app.db import SessionLocal
 from app.models.book import Book
 from app.models.enums import ExtractionStatus
 from app.models.extraction import ExtractionRun
-from app.models.recipe import Keyword, Recipe
+from app.models.recipe import Recipe
 from app.schemas.extraction import RecipeData
 from app.services.ai import get_config
+from app.services.book_keywords import generate_book_keywords
 from app.services.embeddings import embed_recipes
 from app.services.extraction.graph import get_extraction_graph
 from app.services.extraction.review import VALID_HUMAN_RESPONSES
+from app.services.keywords import get_or_create_keyword
 from app.tasks.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
@@ -65,13 +67,13 @@ def generate_recipe_embeddings(session: Session, recipes: list[Recipe]) -> None:
     embed_recipes(session, recipes)
 
 
-def _get_or_create_keyword(session: Session, name: str) -> Keyword:
-    keyword = session.scalar(select(Keyword).where(Keyword.name == name))
-    if keyword is None:
-        keyword = Keyword(name=name)
-        session.add(keyword)
-        session.flush()
-    return keyword
+def _generate_book_keywords(session: Session, book: Book) -> None:
+    """Tag the book from its freshly-saved recipes. Best-effort, like embeddings: a
+    no-op without an AI provider, and never allowed to fail the extraction."""
+    try:
+        generate_book_keywords(session, book)
+    except Exception:
+        logger.exception(f"Book-keyword generation failed for {book.title}")
 
 
 def _upsert_recipe(session: Session, book: Book, run: ExtractionRun, data: RecipeData) -> Recipe:
@@ -92,7 +94,7 @@ def _upsert_recipe(session: Session, book: Book, run: ExtractionRun, data: Recip
     recipe.instructions = data.instructions
     recipe.yields = data.yields
     recipe.image = data.image
-    recipe.keywords = [_get_or_create_keyword(session, name) for name in data.keywords]
+    recipe.keywords = [get_or_create_keyword(session, name) for name in data.keywords]
     session.flush()
     return recipe
 
@@ -112,6 +114,7 @@ def save_recipes_from_graph_state(
         saved.append(_upsert_recipe(session, book, run, recipe_data))
 
     generate_recipe_embeddings(session, saved)
+    _generate_book_keywords(session, book)
     session.commit()
 
     logger.info(f"Saved {len(saved)} recipes for {book.title}")

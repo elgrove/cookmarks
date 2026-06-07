@@ -52,6 +52,7 @@
 				hasCover: b.has_cover,
 				hasEpub: b.has_epub,
 				added: b.added,
+				keywords: b.keywords,
 				recipes: b.recipes
 			};
 			status = 'ready';

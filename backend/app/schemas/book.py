@@ -28,6 +28,7 @@ class BookSummary(BaseModel):
     recipe_count: int
     has_cover: bool
     pubdate: date | None
+    keywords: list[str]
 
 
 class BookDetail(BaseModel):
@@ -45,6 +46,7 @@ class BookDetail(BaseModel):
     has_cover: bool
     has_epub: bool
     added: datetime | None
+    keywords: list[str]
     recipes: list[RecipeRow]
 
 

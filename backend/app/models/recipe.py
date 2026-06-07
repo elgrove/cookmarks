@@ -11,6 +11,9 @@ if TYPE_CHECKING:
     from app.models.extraction import ExtractionRun
     from app.models.recipe_list import RecipeListItem
 
+# The book↔keyword association table lives in app.models.book; Keyword.books
+# references it by name so the two modules stay free of a runtime import cycle.
+
 
 recipe_keywords = Table(
     "recipe_keywords",
@@ -29,7 +32,7 @@ recipe_keywords = Table(
 
 
 class Keyword(UUIDAuditBase):
-    """A free-form tag (AI-generated) shared across recipes."""
+    """A free-form tag (AI-generated), shared across recipes and books."""
 
     __tablename__ = "keywords"
 
@@ -37,6 +40,9 @@ class Keyword(UUIDAuditBase):
 
     recipes: Mapped[list["Recipe"]] = relationship(
         secondary=recipe_keywords, back_populates="keywords"
+    )
+    books: Mapped[list["Book"]] = relationship(
+        secondary="book_keywords", back_populates="keywords"
     )
 
 
