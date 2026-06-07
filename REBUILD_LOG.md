@@ -1196,6 +1196,86 @@ back image-less on the file path instead pauses at REVIEW — that resume UI is 
 covered by the task test.) Caught and fixed a real gap on the way: the Redis client wasn't a dependency
 (`celery[redis]`).
 
+## 2026-06-07 — Resolve the human-in-the-loop image question (MY-10)
+
+**Goal.** Make the one human-in-the-loop decision actionable from the app: when a file-method run finds
+zero images it pauses at the graph's `await_human` interrupt (status `REVIEW`) and asks *"Zero images
+found. Does this cookbook have photos?"* — the operator answers and the run resumes to completion. The
+backend pause/checkpoint/resume machinery was already ported from v1 (`await_human_decision`, the SQLite
+checkpointer, `resume_extraction`); what was missing was the API + UI to act on it.
+
+**Scope.** The live "watch it run" view is descoped (still MY-11), so MY-10 doesn't build a run-detail
+surface — it hangs the question off the **book page** instead. Fire-and-forget throughout, matching MY-9:
+no polling, no live status.
+
+**Single source of truth.** The question text, the choices offered, and the answers accepted now live in
+one place — `app/services/extraction/review.py` (`REVIEW_QUESTION`, `REVIEW_CHOICES`,
+`VALID_HUMAN_RESPONSES`) — shared by the graph (raises the interrupt), `resume_extraction` (validates the
+answer), and the new `ReviewQuestion` schema (surfaces it). The graph and the UI can never drift on what
+is asked, and `test_review_question_current_matches_contract` pins the *actual* graph question to the
+contract example.
+
+**Surface.** `GET /api/books/{id}/extraction` returns the book's latest run (`ExtractionRunRead | null`);
+`ExtractionRunRead` gains `pending_question`, populated only while the run is `REVIEW`. On load the book
+page fetches it; if paused, `BookDetail` renders the new `ReviewPrompt` unit (the question + one button
+per choice). **Answer.** `POST /api/books/{id}/extract/{run_id}/resume` validates the run belongs to the
+book (404), the answer is a graph choice (422) and the run is actually awaiting review (409), then
+dispatches `enqueue_resume_extraction` to the worker and returns `202` — the prompt clears optimistically.
+
+**Harness.** `ReviewQuestion` pinned both sides via `contract/reviewquestion.example.json`;
+`extractionrun.example.json` gains `pending_question: null`. New verify unit `review-prompt` covers the
+pending question, a successful answer, the **no-pending-question** and **already-answered** (submitted)
+states, a reject probe (failed resume → error, never a false submitted), an odd-choice a11y probe, and
+the `expectFail` sentinel.
+
+**Verified.** `make check` clean (ruff + ty + svelte-check, 0/0); 171 backend tests (new latest-run +
+resume API tests covering 202/404/409/422 and a cross-book run, plus the two contract pins); the verify
+matrix and 104 frontend tests green incl. the six new `review-prompt` fixtures. Per the visual-verify
+rule, no screenshots this round (not requested). Snag fixed on the way: naming a `$derived` variable
+`state` (alongside the `$state` rune) made svelte-check collapse the runes to `any` — renamed to
+`displayState`.
+
+## 2026-06-07 — Admin page + Config settings, first tab (MY-12)
+
+The first slice of the config/operations surface: an **`/admin` page with a tab strip**, landing
+**Settings** as the first tab over the `Config` singleton. The shell is built so the MY-11 extraction
+reports drop in later as a second tab with no rework. A fifth **Admin** link joins the top nav (clay
+active-underline; the `<480px` rule tightened so five items + wordmark + toggle stay single-row).
+
+**Scope, deliberately lean.** Settings covers **AI provider**, a **write-only API key**, and the
+**extraction rate limit**. Per-role `model_overrides` are deferred (the column stays, no UI yet); so are
+a live "test the key" provider check and any auth gate (this stays open, single-user, like the rest of
+the app). No migration — every column already exists on `Config`.
+
+**Backend.** `GET`/`PATCH /api/config` (`app/api/config.py`) over the singleton via the existing
+`get_config` seam. `ConfigRead` (`schemas/config.py`) exposes `ai_provider`, a derived **`api_key_set`**
+boolean (the key itself is **never serialised**), `extraction_rate_limit_per_minute`, and a `providers`
+catalogue (`provider_catalogue()` on the AI registry → `{name, requires_api_key}`) so the form can build
+its dropdown and decide whether to show the key field. `ConfigUpdate` is an all-optional PATCH applied
+with `model_dump(exclude_unset=True)`: an omitted field is untouched, and for `api_key` an empty string
+or null **clears** the stored key while a non-empty string **sets/rotates** it. `GET` doesn't commit, so
+a first read materialises defaults without a write.
+
+**Frontend.** A presentational, network-free `ConfigSettings.svelte` (the verifiable unit): provider
+`<select>`, a key field with a **set / not-set** state (`•••• set` + Replace/Clear, hidden for keyless
+providers like Stub), and a numeric rate limit; dirty-tracking gates Save, which drives idle → saving →
+saved (or → error on a rejected PATCH), mirroring `ExtractButton`. The route (`routes/admin/+page.svelte`)
+fetches via a typed+Zod client (`lib/api/config.ts`), maps the snake_case wire shape to the component's
+props, and re-seeds the form from the PATCH response on save. A small `AdminTabs.svelte` carries the
+(currently single-tab) strip.
+
+**Harness.** `ConfigRead` pinned both sides via `contract/config.example.json`. New verify unit
+`config-settings` — fixtures for unset / key-set / keyless-provider / edit-and-save, probes for a
+rejected save, a pending key-clear and an absurd rate limit, plus the `expectFail` truthfulness
+sentinel. (Gotcha fixed: a local variable named `state` made svelte2tsx read `$state` as a legacy
+store-subscription — renamed to `saveState`; editable fields seed from the config via an effect rather
+than `$state(prop)`, which also clears the `state_referenced_locally` warnings.)
+
+**Verified.** `make check` (ruff + ty + svelte-check, 0/0); `make test` — 171 backend tests (new
+`test_config`: defaults + catalogue, set/rotate/clear/omit the key, key never echoed, rate-limit < 1 →
+422) and 103 frontend tests incl. the verify matrix's eight new `config-settings` fixtures and the
+config contract pin both sides.
+
 ## 2026-06-07 — Book-level keywords (AI-generated, shared vocabulary)
 
 Books gain keywords — book-level tags (cuisine/theme/style) that say what a whole cookbook is about,

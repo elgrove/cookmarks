@@ -34,6 +34,22 @@ def dispatched(monkeypatch: pytest.MonkeyPatch) -> list[tuple[Any, ...]]:
 
 
 @pytest.fixture(autouse=True)
+def resume_dispatched(monkeypatch: pytest.MonkeyPatch) -> list[tuple[Any, ...]]:
+    """Stub the resume dispatch so tests never reach a real broker. Records the
+    (run_id, human_response) of each enqueued resume; request it by name to assert a
+    resume dispatched exactly once."""
+    from app.tasks.extraction import resume_extraction_task
+
+    calls: list[tuple[Any, ...]] = []
+
+    def _record(*args: Any, **_kwargs: Any) -> None:
+        calls.append(args)
+
+    monkeypatch.setattr(resume_extraction_task, "delay", _record)
+    return calls
+
+
+@pytest.fixture(autouse=True)
 def _reset_caches() -> Iterator[None]:
     # These caches are module-global; clear them so each test's fresh DB (with fresh
     # recipe ids / its own keyword set) never reads a previous test's cached values.

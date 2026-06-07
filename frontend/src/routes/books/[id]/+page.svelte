@@ -4,10 +4,33 @@
 	import BookDetail, { type BookDetailData } from '$lib/components/BookDetail.svelte';
 	import { fetchBookDetail } from '$lib/api/books';
 	import { cleanTitle, pageTitle } from '$lib/title';
-	import { triggerExtraction } from '$lib/api/extraction';
+	import {
+		fetchLatestRun,
+		resumeExtraction,
+		triggerExtraction,
+		type ExtractionRun,
+		type ReviewAnswer,
+		type ReviewQuestion
+	} from '$lib/api/extraction';
 
 	let status = $state<'loading' | 'error' | 'ready'>('loading');
 	let book = $state<BookDetailData | null>(null);
+	let latestRun = $state<ExtractionRun | null>(null);
+
+	// Only a run paused at review surfaces a question; everything else shows nothing.
+	let review = $derived<ReviewQuestion | null>(
+		latestRun?.status === 'review' ? latestRun.pending_question : null
+	);
+
+	async function loadLatestRun(id: string) {
+		try {
+			latestRun = await fetchLatestRun(id);
+		} catch (err) {
+			// A missing run view must never break the book page; just show no prompt.
+			console.error('failed to load latest extraction run', err);
+			latestRun = null;
+		}
+	}
 
 	async function load() {
 		status = 'loading';
@@ -33,10 +56,20 @@
 				recipes: b.recipes
 			};
 			status = 'ready';
+			void loadLatestRun(id);
 		} catch (err) {
 			console.error('failed to load book', err);
 			status = 'error';
 		}
+	}
+
+	async function answerReview(value: string) {
+		if (!book || !latestRun) return;
+		const run = latestRun;
+		await resumeExtraction(book.id, run.id, value as ReviewAnswer);
+		// Fire-and-forget: there's no live view, so clear the prompt optimistically —
+		// the run is now resuming on the worker.
+		latestRun = null;
 	}
 
 	onMount(load);
@@ -51,6 +84,8 @@
 {#if status === 'ready' && book}
 	<BookDetail
 		{book}
+		{review}
+		onAnswer={answerReview}
 		onExtract={async () => {
 			await triggerExtraction(book!.id);
 		}}
