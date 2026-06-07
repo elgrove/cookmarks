@@ -1327,7 +1327,8 @@ already tags new books; this fills in the rest — or re-tags everything — wit
 
 **Backend.** A library-wide sweep, `app/tasks/book_keywords.py::backfill_book_keywords(regenerate)`, wraps
 the per-book `generate_book_keywords` over every extracted book missing keywords (or, with `regenerate`,
-every extracted book). One code path now serves all three callers — the CLI script (rewritten to call it),
+every extracted book), **committing per book** so a long sweep updates the library incrementally (each
+book's chips appear as soon as the model returns) and a mid-run failure keeps the work already done. One code path now serves all three callers — the CLI script (rewritten to call it),
 the Celery worker (`backfill_book_keywords_task`, registered via the celery `include`), and the new
 endpoint. `POST /api/tasks/book-keywords` (`app/api/tasks.py`) counts the eligible books, dispatches
 through the `enqueue_backfill_book_keywords` seam, and returns `202` + `TaskRunAck {task, status, queued}`

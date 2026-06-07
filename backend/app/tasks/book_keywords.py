@@ -29,7 +29,11 @@ def backfill_book_keywords(regenerate: bool = False) -> int:
     """Generate keywords for extracted books, returning how many were tagged. By
     default only books that have recipes but no keywords yet; `regenerate` re-tags
     every book that has recipes. A no-op per book when no AI provider is configured,
-    so it's always safe to run."""
+    so it's always safe to run.
+
+    Commits per book — each book's tags land as soon as the model returns them, so a
+    long sweep updates the library incrementally and a mid-run failure keeps the work
+    already done, rather than persisting everything in one transaction at the end."""
     stmt = select(Book).where(Book.recipes.any())
     if not regenerate:
         stmt = stmt.where(~Book.keywords.any())
@@ -39,7 +43,7 @@ def backfill_book_keywords(regenerate: bool = False) -> int:
         for book in session.scalars(stmt).all():
             if generate_book_keywords(session, book):
                 tagged += 1
-        session.commit()
+            session.commit()
 
     logger.info(f"Book-keyword backfill tagged {tagged} book(s) (regenerate={regenerate})")
     return tagged
