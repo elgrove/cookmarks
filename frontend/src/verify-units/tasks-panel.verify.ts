@@ -6,6 +6,7 @@ type Props = TasksPanelProps;
 
 const RUN = '.run';
 const CHECK = '.regen-check';
+const DEDUP_RUN = '.dedup-run';
 
 // A handler that echoes the chosen mode back as the queued count, so an invariant can
 // prove the regenerate flag actually reached the call (99 when regenerating, else 1).
@@ -17,11 +18,16 @@ const fixedRun =
 	(): Promise<TaskRunAck> =>
 		Promise.resolve({ task: 'book_keywords', status: 'queued', queued });
 
+const fixedDedup =
+	(queued: number) =>
+	(): Promise<TaskRunAck> =>
+		Promise.resolve({ task: 'keyword_dedup', status: 'queued', queued });
+
 const unit: VerifiableUnit<Props> = {
 	id: 'tasks-panel',
 	title: 'Tasks panel',
 	description:
-		'The admin Tasks tab: an on-demand "Generate book keywords" trigger with a regenerate-all toggle that drives idle → running → queued (fire-and-forget), or → error if the dispatch rejects.',
+		'The admin Tasks tab: on-demand "Generate book keywords" (with a regenerate-all toggle) and "Deduplicate keywords" triggers, each driving idle → running → queued (fire-and-forget), or → error if the dispatch rejects.',
 	kind: 'component',
 	component: TasksPanel,
 	fixtures: [
@@ -79,6 +85,25 @@ const unit: VerifiableUnit<Props> = {
 			}
 		},
 		{
+			id: 'dedup-run',
+			description: 'running the dedup queues the vocabulary and reports its size, book task untouched',
+			props: { onRun: fixedRun(5), onDedup: fixedDedup(42) },
+			act: async ({ click, wait }) => {
+				click(DEDUP_RUN);
+				await wait(0);
+			}
+		},
+		{
+			id: 'dedup-reject',
+			description: 'probe: a failed dedup dispatch surfaces an error state, never a false "queued"',
+			probe: true,
+			props: { onRun: fixedRun(5), onDedup: () => Promise.reject(new Error('broker down')) },
+			act: async ({ click, wait }) => {
+				click(DEDUP_RUN);
+				await wait(0);
+			}
+		},
+		{
 			id: 'contract-lie',
 			description: 'sentinel: a deliberately-failing invariant proves the harness reports truthfully',
 			expectFail: true,
@@ -95,6 +120,14 @@ const unit: VerifiableUnit<Props> = {
 					contract.regenerate === 'false' &&
 					contract.queued === '') ||
 				`state=${contract.state} regenerate=${contract.regenerate} queued=${contract.queued}`
+		},
+		{
+			id: 'dedup-idle',
+			description: 'at rest the dedup task is idle too, with nothing queued',
+			onlyFixtures: ['idle'],
+			check: ({ contract }) =>
+				(contract['dedup-state'] === 'idle' && contract['dedup-queued'] === '') ||
+				`dedup-state=${contract['dedup-state']} dedup-queued=${contract['dedup-queued']}`
 		},
 		{
 			id: 'run-queues',
@@ -144,6 +177,30 @@ const unit: VerifiableUnit<Props> = {
 					return `state=${contract.state} queued=${contract.queued}`;
 				return (root.textContent ?? '').includes('999999') || 'count not rendered in full';
 			}
+		},
+		{
+			id: 'dedup-queues',
+			description: 'a successful dedup run lands on done and reports the vocabulary size',
+			onlyFixtures: ['dedup-run'],
+			check: ({ contract }) =>
+				(contract['dedup-state'] === 'done' && contract['dedup-queued'] === '42') ||
+				`dedup-state=${contract['dedup-state']} dedup-queued=${contract['dedup-queued']}`
+		},
+		{
+			id: 'dedup-run-leaves-book-idle',
+			description: 'running the dedup task does not disturb the book-keywords task',
+			onlyFixtures: ['dedup-run'],
+			check: ({ contract }) =>
+				(contract.state === 'idle' && contract.queued === '') ||
+				`book state=${contract.state} queued=${contract.queued}`
+		},
+		{
+			id: 'dedup-reject-errors',
+			description: 'a rejected dedup dispatch lands on the error state, with nothing queued',
+			onlyFixtures: ['dedup-reject'],
+			check: ({ contract }) =>
+				(contract['dedup-state'] === 'error' && contract['dedup-queued'] === '') ||
+				`dedup-state=${contract['dedup-state']} dedup-queued=${contract['dedup-queued']}`
 		},
 		{
 			id: 'intentional-fail',

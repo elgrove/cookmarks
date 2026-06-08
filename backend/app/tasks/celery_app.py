@@ -8,7 +8,7 @@ celery_app = Celery(
     backend=settings.celery_result_backend,
     # The worker imports the task modules listed here so @celery_app.task names
     # register; without it the worker starts but knows no extraction tasks.
-    include=["app.tasks.extraction", "app.tasks.book_keywords"],
+    include=["app.tasks.extraction", "app.tasks.book_keywords", "app.tasks.keyword_dedup"],
 )
 
 

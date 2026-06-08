@@ -6,61 +6,81 @@
 		 *  to drive running → done, or → error if it rejects. Kept network-free for the
 		 *  verifiable unit, à la ExtractButton. */
 		onRun?: (opts: { regenerate: boolean }) => Promise<TaskRunAck | void>;
+		/** Wired to POST /api/tasks/dedup-keywords — the AI-assisted keyword merge. Same
+		 *  fire-and-forget lifecycle as `onRun`, with no options. */
+		onDedup?: () => Promise<TaskRunAck | void>;
 	};
 
 	type State = 'idle' | 'running' | 'done' | 'error';
+	// One task's lifecycle. `state` is named so, not `state`, to avoid the $state rune
+	// collision that makes svelte2tsx read runes as `any` (see MY-10/MY-12 notes); held
+	// on an object so the two tasks share one run helper. `queued` is the unit count from
+	// the last successful queue (books / keywords), null until one runs or on error.
+	type Runner = { state: State; queued: number | null; timer?: ReturnType<typeof setTimeout> };
 </script>
 
 <script lang="ts">
 	import { onDestroy } from 'svelte';
 
-	let { onRun }: TasksPanelProps = $props();
+	let { onRun, onDedup }: TasksPanelProps = $props();
 
-	// Named runState, not `state`: a local `state` collides with the $state rune and
-	// makes svelte2tsx read the runes as `any` (see MY-10/MY-12 notes).
-	let runState = $state<State>('idle');
+	let book = $state<Runner>({ state: 'idle', queued: null });
+	let dedup = $state<Runner>({ state: 'idle', queued: null });
 	let regenerate = $state(false);
-	// The book count from the last successful queue; null until one runs (or on error).
-	let queued = $state<number | null>(null);
-	let timer: ReturnType<typeof setTimeout> | undefined;
 
-	async function run() {
-		if (runState === 'running') return;
-		clearTimeout(timer);
-		runState = 'running';
+	// `run` may be absent (an unwired handler returns undefined), hence the widened
+	// return — `await undefined` simply yields no ack and the note falls back.
+	async function runTask(runner: Runner, run: () => Promise<TaskRunAck | void> | undefined) {
+		if (runner.state === 'running') return;
+		clearTimeout(runner.timer);
+		runner.state = 'running';
 		try {
-			const ack = await onRun?.({ regenerate });
-			queued = ack && typeof ack.queued === 'number' ? ack.queued : null;
-			runState = 'done';
+			const ack = await run();
+			runner.queued = ack && typeof ack.queued === 'number' ? ack.queued : null;
+			runner.state = 'done';
 			// Fire-and-forget: there's no live view, so settle back to idle after a beat.
-			timer = setTimeout(() => (runState = 'idle'), 3000);
+			runner.timer = setTimeout(() => (runner.state = 'idle'), 3000);
 		} catch {
-			runState = 'error';
-			queued = null;
-			timer = setTimeout(() => (runState = 'idle'), 4000);
+			runner.state = 'error';
+			runner.queued = null;
+			runner.timer = setTimeout(() => (runner.state = 'idle'), 4000);
 		}
 	}
 
-	onDestroy(() => clearTimeout(timer));
+	onDestroy(() => {
+		clearTimeout(book.timer);
+		clearTimeout(dedup.timer);
+	});
 
-	let runLabel = $derived(
-		runState === 'running'
+	function label(state: State): string {
+		return state === 'running'
 			? 'Queuing…'
-			: runState === 'done'
+			: state === 'done'
 				? 'Queued ✓'
-				: runState === 'error'
+				: state === 'error'
 					? "Couldn't queue"
-					: 'Run'
-	);
+					: 'Run';
+	}
 
-	// A human note under the task after it runs: how many books were queued, or why not.
-	let note = $derived(
-		runState === 'done'
-			? queued && queued > 0
-				? `Queued ${queued} book${queued === 1 ? '' : 's'} for tagging — they'll update shortly.`
+	const ERROR_NOTE = 'The task could not be queued. Try again.';
+
+	// A human note under each task after it runs: how many units were queued, or why not.
+	let bookNote = $derived(
+		book.state === 'done'
+			? book.queued && book.queued > 0
+				? `Queued ${book.queued} book${book.queued === 1 ? '' : 's'} for tagging — they'll update shortly.`
 				: 'Nothing to tag: every extracted book already has keywords.'
-			: runState === 'error'
-				? 'The task could not be queued. Try again.'
+			: book.state === 'error'
+				? ERROR_NOTE
+				: ''
+	);
+	let dedupNote = $derived(
+		dedup.state === 'done'
+			? dedup.queued && dedup.queued > 0
+				? `Analysing ${dedup.queued} keyword${dedup.queued === 1 ? '' : 's'} for merges — duplicates fold shortly.`
+				: 'Nothing to deduplicate: the keyword vocabulary is empty.'
+			: dedup.state === 'error'
+				? ERROR_NOTE
 				: ''
 	);
 </script>
@@ -68,9 +88,11 @@
 <section
 	class="tasks"
 	data-verify-unit="tasks-panel"
-	data-verify-state={runState}
+	data-verify-state={book.state}
 	data-verify-regenerate={regenerate ? 'true' : 'false'}
-	data-verify-queued={queued === null ? '' : String(queued)}
+	data-verify-queued={book.queued === null ? '' : String(book.queued)}
+	data-verify-dedup-state={dedup.state}
+	data-verify-dedup-queued={dedup.queued === null ? '' : String(dedup.queued)}
 >
 	<article class="task">
 		<div class="copy">
@@ -96,20 +118,49 @@
 		<div class="action">
 			<button
 				class="run"
-				class:done={runState === 'done'}
-				class:error={runState === 'error'}
+				class:done={book.state === 'done'}
+				class:error={book.state === 'error'}
 				type="button"
-				aria-busy={runState === 'running'}
-				disabled={runState === 'running'}
-				onclick={run}
+				aria-busy={book.state === 'running'}
+				disabled={book.state === 'running'}
+				onclick={() => runTask(book, () => onRun?.({ regenerate }))}
 			>
-				{runLabel}
+				{label(book.state)}
 			</button>
 		</div>
 	</article>
 
-	{#if note}
-		<p class="note" class:err={runState === 'error'} role="status">{note}</p>
+	{#if bookNote}
+		<p class="note" class:err={book.state === 'error'} role="status">{bookNote}</p>
+	{/if}
+
+	<article class="task">
+		<div class="copy">
+			<h2 class="name">Deduplicate keywords</h2>
+			<p class="desc">
+				Use AI to merge near-duplicate tags — "Veggie" into "Vegetarian", "Stir Fry" into "Stir-fry"
+				— across every recipe and book, so search and filtering stay sharp. Merges apply
+				automatically; there's no review step.
+			</p>
+		</div>
+
+		<div class="action">
+			<button
+				class="run dedup-run"
+				class:done={dedup.state === 'done'}
+				class:error={dedup.state === 'error'}
+				type="button"
+				aria-busy={dedup.state === 'running'}
+				disabled={dedup.state === 'running'}
+				onclick={() => runTask(dedup, () => onDedup?.())}
+			>
+				{label(dedup.state)}
+			</button>
+		</div>
+	</article>
+
+	{#if dedupNote}
+		<p class="note" class:err={dedup.state === 'error'} role="status">{dedupNote}</p>
 	{/if}
 </section>
 

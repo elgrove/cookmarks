@@ -7,7 +7,7 @@
 	import TasksPanel from '$lib/components/TasksPanel.svelte';
 	import ExtractionsPanel from '$lib/components/ExtractionsPanel.svelte';
 	import { fetchConfig, updateConfig, type Config, type ConfigUpdate } from '$lib/api/config';
-	import { triggerBookKeywords } from '$lib/api/tasks';
+	import { triggerBookKeywords, triggerDedupKeywords } from '$lib/api/tasks';
 	import { fetchExtractionRuns, type ExtractionRun } from '$lib/api/extraction';
 	import { pageTitle } from '$lib/title';
 
@@ -98,7 +98,10 @@
 			<button class="retry" onclick={load}>Try again</button>
 		{/if}
 	{:else if active === 'tasks'}
-		<TasksPanel onRun={({ regenerate }) => triggerBookKeywords(regenerate)} />
+		<TasksPanel
+			onRun={({ regenerate }) => triggerBookKeywords(regenerate)}
+			onDedup={() => triggerDedupKeywords()}
+		/>
 	{:else if active === 'extractions'}
 		{#if runsStatus === 'ready'}
 			<ExtractionsPanel {runs} />

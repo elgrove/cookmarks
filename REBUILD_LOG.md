@@ -1521,3 +1521,48 @@ re-run, and an end-to-end read→sync.
 **Verified.** `ruff` + `ty` clean; 212 backend tests (12 new). Smoke-ran the CLI against a throwaway DB +
 temp library built from the fixture: first run 3 created, re-run 3 updated, bad pubdate logged not crashed.
 Backend-only slice — no UI / verify unit (endpoint deferred); not yet run against the real Calibre library.
+## 2026-06-08 — MY-16 AI-assisted keyword dedup
+
+**Goal:** wire the long-dormant `DEDUPLICATE_KEYWORDS_PROMPT` into a runnable flow that merges
+near-duplicate tags ("Veggie" → "Vegetarian", "tomatoes" → "Tomato") across the shared vocabulary,
+preserving every recipe/book association. v1 had this as an admin button; v2's prompt existed but was
+never invoked.
+
+**Decisions (with the user).** Surface is the **admin Tasks tab only** — a fire-and-forget Celery task
+like book-keywords, no CLI. **No review step** — it runs the AI and applies merges directly; the prompt is
+the guardrail (no scale cap, just a logged summary). **One global AI call** over the whole vocabulary (no
+batching). **Re-embedding deferred** → filed as **MY-38** (a merge changes a recipe's tag set, which feeds
+`recipe_to_text`, so stored embeddings drift until the next `backfill_embeddings`).
+
+**Backend.** New `ModelRole.KEYWORD_DEDUP` and `AIProvider.deduplicate_keywords()` (formats the prompt,
+parses the `{duplicate → canonical}` map, drops non-string entries) — model entries in Gemini/OpenRouter,
+and the **Stub** echoes the prompt as a no-op, so the flow is offline-verifiable. New
+`app/services/keyword_dedup.py` is the heart, in two stages. A deterministic **pre-pass** (`inflect`) folds
+only the certain cases *without ever restyling*: collapse whitespace, fold genuinely co-existing
+case-variants onto the **most-used** spelling (the vocabulary is fed most-used-first), and a plural onto its
+singular when both are present. Then `propose_merges` composes the pre-pass map with the AI's semantic
+merges and **resolves chains** to a single terminal canonical (cycle-guarded), and `apply_merges` reassigns
+associations across **both** `recipe_keywords` **and** `book_keywords` (the shared vocabulary), skipping
+owners that already carry the canonical so no association-PK collision, then deletes the merged-away row.
+Writes ride the caller's transaction. `app/tasks/keyword_dedup.py` wraps it for the worker (registered in
+`celery_app` `include`); `POST /api/tasks/dedup-keywords` returns `TaskRunAck(task="keyword_dedup",
+queued=<vocabulary size>)`. One new dep: `inflect`.
+
+**Frontend.** `TasksPanel` now hosts **two** tasks, sharing one run-lifecycle helper over a per-task
+`Runner` (`state` + `queued` + timer); the second is "Deduplicate keywords" (no options), wired to a new
+`triggerDedupKeywords()`. Its state surfaces as `data-verify-dedup-state` / `data-verify-dedup-queued` on
+the **same** panel root (`readContract` only reads the `data-verify-unit` element), so the existing
+book-keyword contract is untouched.
+
+**Harness.** `TaskRunAck` is reused, so no new `contract/*.example.json`. Extended `tasks-panel.verify.ts`:
+a `dedup-run` fixture and a `dedup-reject` probe, plus invariants that the dedup task queues/errors
+correctly and that running it leaves the book task idle. Backend tests (`test_keyword_dedup.py`): pre-pass
+casing-preservation + plural folds, chain + self-map/cycle resolution, apply covering both association
+tables, the already-has-both collision, canonical-created-when-absent and a missing duplicate skipped, plus
+end-to-end through a fake map-provider, a no-provider no-op and the stub no-op. Endpoint test in
+`test_tasks_api.py`.
+
+**Verified.** Backend: ruff + ty clean, 213 pytest. Frontend: svelte-check 0/0, 125 vitest incl. the verify
+matrix (77, with the new dedup fixtures). Driven live via the UI against an isolated copy of the real
+library (Gemini): 5114 → 3713 keywords, 1401 merges across recipes and books, **0 manufactured keyword
+rows** (every merge folds onto a spelling that already exists), 0 duplicate names, associations preserved.

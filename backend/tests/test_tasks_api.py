@@ -39,6 +39,18 @@ def test_trigger_regenerate_queues_every_extracted_book(
     assert tasks_dispatched == [(True,)]
 
 
+def test_trigger_dedup_reports_vocabulary_size_and_dispatches(
+    client: TestClient, dedup_dispatched: list[tuple[Any, ...]]
+) -> None:
+    res = client.post("/api/tasks/dedup-keywords")
+
+    assert res.status_code == 202
+    # The seeded vocabulary is Pasta, Quick, Italian — the count the task will analyse.
+    assert res.json() == {"task": "keyword_dedup", "status": "queued", "queued": 3}
+    # Fire-and-forget: dispatched exactly once, with no arguments.
+    assert dedup_dispatched == [()]
+
+
 # --- The sweep itself, against a throwaway DB the task's SessionLocal is patched onto.
 
 

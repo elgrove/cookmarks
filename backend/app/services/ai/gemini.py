@@ -26,6 +26,7 @@ class GeminiProvider(AIProvider):
         ModelRole.ONE_RECIPE_PER_FILE: "gemini-2.5-flash-lite",
         ModelRole.BLOCKS_OF_FILES: "gemini-2.5-flash",
         ModelRole.BOOK_KEYWORDS: "gemini-2.5-flash",
+        ModelRole.KEYWORD_DEDUP: "gemini-2.5-flash",
     }
     embedding_model: ClassVar[str] = "gemini-embedding-001"
     embedding_dimensions: ClassVar[int] = 3072

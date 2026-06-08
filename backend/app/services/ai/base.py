@@ -12,6 +12,7 @@ from pydantic import ValidationError
 from app.schemas.extraction import RecipeData
 from app.services.prompts import (
     BOOK_KEYWORDS_PROMPT,
+    DEDUPLICATE_KEYWORDS_PROMPT,
     EXTRACT_RECIPES_PROMPT,
     IMAGE_MATCH_CHECK_PROMPT,
 )
@@ -39,6 +40,7 @@ class ModelRole(Enum):
     ONE_RECIPE_PER_FILE = "one_recipe_per_file"
     BLOCKS_OF_FILES = "blocks_of_files"
     BOOK_KEYWORDS = "book_keywords"
+    KEYWORD_DEDUP = "keyword_dedup"
 
 
 class EmbedTask(Enum):
@@ -209,3 +211,30 @@ class AIProvider(abc.ABC):
             return [], usage
 
         return _clean_keywords(raw, MAX_BOOK_KEYWORDS), usage
+
+    def deduplicate_keywords(
+        self, keywords: list[str], model: str | None = None
+    ) -> tuple[dict[str, str], Usage]:
+        """Propose merges across a keyword vocabulary: given the list, return a
+        {duplicate -> canonical} map naming, for each near-duplicate, the single
+        spelling to keep. An empty map (no merges) on anything unusable, so the
+        caller never acts on a malformed response. The map is raw — the caller
+        validates keys against the live vocabulary and resolves any chains."""
+        model = model or self.model_for(ModelRole.KEYWORD_DEDUP)
+        prompt = DEDUPLICATE_KEYWORDS_PROMPT.format(keywords=json.dumps(keywords))
+        response, usage = self._complete(prompt, model, temp=0)
+
+        if not response:
+            return {}, usage
+
+        try:
+            raw = json.loads(_strip_json_fence(response))
+        except json.JSONDecodeError:
+            logger.error(f"Failed to decode keyword-dedup JSON from AI response:\n{response}")
+            return {}, usage
+
+        if not isinstance(raw, dict):
+            logger.warning(f"Keyword-dedup response was not a JSON object: {raw!r}")
+            return {}, usage
+
+        return {k: v for k, v in raw.items() if isinstance(k, str) and isinstance(v, str)}, usage

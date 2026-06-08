@@ -26,3 +26,13 @@ export async function triggerBookKeywords(
 	if (!res.ok) throw new Error(`POST /api/tasks/book-keywords → ${res.status}`);
 	return taskRunAckSchema.parse(await res.json());
 }
+
+/** Queue an AI-assisted dedup of the whole keyword vocabulary, merging near-duplicate
+ *  tags ("Veggie" → "Vegetarian") across recipes and books. Fire-and-forget: the pass
+ *  runs on the background worker. `queued` is the vocabulary size it will analyse.
+ *  `fetchFn` is injectable for SSR/tests. */
+export async function triggerDedupKeywords(fetchFn: typeof fetch = fetch): Promise<TaskRunAck> {
+	const res = await fetchFn('/api/tasks/dedup-keywords', { method: 'POST' });
+	if (!res.ok) throw new Error(`POST /api/tasks/dedup-keywords → ${res.status}`);
+	return taskRunAckSchema.parse(await res.json());
+}
