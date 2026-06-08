@@ -1,4 +1,5 @@
 import BookDetail, { type BookDetailData } from '$lib/components/BookDetail.svelte';
+import { keywordHref } from '$lib/api/recipes';
 import type { VerifiableUnit } from '$lib/verify/types';
 import { z } from 'zod';
 
@@ -175,6 +176,30 @@ const unit: VerifiableUnit<Props> = {
 					return `contract keywords=${contract.keywords} expected ${want}`;
 				const chips = root.querySelectorAll('.book-tags li').length;
 				return chips === want || `rendered ${chips} book-keyword chips, expected ${want}`;
+			}
+		},
+		{
+			id: 'keyword-links',
+			description: 'book-level and recipe-index keyword chips link to the keyword-filtered recipes list',
+			onlyFixtures: ['populated'],
+			check: ({ root, props }) => {
+				const tags = [...root.querySelectorAll('.book-tags a.chip')];
+				if (tags.length !== props.book.keywords.length)
+					return `${tags.length} book-keyword links, expected ${props.book.keywords.length}`;
+				for (let i = 0; i < tags.length; i++) {
+					const want = keywordHref(props.book.keywords[i]);
+					if (tags[i].getAttribute('href') !== want)
+						return `book tag ${i} href=${tags[i].getAttribute('href')} expected ${want}`;
+				}
+				const first = props.book.recipes.find((r) => r.keywords.length);
+				const chip = root.querySelector('.index a.chip');
+				if (first && !chip) return 'no recipe-index keyword link rendered';
+				if (first && chip) {
+					const want = keywordHref(first.keywords[0]);
+					if (chip.getAttribute('href') !== want)
+						return `recipe chip href=${chip.getAttribute('href')} expected ${want}`;
+				}
+				return true;
 			}
 		},
 		{

@@ -11,9 +11,12 @@
 
 <script lang="ts">
 	import { cleanTitle } from '$lib/title';
+	import { keywordHref } from '$lib/api/recipes';
 
 	// `contextQuery` carries the originating search (criteria + ordering) into the
 	// recipe link, so the detail page's prev/next follow the search order.
+	// `onKeyword`, when set, intercepts a plain click on a keyword chip to filter
+	// in place (the search page); without it the chip just navigates to its href.
 	let {
 		id,
 		name,
@@ -22,14 +25,27 @@
 		bookAuthor,
 		keywords,
 		contextQuery = '',
-		onRemove
-	}: RecipeRowData & { contextQuery?: string; onRemove?: () => void } = $props();
+		onRemove,
+		onKeyword
+	}: RecipeRowData & {
+		contextQuery?: string;
+		onRemove?: () => void;
+		onKeyword?: (name: string) => void;
+	} = $props();
 
 	// Calibre titles carry a subtitle after a colon; show the clean pre-colon title.
 	let displayTitle = $derived(cleanTitle(bookTitle));
 
 	// Rotating chip tints (DESIGN §3.1).
 	const tints = ['clay', 'blue', 'green'] as const;
+
+	// A plain left-click filters the current view in place; modifier/middle clicks
+	// fall through to the href so the keyword opens in a new tab.
+	function onChipClick(e: MouseEvent, kw: string): void {
+		if (!onKeyword || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+		e.preventDefault();
+		onKeyword(kw);
+	}
 </script>
 
 <li class="row">
@@ -52,7 +68,13 @@
 	{#if keywords.length}
 		<ul class="chips">
 			{#each keywords as kw, i (kw)}
-				<li class={`chip chip-${tints[i % tints.length]}`}>{kw}</li>
+				<li>
+					<a
+						class={`chip chip-${tints[i % tints.length]}`}
+						href={keywordHref(kw)}
+						onclick={(e) => onChipClick(e, kw)}>{kw}</a
+					>
+				</li>
 			{/each}
 		</ul>
 	{/if}
@@ -131,11 +153,23 @@
 	}
 
 	.chip {
+		display: inline-block;
 		font-family: var(--f-mono);
 		font-size: 0.66rem;
 		letter-spacing: 0.03em;
 		padding: 0.15rem 0.5rem;
 		border-radius: 3px;
+		text-decoration: none;
+	}
+
+	.chip:hover,
+	.chip:focus-visible {
+		text-decoration: underline;
+		text-underline-offset: 2px;
+	}
+	.chip:focus-visible {
+		outline: 2px solid var(--clay);
+		outline-offset: 1px;
 	}
 
 	.chip-clay {

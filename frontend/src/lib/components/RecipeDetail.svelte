@@ -36,6 +36,7 @@
 <script lang="ts">
 	import { plainText } from '$lib/html';
 	import { cleanTitle } from '$lib/title';
+	import { keywordHref } from '$lib/api/recipes';
 	import type { ListMembership } from '$lib/api/lists';
 	import FavouriteToggle from './FavouriteToggle.svelte';
 	import ListPicker from './ListPicker.svelte';
@@ -141,7 +142,7 @@
 				{#if recipe.keywords.length}
 					<div class="chips">
 						{#each recipe.keywords as kw (kw)}
-							<span class="chip {chipClass(kw)}">{kw}</span>
+							<a class="chip {chipClass(kw)}" href={keywordHref(kw)}>{kw}</a>
 						{/each}
 					</div>
 				{/if}
@@ -345,6 +346,7 @@
 		padding: 0.2rem 0.55rem;
 		border-radius: 3px;
 		white-space: nowrap;
+		text-decoration: none;
 		background: var(--chip-clay);
 		color: var(--chip-clay-c);
 	}
@@ -355,6 +357,15 @@
 	.chip.g {
 		background: var(--chip-green);
 		color: var(--chip-green-c);
+	}
+	.chip:hover,
+	.chip:focus-visible {
+		text-decoration: underline;
+		text-underline-offset: 2px;
+	}
+	.chip:focus-visible {
+		outline: 2px solid var(--clay);
+		outline-offset: 1px;
 	}
 	.yields {
 		font-family: var(--f-mono);

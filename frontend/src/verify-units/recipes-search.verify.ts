@@ -1,5 +1,5 @@
 import RecipesSearch, { type RecipesSearchProps } from '$lib/components/RecipesSearch.svelte';
-import type { RecipeSummary } from '$lib/api/recipes';
+import { keywordHref, type RecipeSummary } from '$lib/api/recipes';
 import type { VerifiableUnit } from '$lib/verify/types';
 
 type Props = RecipesSearchProps;
@@ -58,6 +58,17 @@ const unit: VerifiableUnit<Props> = {
 				results: { total: 5, items: twoResults, facets: chips },
 				keywords: chips
 			}
+		},
+		{
+			id: 'narrow-by-row',
+			description: 'clicking a keyword on a result row adds it to the active filters (narrows)',
+			props: {
+				status: 'results',
+				criteria: { q: 'dal', limit: 2, offset: 0 },
+				results: { total: 5, items: twoResults, facets: chips },
+				keywords: chips
+			},
+			act: ({ click }) => click('.rows .row .chip')
 		},
 		{
 			id: 'no-results',
@@ -208,6 +219,26 @@ const unit: VerifiableUnit<Props> = {
 				const prev = buttons[0] as HTMLButtonElement;
 				return prev.disabled || 'previous should be disabled on the first page';
 			}
+		},
+		{
+			id: 'row-keyword-links',
+			description: 'result-row keyword chips are links to the keyword-filtered recipes list',
+			onlyFixtures: ['results'],
+			check: ({ root }) => {
+				const chip = root.querySelector('.rows .row .chip');
+				if (!chip) return 'no result-row keyword chip rendered';
+				if (chip.tagName !== 'A') return `row chip is <${chip.tagName.toLowerCase()}>, expected <a>`;
+				const href = chip.getAttribute('href');
+				const want = keywordHref('lentils');
+				return href === want || `row chip href=${href} expected ${want}`;
+			}
+		},
+		{
+			id: 'row-keyword-narrows',
+			description: 'clicking a result-row keyword adds it to the active keyword filters',
+			onlyFixtures: ['narrow-by-row'],
+			check: ({ contract }) =>
+				contract.keywords.split('|').includes('lentils') || `keywords=${contract.keywords}`
 		},
 		{
 			id: 'no-results-state',

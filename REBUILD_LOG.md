@@ -1449,3 +1449,38 @@ many-runs probe), each asserting the nested detail's `data-verify-status` tracks
 empty, newest-first across books with `book_title`, and a REVIEW run surfacing its question in the index);
 125 frontend tests incl. the verify matrix's new `extraction-run-detail` / `extractions-panel` fixtures.
 Read-only slice over real run rows — no live worker needed; not yet eyeballed against prod data.
+
+## 2026-06-08 — MY-35: clickable keywords filter the recipes list
+
+Every keyword chip in the app is now a link to the recipes list filtered to that keyword. Pure
+frontend slice — the backend already filters on `?keyword=` and the search page already restores
+criteria from the URL, so the work was the missing affordance, not new plumbing.
+
+**Helper.** One source of truth for the target URL: `keywordHref(name)` in `api/recipes.ts` →
+`/recipes?keyword=<name>` (reuses `criteriaToParams`).
+
+**Chips → links.** The static chips in `RecipeRow`, `RecipeDetail`, `BookDetail` (both book-level
+tags and the recipe-index) and `BookCard` became `<a href={keywordHref(kw)}>`, styled to read as
+the same tinted pills at rest and reveal an underline (+ a clay focus ring) on hover/focus. Two
+navigation modes by context:
+
+- **Cross-route** (detail/book pages): a plain anchor — landing on `/recipes` mounts fresh and runs
+  the search via its existing `onMount`.
+- **Same-route** (`RecipeRow`, which renders inside the search results): a new optional `onKeyword`
+  callback. Only `RecipesSearch` passes it (`narrowByKeyword`, add-only); a plain left-click
+  `preventDefault`s and **narrows the active filters in place** (no remount, which a same-route URL
+  change wouldn't trigger), while cmd/middle-click still opens the keyword in a new tab. Everywhere
+  else `RecipeRow` (lists, similar) the same chip just navigates.
+
+**BookCard.** The card is a stretched-link (`::after` overlay), so the chips were lifted with
+`position: relative; z-index: 1` to sit above it — a keyword click filters recipes, the rest of the
+card still opens the book. The `whole-card-clickable` invariant is scoped to `/books/` links, so it
+stays green alongside the new `/recipes?` chip links.
+
+**Harness.** New invariants assert the chips are anchors to `keywordHref` in `recipe-detail`,
+`book-detail` (book tags + recipe index) and `books-library`; `recipes-search` adds a
+`narrow-by-row` fixture proving a result-row keyword click adds to `data-verify-keywords` in place,
+plus a static row-link check.
+
+**Verified.** `svelte-check` 0/0; 125 frontend tests incl. the verify matrix's new keyword-link
+fixtures. Not yet eyeballed in a live browser.

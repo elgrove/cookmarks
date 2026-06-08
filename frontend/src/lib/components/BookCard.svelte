@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { cleanTitle } from '$lib/title';
+	import { keywordHref } from '$lib/api/recipes';
 
 	let {
 		id,
@@ -62,7 +63,9 @@
 		{#if shownKeywords.length}
 			<ul class="chips" aria-label="Keywords">
 				{#each shownKeywords as kw, i (kw)}
-					<li class={`chip chip-${tints[i % tints.length]}`}>{kw}</li>
+					<li>
+						<a class={`chip chip-${tints[i % tints.length]}`} href={keywordHref(kw)}>{kw}</a>
+					</li>
 				{/each}
 			</ul>
 		{/if}
@@ -190,12 +193,27 @@
 		overflow: hidden;
 	}
 	.chip {
+		/* Raised above the card's stretched-link overlay so a keyword click filters
+		   recipes while the rest of the card still navigates to the book. */
+		position: relative;
+		z-index: 1;
+		display: inline-block;
 		font-family: var(--f-mono);
 		font-size: 0.62rem;
 		letter-spacing: 0.03em;
 		padding: 0.12rem 0.42rem;
 		border-radius: 3px;
 		white-space: nowrap;
+		text-decoration: none;
+	}
+	.chip:hover,
+	.chip:focus-visible {
+		text-decoration: underline;
+		text-underline-offset: 2px;
+	}
+	.chip:focus-visible {
+		outline: 2px solid var(--clay);
+		outline-offset: 1px;
 	}
 	.chip-clay {
 		background: var(--chip-clay);

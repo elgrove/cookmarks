@@ -44,6 +44,7 @@
 <script lang="ts">
 	import { plainText } from '$lib/html';
 	import { cleanTitle, titleSubtitle } from '$lib/title';
+	import { keywordHref } from '$lib/api/recipes';
 	import ExtractButton from '$lib/components/ExtractButton.svelte';
 	import ReviewPrompt from '$lib/components/ReviewPrompt.svelte';
 	import type { ReviewQuestion } from '$lib/api/extraction';
@@ -106,7 +107,7 @@
 			{#if book.keywords.length}
 				<ul class="book-tags" aria-label="Book keywords">
 					{#each book.keywords as kw (kw)}
-						<li class="chip {chipClass(kw)}">{kw}</li>
+						<li><a class="chip {chipClass(kw)}" href={keywordHref(kw)}>{kw}</a></li>
 					{/each}
 				</ul>
 			{/if}
@@ -135,7 +136,7 @@
 							{#if recipe.keywords.length}
 								<div class="chips">
 									{#each recipe.keywords as kw (kw)}
-										<span class="chip {chipClass(kw)}">{kw}</span>
+										<a class="chip {chipClass(kw)}" href={keywordHref(kw)}>{kw}</a>
 									{/each}
 								</div>
 							{/if}
@@ -356,6 +357,7 @@
 		overflow: hidden;
 	}
 	.chip {
+		display: inline-block;
 		font-family: var(--f-grotesk);
 		font-size: 0.68rem;
 		font-weight: 500;
@@ -364,6 +366,7 @@
 		padding: 0.18rem 0.5rem;
 		border-radius: 3px;
 		white-space: nowrap;
+		text-decoration: none;
 		background: var(--chip-clay);
 		color: var(--chip-clay-c);
 	}
@@ -374,6 +377,15 @@
 	.chip.g {
 		background: var(--chip-green);
 		color: var(--chip-green-c);
+	}
+	.chip:hover,
+	.chip:focus-visible {
+		text-decoration: underline;
+		text-underline-offset: 2px;
+	}
+	.chip:focus-visible {
+		outline: 2px solid var(--clay);
+		outline-offset: 1px;
 	}
 
 	.more {
