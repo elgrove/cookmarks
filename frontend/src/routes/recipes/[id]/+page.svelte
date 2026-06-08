@@ -177,7 +177,8 @@
 		if (id) load(id, $page.url.searchParams);
 	}
 
-	// ← / → page through the current ordering (ignored while typing in a field).
+	// ← / → page through the current ordering; F toggles the favourite. All ignored
+	// while typing in a field or with a modifier held.
 	function onKey(e: KeyboardEvent) {
 		if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
 		const t = e.target as HTMLElement | null;
@@ -196,6 +197,11 @@
 		} else if (e.key === 'ArrowRight' && recipe.next) {
 			e.preventDefault();
 			goto(`/recipes/${recipe.next.id}?${recipe.contextQuery}`);
+		} else if ((e.key === 'f' || e.key === 'F') && !e.repeat) {
+			// F toggles the recipe's favourite state — same action as the ★ button.
+			// The repeat guard stops a held key firing the toggle over and over.
+			e.preventDefault();
+			onToggleFavourite();
 		}
 	}
 
