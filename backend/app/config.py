@@ -17,6 +17,11 @@ class Settings(BaseSettings):
     # relative to it, so the library can be relocated without touching the data.
     calibre_library_path: Path = Path.home() / "books" / "calibre-all"
 
+    # Which Calibre books the live re-sync mirrors: those carrying this tag and
+    # having this format. Defaults match v1's proven filter ("Food" + EPUB).
+    calibre_sync_tag: str = "Food"
+    calibre_sync_format: str = "EPUB"
+
     # SvelteKit adapter-static output, served by FastAPI in production.
     frontend_dist: Path = BACKEND_ROOT.parent / "frontend" / "build"
 

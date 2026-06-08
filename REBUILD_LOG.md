@@ -1449,3 +1449,40 @@ many-runs probe), each asserting the nested detail's `data-verify-status` tracks
 empty, newest-first across books with `book_title`, and a REVIEW run surfacing its question in the index);
 125 frontend tests incl. the verify matrix's new `extraction-run-detail` / `extractions-panel` fixtures.
 Read-only slice over real run rows — no live worker needed; not yet eyeballed against prod data.
+
+## 2026-06-08 — MY-15: Calibre live re-sync
+
+A re-runnable path to pick up new/changed cookbooks straight from the Calibre library, replacing the
+one-off `scripts/import_v1_data` copy from v1's production SQLite as the way books enter v2. Ports v1's
+proven `load_books_from_calibre` query, re-thought for v2's relative-path convention and recipe-identity
+guarantees. CLI now; the operator endpoint is deferred (it will reuse the same service functions).
+
+**Service** (`app/services/calibre.py`). Two layers, deliberately split so both the future endpoint and the
+tests reuse them. **Read:** `read_books(conn, *, tag, book_format)` runs v1's selection query (books → tags →
+data, with the isbn/authors/comments correlated subqueries) over any open connection — a real metadata.db or
+an in-memory fixture — and parses each row into a frozen `CalibreBook` (pubdate/timestamp parsed defensively,
+blanks defaulted); `open_calibre_db` opens `<library>/metadata.db` **read-only** (`mode=ro`, `query_only=ON`)
+and `read_calibre_books` wraps the two. **Reconcile:** `sync_calibre(session, books)` upserts `Book` rows by
+`calibre_id` — insert new, refresh bibliographic fields + the `path` pointer on existing — and returns a
+`SyncResult(created, updated, orphaned)` of titles. `path` is stored exactly as Calibre gives it (already
+library-relative), matching v2's convention rather than v1's absolute paths.
+
+**Decisions.** (1) **Orphans** — books in v2 absent from the current Calibre selection are *reported, never
+touched*: deleting would cascade to recipes and destroy favourites/list membership keyed by stable recipe
+UUIDs, so the sync only names them. (2) **Selection is configurable** — `calibre_sync_tag` / `calibre_sync_format`
+settings (default `"Food"` / `EPUB`, matching v1). (3) **Scope** — full-library sync only; per-book refresh
+rides with the later endpoint. (4) Recipes, list membership and AI book-keywords are never written by the sync.
+
+**CLI** (`scripts/sync_calibre.py`). `uv run python -m scripts.sync_calibre [--library PATH]` (defaults to
+`settings.calibre_library_path`); prints `N created, N updated, N orphaned` and names the orphans. Idempotent.
+
+**Harness.** `tests/fixtures/calibre_metadata.sql` is a minimal Calibre schema subset + data (loaded into an
+in-memory connection), covering the tag/format filter (Fiction and PDF-only books excluded), multi-author
+`GROUP_CONCAT`, NULL/blank fields, and a malformed pubdate. `tests/test_calibre.py` (12 tests) exercises the
+read layer, the read-only file open + missing-db error, and the reconcile against the seeded session: create,
+**update-in-place preserving recipes + keywords** (stable UUID), orphan-reported-not-deleted, idempotent
+re-run, and an end-to-end read→sync.
+
+**Verified.** `ruff` + `ty` clean; 212 backend tests (12 new). Smoke-ran the CLI against a throwaway DB +
+temp library built from the fixture: first run 3 created, re-run 3 updated, bad pubdate logged not crashed.
+Backend-only slice — no UI / verify unit (endpoint deferred); not yet run against the real Calibre library.
