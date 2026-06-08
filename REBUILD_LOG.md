@@ -1449,3 +1449,47 @@ many-runs probe), each asserting the nested detail's `data-verify-status` tracks
 empty, newest-first across books with `book_title`, and a REVIEW run surfacing its question in the index);
 125 frontend tests incl. the verify matrix's new `extraction-run-detail` / `extractions-panel` fixtures.
 Read-only slice over real run rows — no live worker needed; not yet eyeballed against prod data.
+
+## 2026-06-08 — MY-16 AI-assisted keyword dedup
+
+**Goal:** wire the long-dormant `DEDUPLICATE_KEYWORDS_PROMPT` into a runnable flow that merges
+near-duplicate tags ("Veggie" → "Vegetarian", "Stir Fry" → "Stir-fry") across the shared vocabulary,
+preserving every recipe/book association. v1 had this as an admin button; v2's prompt existed but was
+never invoked.
+
+**Decisions (with the user).** Surface is the **admin Tasks tab only** — a fire-and-forget Celery task
+like book-keywords, no CLI. **No review step** — it runs the AI and applies merges directly; the prompt is
+the guardrail (no scale cap, just a logged summary). **One global AI call** over the whole vocabulary (v1's
+approach, no batching). **Pre-pass ported** from v1. **Re-embedding deferred** → filed as **MY-38** (a
+merge changes a recipe's tag set, which feeds `recipe_to_text`, so stored embeddings drift until the next
+`backfill_embeddings`).
+
+**Backend.** New `ModelRole.KEYWORD_DEDUP` and `AIProvider.deduplicate_keywords()` (formats the prompt,
+parses the `{duplicate → canonical}` map, drops non-string entries) — model entries in Gemini/OpenRouter,
+and the **Stub** already echoed the prompt as a no-op, so the flow is offline-verifiable. New
+`app/services/keyword_dedup.py` is the heart: a deterministic **pre-pass** (`inflect` + `titlecase`:
+whitespace/title-case folds + plural→singular when both present, ported from v1), then `propose_merges`
+composes `{**pre_map, **ai_map}` and **resolves chains** to a single terminal canonical (cycle-guarded —
+the improvement over v1, which could delete an intermediate row mid-chain), then `apply_merges` reassigns
+associations across **both** `recipe_keywords` **and** `book_keywords` (the shared vocabulary), skipping
+owners that already carry the canonical so no association-PK collision, and deletes the merged-away row.
+Writes ride the caller's transaction. `app/tasks/keyword_dedup.py` wraps it for the worker (registered in
+`celery_app` `include`); `POST /api/tasks/dedup-keywords` returns `TaskRunAck(task="keyword_dedup",
+queued=<vocabulary size>)`. Two new deps: `inflect`, `titlecase`.
+
+**Frontend.** `TasksPanel` now hosts **two** tasks, sharing one run-lifecycle helper over a per-task
+`Runner` (`state` + `queued` + timer); the second is "Deduplicate keywords" (no options), wired to a new
+`triggerDedupKeywords()`. Its state surfaces as `data-verify-dedup-state` / `data-verify-dedup-queued` on
+the **same** panel root (`readContract` only reads the `data-verify-unit` element), so the existing
+book-keyword contract is untouched.
+
+**Harness.** `TaskRunAck` is reused, so no new `contract/*.example.json`. Extended `tasks-panel.verify.ts`:
+a `dedup-run` fixture and a `dedup-reject` probe, plus invariants that the dedup task queues/errors
+correctly and that running it leaves the book task idle. Backend tests (`test_keyword_dedup.py`): pre-pass
+case/plural folds, chain resolution + self-map/cycle drops, and apply covering both association tables, the
+already-has-both collision, canonical-created-when-absent, and a missing duplicate skipped; plus end-to-end
+through a fake map-provider, a no-provider no-op, and the stub no-op. Endpoint test in `test_tasks_api.py`.
+
+**Verified.** Backend: ruff + ty clean, 213 pytest. Frontend: svelte-check 0/0, 125 vitest incl. the verify
+matrix (77, with the new dedup fixtures). Not eyeballed live; no real merge run against prod data yet (the
+stub merges nothing by design).
