@@ -25,6 +25,7 @@
 <script lang="ts">
 	import RecipeRow from './RecipeRow.svelte';
 	import { searchContextQuery } from '$lib/api/recipes';
+	import { cleanTitle } from '$lib/title';
 
 	let {
 		status = 'resting',
@@ -362,7 +363,7 @@
 			>
 				<option value="">All books</option>
 				{#each books as b (b.id)}
-					<option value={b.id}>{b.title}</option>
+					<option value={b.id}>{cleanTitle(b.title)}</option>
 				{/each}
 			</select>
 		</label>

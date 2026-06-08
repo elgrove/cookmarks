@@ -22,6 +22,7 @@
 <script lang="ts">
 	import ExtractionStatusBadge from './ExtractionStatusBadge.svelte';
 	import ExtractionRunDetail from './ExtractionRunDetail.svelte';
+	import { cleanTitle } from '$lib/title';
 
 	let { runs }: ExtractionsPanelProps = $props();
 
@@ -57,7 +58,7 @@
 							onclick={() => (selectedId = run.id)}
 						>
 							<span class="row-main">
-								<span class="row-title">{run.book_title}</span>
+								<span class="row-title">{cleanTitle(run.book_title)}</span>
 								<span class="row-sub mono"
 									>{rowDate(run.created_at)} · {run.recipes_found} recipes</span
 								>

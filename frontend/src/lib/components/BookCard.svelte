@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { cleanTitle } from '$lib/title';
+
 	let {
 		id,
 		title,
@@ -15,11 +17,16 @@
 		keywords?: string[];
 	} = $props();
 
+	// Cards show the clean name only; the colon-subtitle is a detail-page affordance.
+	let displayTitle = $derived(cleanTitle(title));
+
 	let coverFailed = $state(false);
 	let showCover = $derived(hasCover && !coverFailed);
 	// Extraction state lives on the cover as a count circle; fold the count into the
 	// link's accessible name since the circle itself is decorative.
-	let linkLabel = $derived(recipeCount > 0 ? `${title}, ${recipeCount} recipes` : title);
+	let linkLabel = $derived(
+		recipeCount > 0 ? `${displayTitle}, ${recipeCount} recipes` : displayTitle
+	);
 
 	// A glance of the book's themes; the full set lives on the detail page. Rotating
 	// chip tints (DESIGN §3.1).
@@ -36,13 +43,13 @@
 				<img
 					class="cover"
 					src={`/api/books/${id}/cover`}
-					alt={`Cover of ${title}`}
+					alt={`Cover of ${displayTitle}`}
 					loading="lazy"
 					onerror={() => (coverFailed = true)}
 				/>
 			{:else}
 				<!-- §7: missing cover → hairline plate bearing the title in serif. -->
-				<span class="plate-title" aria-hidden="true">{title}</span>
+				<span class="plate-title" aria-hidden="true">{displayTitle}</span>
 			{/if}
 			{#if recipeCount > 0}
 				<span class="count-badge" aria-hidden="true">{recipeCount}</span>
@@ -50,7 +57,7 @@
 		</div>
 	</a>
 	<div class="meta">
-		<h3 class="title">{title}</h3>
+		<h3 class="title">{displayTitle}</h3>
 		<p class="author">{author}</p>
 		{#if shownKeywords.length}
 			<ul class="chips" aria-label="Keywords">

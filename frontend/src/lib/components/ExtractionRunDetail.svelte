@@ -55,6 +55,7 @@
 
 <script lang="ts">
 	import ExtractionStatusBadge from './ExtractionStatusBadge.svelte';
+	import { cleanTitle } from '$lib/title';
 
 	let { run = null }: ExtractionRunDetailProps = $props();
 </script>
@@ -70,7 +71,7 @@
 		<header class="head">
 			<div class="titles">
 				<p class="eyebrow">Extraction run</p>
-				<h3 class="title">{run.book_title}</h3>
+				<h3 class="title">{cleanTitle(run.book_title)}</h3>
 			</div>
 			<ExtractionStatusBadge status={run.status} />
 		</header>

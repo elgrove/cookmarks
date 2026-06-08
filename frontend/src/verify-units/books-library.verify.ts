@@ -77,14 +77,15 @@ const unit: VerifiableUnit<Props> = {
 		},
 		{
 			id: 'long-title',
-			description: 'probe: an overlong unicode title renders in full without breaking the contract',
+			description:
+				'probe: an overlong unicode clean name renders in full while the colon-subtitle is dropped',
 			probe: true,
 			props: {
 				books: [
 					{
 						id: 'c1',
 						title:
-							'A Modern Way to Cook: 150+ Vegetarian Recipes for Quick, Flavour-Packed Meals — Crème Brûlée, Soufflé & Far More Than Will Ever Fit On One Line',
+							'A Modern Way to Cook — Crème Brûlée, Soufflé & Far More Than Will Ever Fit On One Line of a Compact Cookbook Card: 150+ Vegetarian Recipes for Quick, Flavour-Packed Meals',
 						author: 'Anna Jones',
 						recipeCount: 3,
 						hasCover: false
@@ -231,13 +232,15 @@ const unit: VerifiableUnit<Props> = {
 		},
 		{
 			id: 'long-title-rendered',
-			description: 'the overlong title renders in full as a single card (no crash/truncation)',
+			description:
+				'the card shows the overlong clean name in full (subtitle dropped, no crash/truncation)',
 			onlyFixtures: ['long-title'],
 			check: ({ root, props }) => {
 				const cards = root.querySelectorAll('.card').length;
 				if (cards !== props.books.length) return `expected ${props.books.length} card(s), saw ${cards}`;
+				const expected = props.books[0].title.split(':')[0].trim();
 				const title = root.querySelector('.title')?.textContent?.trim() ?? '';
-				return title === props.books[0].title || `title not rendered in full: ${title}`;
+				return title === expected || `expected clean name "${expected}", saw "${title}"`;
 			}
 		},
 		{
