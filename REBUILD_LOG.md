@@ -1413,3 +1413,39 @@ trigger eligible-count for default vs regenerate + dispatched once, and the swee
 `SessionLocal` — tags untagged books, no-op without a provider — plus the contract pin both sides); 116
 frontend tests incl. the verify matrix's seven new `tasks-panel` fixtures. Fire-and-forget dispatch stubbed
 in tests (new autouse `tasks_dispatched` fixture); not run against a live worker/Gemini this slice.
+
+## 2026-06-07 — MY-11: extraction history & reports (admin Extractions tab)
+
+The history/reports view promised by MY-10's notes: a third **Extractions** tab on `/admin` (after Settings
+and Tasks) that browses every extraction run, newest first, with status at a glance and a drill-into-a-run
+report. Scoped into the admin shell rather than standalone `/extractions` routes — the runs are an
+operational record, so they live beside Settings and Tasks.
+
+**Backend.** One new read endpoint, `GET /api/extractions` (`app/api/extraction.py::list_runs`) — every
+`ExtractionRun` ordered `created_at DESC`, with `selectinload(ExtractionRun.book)` to avoid an N+1 on the
+title. `ExtractionRunRead` gains a single field, **`book_title`** (set from `run.book.title` in `from_run`),
+so the index reads as runs against named books and each item already carries the full per-run report
+(method, chapters, recipes, cost, tokens, errors, timings) — list and detail come from the one fetch. The
+field rides on the existing model, so the trigger and latest-run endpoints now include it too (harmless,
+and useful). `ReviewQuestion` still rides along when a run is paused at `REVIEW`.
+
+**Frontend.** Three presentational, network-free components: `ExtractionStatusBadge` (a mono status chip,
+clay/blue/green/error tints per DESIGN §3.1), `ExtractionRunDetail` (the per-run report — a hairline
+`LABEL · value` metadata table, an awaiting-review note, and an errors list, with a calm "select a run"
+empty state), and `ExtractionsPanel` (the master-detail: a newest-first row list — title · date · recipes +
+status badge — defaulting the report to the newest run, a click swapping it). The admin route adds the tab
+and **lazily** loads `GET /api/extractions` (via a typed+Zod `fetchExtractionRuns`) the first time the tab
+is opened, with its own loading/error/ready state so a Settings failure never touches it.
+
+**Harness.** `book_title` pinned both sides (`contract/extractionrun.example.json` + the backend round-trip /
+live-keys tests + a frontend drift test); new contract-keys test for the list endpoint. Two verify units —
+`extraction-run-detail` (done / failed-with-errors / review / queued-all-dashes / none, plus messy-wall and
+partial-nulls probes) and `extractions-panel` (populated / empty / single / click-selects-second, plus a
+many-runs probe), each asserting the nested detail's `data-verify-status` tracks the selection — plus the
+`expectFail` sentinels. The panel nests the detail unit; `readContract` reads the outermost
+`data-verify-unit` only, so the contracts don't collide.
+
+**Verified.** `make check` (ruff + ty + svelte-check, 0/0); 200 backend tests (new list-endpoint tests:
+empty, newest-first across books with `book_title`, and a REVIEW run surfacing its question in the index);
+125 frontend tests incl. the verify matrix's new `extraction-run-detail` / `extractions-panel` fixtures.
+Read-only slice over real run rows — no live worker needed; not yet eyeballed against prod data.

@@ -26,6 +26,30 @@ def _make_run(
     return str(run.id)
 
 
+def test_list_runs_empty_when_none(client: TestClient) -> None:
+    assert client.get("/api/extractions").json() == []
+
+
+def test_list_runs_newest_first_with_book_title(client: TestClient, session: Session) -> None:
+    """The index returns every run across all books, newest first, each carrying its
+    book's title so the admin view needs no second fetch."""
+    owner = _book_id(client, "With Recipes")
+    other = _book_id(client, "No Recipes Yet")
+    oldest = _make_run(session, owner, ExtractionStatus.DONE, datetime(2024, 1, 1, tzinfo=UTC))
+    middle = _make_run(session, other, ExtractionStatus.FAILED, datetime(2024, 2, 1, tzinfo=UTC))
+    newest = _make_run(session, owner, ExtractionStatus.REVIEW, datetime(2024, 3, 1, tzinfo=UTC))
+
+    body = client.get("/api/extractions").json()
+    assert [run["id"] for run in body] == [newest, middle, oldest]
+    assert [run["status"] for run in body] == ["review", "failed", "done"]
+
+    by_id = {run["id"]: run for run in body}
+    assert by_id[oldest]["book_title"] == "With Recipes"
+    assert by_id[middle]["book_title"] == "No Recipes Yet"
+    # A run paused at REVIEW surfaces its pending question in the index too.
+    assert by_id[newest]["pending_question"] is not None
+
+
 def test_trigger_creates_queued_run_and_dispatches(
     client: TestClient, session: Session, dispatched: list[tuple[Any, ...]]
 ) -> None:

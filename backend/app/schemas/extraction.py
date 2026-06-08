@@ -47,14 +47,17 @@ class ResumeRequest(BaseModel):
 class ExtractionRunRead(BaseModel):
     """The wire view of one extraction run: lifecycle, strategy, progress, and cost.
     Returned by the trigger endpoint (a freshly-queued run), the latest-run endpoint,
-    and the honest record the history/reports view (MY-11) reads. `chapters_processed`
-    is the count of the underlying progress list, not the list itself. `pending_question`
-    is populated only when the run is paused at REVIEW awaiting a human decision."""
+    the runs index, and the honest record the history/reports view (MY-11) reads.
+    `book_title` rides alongside `book_id` so the index reads as runs against named
+    books without a second fetch. `chapters_processed` is the count of the underlying
+    progress list, not the list itself. `pending_question` is populated only when the
+    run is paused at REVIEW awaiting a human decision."""
 
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
     book_id: uuid.UUID
+    book_title: str
     status: ExtractionStatus
     provider_name: str | None
     model_name: str | None
@@ -79,6 +82,7 @@ class ExtractionRunRead(BaseModel):
         return cls(
             id=run.id,
             book_id=run.book_id,
+            book_title=run.book.title,
             status=run.status,
             provider_name=run.provider_name,
             model_name=run.model_name,

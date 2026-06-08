@@ -2,6 +2,7 @@ import uuid
 
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.db import SessionDep
 from app.models.book import Book
@@ -13,6 +14,20 @@ from app.services.extraction.review import VALID_HUMAN_RESPONSES
 from app.tasks.extraction import enqueue_extract_recipes, enqueue_resume_extraction
 
 router = APIRouter(tags=["extraction"])
+
+
+@router.get("/extractions", response_model=list[ExtractionRunRead])
+def list_runs(session: SessionDep) -> list[ExtractionRunRead]:
+    """Every extraction run, newest first — the history/reports index (MY-11). Each
+    item carries its book's title (eager-loaded to avoid an N+1) so the admin view
+    reads as a list of runs against named books, and the full per-run report (method,
+    progress, cost, tokens, errors) without a second fetch."""
+    runs = session.scalars(
+        select(ExtractionRun)
+        .options(selectinload(ExtractionRun.book))
+        .order_by(ExtractionRun.created_at.desc())
+    ).all()
+    return [ExtractionRunRead.from_run(run) for run in runs]
 
 
 @router.post(

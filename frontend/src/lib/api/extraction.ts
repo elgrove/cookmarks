@@ -27,6 +27,7 @@ export type ReviewAnswer = 'has_images' | 'no_images';
 export const extractionRunSchema = z.object({
 	id: z.string().uuid(),
 	book_id: z.string().uuid(),
+	book_title: z.string(),
 	status: z.enum(['queued', 'running', 'review', 'done', 'failed']),
 	provider_name: z.string().nullable(),
 	model_name: z.string().nullable(),
@@ -45,6 +46,19 @@ export const extractionRunSchema = z.object({
 });
 
 export type ExtractionRun = z.infer<typeof extractionRunSchema>;
+
+export const extractionRunsSchema = z.array(extractionRunSchema);
+
+/** Every extraction run, newest first — the history/reports index (MY-11). Each run
+ *  carries its book's title and the full per-run report, so the admin Extractions tab
+ *  renders the list and any drilled-into run from this one fetch. */
+export async function fetchExtractionRuns(
+	fetchFn: typeof fetch = fetch
+): Promise<ExtractionRun[]> {
+	const res = await fetchFn('/api/extractions');
+	if (!res.ok) throw new Error(`GET /api/extractions → ${res.status}`);
+	return extractionRunsSchema.parse(await res.json());
+}
 
 /** Queue recipe extraction for a book and return the freshly-created run. Fire-and-forget:
  *  the run executes in the background worker. `fetchFn` is injectable for SSR/tests. */

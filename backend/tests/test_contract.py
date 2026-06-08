@@ -195,6 +195,14 @@ def test_extract_endpoint_keys_match_contract(client: TestClient) -> None:
     assert set(body.keys()) == set(example.keys())
 
 
+def test_extractions_index_endpoint_keys_match_contract(client: TestClient) -> None:
+    example = _example("extractionrun.example.json")
+    book = next(b for b in client.get("/api/books").json() if b["title"] == "No Recipes Yet")
+    client.post(f"/api/books/{book['id']}/extract")
+    item = client.get("/api/extractions").json()[0]
+    assert set(item.keys()) == set(example.keys())
+
+
 def test_review_question_model_matches_contract() -> None:
     example = _example("reviewquestion.example.json")
     dumped = ReviewQuestion.model_validate(example).model_dump(mode="json")

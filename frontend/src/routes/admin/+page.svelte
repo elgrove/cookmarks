@@ -5,19 +5,26 @@
 		type ConfigSettingsConfig
 	} from '$lib/components/ConfigSettings.svelte';
 	import TasksPanel from '$lib/components/TasksPanel.svelte';
+	import ExtractionsPanel from '$lib/components/ExtractionsPanel.svelte';
 	import { fetchConfig, updateConfig, type Config, type ConfigUpdate } from '$lib/api/config';
 	import { triggerBookKeywords } from '$lib/api/tasks';
+	import { fetchExtractionRuns, type ExtractionRun } from '$lib/api/extraction';
 	import { pageTitle } from '$lib/title';
 
-	// Settings + Tasks today; the extraction reports (MY-11) slot in as a further tab.
 	const tabs: AdminTab[] = [
 		{ id: 'settings', label: 'Settings' },
-		{ id: 'tasks', label: 'Tasks' }
+		{ id: 'tasks', label: 'Tasks' },
+		{ id: 'extractions', label: 'Extractions' }
 	];
 	let active = $state('settings');
 
 	let status = $state<'loading' | 'error' | 'ready'>('loading');
 	let config = $state<Config | null>(null);
+
+	// Extraction history loads lazily the first time its tab is opened, with its own state
+	// so a settings failure (or never opening this tab) never touches it.
+	let runsStatus = $state<'idle' | 'loading' | 'error' | 'ready'>('idle');
+	let runs = $state<ExtractionRun[]>([]);
 
 	// Map the snake_case wire shape to the component's camelCase props.
 	let settingsConfig = $derived<ConfigSettingsConfig | null>(
@@ -50,6 +57,22 @@
 		config = await updateConfig(patch);
 	}
 
+	async function loadRuns() {
+		runsStatus = 'loading';
+		try {
+			runs = await fetchExtractionRuns();
+			runsStatus = 'ready';
+		} catch (err) {
+			console.error('failed to load extraction runs', err);
+			runsStatus = 'error';
+		}
+	}
+
+	function selectTab(id: string) {
+		active = id;
+		if (id === 'extractions' && runsStatus === 'idle') loadRuns();
+	}
+
 	onMount(load);
 </script>
 
@@ -63,7 +86,7 @@
 		<h1>Admin</h1>
 	</header>
 
-	<AdminTabs {tabs} {active} onSelect={(id) => (active = id)} />
+	<AdminTabs {tabs} {active} onSelect={selectTab} />
 
 	{#if active === 'settings'}
 		{#if status === 'ready' && settingsConfig}
@@ -76,6 +99,15 @@
 		{/if}
 	{:else if active === 'tasks'}
 		<TasksPanel onRun={({ regenerate }) => triggerBookKeywords(regenerate)} />
+	{:else if active === 'extractions'}
+		{#if runsStatus === 'ready'}
+			<ExtractionsPanel {runs} />
+		{:else if runsStatus === 'error'}
+			<p class="msg">Couldn’t load extraction history.</p>
+			<button class="retry" onclick={loadRuns}>Try again</button>
+		{:else}
+			<p class="msg">Loading extraction history…</p>
+		{/if}
 	{/if}
 </section>
 

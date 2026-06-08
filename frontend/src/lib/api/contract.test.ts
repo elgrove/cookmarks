@@ -162,6 +162,13 @@ describe('api wire contract', () => {
 		expect(() => extractionRunSchema.parse(drifted)).toThrow();
 	});
 
+	it('rejects an extraction-run example with a drifted book_title', () => {
+		const example = load('extractionrun.example.json');
+		const { book_title, ...rest } = example;
+		const drifted = { ...rest, bookTitle: book_title };
+		expect(() => extractionRunSchema.parse(drifted)).toThrow();
+	});
+
 	it('accepts the review-question example', () => {
 		expect(() => reviewQuestionSchema.parse(load('reviewquestion.example.json'))).not.toThrow();
 	});
