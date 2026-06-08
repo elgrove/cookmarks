@@ -145,6 +145,12 @@ export function criteriaToParams(c: SearchCriteria): URLSearchParams {
 	return p;
 }
 
+/** The recipes-list URL filtered to a single keyword — the target of a clickable
+ *  keyword chip anywhere in the app (result rows, recipe detail, book pages). */
+export function keywordHref(name: string): string {
+	return `/recipes?${criteriaToParams({ keywords: [name] })}`;
+}
+
 /** The query string that carries a search context into a recipe link, so the
  *  recipe's prev/next follow the search ordering (filters + sort + seed). Page
  *  size and offset are dropped — neighbours span the whole result set. */

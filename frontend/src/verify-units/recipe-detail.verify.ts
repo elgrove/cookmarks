@@ -1,4 +1,5 @@
 import RecipeDetail, { type RecipeDetailData } from '$lib/components/RecipeDetail.svelte';
+import { keywordHref } from '$lib/api/recipes';
 import type { VerifiableUnit } from '$lib/verify/types';
 import { z } from 'zod';
 
@@ -215,6 +216,23 @@ const unit: VerifiableUnit<Props> = {
 					return `contract keywords=${contract.keywords} expected ${props.recipe.keywords.length}`;
 				const chips = root.querySelectorAll('.chips .chip').length;
 				return chips === props.recipe.keywords.length || `rendered ${chips} chips`;
+			}
+		},
+		{
+			id: 'keyword-links',
+			description: 'each keyword chip links to the keyword-filtered recipes list',
+			onlyFixtures: ['populated'],
+			check: ({ root, props }) => {
+				const chips = [...root.querySelectorAll('.chips .chip')];
+				if (chips.length !== props.recipe.keywords.length)
+					return `rendered ${chips.length} chips, expected ${props.recipe.keywords.length}`;
+				for (let i = 0; i < chips.length; i++) {
+					if (chips[i].tagName !== 'A') return `chip ${i} is <${chips[i].tagName.toLowerCase()}>`;
+					const want = keywordHref(props.recipe.keywords[i]);
+					const href = chips[i].getAttribute('href');
+					if (href !== want) return `chip ${i} href=${href} expected ${want}`;
+				}
+				return true;
 			}
 		},
 		{

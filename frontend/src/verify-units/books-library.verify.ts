@@ -1,4 +1,5 @@
 import BooksLibrary, { type LibraryBook } from '$lib/components/BooksLibrary.svelte';
+import { keywordHref } from '$lib/api/recipes';
 import type { VerifiableUnit } from '$lib/verify/types';
 import { z } from 'zod';
 
@@ -168,6 +169,26 @@ const unit: VerifiableUnit<Props> = {
 					const expected = Math.min(3, props.books[i].keywords?.length ?? 0);
 					const chips = cards[i].querySelectorAll('.chips .chip').length;
 					if (chips !== expected) return `card ${i} shows ${chips} chips, expected ${expected}`;
+				}
+				return true;
+			}
+		},
+		{
+			id: 'card-keyword-links',
+			description: 'card keyword chips are links to the keyword-filtered recipes list',
+			onlyFixtures: ['populated'],
+			check: ({ root, props }) => {
+				const cards = [...root.querySelectorAll('.card')];
+				for (let i = 0; i < cards.length; i++) {
+					const shown = (props.books[i].keywords ?? []).slice(0, 3);
+					const links = [...cards[i].querySelectorAll('.chips a.chip')];
+					if (links.length !== shown.length)
+						return `card ${i}: ${links.length} keyword links, expected ${shown.length}`;
+					for (let j = 0; j < shown.length; j++) {
+						const want = keywordHref(shown[j]);
+						if (links[j].getAttribute('href') !== want)
+							return `card ${i} chip ${j} href=${links[j].getAttribute('href')} expected ${want}`;
+					}
 				}
 				return true;
 			}

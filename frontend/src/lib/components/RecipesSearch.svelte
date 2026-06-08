@@ -257,6 +257,15 @@
 		emitKeyword();
 	}
 
+	// Clicking a keyword on a result row narrows the active search by adding it
+	// (never removes — an already-applied keyword is a no-op, since every result
+	// already carries it).
+	function narrowByKeyword(name: string): void {
+		if (selected.includes(name)) return;
+		selected = [...selected, name];
+		emitKeyword();
+	}
+
 	function clearKeywords(): void {
 		if (!selected.length) return;
 		selected = [];
@@ -474,6 +483,7 @@
 						bookAuthor={r.book_author}
 						keywords={r.keywords}
 						contextQuery={isSemantic ? '' : contextQuery}
+						onKeyword={narrowByKeyword}
 					/>
 				{/each}
 			</ul>
