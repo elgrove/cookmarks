@@ -1,5 +1,4 @@
 import BooksLibrary, { type LibraryBook } from '$lib/components/BooksLibrary.svelte';
-import { keywordHref } from '$lib/api/recipes';
 import type { VerifiableUnit } from '$lib/verify/types';
 import { z } from 'zod';
 
@@ -122,6 +121,12 @@ const unit: VerifiableUnit<Props> = {
 				]
 			},
 			act: ({ click }) => click(EXTRACTED)
+		},
+		{
+			id: 'keyword-filter',
+			description: 'clicking a keyword chip narrows the grid to books carrying it',
+			props: { books: populated },
+			act: ({ click }) => click('.keywords .chip[data-kw="Baking"]')
 		}
 	],
 	invariants: [
@@ -158,39 +163,28 @@ const unit: VerifiableUnit<Props> = {
 			}
 		},
 		{
-			id: 'card-keyword-chips',
-			description: 'each card shows up to three book-keyword chips, in incoming order',
+			id: 'keyword-bar-chips',
+			description: 'the keyword filter bar offers one chip per distinct book keyword',
 			onlyFixtures: ['populated'],
-			check: ({ root, props }) => {
-				const cards = [...root.querySelectorAll('.card')];
-				if (cards.length !== props.books.length)
-					return `rendered ${cards.length} cards, expected ${props.books.length}`;
-				for (let i = 0; i < cards.length; i++) {
-					const expected = Math.min(3, props.books[i].keywords?.length ?? 0);
-					const chips = cards[i].querySelectorAll('.chips .chip').length;
-					if (chips !== expected) return `card ${i} shows ${chips} chips, expected ${expected}`;
-				}
-				return true;
+			check: ({ contract, props }) => {
+				const distinct = new Set(props.books.flatMap((b) => b.keywords ?? []));
+				const shown = contract['kw-chips'] ? contract['kw-chips'].split('|') : [];
+				if (shown.length !== distinct.size)
+					return `bar shows ${shown.length} chips, expected ${distinct.size}`;
+				return shown.every((c) => distinct.has(c)) || `unexpected chip in bar: ${shown.join('|')}`;
 			}
 		},
 		{
-			id: 'card-keyword-links',
-			description: 'card keyword chips are links to the keyword-filtered recipes list',
-			onlyFixtures: ['populated'],
-			check: ({ root, props }) => {
-				const cards = [...root.querySelectorAll('.card')];
-				for (let i = 0; i < cards.length; i++) {
-					const shown = (props.books[i].keywords ?? []).slice(0, 3);
-					const links = [...cards[i].querySelectorAll('.chips a.chip')];
-					if (links.length !== shown.length)
-						return `card ${i}: ${links.length} keyword links, expected ${shown.length}`;
-					for (let j = 0; j < shown.length; j++) {
-						const want = keywordHref(shown[j]);
-						if (links[j].getAttribute('href') !== want)
-							return `card ${i} chip ${j} href=${links[j].getAttribute('href')} expected ${want}`;
-					}
-				}
-				return true;
+			id: 'keyword-filter-narrows',
+			description: 'selecting a keyword filters the grid to books that carry it',
+			onlyFixtures: ['keyword-filter'],
+			check: ({ contract, root, props }) => {
+				if (contract['kw-selected'] !== 'Baking') return `kw-selected=${contract['kw-selected']}`;
+				const expected = props.books.filter((b) => (b.keywords ?? []).includes('Baking')).length;
+				if (Number(contract.count) !== expected)
+					return `expected ${expected} book(s), saw ${contract.count}`;
+				const cards = root.querySelectorAll('.card').length;
+				return cards === expected || `rendered ${cards} cards, expected ${expected}`;
 			}
 		},
 		{
