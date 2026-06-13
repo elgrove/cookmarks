@@ -22,6 +22,7 @@
 
 <script lang="ts">
 	import { onDestroy } from 'svelte';
+	import { preference, setPreference, type ThemePref } from '$lib/theme';
 
 	let { config, onSave }: ConfigSettingsProps = $props();
 
@@ -165,6 +166,21 @@
 		<div class="control">
 			<input id="rate-limit" type="number" min="1" bind:value={rateLimit} />
 			<span class="suffix mono">requests / minute</span>
+		</div>
+	</div>
+
+	<div class="field">
+		<label class="label" for="appearance">Appearance</label>
+		<div class="control">
+			<select
+				id="appearance"
+				value={$preference}
+				onchange={(e) => setPreference((e.currentTarget as HTMLSelectElement).value as ThemePref)}
+			>
+				<option value="light">Light</option>
+				<option value="dark">Dark</option>
+				<option value="system">System</option>
+			</select>
 		</div>
 	</div>
 

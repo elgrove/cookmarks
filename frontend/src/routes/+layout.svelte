@@ -10,8 +10,7 @@
 	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
 	import { installVerifyHandle } from '$lib/verify/handle';
-	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
-	import { initTheme, resolvedTheme, toggleTheme } from '$lib/theme';
+	import { initTheme } from '$lib/theme';
 	import '../app.css';
 
 	let { children } = $props();
@@ -29,7 +28,6 @@
 {#if showChrome}
 	<nav class="nav">
 		<a class="wordmark" href="/">Cookmarks</a>
-		<a class="navlink" class:active={$page.url.pathname === '/'} href="/">Home</a>
 		<a class="navlink" class:active={$page.url.pathname.startsWith('/books')} href="/books">Books</a>
 		<a
 			class="navlink"
@@ -42,11 +40,23 @@
 			href="/lists">Lists</a
 		>
 		<a
-			class="navlink"
+			class="admin-icon"
 			class:active={$page.url.pathname.startsWith('/admin')}
-			href="/admin">Admin</a
+			href="/admin"
+			aria-label="Admin"
+			title="Admin"
 		>
-		<ThemeToggle theme={$resolvedTheme} onToggle={toggleTheme} />
+			<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+				<circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="1.8" />
+				<path
+					d="M4 20c0-4 3.6-7 8-7s8 3 8 7"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="1.8"
+					stroke-linecap="round"
+				/>
+			</svg>
+		</a>
 	</nav>
 {/if}
 

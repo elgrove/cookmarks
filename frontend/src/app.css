@@ -178,11 +178,23 @@ a {
 	border-bottom-color: var(--clay);
 }
 
-/* Theme toggle pins to the top-right of the nav (DESIGN §5 chrome). */
-.nav .theme-toggle {
+/* Admin icon pins to the top-right of the nav (DESIGN §5 chrome). */
+.nav .admin-icon {
 	margin-left: auto;
 	align-self: center;
 	flex: none;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 2rem;
+	height: 2rem;
+	border-radius: 4px;
+	color: var(--muted);
+	transition: color 0.18s var(--ease-out);
+}
+.nav .admin-icon:hover,
+.nav .admin-icon.active {
+	color: var(--ink);
 }
 
 /* Tighten the nav gap on mobile so the wordmark, links and toggle fit one row
