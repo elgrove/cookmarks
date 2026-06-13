@@ -82,7 +82,6 @@
 
 <section class="admin">
 	<header class="head">
-		<p class="label">Operations</p>
 		<h1>Admin</h1>
 	</header>
 
