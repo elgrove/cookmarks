@@ -283,7 +283,7 @@
 	.library {
 		max-width: var(--max-w);
 		margin: 0 auto;
-		padding: 3rem var(--page-h) 5rem;
+		padding: var(--page-pt) var(--page-h) 5rem;
 	}
 
 	.head {
@@ -539,7 +539,7 @@
 
 	@media (max-width: 760px) {
 		.library {
-			padding: 2rem var(--page-h) 3rem;
+			padding: var(--page-pt) var(--page-h) 3rem;
 		}
 		.controls {
 			gap: 0.75rem 1rem;

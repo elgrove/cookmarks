@@ -118,7 +118,7 @@
 	.admin {
 		max-width: var(--max-w);
 		margin: 0 auto;
-		padding: 3.5rem var(--page-h) 5rem;
+		padding: var(--page-pt) var(--page-h) 5rem;
 	}
 	.head {
 		margin-bottom: 2.5rem;

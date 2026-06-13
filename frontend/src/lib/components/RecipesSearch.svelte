@@ -501,7 +501,7 @@
 	.search {
 		max-width: var(--max-w);
 		margin: 0 auto;
-		padding: 3rem var(--page-h) 5rem;
+		padding: var(--page-pt) var(--page-h) 5rem;
 	}
 
 	.head {
@@ -838,7 +838,7 @@
 
 	@media (max-width: 760px) {
 		.search {
-			padding: 2rem var(--page-h) 3rem;
+			padding: var(--page-pt) var(--page-h) 3rem;
 		}
 
 		/* Tighter search row so the box keeps room beside the two icon triggers. */
