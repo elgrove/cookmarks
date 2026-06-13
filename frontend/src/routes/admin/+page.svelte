@@ -125,10 +125,12 @@
 	}
 	.head h1 {
 		font-family: var(--f-serif);
-		font-weight: 600;
-		font-size: 2.4rem;
+		font-weight: 400;
+		font-style: italic;
+		font-size: clamp(2.2rem, 5vw, 3.2rem);
+		line-height: 1.05;
 		letter-spacing: -0.01em;
-		margin: 0.3rem 0 0;
+		margin: 0.2rem 0 0;
 	}
 	.msg {
 		font-family: var(--f-serif);
