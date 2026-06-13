@@ -139,9 +139,9 @@ a {
 /* App shell / top nav — DESIGN §5. */
 .nav {
 	display: flex;
-	align-items: baseline;
+	align-items: center;
 	gap: 1.75rem;
-	padding: 1.1rem var(--page-h);
+	padding: 0.85rem var(--page-h);
 	border-bottom: var(--border);
 	background: var(--bg);
 	font-family: var(--f-grotesk);
@@ -181,7 +181,6 @@ a {
 /* Admin icon pins to the top-right of the nav (DESIGN §5 chrome). */
 .nav .admin-icon {
 	margin-left: auto;
-	align-self: center;
 	flex: none;
 	display: inline-flex;
 	align-items: center;
@@ -206,23 +205,6 @@ a {
 	}
 }
 
-/* Smallest phones: five nav items (Books · Recipes · Lists · Admin) no longer fit the
-   comfortable row, so tighten the gap, trim the wordmark and shrink the links to stay
-   single-row without horizontal scroll (DESIGN §8) — a proper drawer is future work. */
-@media (max-width: 480px) {
-	.nav {
-		gap: 0.55rem;
-		padding-left: 0.85rem;
-		padding-right: 0.85rem;
-	}
-	.nav .wordmark {
-		font-size: 1.05rem;
-		margin-right: 0;
-	}
-	.nav .navlink {
-		font-size: 0.78rem;
-	}
-}
 
 main {
 	/* Grow to fill the viewport so the footer pins to the bottom on short pages. */
