@@ -1624,8 +1624,16 @@ worker — in **one container** supervised by **s6-overlay**, in the style of `e
 fetches the multi-arch s6-overlay tarballs; (3) `python:3.11-slim` runtime — `redis-server`
 + `sqlite3` from apt, deps via `uv sync --frozen --no-dev`, backend source, the built SPA
 copied to `/app/static/frontend`, and s6-overlay unpacked (amd64/arm64 by `TARGETARCH`).
-`ENTRYPOINT ["/init"]`. Image env pins `COOKMARKS_{ENV,DB_PATH,FRONTEND_DIST}`; `EXPOSE 8789`
-(the prod web slot). sqlite-vec needs no apt package — it rides in via the pip dependency.
+`ENTRYPOINT ["/init"]`; `EXPOSE 8789` (the prod web slot). sqlite-vec needs no apt package —
+it rides in via the pip dependency.
+
+**Configuration.** Every env var keeps its default in the codebase and is set only where the
+container genuinely diverges. `COOKMARKS_{DB_PATH,FRONTEND_DIST}` differ from the app's host
+defaults (the DB lives on a volume; the SPA is bundled at `/app/static/frontend`), so they're
+pinned as image-level `ENV` alongside `COOKMARKS_ENV=prod`. `COOKMARKS_CELERY_{BROKER_URL,
+RESULT_BACKEND}` are *not* set anywhere — the in-code defaults (`redis://localhost:6379/{0,1}`)
+already resolve to the in-container Redis. Net result: `docker-compose.yml` carries **no**
+`environment:` block at all; every value stays optionally overridable at run time.
 
 **Services** (`docker/s6/s6-rc.d/`, copied to `/etc/s6-overlay/`): oneshots `data-dirs`
 (mkdir the `/data` volume) → `db-init` (alembic upgrade head); longruns `redis`, `api`,
@@ -1639,9 +1647,11 @@ volume's `/data/db.sqlite3`, so `/api/books` 500'd against an empty DB. Fix (the
 pattern): the oneshot `up` execs a real script file `docker/s6/scripts/db-init` whose own
 shebang pulls in the env. Longrun `run` files are exec'd as programs, so their shebang works.
 
-**Compose.** Single `cookmarks` service, `8789:8789`, `./data:/data` (SQLite DB + embeddings
-+ Redis dump), internal Redis on loopback, commented Calibre-library mount. The AI key is a DB
-`Config` column set via the settings UI, so no secret is needed in compose.
+**Compose.** A single `cookmarks` service — `build .`, `8789:8789`, `./data:/data` (SQLite DB
++ embeddings + Redis dump), `restart: unless-stopped`. No env, no comments: the file is just
+the four lines that can't be defaulted in the image. The AI key is a DB `Config` column set via
+the settings UI, so no secret is needed in compose; a Calibre library is mounted ad hoc when
+book sync is wanted (`-v …:/calibre:ro` + `COOKMARKS_CALIBRE_LIBRARY_PATH=/calibre`).
 
 **Verified.** Image builds (amd64); container boots all services clean; `/`, `/api/health`,
 `/api/books`, `/api/recipes` all 200; SPA + deep links serve; worker registers every task and
