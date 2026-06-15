@@ -9,6 +9,9 @@
 		/** Wired to POST /api/tasks/dedup-keywords — the AI-assisted keyword merge. Same
 		 *  fire-and-forget lifecycle as `onRun`, with no options. */
 		onDedup?: () => Promise<TaskRunAck | void>;
+		/** Wired to POST /api/tasks/calibre-sync — re-reads the Calibre library and
+		 *  reconciles books. Same fire-and-forget lifecycle, with no options. */
+		onSync?: () => Promise<TaskRunAck | void>;
 	};
 
 	type State = 'idle' | 'running' | 'done' | 'error';
@@ -22,10 +25,11 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
 
-	let { onRun, onDedup }: TasksPanelProps = $props();
+	let { onRun, onDedup, onSync }: TasksPanelProps = $props();
 
 	let book = $state<Runner>({ state: 'idle', queued: null });
 	let dedup = $state<Runner>({ state: 'idle', queued: null });
+	let calibre = $state<Runner>({ state: 'idle', queued: null });
 	let regenerate = $state(false);
 
 	// `run` may be absent (an unwired handler returns undefined), hence the widened
@@ -50,6 +54,7 @@
 	onDestroy(() => {
 		clearTimeout(book.timer);
 		clearTimeout(dedup.timer);
+		clearTimeout(calibre.timer);
 	});
 
 	function label(state: State): string {
@@ -83,6 +88,13 @@
 				? ERROR_NOTE
 				: ''
 	);
+	let calibreNote = $derived(
+		calibre.state === 'done'
+			? 'Syncing the Calibre library — new and changed books land shortly. See the result in Task Runs.'
+			: calibre.state === 'error'
+				? ERROR_NOTE
+				: ''
+	);
 </script>
 
 <section
@@ -93,6 +105,7 @@
 	data-verify-queued={book.queued === null ? '' : String(book.queued)}
 	data-verify-dedup-state={dedup.state}
 	data-verify-dedup-queued={dedup.queued === null ? '' : String(dedup.queued)}
+	data-verify-calibre-state={calibre.state}
 >
 	<article class="task">
 		<div class="copy">
@@ -161,6 +174,35 @@
 
 	{#if dedupNote}
 		<p class="note" class:err={dedup.state === 'error'} role="status">{dedupNote}</p>
+	{/if}
+
+	<article class="task">
+		<div class="copy">
+			<h2 class="name">Sync Calibre library</h2>
+			<p class="desc">
+				Re-read the Calibre library and reconcile it — add newly-tagged cookbooks, refresh changed
+				metadata, and flag books that have left the selection. Recipes, favourites and lists are
+				never touched. The run's result (created, updated, orphaned) lands in Task Runs.
+			</p>
+		</div>
+
+		<div class="action">
+			<button
+				class="run calibre-run"
+				class:done={calibre.state === 'done'}
+				class:error={calibre.state === 'error'}
+				type="button"
+				aria-busy={calibre.state === 'running'}
+				disabled={calibre.state === 'running'}
+				onclick={() => runTask(calibre, () => onSync?.())}
+			>
+				{label(calibre.state)}
+			</button>
+		</div>
+	</article>
+
+	{#if calibreNote}
+		<p class="note" class:err={calibre.state === 'error'} role="status">{calibreNote}</p>
 	{/if}
 </section>
 

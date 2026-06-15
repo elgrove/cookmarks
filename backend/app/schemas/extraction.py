@@ -1,16 +1,8 @@
 import string
-import uuid
-from datetime import datetime
-from decimal import Decimal
-from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.enums import ExtractionMethod, ExtractionStatus
 from app.services.extraction.review import REVIEW_CHOICES, REVIEW_QUESTION
-
-if TYPE_CHECKING:
-    from app.models.extraction import ExtractionRun
 
 
 class ReviewChoice(BaseModel):
@@ -42,65 +34,6 @@ class ResumeRequest(BaseModel):
     of the choices the graph offers (validated in the endpoint)."""
 
     response: str
-
-
-class ExtractionRunRead(BaseModel):
-    """The wire view of one extraction run: lifecycle, strategy, progress, and cost.
-    Returned by the trigger endpoint (a freshly-queued run), the latest-run endpoint,
-    the runs index, and the honest record the history/reports view (MY-11) reads.
-    `book_title` rides alongside `book_id` so the index reads as runs against named
-    books without a second fetch. `chapters_processed` is the count of the underlying
-    progress list, not the list itself. `pending_question` is populated only when the
-    run is paused at REVIEW awaiting a human decision."""
-
-    model_config = ConfigDict(from_attributes=True)
-
-    id: uuid.UUID
-    book_id: uuid.UUID
-    book_title: str
-    status: ExtractionStatus
-    provider_name: str | None
-    model_name: str | None
-    extraction_method: ExtractionMethod | None
-    total_chapters: int
-    chapters_processed: int
-    recipes_found: int
-    cost_usd: Decimal | None
-    input_tokens: int | None
-    output_tokens: int | None
-    errors: list[str]
-    created_at: datetime
-    started_at: datetime | None
-    completed_at: datetime | None
-    pending_question: ReviewQuestion | None
-
-    @classmethod
-    def from_run(cls, run: "ExtractionRun") -> "ExtractionRunRead":
-        """Build from an ORM row, collapsing the chapters_processed JSON list to its
-        count (the wire field is a number, not the list of processed file paths) and
-        attaching the pending review question only while the run is paused at REVIEW."""
-        return cls(
-            id=run.id,
-            book_id=run.book_id,
-            book_title=run.book.title,
-            status=run.status,
-            provider_name=run.provider_name,
-            model_name=run.model_name,
-            extraction_method=run.extraction_method,
-            total_chapters=run.total_chapters,
-            chapters_processed=len(run.chapters_processed),
-            recipes_found=run.recipes_found,
-            cost_usd=run.cost_usd,
-            input_tokens=run.input_tokens,
-            output_tokens=run.output_tokens,
-            errors=list(run.errors),
-            created_at=run.created_at,
-            started_at=run.started_at,
-            completed_at=run.completed_at,
-            pending_question=(
-                ReviewQuestion.current() if run.status == ExtractionStatus.REVIEW else None
-            ),
-        )
 
 
 class RecipeData(BaseModel):

@@ -1,13 +1,11 @@
 <script module lang="ts">
-	import type { ExtractionRun } from '$lib/api/extraction';
+	import type { TaskStatus } from '$lib/api/task-runs';
 
-	export type ExtractionStatus = ExtractionRun['status'];
-
-	export type ExtractionStatusBadgeProps = {
-		status: ExtractionStatus;
+	export type TaskStatusBadgeProps = {
+		status: TaskStatus;
 	};
 
-	const LABELS: Record<ExtractionStatus, string> = {
+	const LABELS: Record<TaskStatus, string> = {
 		queued: 'Queued',
 		running: 'Running',
 		review: 'Review',
@@ -17,7 +15,7 @@
 </script>
 
 <script lang="ts">
-	let { status }: ExtractionStatusBadgeProps = $props();
+	let { status }: TaskStatusBadgeProps = $props();
 </script>
 
 <span class="badge {status}">{LABELS[status]}</span>

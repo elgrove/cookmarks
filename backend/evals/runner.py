@@ -23,8 +23,8 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.config import BACKEND_ROOT
 from app.covers import epub_path
 from app.models.book import Book
-from app.models.enums import ExtractionStatus
-from app.models.extraction import ExtractionRun
+from app.models.enums import TaskStatus, TaskType
+from app.models.task_run import TaskRun
 from app.services.ai import ModelRole
 from app.services.extraction.graph import get_extraction_graph
 from evals.config import LEDGER_PATH, RUNS_DIR, EvalConfig
@@ -63,9 +63,9 @@ def _git_sha() -> str | None:
     return out.stdout.strip() or None
 
 
-def _run_status(factory: sessionmaker[Session], run_id: uuid.UUID) -> ExtractionStatus | None:
+def _run_status(factory: sessionmaker[Session], run_id: uuid.UUID) -> TaskStatus | None:
     with factory() as session:
-        run = session.get(ExtractionRun, run_id)
+        run = session.get(TaskRun, run_id)
         return run.status if run else None
 
 
@@ -73,10 +73,11 @@ def _create_run(
     factory: sessionmaker[Session], book_id: uuid.UUID, provider: str, *, force_block: bool
 ) -> uuid.UUID:
     with factory() as session:
-        run = ExtractionRun(
+        run = TaskRun(
+            task_type=TaskType.EXTRACTION,
             book_id=book_id,
             provider_name=provider,
-            status=ExtractionStatus.RUNNING,
+            status=TaskStatus.RUNNING,
             started_at=datetime.now(UTC),
             # Pre-setting this makes analyse_epub skip the image-match check and choose
             # block extraction directly (when the book has separate image chapters).
@@ -89,9 +90,9 @@ def _create_run(
 
 def _read_run_meta(factory: sessionmaker[Session], run_id: uuid.UUID, duration_s: float) -> RunMeta:
     with factory() as session:
-        run = session.get(ExtractionRun, run_id)
+        run = session.get(TaskRun, run_id)
         if run is None:
-            raise RuntimeError(f"ExtractionRun {run_id} vanished")
+            raise RuntimeError(f"TaskRun {run_id} vanished")
         return RunMeta(
             resolved_model=run.model_name,
             extraction_method=run.extraction_method.value if run.extraction_method else None,
@@ -128,7 +129,7 @@ def extract_book(
     }
     result = graph.invoke(state, gconf)
 
-    if _run_status(factory, run_id) == ExtractionStatus.REVIEW:
+    if _run_status(factory, run_id) == TaskStatus.REVIEW:
         answer = _RESUME_ANSWER[book.has_photos]
         logger.info(f"Review pause on {book.slug}: answering {answer!r}")
         graph.update_state(gconf, {"human_response": answer}, as_node="await_human")
@@ -149,7 +150,9 @@ def score_book(
     recipe_scores: list[RecipeScore] = []
     field_scores = []
     for match in result.matches:
-        scores = score_pair(gold[match.gold_index], predicted[match.predicted_index], config.weights)
+        scores = score_pair(
+            gold[match.gold_index], predicted[match.predicted_index], config.weights
+        )
         field_scores.append(scores)
         recipe_scores.append(
             RecipeScore(
@@ -297,8 +300,12 @@ def run_eval(
     _append_ledger(records)
     (run_dir / "run.json").write_text(
         json.dumps(
-            {"run_id": run_id, "timestamp": timestamp, "git_sha": git_sha,
-             "tasks": [t.role for t in tasks]},
+            {
+                "run_id": run_id,
+                "timestamp": timestamp,
+                "git_sha": git_sha,
+                "tasks": [t.role for t in tasks],
+            },
             indent=2,
         )
     )

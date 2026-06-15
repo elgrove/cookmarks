@@ -16,8 +16,8 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.db import SessionLocal
 from app.models.book import Book
-from app.models.enums import ExtractionMethod, ExtractionStatus
-from app.models.extraction import ExtractionRun
+from app.models.enums import ExtractionMethod, TaskStatus
+from app.models.task_run import TaskRun
 from app.schemas.extraction import RecipeData
 from app.services.ai import AIProvider, ModelRole, Usage, get_ai_provider, get_config
 from app.services.epub import (
@@ -42,10 +42,10 @@ logger = logging.getLogger(__name__)
 _EMPTY_USAGE = Usage()
 
 
-def _load_run(session: Session, report_id: str) -> ExtractionRun:
-    run = session.get(ExtractionRun, uuid.UUID(report_id))
+def _load_run(session: Session, report_id: str) -> TaskRun:
+    run = session.get(TaskRun, uuid.UUID(report_id))
     if run is None:
-        raise ValueError(f"ExtractionRun {report_id} not found")
+        raise ValueError(f"TaskRun {report_id} not found")
     return run
 
 
@@ -56,7 +56,7 @@ def _require_provider(session: Session) -> AIProvider:
     return provider
 
 
-def _apply_usage(run: ExtractionRun, usage: Usage) -> None:
+def _apply_usage(run: TaskRun, usage: Usage) -> None:
     """Accumulate one call's cost/tokens onto the run, leaving unreported (None)
     components untouched. Cost is rounded to 4dp as it lands, matching v1."""
     if usage.cost_usd is not None:
@@ -280,7 +280,7 @@ def await_human_decision(state: ExtractionState) -> dict:
 
     with SessionLocal() as session:
         run = _load_run(session, state["report_id"])
-        run.status = ExtractionStatus.REVIEW
+        run.status = TaskStatus.REVIEW
         session.commit()
 
     logger.info("Awaiting human decision on image availability")
@@ -344,7 +344,7 @@ def finalise(state: ExtractionState) -> dict:
         run = _load_run(session, state["report_id"])
         run.recipes_found = len(raw_recipes)
         run.completed_at = datetime.now(UTC)
-        run.status = ExtractionStatus.DONE
+        run.status = TaskStatus.DONE
         session.commit()
 
     logger.info(f"Extraction complete: {len(raw_recipes)} recipes found")

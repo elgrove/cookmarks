@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 
 from app.schemas.book import BookFilter, BookSummary, RecipeIndexEntry
 from app.schemas.config import ConfigRead
-from app.schemas.extraction import ExtractionRunRead, ReviewQuestion
+from app.schemas.extraction import ReviewQuestion
 from app.schemas.home import HomeData
 from app.schemas.recipe import (
     KeywordSummary,
@@ -23,6 +23,7 @@ from app.schemas.recipe import (
     SimilarRecipes,
 )
 from app.schemas.recipe_list import ListDetail, ListMembership, ListSummary
+from app.schemas.task_run import TaskRunRead
 from app.schemas.tasks import TaskRunAck
 
 CONTRACT_DIR = Path(__file__).resolve().parents[2] / "contract"
@@ -182,24 +183,24 @@ def test_recipe_lists_endpoint_keys_match_contract(client: TestClient) -> None:
     assert set(item.keys()) == set(example.keys())
 
 
-def test_extraction_run_model_matches_contract() -> None:
-    example = _example("extractionrun.example.json")
-    dumped = ExtractionRunRead.model_validate(example).model_dump(mode="json")
+def test_task_run_model_matches_contract() -> None:
+    example = _example("taskrun.example.json")
+    dumped = TaskRunRead.model_validate(example).model_dump(mode="json")
     assert dumped == example
 
 
 def test_extract_endpoint_keys_match_contract(client: TestClient) -> None:
-    example = _example("extractionrun.example.json")
+    example = _example("taskrun.example.json")
     book = next(b for b in client.get("/api/books").json() if b["title"] == "No Recipes Yet")
     body = client.post(f"/api/books/{book['id']}/extract").json()
     assert set(body.keys()) == set(example.keys())
 
 
-def test_extractions_index_endpoint_keys_match_contract(client: TestClient) -> None:
-    example = _example("extractionrun.example.json")
+def test_task_runs_index_endpoint_keys_match_contract(client: TestClient) -> None:
+    example = _example("taskrun.example.json")
     book = next(b for b in client.get("/api/books").json() if b["title"] == "No Recipes Yet")
     client.post(f"/api/books/{book['id']}/extract")
-    item = client.get("/api/extractions").json()[0]
+    item = client.get("/api/task-runs").json()[0]
     assert set(item.keys()) == set(example.keys())
 
 
@@ -230,12 +231,12 @@ def test_config_endpoint_keys_match_contract(client: TestClient) -> None:
 
 
 def test_task_run_ack_model_matches_contract() -> None:
-    example = _example("taskrun.example.json")
+    example = _example("taskrunack.example.json")
     dumped = TaskRunAck.model_validate(example).model_dump(mode="json")
     assert dumped == example
 
 
 def test_book_keywords_task_endpoint_keys_match_contract(client: TestClient) -> None:
-    example = _example("taskrun.example.json")
+    example = _example("taskrunack.example.json")
     body = client.post("/api/tasks/book-keywords", json={}).json()
     assert set(body.keys()) == set(example.keys())

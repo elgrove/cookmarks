@@ -14,9 +14,9 @@ from app.config import settings as app_settings
 from app.models import Base
 from app.models.book import Book
 from app.models.enums import AIProvider as AIProviderEnum
-from app.models.enums import ExtractionMethod, ExtractionStatus
-from app.models.extraction import ExtractionRun
+from app.models.enums import ExtractionMethod, TaskStatus, TaskType
 from app.models.recipe import Recipe
+from app.models.task_run import TaskRun
 from app.schemas.extraction import RecipeData
 from app.services.ai import ModelRole, StubProvider, Usage, get_ai_provider, get_config
 from app.services.extraction import graph
@@ -74,8 +74,8 @@ def _make_book(session: Session, calibre_id: int = 999) -> Book:
     return book
 
 
-def _make_run(session: Session, book: Book) -> ExtractionRun:
-    run = ExtractionRun(book_id=book.id, status=ExtractionStatus.RUNNING)
+def _make_run(session: Session, book: Book) -> TaskRun:
+    run = TaskRun(task_type=TaskType.EXTRACTION, book_id=book.id, status=TaskStatus.RUNNING)
     session.add(run)
     session.commit()
     return run
@@ -123,7 +123,10 @@ def test_route_post_analyse() -> None:
 
 
 def test_route_post_validate_with_images() -> None:
-    state: ExtractionState = {"raw_recipes": [{"name": "R", "image": "img.jpg"}], "already_tried": []}
+    state: ExtractionState = {
+        "raw_recipes": [{"name": "R", "image": "img.jpg"}],
+        "already_tried": [],
+    }
     assert graph.route_post_validate(state) == "resolve_images"
 
 
@@ -133,7 +136,10 @@ def test_route_post_validate_no_images_first_try() -> None:
 
 
 def test_route_post_validate_no_images_already_tried_block() -> None:
-    state: ExtractionState = {"raw_recipes": [{"name": "R", "image": None}], "already_tried": ["block"]}
+    state: ExtractionState = {
+        "raw_recipes": [{"name": "R", "image": None}],
+        "already_tried": ["block"],
+    }
     assert graph.route_post_validate(state) == "resolve_images"
 
 
@@ -143,12 +149,18 @@ def test_route_post_human() -> None:
 
 
 def test_route_post_resolve_with_images() -> None:
-    state: ExtractionState = {"raw_recipes": [{"name": "R", "image": "resolved.jpg"}], "already_tried": []}
+    state: ExtractionState = {
+        "raw_recipes": [{"name": "R", "image": "resolved.jpg"}],
+        "already_tried": [],
+    }
     assert graph.route_post_resolve(state) == "finalise"
 
 
 def test_route_post_resolve_no_images_with_human_response() -> None:
-    state: ExtractionState = {"raw_recipes": [{"name": "R", "image": None}], "human_response": "no_images"}
+    state: ExtractionState = {
+        "raw_recipes": [{"name": "R", "image": None}],
+        "human_response": "no_images",
+    }
     assert graph.route_post_resolve(state) == "finalise"
 
 
@@ -158,7 +170,10 @@ def test_route_post_resolve_no_images_no_human_response() -> None:
 
 
 def test_route_post_resolve_no_images_already_tried_block() -> None:
-    state: ExtractionState = {"raw_recipes": [{"name": "R", "image": None}], "already_tried": ["block"]}
+    state: ExtractionState = {
+        "raw_recipes": [{"name": "R", "image": None}],
+        "already_tried": ["block"],
+    }
     assert graph.route_post_resolve(state) == "finalise"
 
 
@@ -275,7 +290,7 @@ def test_analyse_epub_file_path(db: sessionmaker[Session], monkeypatch: pytest.M
     assert len(result["chapter_files"]) == 2
 
     with db() as s:
-        run = s.get(ExtractionRun, uuid.UUID(run_id))
+        run = s.get(TaskRun, uuid.UUID(run_id))
         assert run is not None
         assert run.total_chapters == 2
         assert run.extraction_method == ExtractionMethod.FILE
@@ -303,7 +318,7 @@ def test_analyse_epub_block_path(
     assert result["extraction_type"] == "block"  # stub image-match answers "yes"
 
     with db() as s:
-        run = s.get(ExtractionRun, uuid.UUID(run_id))
+        run = s.get(TaskRun, uuid.UUID(run_id))
         assert run is not None
         assert run.extraction_method == ExtractionMethod.BLOCK
         assert run.images_can_be_matched is True
@@ -335,7 +350,7 @@ def test_analyse_epub_respects_preset_image_match(
     assert result["extraction_type"] == "block"
 
     with db() as s:
-        run = s.get(ExtractionRun, uuid.UUID(run_id))
+        run = s.get(TaskRun, uuid.UUID(run_id))
         assert run is not None
         assert run.extraction_method == ExtractionMethod.BLOCK
 
@@ -383,10 +398,10 @@ def test_finalise_marks_done(db: sessionmaker[Session]) -> None:
     )
 
     with db() as s:
-        run = s.get(ExtractionRun, uuid.UUID(run_id))
+        run = s.get(TaskRun, uuid.UUID(run_id))
         assert run is not None
         assert run.recipes_found == 2
-        assert run.status == ExtractionStatus.DONE
+        assert run.status == TaskStatus.DONE
         assert run.completed_at is not None
 
 
@@ -506,8 +521,8 @@ def test_end_to_end_stub_review_then_resume(e2e: tuple[sessionmaker[Session], Pa
     message = extract_recipes_from_book(book_id)
     assert "paused for review" in message.lower()
     with factory() as s:
-        run = s.scalars(select(ExtractionRun)).one()
-        assert run.status == ExtractionStatus.REVIEW
+        run = s.scalars(select(TaskRun)).one()
+        assert run.status == TaskStatus.REVIEW
         run_id = str(run.id)
         assert s.scalars(select(Recipe)).all() == []
 
@@ -519,8 +534,8 @@ def test_end_to_end_stub_review_then_resume(e2e: tuple[sessionmaker[Session], Pa
         assert len(recipes) == 2
         assert all(r.book_id == uuid.UUID(book_id) for r in recipes)
         assert all("Stub" in {k.name for k in r.keywords} for r in recipes)
-        run = s.scalars(select(ExtractionRun)).one()
-        assert run.status == ExtractionStatus.DONE
+        run = s.scalars(select(TaskRun)).one()
+        assert run.status == TaskStatus.DONE
         assert run.recipes_found == 2
 
 
@@ -549,8 +564,8 @@ def test_task_marks_run_failed_on_error(
         extract_recipes_from_book_task(book_id, run_id)
 
     with db() as s:
-        run = s.get(ExtractionRun, uuid.UUID(run_id))
+        run = s.get(TaskRun, uuid.UUID(run_id))
         assert run is not None
-        assert run.status == ExtractionStatus.FAILED
+        assert run.status == TaskStatus.FAILED
         assert run.completed_at is not None
         assert any("kaboom" in e for e in run.errors)

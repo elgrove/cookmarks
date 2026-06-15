@@ -1,5 +1,5 @@
 import ReviewPrompt, { type ReviewPromptProps } from '$lib/components/ReviewPrompt.svelte';
-import type { ReviewQuestion } from '$lib/api/extraction';
+import type { ReviewQuestion } from '$lib/api/task-runs';
 import type { VerifiableUnit } from '$lib/verify/types';
 
 type Props = ReviewPromptProps;

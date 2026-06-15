@@ -36,3 +36,13 @@ export async function triggerDedupKeywords(fetchFn: typeof fetch = fetch): Promi
 	if (!res.ok) throw new Error(`POST /api/tasks/dedup-keywords → ${res.status}`);
 	return taskRunAckSchema.parse(await res.json());
 }
+
+/** Queue a sync of the Calibre library into the v2 DB, upserting books by calibre_id.
+ *  Fire-and-forget: the sync runs on the background worker and its result lands on the
+ *  task run. `queued` is 0 (the book count isn't known until the worker reads the
+ *  library). `fetchFn` is injectable for SSR/tests. */
+export async function triggerCalibreSync(fetchFn: typeof fetch = fetch): Promise<TaskRunAck> {
+	const res = await fetchFn('/api/tasks/calibre-sync', { method: 'POST' });
+	if (!res.ok) throw new Error(`POST /api/tasks/calibre-sync → ${res.status}`);
+	return taskRunAckSchema.parse(await res.json());
+}

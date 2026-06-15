@@ -1,0 +1,72 @@
+"""Shared task-run lifecycle helpers.
+
+A `TaskRun` records every background job — not just extraction. The trigger endpoint
+creates a QUEUED row (`create_task_run`); the worker then drives it RUNNING → DONE
+(`start_run` / `complete_run`) or FAILED (`fail_run`), writing the job's metrics into
+`detail`. Extraction has its own richer path in `app.tasks.extraction`; this is the seam
+the simpler maintenance tasks (book-keywords, dedup, Calibre sync) go through.
+"""
+
+import logging
+import uuid
+from datetime import UTC, datetime
+
+from sqlalchemy.orm import Session
+
+from app.db import SessionLocal
+from app.models.enums import TaskStatus, TaskType
+from app.models.task_run import TaskRun
+
+logger = logging.getLogger(__name__)
+
+
+def create_task_run(
+    session: Session, task_type: TaskType, *, detail: dict | None = None
+) -> TaskRun:
+    """Record a freshly-queued run on the caller's session and commit it, so a trigger is
+    visible in the history even before a worker picks it up. Returns the persisted row."""
+    run = TaskRun(task_type=task_type, status=TaskStatus.QUEUED, detail=detail or {})
+    session.add(run)
+    session.commit()
+    return run
+
+
+def start_run(run_id: str) -> None:
+    """Mark a run RUNNING and stamp `started_at` as the worker begins it."""
+    with SessionLocal() as session:
+        run = session.get(TaskRun, uuid.UUID(run_id))
+        if run is None:
+            return
+        run.status = TaskStatus.RUNNING
+        run.started_at = datetime.now(UTC)
+        session.commit()
+
+
+def complete_run(run_id: str, detail: dict | None = None) -> None:
+    """Mark a run DONE, stamp `completed_at`, and merge in the job's result metrics."""
+    with SessionLocal() as session:
+        run = session.get(TaskRun, uuid.UUID(run_id))
+        if run is None:
+            return
+        run.status = TaskStatus.DONE
+        run.completed_at = datetime.now(UTC)
+        if detail:
+            run.detail = {**run.detail, **detail}
+        session.commit()
+
+
+def fail_run(run_id: str, exc: Exception) -> None:
+    """Record a crashed run: status FAILED, the error appended, completed stamped — so a
+    worker exception leaves an honest record instead of a run wedged in RUNNING forever.
+    Best-effort: a failure here must not mask the original exception."""
+    try:
+        with SessionLocal() as session:
+            run = session.get(TaskRun, uuid.UUID(run_id))
+            if run is None:
+                return
+            run.status = TaskStatus.FAILED
+            run.errors = [*run.errors, str(exc)]
+            run.completed_at = datetime.now(UTC)
+            session.commit()
+    except Exception:
+        logger.exception(f"Failed to mark task run {run_id} as failed")

@@ -1,5 +1,25 @@
 {
-  "task": "book_keywords",
-  "status": "queued",
-  "queued": 3
+  "id": "3f1a2b3c-4d5e-4f6a-8b9c-0d1e2f3a4b5c",
+  "task_type": "extraction",
+  "status": "done",
+  "book_id": "1b2c3d4e-5f6a-4b7c-8d9e-0f1a2b3c4d5e",
+  "book_title": "The Flavour Thesaurus",
+  "provider_name": "GEMINI",
+  "model_name": "gemini-2.5-flash",
+  "cost_usd": "0.0123",
+  "input_tokens": 45000,
+  "output_tokens": 6700,
+  "errors": [],
+  "detail": {
+    "extraction_method": "file",
+    "total_chapters": 12,
+    "chapters_processed": 12,
+    "recipes_found": 34,
+    "images_in_separate_chapters": false,
+    "images_can_be_matched": true
+  },
+  "created_at": "2026-06-05T10:00:00Z",
+  "started_at": "2026-06-05T10:00:01Z",
+  "completed_at": "2026-06-05T10:01:30Z",
+  "pending_question": null
 }

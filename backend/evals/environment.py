@@ -1,7 +1,7 @@
 """The isolated database the eval runs against.
 
 The extraction pipeline is database-coupled: its nodes read Book/Config and write
-ExtractionRun through a module-level session factory, and the LangGraph checkpointer
+TaskRun through a module-level session factory, and the LangGraph checkpointer
 opens ``settings.db_path``. So the eval stands up its own throwaway SQLite, seeds just
 the Config and Book rows it needs (copied from the real app DB), and rebinds the
 pipeline onto it. Prod data is never read for recipes nor written at all.

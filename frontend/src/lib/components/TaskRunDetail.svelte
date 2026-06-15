@@ -1,14 +1,37 @@
 <script module lang="ts">
-	import type { ExtractionRun } from '$lib/api/extraction';
+	import type {
+		TaskRun,
+		TaskType,
+		ExtractionDetail,
+		BookKeywordsDetail,
+		KeywordDedupDetail,
+		CalibreSyncDetail
+	} from '$lib/api/task-runs';
 
-	export type ExtractionRunDetailProps = {
+	export type TaskRunDetailProps = {
 		/** The run to report on, or null when nothing is selected — the component renders
 		 *  a calm "no run selected" state in that case. Network-free and verifiable in
 		 *  isolation; the admin route owns the fetch and selection. */
-		run?: ExtractionRun | null;
+		run?: TaskRun | null;
 	};
 
+	type Row = { label: string; value: string; wrap?: boolean };
+
 	const METHOD_LABELS: Record<string, string> = { file: 'File', block: 'Block' };
+
+	// Short eyebrow label + a serif title for the non-extraction types (extraction's
+	// title is the book it ran against).
+	const TYPE_LABELS: Record<TaskType, string> = {
+		extraction: 'Extraction',
+		book_keywords: 'Book keywords',
+		keyword_dedup: 'Keyword dedup',
+		calibre_sync: 'Calibre sync'
+	};
+	const TYPE_TITLES: Record<Exclude<TaskType, 'extraction'>, string> = {
+		book_keywords: 'Book-keyword tagging',
+		keyword_dedup: 'Keyword vocabulary dedup',
+		calibre_sync: 'Calibre library sync'
+	};
 
 	const dateFmt = new Intl.DateTimeFormat('en-GB', {
 		day: 'numeric',
@@ -42,7 +65,7 @@
 		return parts.join(' · ');
 	}
 
-	function formatDuration(run: ExtractionRun): string {
+	function formatDuration(run: TaskRun): string {
 		if (!run.started_at || !run.completed_at) return '—';
 		const ms = new Date(run.completed_at).getTime() - new Date(run.started_at).getTime();
 		if (Number.isNaN(ms) || ms < 0) return '—';
@@ -51,60 +74,93 @@
 		const mins = Math.floor(secs / 60);
 		return `${mins}m ${secs % 60}s`;
 	}
+
+	function count(n: number | undefined): string {
+		return typeof n === 'number' ? String(n) : '—';
+	}
+
+	// The type-specific report rows, read from the run's `detail` payload. Defensive
+	// against a still-queued run whose detail isn't populated yet.
+	function metaRows(run: TaskRun): Row[] {
+		switch (run.task_type) {
+			case 'extraction': {
+				const d = run.detail as unknown as ExtractionDetail;
+				return [
+					{ label: 'Method', value: d.extraction_method ? METHOD_LABELS[d.extraction_method] : '—' },
+					{ label: 'Provider', value: run.provider_name ?? '—' },
+					{ label: 'Model', value: run.model_name ?? '—', wrap: true },
+					{ label: 'Chapters', value: formatChapters(d.chapters_processed, d.total_chapters) },
+					{ label: 'Recipes found', value: count(d.recipes_found) },
+					{ label: 'Cost', value: formatCost(run.cost_usd) },
+					{ label: 'Tokens', value: formatTokens(run.input_tokens, run.output_tokens) }
+				];
+			}
+			case 'book_keywords': {
+				const d = run.detail as unknown as BookKeywordsDetail;
+				return [
+					{ label: 'Books tagged', value: count(d.books_tagged) },
+					{ label: 'Regenerate', value: d.regenerate ? 'Yes' : 'No' }
+				];
+			}
+			case 'keyword_dedup': {
+				const d = run.detail as unknown as KeywordDedupDetail;
+				return [
+					{ label: 'Keywords analysed', value: count(d.keywords_in) },
+					{ label: 'Merges applied', value: count(d.merges_applied) },
+					{ label: 'Keywords removed', value: count(d.keywords_removed) }
+				];
+			}
+			case 'calibre_sync': {
+				const d = run.detail as unknown as CalibreSyncDetail;
+				return [
+					{ label: 'Created', value: count(d.created?.length) },
+					{ label: 'Updated', value: count(d.updated?.length) },
+					{ label: 'Orphaned', value: count(d.orphaned?.length) }
+				];
+			}
+		}
+	}
 </script>
 
 <script lang="ts">
-	import ExtractionStatusBadge from './ExtractionStatusBadge.svelte';
+	import TaskStatusBadge from './TaskStatusBadge.svelte';
 	import { cleanTitle } from '$lib/title';
 
-	let { run = null }: ExtractionRunDetailProps = $props();
+	let { run = null }: TaskRunDetailProps = $props();
+
+	let title = $derived(
+		run
+			? run.task_type === 'extraction'
+				? cleanTitle(run.book_title ?? 'Extraction')
+				: TYPE_TITLES[run.task_type]
+			: ''
+	);
 </script>
 
 <section
 	class="detail"
-	data-verify-unit="extraction-run-detail"
+	data-verify-unit="task-run-detail"
 	data-verify-has-run={run ? 'true' : 'false'}
+	data-verify-task-type={run ? run.task_type : 'none'}
 	data-verify-status={run ? run.status : 'none'}
 	data-verify-error-count={run ? run.errors.length : 0}
 >
 	{#if run}
 		<header class="head">
 			<div class="titles">
-				<p class="eyebrow">Extraction run</p>
-				<h3 class="title">{cleanTitle(run.book_title)}</h3>
+				<p class="eyebrow">{TYPE_LABELS[run.task_type]} run</p>
+				<h3 class="title">{title}</h3>
 			</div>
-			<ExtractionStatusBadge status={run.status} />
+			<TaskStatusBadge status={run.status} />
 		</header>
 
 		<dl class="meta">
-			<div class="row">
-				<dt>Method</dt>
-				<dd>{run.extraction_method ? METHOD_LABELS[run.extraction_method] : '—'}</dd>
-			</div>
-			<div class="row">
-				<dt>Provider</dt>
-				<dd>{run.provider_name ?? '—'}</dd>
-			</div>
-			<div class="row">
-				<dt>Model</dt>
-				<dd class="wrap">{run.model_name ?? '—'}</dd>
-			</div>
-			<div class="row">
-				<dt>Chapters</dt>
-				<dd>{formatChapters(run.chapters_processed, run.total_chapters)}</dd>
-			</div>
-			<div class="row">
-				<dt>Recipes found</dt>
-				<dd>{run.recipes_found}</dd>
-			</div>
-			<div class="row">
-				<dt>Cost</dt>
-				<dd>{formatCost(run.cost_usd)}</dd>
-			</div>
-			<div class="row">
-				<dt>Tokens</dt>
-				<dd>{formatTokens(run.input_tokens, run.output_tokens)}</dd>
-			</div>
+			{#each metaRows(run) as row (row.label)}
+				<div class="row">
+					<dt>{row.label}</dt>
+					<dd class:wrap={row.wrap}>{row.value}</dd>
+				</div>
+			{/each}
 			<div class="row">
 				<dt>Started</dt>
 				<dd>{formatDate(run.started_at)}</dd>

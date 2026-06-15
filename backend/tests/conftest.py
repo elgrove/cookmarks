@@ -52,8 +52,8 @@ def resume_dispatched(monkeypatch: pytest.MonkeyPatch) -> list[tuple[Any, ...]]:
 @pytest.fixture(autouse=True)
 def tasks_dispatched(monkeypatch: pytest.MonkeyPatch) -> list[tuple[Any, ...]]:
     """Stub the book-keyword backfill dispatch so tests never reach a real broker.
-    Records the (regenerate,) of each enqueued task; request it by name to assert a
-    task dispatched exactly once."""
+    Records the (run_id, regenerate) of each enqueued task; request it by name to assert
+    a task dispatched exactly once."""
     from app.tasks.book_keywords import backfill_book_keywords_task
 
     calls: list[tuple[Any, ...]] = []
@@ -68,8 +68,8 @@ def tasks_dispatched(monkeypatch: pytest.MonkeyPatch) -> list[tuple[Any, ...]]:
 @pytest.fixture(autouse=True)
 def dedup_dispatched(monkeypatch: pytest.MonkeyPatch) -> list[tuple[Any, ...]]:
     """Stub the keyword-dedup dispatch so tests never reach a real broker. Records the
-    (empty) args of each enqueued task; request it by name to assert a trigger
-    dispatched exactly once."""
+    (run_id,) of each enqueued task; request it by name to assert a trigger dispatched
+    exactly once."""
     from app.tasks.keyword_dedup import dedup_keywords_task
 
     calls: list[tuple[Any, ...]] = []
@@ -78,6 +78,22 @@ def dedup_dispatched(monkeypatch: pytest.MonkeyPatch) -> list[tuple[Any, ...]]:
         calls.append(args)
 
     monkeypatch.setattr(dedup_keywords_task, "delay", _record)
+    return calls
+
+
+@pytest.fixture(autouse=True)
+def calibre_dispatched(monkeypatch: pytest.MonkeyPatch) -> list[tuple[Any, ...]]:
+    """Stub the Calibre-sync dispatch so tests never reach a real broker. Records the
+    (run_id,) of each enqueued task; request it by name to assert a trigger dispatched
+    exactly once."""
+    from app.tasks.calibre_sync import calibre_sync_task
+
+    calls: list[tuple[Any, ...]] = []
+
+    def _record(*args: Any, **_kwargs: Any) -> None:
+        calls.append(args)
+
+    monkeypatch.setattr(calibre_sync_task, "delay", _record)
     return calls
 
 

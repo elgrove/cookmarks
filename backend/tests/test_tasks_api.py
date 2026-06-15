@@ -1,6 +1,7 @@
 """The admin Tasks tab's on-demand book-keyword trigger: the POST endpoint (eligible
 count + dispatch) and the library-wide backfill sweep it runs on the worker."""
 
+import uuid
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -11,44 +12,65 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event, select
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.models import Base, Book, Config, Recipe
-from app.models.enums import AIProvider
+from app.models import Base, Book, Config, Recipe, TaskRun
+from app.models.enums import AIProvider, TaskStatus, TaskType
 from app.tasks.book_keywords import backfill_book_keywords
 
 
+def _only_run(session: Session) -> TaskRun:
+    return session.scalars(select(TaskRun)).one()
+
+
 def test_trigger_default_queues_only_untagged_books(
-    client: TestClient, tasks_dispatched: list[tuple[Any, ...]]
+    client: TestClient, session: Session, tasks_dispatched: list[tuple[Any, ...]]
 ) -> None:
     res = client.post("/api/tasks/book-keywords", json={})
 
     assert res.status_code == 202
     assert res.json() == {"task": "book_keywords", "status": "queued", "queued": 0}
-    # The one recipe-bearing book is already tagged, so nothing is eligible by default.
-    # Dispatched once, not regenerating.
-    assert tasks_dispatched == [(False,)]
+    # A queued TaskRun is recorded and dispatched once with (run_id, regenerate=False).
+    run = _only_run(session)
+    assert run.task_type == TaskType.BOOK_KEYWORDS
+    assert run.status == TaskStatus.QUEUED
+    assert tasks_dispatched == [(str(run.id), False)]
 
 
 def test_trigger_regenerate_queues_every_extracted_book(
-    client: TestClient, tasks_dispatched: list[tuple[Any, ...]]
+    client: TestClient, session: Session, tasks_dispatched: list[tuple[Any, ...]]
 ) -> None:
     res = client.post("/api/tasks/book-keywords", json={"regenerate": True})
 
     assert res.status_code == 202
     # Regenerate counts every book with recipes, tagged or not — here, one.
     assert res.json() == {"task": "book_keywords", "status": "queued", "queued": 1}
-    assert tasks_dispatched == [(True,)]
+    run = _only_run(session)
+    assert tasks_dispatched == [(str(run.id), True)]
 
 
 def test_trigger_dedup_reports_vocabulary_size_and_dispatches(
-    client: TestClient, dedup_dispatched: list[tuple[Any, ...]]
+    client: TestClient, session: Session, dedup_dispatched: list[tuple[Any, ...]]
 ) -> None:
     res = client.post("/api/tasks/dedup-keywords")
 
     assert res.status_code == 202
     # The seeded vocabulary is Pasta, Quick, Italian — the count the task will analyse.
     assert res.json() == {"task": "keyword_dedup", "status": "queued", "queued": 3}
-    # Fire-and-forget: dispatched exactly once, with no arguments.
-    assert dedup_dispatched == [()]
+    run = _only_run(session)
+    assert run.task_type == TaskType.KEYWORD_DEDUP
+    assert dedup_dispatched == [(str(run.id),)]
+
+
+def test_trigger_calibre_sync_records_run_and_dispatches(
+    client: TestClient, session: Session, calibre_dispatched: list[tuple[Any, ...]]
+) -> None:
+    res = client.post("/api/tasks/calibre-sync")
+
+    assert res.status_code == 202
+    assert res.json() == {"task": "calibre_sync", "status": "queued", "queued": 0}
+    run = _only_run(session)
+    assert run.task_type == TaskType.CALIBRE_SYNC
+    assert run.status == TaskStatus.QUEUED
+    assert calibre_dispatched == [(str(run.id),)]
 
 
 # --- The sweep itself, against a throwaway DB the task's SessionLocal is patched onto.
@@ -70,10 +92,21 @@ def task_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[session
 
     Base.metadata.create_all(engine)
     factory = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
-    # The sweep opens its own session via app.db.SessionLocal — point it at this DB.
+    # The sweep and the run-lifecycle helpers each open their own session via
+    # app.db.SessionLocal — point both at this throwaway DB.
     monkeypatch.setattr("app.tasks.book_keywords.SessionLocal", factory)
+    monkeypatch.setattr("app.tasks.runs.SessionLocal", factory)
+    monkeypatch.setattr("app.tasks.calibre_sync.SessionLocal", factory)
     yield factory
     engine.dispose()
+
+
+def _queued_run(factory: sessionmaker[Session], task_type: TaskType) -> str:
+    with factory() as session:
+        run = TaskRun(task_type=task_type, status=TaskStatus.QUEUED)
+        session.add(run)
+        session.commit()
+        return str(run.id)
 
 
 def _seed_book(factory: sessionmaker[Session], *, provider: AIProvider | None) -> None:
@@ -100,3 +133,44 @@ def test_backfill_tags_untagged_books(task_db: sessionmaker[Session]) -> None:
 def test_backfill_is_a_noop_without_a_provider(task_db: sessionmaker[Session]) -> None:
     _seed_book(task_db, provider=None)
     assert backfill_book_keywords(regenerate=True) == 0
+
+
+# --- The task wrappers drive a queued TaskRun to DONE (with detail) or FAILED.
+
+
+def test_book_keywords_task_completes_run_with_detail(task_db: sessionmaker[Session]) -> None:
+    from app.tasks.book_keywords import backfill_book_keywords_task
+
+    _seed_book(task_db, provider=AIProvider.STUB)
+    run_id = _queued_run(task_db, TaskType.BOOK_KEYWORDS)
+
+    detail = backfill_book_keywords_task(run_id, False)
+
+    assert detail == {"books_tagged": 1, "regenerate": False}
+    with task_db() as session:
+        run = session.get(TaskRun, uuid.UUID(run_id))
+        assert run is not None
+        assert run.status == TaskStatus.DONE
+        assert run.started_at is not None and run.completed_at is not None
+        assert run.detail == {"books_tagged": 1, "regenerate": False}
+
+
+def test_calibre_sync_task_records_failure(
+    task_db: sessionmaker[Session], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A missing Calibre library leaves a FAILED run carrying the error — the headline
+    value of tracking every task run."""
+    from app.tasks import calibre_sync
+
+    monkeypatch.setattr(calibre_sync.settings, "calibre_library_path", tmp_path / "absent")
+    run_id = _queued_run(task_db, TaskType.CALIBRE_SYNC)
+
+    with pytest.raises(FileNotFoundError):
+        calibre_sync.calibre_sync_task(run_id)
+
+    with task_db() as session:
+        run = session.get(TaskRun, uuid.UUID(run_id))
+        assert run is not None
+        assert run.status == TaskStatus.FAILED
+        assert run.errors
+        assert run.completed_at is not None

@@ -2,13 +2,13 @@ import uuid
 
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload
 
 from app.db import SessionDep
 from app.models.book import Book
-from app.models.enums import ExtractionStatus
-from app.models.extraction import ExtractionRun
-from app.schemas.extraction import ExtractionRunRead, ResumeRequest
+from app.models.enums import TaskStatus, TaskType
+from app.models.task_run import TaskRun
+from app.schemas.extraction import ResumeRequest
+from app.schemas.task_run import TaskRunRead
 from app.services.ai import get_config
 from app.services.extraction.review import VALID_HUMAN_RESPONSES
 from app.tasks.extraction import enqueue_extract_recipes, enqueue_resume_extraction
@@ -16,26 +16,12 @@ from app.tasks.extraction import enqueue_extract_recipes, enqueue_resume_extract
 router = APIRouter(tags=["extraction"])
 
 
-@router.get("/extractions", response_model=list[ExtractionRunRead])
-def list_runs(session: SessionDep) -> list[ExtractionRunRead]:
-    """Every extraction run, newest first — the history/reports index (MY-11). Each
-    item carries its book's title (eager-loaded to avoid an N+1) so the admin view
-    reads as a list of runs against named books, and the full per-run report (method,
-    progress, cost, tokens, errors) without a second fetch."""
-    runs = session.scalars(
-        select(ExtractionRun)
-        .options(selectinload(ExtractionRun.book))
-        .order_by(ExtractionRun.created_at.desc())
-    ).all()
-    return [ExtractionRunRead.from_run(run) for run in runs]
-
-
 @router.post(
     "/books/{book_id}/extract",
-    response_model=ExtractionRunRead,
+    response_model=TaskRunRead,
     status_code=status.HTTP_202_ACCEPTED,
 )
-def trigger_extraction(book_id: uuid.UUID, session: SessionDep) -> ExtractionRunRead:
+def trigger_extraction(book_id: uuid.UUID, session: SessionDep) -> TaskRunRead:
     """Queue recipe extraction for a book. Creates the run row up front (so a trigger
     is recorded even before a worker picks it up) then dispatches the background task,
     which reconciles recipes by normalised name — favourites and list membership
@@ -44,20 +30,21 @@ def trigger_extraction(book_id: uuid.UUID, session: SessionDep) -> ExtractionRun
     if book is None:
         raise HTTPException(status_code=404, detail="book not found")
 
-    run = ExtractionRun(
+    run = TaskRun(
+        task_type=TaskType.EXTRACTION,
         book_id=book.id,
         provider_name=get_config(session).ai_provider,
-        status=ExtractionStatus.QUEUED,
+        status=TaskStatus.QUEUED,
     )
     session.add(run)
     session.commit()
 
     enqueue_extract_recipes(str(book.id), str(run.id))
-    return ExtractionRunRead.from_run(run)
+    return TaskRunRead.from_run(run)
 
 
-@router.get("/books/{book_id}/extraction", response_model=ExtractionRunRead | None)
-def latest_run(book_id: uuid.UUID, session: SessionDep) -> ExtractionRunRead | None:
+@router.get("/books/{book_id}/extraction", response_model=TaskRunRead | None)
+def latest_run(book_id: uuid.UUID, session: SessionDep) -> TaskRunRead | None:
     """The book's most recent extraction run, or null if it's never been extracted.
     Fetched on the book page so a run paused at REVIEW can surface its pending question
     without a live view — the answer drives it to completion via the resume endpoint."""
@@ -66,22 +53,22 @@ def latest_run(book_id: uuid.UUID, session: SessionDep) -> ExtractionRunRead | N
         raise HTTPException(status_code=404, detail="book not found")
 
     run = session.scalars(
-        select(ExtractionRun)
-        .where(ExtractionRun.book_id == book_id)
-        .order_by(ExtractionRun.created_at.desc())
+        select(TaskRun)
+        .where(TaskRun.book_id == book_id, TaskRun.task_type == TaskType.EXTRACTION)
+        .order_by(TaskRun.created_at.desc())
         .limit(1)
     ).first()
-    return ExtractionRunRead.from_run(run) if run is not None else None
+    return TaskRunRead.from_run(run) if run is not None else None
 
 
 @router.post(
     "/books/{book_id}/extract/{run_id}/resume",
-    response_model=ExtractionRunRead,
+    response_model=TaskRunRead,
     status_code=status.HTTP_202_ACCEPTED,
 )
 def resume_run(
     book_id: uuid.UUID, run_id: uuid.UUID, body: ResumeRequest, session: SessionDep
-) -> ExtractionRunRead:
+) -> TaskRunRead:
     """Answer the human-in-the-loop question on a paused run and resume it. Validates
     the run belongs to the book, the answer is a choice the graph offers, and the run
     is actually awaiting review; then dispatches the resume to the worker. Fire-and-
@@ -90,7 +77,7 @@ def resume_run(
     if book is None:
         raise HTTPException(status_code=404, detail="book not found")
 
-    run = session.get(ExtractionRun, run_id)
+    run = session.get(TaskRun, run_id)
     if run is None or run.book_id != book_id:
         raise HTTPException(status_code=404, detail="extraction run not found")
 
@@ -100,8 +87,8 @@ def resume_run(
             detail=f"invalid response; expected one of {sorted(VALID_HUMAN_RESPONSES)}",
         )
 
-    if run.status != ExtractionStatus.REVIEW:
+    if run.status != TaskStatus.REVIEW:
         raise HTTPException(status_code=409, detail="this extraction is not awaiting review")
 
     enqueue_resume_extraction(str(run.id), body.response)
-    return ExtractionRunRead.from_run(run)
+    return TaskRunRead.from_run(run)

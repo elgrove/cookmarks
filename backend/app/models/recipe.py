@@ -8,8 +8,8 @@ from app.models.base import Base, UUIDAuditBase
 
 if TYPE_CHECKING:
     from app.models.book import Book
-    from app.models.extraction import ExtractionRun
     from app.models.recipe_list import RecipeListItem
+    from app.models.task_run import TaskRun
 
 # The book↔keyword association table lives in app.models.book; Keyword.books
 # references it by name so the two modules stay free of a runtime import cycle.
@@ -41,9 +41,7 @@ class Keyword(UUIDAuditBase):
     recipes: Mapped[list["Recipe"]] = relationship(
         secondary=recipe_keywords, back_populates="keywords"
     )
-    books: Mapped[list["Book"]] = relationship(
-        secondary="book_keywords", back_populates="keywords"
-    )
+    books: Mapped[list["Book"]] = relationship(secondary="book_keywords", back_populates="keywords")
 
 
 class Recipe(UUIDAuditBase):
@@ -57,7 +55,7 @@ class Recipe(UUIDAuditBase):
         ForeignKey("books.id", ondelete="CASCADE"), index=True
     )
     extraction_run_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("extraction_runs.id", ondelete="SET NULL")
+        ForeignKey("task_runs.id", ondelete="SET NULL")
     )
     order: Mapped[int]
     name: Mapped[str] = mapped_column(String(500))
@@ -68,7 +66,7 @@ class Recipe(UUIDAuditBase):
     image: Mapped[str | None] = mapped_column(Text)
 
     book: Mapped["Book"] = relationship(back_populates="recipes")
-    extraction_run: Mapped["ExtractionRun | None"] = relationship(back_populates="recipes")
+    extraction_run: Mapped["TaskRun | None"] = relationship(back_populates="recipes")
     keywords: Mapped[list["Keyword"]] = relationship(
         secondary=recipe_keywords, back_populates="recipes"
     )

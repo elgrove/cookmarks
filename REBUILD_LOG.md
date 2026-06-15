@@ -1566,3 +1566,49 @@ end-to-end through a fake map-provider, a no-provider no-op and the stub no-op. 
 matrix (77, with the new dedup fixtures). Driven live via the UI against an isolated copy of the real
 library (Gemini): 5114 → 3713 keywords, 1401 merges across recipes and books, **0 manufactured keyword
 rows** (every merge folds onto a spelling that already exists), 0 duplicate names, associations preserved.
+
+## 2026-06-15 — Unify extractions into a generic Task Run + admin Task Runs tab
+
+Before this, only extraction recorded a durable, reported run; the other jobs vanished after dispatch
+(`book_keywords` / `keyword_dedup` were fire-and-forget, and Calibre sync was a CLI script only). Now
+**every background job is a first-class `TaskRun`** — extraction is one `task_type` among `book_keywords`,
+`keyword_dedup`, `calibre_sync` — and the admin **Task Runs** tab reports them all, newest-first, filterable
+by type, at the same level of per-run detail extraction always had (status, timings, cost/tokens, errors,
+type-specific metrics).
+
+**Data model.** Renamed `ExtractionRun` → `TaskRun` (module `app/models/task_run.py`, table `task_runs`),
+adding a `task_type` discriminator (enum `TaskType`), a nullable `book_id` (set on extraction runs only) and
+a generic JSON `detail` for the non-extraction types' metrics. Extraction keeps its proven typed columns
+(method, chapter progress, image flags, recipes found) untouched — the LangGraph pipeline changes only a
+class-name import and one `task_type=EXTRACTION` at creation. `ExtractionStatus` → `TaskStatus`. The
+recipes FK retargets to `task_runs.id`. **Migration** (`d7e1f2a3b4c5`, hand-written): `rename_table`, add
+`task_type` (existing rows backfilled to `extraction`) + `detail`, make `book_id` nullable; SQLite (≥3.25)
+rewrites the `recipes.extraction_run_id` FK across the rename automatically (verified empirically on a DB
+built at the prior head — existing rows preserved, FK still enforced, NULL-book_id rows now insertable).
+`import_v1_data.py` writes `task_runs` with `task_type='extraction'`.
+
+**Backend.** A shared lifecycle seam (`app/tasks/runs.py`: `create_task_run` / `start_run` / `complete_run`
+/ `fail_run`) mirrors extraction's `_mark_run_failed`. `book_keywords` and `keyword_dedup` task wrappers now
+take a `run_id` and transition a queued run RUNNING → DONE (metrics into `detail`) or FAILED — the pure
+sweeps (called by the CLIs) keep their old signatures. Calibre sync graduates from script to a real task
+(`app/tasks/calibre_sync.py`, added to `celery_app` `include`) with a new `POST /api/tasks/calibre-sync`
+trigger — a missing library leaves a FAILED run carrying the error, the headline win of unified reporting.
+New `TaskRunRead` (`app/schemas/task_run.py`) folds extraction's columns and each type's stored `detail`
+into one wire `detail`; `GET /api/task-runs?type=` (`app/api/task_runs.py`) is the unified index. The
+extraction trigger/latest/resume endpoints return `TaskRunRead`; `GET /api/extractions` is gone.
+
+**Frontend.** New `lib/api/task-runs.ts` (one `taskRunSchema`, `fetchTaskRuns(type?)`, the extraction
+calls; `lib/api/extraction.ts` deleted). `ExtractionsPanel`/`ExtractionRunDetail`/`ExtractionStatusBadge`
+→ `TaskRunsPanel`/`TaskRunDetail`/`TaskStatusBadge`: the panel gains type-filter chips and a per-type row
+summary; the detail renders rows that adapt to `task_type` (extraction: method/chapters/recipes/cost;
+keywords: tagged; dedup: in/merges/removed; calibre: created/updated/orphaned). `TasksPanel` gains a third
+**Sync Calibre library** card; the admin **Extractions** tab becomes **Task Runs**.
+
+**Harness.** Contract collision resolved: `taskrun.example.json` (was `TaskRunAck`) → `taskrunack.example.
+json`; `extractionrun.example.json` → `taskrun.example.json` (the `TaskRunRead` shape). Verify units
+renamed to `task-runs-panel` / `task-run-detail` with fixtures across every task type (incl. a failed
+Calibre run) plus the filter act and the expectFail sentinels.
+
+**Verified.** Backend: ruff + ty clean, 229 pytest (new task-run persistence + filter + Calibre-failure
+tests). Frontend: svelte-check 0/0, 125 vitest incl. the verify matrix (77). `make build` clean. Migration
+exercised end-to-end against a seeded copy at the prior head.

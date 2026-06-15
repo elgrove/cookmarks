@@ -7,7 +7,17 @@ class AIProvider(StrEnum):
     STUB = "STUB"
 
 
-class ExtractionStatus(StrEnum):
+class TaskType(StrEnum):
+    """Which kind of background job a task run records. Extraction is one type among
+    several maintenance jobs (book-keyword tagging, keyword dedup, Calibre sync)."""
+
+    EXTRACTION = "extraction"
+    BOOK_KEYWORDS = "book_keywords"
+    KEYWORD_DEDUP = "keyword_dedup"
+    CALIBRE_SYNC = "calibre_sync"
+
+
+class TaskStatus(StrEnum):
     QUEUED = "queued"
     RUNNING = "running"
     REVIEW = "review"

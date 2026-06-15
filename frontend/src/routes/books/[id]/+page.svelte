@@ -8,14 +8,14 @@
 		fetchLatestRun,
 		resumeExtraction,
 		triggerExtraction,
-		type ExtractionRun,
+		type TaskRun,
 		type ReviewAnswer,
 		type ReviewQuestion
-	} from '$lib/api/extraction';
+	} from '$lib/api/task-runs';
 
 	let status = $state<'loading' | 'error' | 'ready'>('loading');
 	let book = $state<BookDetailData | null>(null);
-	let latestRun = $state<ExtractionRun | null>(null);
+	let latestRun = $state<TaskRun | null>(null);
 
 	// Only a run paused at review surfaces a question; everything else shows nothing.
 	let review = $derived<ReviewQuestion | null>(

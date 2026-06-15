@@ -7,8 +7,8 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base, UUIDAuditBase
 
 if TYPE_CHECKING:
-    from app.models.extraction import ExtractionRun
     from app.models.recipe import Keyword, Recipe
+    from app.models.task_run import TaskRun
 
 
 book_keywords = Table(
@@ -45,7 +45,8 @@ class Book(UUIDAuditBase):
     recipes: Mapped[list["Recipe"]] = relationship(
         back_populates="book", cascade="all, delete-orphan"
     )
-    extraction_runs: Mapped[list["ExtractionRun"]] = relationship(
+    # Only extraction task runs carry a book_id, so this lists this book's extractions.
+    extraction_runs: Mapped[list["TaskRun"]] = relationship(
         back_populates="book", cascade="all, delete-orphan"
     )
     # AI-generated book-level tags (cuisine/theme/style), drawn from the same shared

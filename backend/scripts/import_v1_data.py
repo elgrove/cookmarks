@@ -37,21 +37,54 @@ COPIES: list[tuple[str, list[str], str]] = [
         "SELECT id, created_at, updated_at, name, is_default FROM core_recipelist",
     ),
     (
-        "extraction_runs",
-        ["id", "created_at", "updated_at", "book_id", "provider_name", "model_name",
-         "extraction_method", "status", "started_at", "completed_at", "total_chapters",
-         "chapters_processed", "recipes_found", "images_in_separate_chapters",
-         "images_can_be_matched", "cost_usd", "input_tokens", "output_tokens", "errors"],
-        """SELECT id, created_at, updated_at, book_id, provider_name, model_name,
-                  extraction_method, status, started_at, completed_at, total_chapters,
-                  chapters_processed, recipes_found, images_in_separate_chapters,
-                  images_can_be_matched, cost_usd, input_tokens, output_tokens, errors
+        # v1's ExtractionReport becomes one task_type of the unified task_runs table.
+        "task_runs",
+        [
+            "id",
+            "created_at",
+            "updated_at",
+            "task_type",
+            "detail",
+            "book_id",
+            "provider_name",
+            "model_name",
+            "extraction_method",
+            "status",
+            "started_at",
+            "completed_at",
+            "total_chapters",
+            "chapters_processed",
+            "recipes_found",
+            "images_in_separate_chapters",
+            "images_can_be_matched",
+            "cost_usd",
+            "input_tokens",
+            "output_tokens",
+            "errors",
+        ],
+        """SELECT id, created_at, updated_at, 'extraction', '{}', book_id,
+                  provider_name, model_name, extraction_method, status, started_at,
+                  completed_at, total_chapters, chapters_processed, recipes_found,
+                  images_in_separate_chapters, images_can_be_matched, cost_usd,
+                  input_tokens, output_tokens, errors
            FROM core_extractionreport""",
     ),
     (
         "recipes",
-        ["id", "created_at", "updated_at", "book_id", "extraction_run_id", "order",
-         "name", "description", "ingredients", "instructions", "yields", "image"],
+        [
+            "id",
+            "created_at",
+            "updated_at",
+            "book_id",
+            "extraction_run_id",
+            "order",
+            "name",
+            "description",
+            "ingredients",
+            "instructions",
+            "yields",
+            "image",
+        ],
         """SELECT id, created_at, updated_at, book_id, extraction_report_id, "order",
                   name, description, COALESCE(ingredients, '[]'),
                   COALESCE(instructions, '[]'), yields, image
@@ -66,8 +99,14 @@ COPIES: list[tuple[str, list[str], str]] = [
 
 # Reverse of insertion order, for FK-safe clearing.
 DELETE_ORDER = [
-    "config", "recipe_list_items", "recipe_keywords", "recipes",
-    "extraction_runs", "recipe_lists", "keywords", "books",
+    "config",
+    "recipe_list_items",
+    "recipe_keywords",
+    "recipes",
+    "task_runs",
+    "recipe_lists",
+    "keywords",
+    "books",
 ]
 
 
@@ -153,12 +192,9 @@ def copy_config(src: sqlite3.Connection, tgt: sqlite3.Connection) -> int:
     valid = {p.value for p in AIProvider}
     rows = src.execute("SELECT id, ai_provider, api_key FROM core_config").fetchall()
     out = [
-        (cid, provider if provider in valid else None, key or None)
-        for cid, provider, key in rows
+        (cid, provider if provider in valid else None, key or None) for cid, provider, key in rows
     ]
-    tgt.executemany(
-        "INSERT INTO config (id, ai_provider, api_key) VALUES (?, ?, ?)", out
-    )
+    tgt.executemany("INSERT INTO config (id, ai_provider, api_key) VALUES (?, ?, ?)", out)
     tgt.commit()
     return len(out)
 
@@ -173,9 +209,7 @@ def copy_embeddings(src: sqlite3.Connection, tgt: sqlite3.Connection) -> int:
     cursor = src.execute("SELECT recipe_id, embedding FROM recipe_embeddings")
     total = 0
     while batch := cursor.fetchmany(EMBEDDING_BATCH):
-        tgt.executemany(
-            "INSERT INTO recipe_embeddings (recipe_id, embedding) VALUES (?, ?)", batch
-        )
+        tgt.executemany("INSERT INTO recipe_embeddings (recipe_id, embedding) VALUES (?, ?)", batch)
         total += len(batch)
     tgt.commit()
     return total

@@ -1,5 +1,5 @@
 <script module lang="ts">
-	import type { ReviewQuestion } from '$lib/api/extraction';
+	import type { ReviewQuestion } from '$lib/api/task-runs';
 
 	export type ReviewPromptProps = {
 		/** The pending question on a run paused at REVIEW, or null when nothing awaits an

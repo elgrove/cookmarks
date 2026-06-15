@@ -47,7 +47,7 @@
 	import { keywordHref } from '$lib/api/recipes';
 	import ExtractButton from '$lib/components/ExtractButton.svelte';
 	import ReviewPrompt from '$lib/components/ReviewPrompt.svelte';
-	import type { ReviewQuestion } from '$lib/api/extraction';
+	import type { ReviewQuestion } from '$lib/api/task-runs';
 
 	let {
 		book,

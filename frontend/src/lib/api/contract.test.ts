@@ -18,7 +18,7 @@ import {
 	similarRecipesSchema
 } from './recipes';
 import { listDetailSchema, listMembershipSchema, listSummarySchema } from './lists';
-import { extractionRunSchema, reviewQuestionSchema } from './extraction';
+import { taskRunSchema, reviewQuestionSchema } from './task-runs';
 import { configSchema } from './config';
 import { taskRunAckSchema } from './tasks';
 
@@ -151,22 +151,22 @@ describe('api wire contract', () => {
 		expect(() => listMembershipSchema.parse(drifted)).toThrow();
 	});
 
-	it('accepts the extraction-run example', () => {
-		expect(() => extractionRunSchema.parse(load('extractionrun.example.json'))).not.toThrow();
+	it('accepts the task-run example', () => {
+		expect(() => taskRunSchema.parse(load('taskrun.example.json'))).not.toThrow();
 	});
 
-	it('rejects an extraction-run example with a drifted field name', () => {
-		const example = load('extractionrun.example.json');
-		const { chapters_processed, ...rest } = example;
-		const drifted = { ...rest, chaptersProcessed: chapters_processed };
-		expect(() => extractionRunSchema.parse(drifted)).toThrow();
+	it('rejects a task-run example with a drifted field name', () => {
+		const example = load('taskrun.example.json');
+		const { task_type, ...rest } = example;
+		const drifted = { ...rest, taskType: task_type };
+		expect(() => taskRunSchema.parse(drifted)).toThrow();
 	});
 
-	it('rejects an extraction-run example with a drifted book_title', () => {
-		const example = load('extractionrun.example.json');
+	it('rejects a task-run example with a drifted book_title', () => {
+		const example = load('taskrun.example.json');
 		const { book_title, ...rest } = example;
 		const drifted = { ...rest, bookTitle: book_title };
-		expect(() => extractionRunSchema.parse(drifted)).toThrow();
+		expect(() => taskRunSchema.parse(drifted)).toThrow();
 	});
 
 	it('accepts the review-question example', () => {
@@ -180,13 +180,13 @@ describe('api wire contract', () => {
 		expect(() => reviewQuestionSchema.parse(drifted)).toThrow();
 	});
 
-	it('accepts an extraction run paused at review with a pending question', () => {
+	it('accepts a task run paused at review with a pending question', () => {
 		const example = {
-			...load('extractionrun.example.json'),
+			...load('taskrun.example.json'),
 			status: 'review',
 			pending_question: load('reviewquestion.example.json')
 		};
-		expect(() => extractionRunSchema.parse(example)).not.toThrow();
+		expect(() => taskRunSchema.parse(example)).not.toThrow();
 	});
 
 	it('accepts the config example', () => {
@@ -200,12 +200,12 @@ describe('api wire contract', () => {
 		expect(() => configSchema.parse(drifted)).toThrow();
 	});
 
-	it('accepts the task-run example', () => {
-		expect(() => taskRunAckSchema.parse(load('taskrun.example.json'))).not.toThrow();
+	it('accepts the task-run-ack example', () => {
+		expect(() => taskRunAckSchema.parse(load('taskrunack.example.json'))).not.toThrow();
 	});
 
-	it('rejects a task-run example with a drifted field name', () => {
-		const example = load('taskrun.example.json');
+	it('rejects a task-run-ack example with a drifted field name', () => {
+		const example = load('taskrunack.example.json');
 		const { queued, ...rest } = example;
 		const drifted = { ...rest, books_queued: queued };
 		expect(() => taskRunAckSchema.parse(drifted)).toThrow();

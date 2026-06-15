@@ -5,26 +5,26 @@
 		type ConfigSettingsConfig
 	} from '$lib/components/ConfigSettings.svelte';
 	import TasksPanel from '$lib/components/TasksPanel.svelte';
-	import ExtractionsPanel from '$lib/components/ExtractionsPanel.svelte';
+	import TaskRunsPanel from '$lib/components/TaskRunsPanel.svelte';
 	import { fetchConfig, updateConfig, type Config, type ConfigUpdate } from '$lib/api/config';
-	import { triggerBookKeywords, triggerDedupKeywords } from '$lib/api/tasks';
-	import { fetchExtractionRuns, type ExtractionRun } from '$lib/api/extraction';
+	import { triggerBookKeywords, triggerDedupKeywords, triggerCalibreSync } from '$lib/api/tasks';
+	import { fetchTaskRuns, type TaskRun } from '$lib/api/task-runs';
 	import { pageTitle } from '$lib/title';
 
 	const tabs: AdminTab[] = [
 		{ id: 'settings', label: 'Settings' },
 		{ id: 'tasks', label: 'Tasks' },
-		{ id: 'extractions', label: 'Extractions' }
+		{ id: 'task-runs', label: 'Task Runs' }
 	];
 	let active = $state('settings');
 
 	let status = $state<'loading' | 'error' | 'ready'>('loading');
 	let config = $state<Config | null>(null);
 
-	// Extraction history loads lazily the first time its tab is opened, with its own state
+	// Task-run history loads lazily the first time its tab is opened, with its own state
 	// so a settings failure (or never opening this tab) never touches it.
 	let runsStatus = $state<'idle' | 'loading' | 'error' | 'ready'>('idle');
-	let runs = $state<ExtractionRun[]>([]);
+	let runs = $state<TaskRun[]>([]);
 
 	// Map the snake_case wire shape to the component's camelCase props.
 	let settingsConfig = $derived<ConfigSettingsConfig | null>(
@@ -60,17 +60,17 @@
 	async function loadRuns() {
 		runsStatus = 'loading';
 		try {
-			runs = await fetchExtractionRuns();
+			runs = await fetchTaskRuns();
 			runsStatus = 'ready';
 		} catch (err) {
-			console.error('failed to load extraction runs', err);
+			console.error('failed to load task runs', err);
 			runsStatus = 'error';
 		}
 	}
 
 	function selectTab(id: string) {
 		active = id;
-		if (id === 'extractions' && runsStatus === 'idle') loadRuns();
+		if (id === 'task-runs' && runsStatus === 'idle') loadRuns();
 	}
 
 	onMount(load);
@@ -100,15 +100,16 @@
 		<TasksPanel
 			onRun={({ regenerate }) => triggerBookKeywords(regenerate)}
 			onDedup={() => triggerDedupKeywords()}
+			onSync={() => triggerCalibreSync()}
 		/>
-	{:else if active === 'extractions'}
+	{:else if active === 'task-runs'}
 		{#if runsStatus === 'ready'}
-			<ExtractionsPanel {runs} />
+			<TaskRunsPanel {runs} />
 		{:else if runsStatus === 'error'}
-			<p class="msg">Couldn’t load extraction history.</p>
+			<p class="msg">Couldn’t load task-run history.</p>
 			<button class="retry" onclick={loadRuns}>Try again</button>
 		{:else}
-			<p class="msg">Loading extraction history…</p>
+			<p class="msg">Loading task-run history…</p>
 		{/if}
 	{/if}
 </section>

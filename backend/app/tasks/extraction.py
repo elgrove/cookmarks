@@ -8,9 +8,9 @@ from sqlalchemy.orm import Session
 from app.covers import epub_path
 from app.db import SessionLocal
 from app.models.book import Book
-from app.models.enums import ExtractionStatus
-from app.models.extraction import ExtractionRun
+from app.models.enums import TaskStatus, TaskType
 from app.models.recipe import Recipe
+from app.models.task_run import TaskRun
 from app.schemas.extraction import RecipeData
 from app.services.ai import get_config
 from app.services.book_keywords import generate_book_keywords
@@ -43,10 +43,10 @@ def _mark_run_failed(extraction_id: str, exc: Exception) -> None:
     in RUNNING forever. Best-effort: a failure here must not mask the original."""
     try:
         with SessionLocal() as session:
-            run = session.get(ExtractionRun, uuid.UUID(extraction_id))
+            run = session.get(TaskRun, uuid.UUID(extraction_id))
             if run is None:
                 return
-            run.status = ExtractionStatus.FAILED
+            run.status = TaskStatus.FAILED
             run.errors = [*run.errors, str(exc)]
             run.completed_at = datetime.now(UTC)
             session.commit()
@@ -76,7 +76,7 @@ def _generate_book_keywords(session: Session, book: Book) -> None:
         logger.exception(f"Book-keyword generation failed for {book.title}")
 
 
-def _upsert_recipe(session: Session, book: Book, run: ExtractionRun, data: RecipeData) -> Recipe:
+def _upsert_recipe(session: Session, book: Book, run: TaskRun, data: RecipeData) -> Recipe:
     """Reconcile by normalised name within the book: update the existing recipe in
     place if one matches, else create it. Identity is stable across re-extraction so
     favourites and list membership survive a re-run."""
@@ -100,7 +100,7 @@ def _upsert_recipe(session: Session, book: Book, run: ExtractionRun, data: Recip
 
 
 def save_recipes_from_graph_state(
-    session: Session, book: Book, run: ExtractionRun, raw_recipes: list[dict]
+    session: Session, book: Book, run: TaskRun, raw_recipes: list[dict]
 ) -> int:
     logger.info(f"Saving {len(raw_recipes)} recipes for {book.title}")
 
@@ -126,15 +126,15 @@ def _finalise_result(run_id: str, result: dict | None) -> str:
     the review pause. `result` is the graph's final state (None never reaches here on
     a completed run, but is tolerated)."""
     with SessionLocal() as session:
-        run = session.get(ExtractionRun, uuid.UUID(run_id))
+        run = session.get(TaskRun, uuid.UUID(run_id))
         if run is None:
             return "Extraction run not found"
 
-        if run.status == ExtractionStatus.REVIEW:
+        if run.status == TaskStatus.REVIEW:
             logger.info(f"Extraction paused for review: run {run_id}")
             return f"Extraction paused for review. Check run {run_id}"
 
-        if run.status == ExtractionStatus.DONE:
+        if run.status == TaskStatus.DONE:
             book = session.get(Book, run.book_id)
             if book is None:
                 return "Book not found"
@@ -148,22 +148,26 @@ def _finalise_result(run_id: str, result: dict | None) -> str:
 
 def extract_recipes_from_book(book_id: str, extraction_id: str | None = None) -> str:
     """Run extraction for a book to completion or to the human-review pause. Creates a
-    new ExtractionRun unless an existing one is supplied (e.g. a retry)."""
+    new TaskRun unless an existing one is supplied (e.g. a retry)."""
     with SessionLocal() as session:
         book = session.get(Book, uuid.UUID(book_id))
         if book is None:
             logger.error(f"Book with id {book_id} not found")
             return "Book not found"
 
-        run: ExtractionRun | None = None
+        run: TaskRun | None = None
         if extraction_id:
-            run = session.get(ExtractionRun, uuid.UUID(extraction_id))
+            run = session.get(TaskRun, uuid.UUID(extraction_id))
         if run is None:
             config = get_config(session)
-            run = ExtractionRun(book_id=book.id, provider_name=config.ai_provider)
+            run = TaskRun(
+                task_type=TaskType.EXTRACTION,
+                book_id=book.id,
+                provider_name=config.ai_provider,
+            )
             session.add(run)
 
-        run.status = ExtractionStatus.RUNNING
+        run.status = TaskStatus.RUNNING
         run.started_at = datetime.now(UTC)
         session.commit()
 
@@ -194,10 +198,10 @@ def resume_extraction(extraction_id: str, human_response: str) -> str:
         )
 
     with SessionLocal() as session:
-        run = session.get(ExtractionRun, uuid.UUID(extraction_id))
+        run = session.get(TaskRun, uuid.UUID(extraction_id))
         if run is None:
             return "Extraction run not found"
-        if run.status != ExtractionStatus.REVIEW:
+        if run.status != TaskStatus.REVIEW:
             return "This extraction is not awaiting review."
         run_id = str(run.id)
 
