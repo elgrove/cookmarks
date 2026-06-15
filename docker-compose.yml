@@ -7,9 +7,5 @@ services:
     ports:
       - "8789:8789"
     volumes:
-      # SQLite DB, embeddings and the internal Redis dump.
       - ./data:/data
-      # Optional: mount a Calibre library to enable book sync.
-      # - /path/to/calibre-all:/calibre:ro
-      #   then set COOKMARKS_CALIBRE_LIBRARY_PATH=/calibre
     restart: unless-stopped
