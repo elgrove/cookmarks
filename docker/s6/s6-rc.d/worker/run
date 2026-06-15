@@ -1,0 +1,5 @@
+#!/command/with-contenv sh
+# Celery worker: runs extraction and the maintenance tasks off the request thread.
+cd /app
+exec uv run celery -A app.tasks.celery_app:celery_app worker \
+    --loglevel=info --concurrency=1

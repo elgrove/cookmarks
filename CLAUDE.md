@@ -52,6 +52,10 @@ Run from the repo root unless noted.
 - Single backend test: `cd backend && uv run pytest tests/test_health.py::test_health`.
 - Single frontend test file: `cd frontend && npx vitest run src/lib/verify/harness.test.ts`.
 
+## Docker (single-container deploy)
+
+`docker compose up -d --build` ships the whole stack — Redis, uvicorn (API + built SPA), and the Celery worker — in **one container** supervised by **s6-overlay**, serving on `8789`. The three-stage `Dockerfile` builds the SPA (`node:20`), unpacks s6-overlay, and runs on `python:3.11-slim` (deps via `uv sync --frozen --no-dev`). s6 service defs live in `docker/s6/` (copied to `/etc/s6-overlay/`): oneshots `data-dirs` → `db-init` (alembic upgrade head), longruns `redis`/`api`/`worker`. SQLite DB + embeddings + the Redis dump persist on the `./data:/data` bind-mount (`COOKMARKS_DB_PATH=/data/db.sqlite3`); the AI key is set at runtime via the settings UI (DB `Config`), not an env secret. **Gotcha:** a oneshot s6 `up` is an execline line, so a `with-contenv` shebang in it is ignored — `db-init/up` therefore execs the real script `docker/s6/scripts/db-init` (whose shebang pulls in the env so alembic targets the volume DB, not the in-image default).
+
 ## Data layer
 
 SQLite (`backend/db.sqlite3` by default; `COOKMARKS_DB_PATH` overrides — see `app/config.py`). `app/db.py` loads the **sqlite-vec** extension and sets `PRAGMA foreign_keys=ON` on every connection (SQLite ignores foreign keys and `ON DELETE` otherwise).
