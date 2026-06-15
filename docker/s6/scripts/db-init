@@ -1,0 +1,7 @@
+#!/command/with-contenv sh
+# Apply Alembic migrations before any longrun starts. A oneshot `up` is an
+# execline command line, so it can't carry a with-contenv shebang itself — it
+# execs this script, whose shebang pulls in the container environment so
+# COOKMARKS_DB_PATH points at the mounted DB rather than the in-image default.
+cd /app
+exec uv run python -m alembic upgrade head

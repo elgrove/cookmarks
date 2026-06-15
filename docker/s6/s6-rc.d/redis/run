@@ -1,0 +1,8 @@
+#!/command/with-contenv sh
+# Container-internal Redis: Celery broker (db 0) + result backend (db 1).
+# Bound to loopback only; never published off the container.
+exec redis-server \
+    --bind 127.0.0.1 --port 6379 \
+    --dir /data/redis \
+    --save 60 1000 --appendonly no \
+    --loglevel notice

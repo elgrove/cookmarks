@@ -1612,3 +1612,39 @@ Calibre run) plus the filter act and the expectFail sentinels.
 **Verified.** Backend: ruff + ty clean, 229 pytest (new task-run persistence + filter + Calibre-failure
 tests). Frontend: svelte-check 0/0, 125 vitest incl. the verify matrix (77). `make build` clean. Migration
 exercised end-to-end against a seeded copy at the prior head.
+
+## 2026-06-15 — Single-container Docker packaging (s6-overlay)
+
+**Context.** The app previously had no container packaging — prod meant running honcho
+(or four bare processes) on a host. Added a `Dockerfile` + `docker-compose.yml` that ship
+the whole stack — Redis, FastAPI/uvicorn serving the API and the built SPA, and the Celery
+worker — in **one container** supervised by **s6-overlay**, in the style of `elgrove/clipcast`.
+
+**Image.** Three-stage build: (1) `node:20-slim` builds the SvelteKit SPA; (2) `alpine`
+fetches the multi-arch s6-overlay tarballs; (3) `python:3.11-slim` runtime — `redis-server`
++ `sqlite3` from apt, deps via `uv sync --frozen --no-dev`, backend source, the built SPA
+copied to `/app/static/frontend`, and s6-overlay unpacked (amd64/arm64 by `TARGETARCH`).
+`ENTRYPOINT ["/init"]`. Image env pins `COOKMARKS_{ENV,DB_PATH,FRONTEND_DIST}`; `EXPOSE 8789`
+(the prod web slot). sqlite-vec needs no apt package — it rides in via the pip dependency.
+
+**Services** (`docker/s6/s6-rc.d/`, copied to `/etc/s6-overlay/`): oneshots `data-dirs`
+(mkdir the `/data` volume) → `db-init` (alembic upgrade head); longruns `redis`, `api`,
+`worker`, each depending on `db-init` + `redis`. The user bundle lists all five.
+
+**The one real gotcha.** A oneshot `up` is an **execline** command line, not a program, so a
+`#!/command/with-contenv sh` shebang in it is silently ignored — the command runs *without*
+the container environment. First cut put alembic directly in `db-init/up`; it migrated the
+in-image default `/app/db.sqlite3` while the (with-contenv'd) longruns correctly used the
+volume's `/data/db.sqlite3`, so `/api/books` 500'd against an empty DB. Fix (the clipcast
+pattern): the oneshot `up` execs a real script file `docker/s6/scripts/db-init` whose own
+shebang pulls in the env. Longrun `run` files are exec'd as programs, so their shebang works.
+
+**Compose.** Single `cookmarks` service, `8789:8789`, `./data:/data` (SQLite DB + embeddings
++ Redis dump), internal Redis on loopback, commented Calibre-library mount. The AI key is a DB
+`Config` column set via the settings UI, so no secret is needed in compose.
+
+**Verified.** Image builds (amd64); container boots all services clean; `/`, `/api/health`,
+`/api/books`, `/api/recipes` all 200; SPA + deep links serve; worker registers every task and
+reports ready; alembic lands on `/data/db.sqlite3` and survives a restart (idempotent); the
+`docker compose up` path verified end-to-end (on an alternate host port — 8789 was already held
+by an unrelated long-running container, left untouched). `data/` added to `.gitignore`.

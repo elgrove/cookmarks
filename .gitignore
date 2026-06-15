@@ -22,6 +22,9 @@ frontend/build/
 .env
 .DS_Store
 
+# Docker: the compose bind-mount holding the runtime SQLite DB + Redis dump.
+/data/
+
 # Playwright MCP (screenshots, traces) + ad-hoc review screenshots at repo root.
 # Screenshots are for PR review only — never committed to the repo.
 .playwright-mcp/
