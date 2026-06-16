@@ -14,6 +14,11 @@ services:
       - ${COOKMARKS_CALIBRE_LIBRARY:-./calibre-library}:/library:ro
     environment:
       - COOKMARKS_CALIBRE_LIBRARY_PATH=/library
+      # Optional: enables the footer "Submit a ticket" link, which files issues into
+      # the Cookmarks Linear project. The link stays hidden until the key + team are set.
+      - COOKMARKS_LINEAR_API_KEY=${COOKMARKS_LINEAR_API_KEY:-}
+      - COOKMARKS_LINEAR_TEAM_ID=${COOKMARKS_LINEAR_TEAM_ID:-}
+      - COOKMARKS_LINEAR_PROJECT_ID=${COOKMARKS_LINEAR_PROJECT_ID:-}
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8789/api/health"]
       interval: 30s

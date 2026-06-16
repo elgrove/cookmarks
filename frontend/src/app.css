@@ -234,8 +234,28 @@ main {
 	color: var(--ink);
 }
 
-.foot-note {
+/* Footer "Submit a ticket" link — pinned to the trailing edge, opens the ticket
+   modal (files a Linear issue). Underline-led so colour isn't the only signal (§8). */
+.foot-ticket {
+	margin-left: auto;
+	font-family: var(--f-grotesk);
+	font-size: 0.85rem;
 	color: var(--muted);
+	background: none;
+	border: none;
+	padding: 0;
+	cursor: pointer;
+	text-decoration: underline;
+	text-underline-offset: 3px;
+	text-decoration-color: var(--line-strong);
+	transition:
+		color 0.18s var(--ease-out),
+		text-decoration-color 0.18s var(--ease-out);
+}
+
+.foot-ticket:hover {
+	color: var(--clay-deep);
+	text-decoration-color: var(--clay-deep);
 }
 
 /* Motion — DESIGN §3.4. Entrance only; content is visible at rest (fill-mode both). */

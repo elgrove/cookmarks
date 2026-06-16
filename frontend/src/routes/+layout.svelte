@@ -11,12 +11,26 @@
 	import { onMount } from 'svelte';
 	import { installVerifyHandle } from '$lib/verify/handle';
 	import { initTheme } from '$lib/theme';
+	import { fetchTicketsEnabled, submitTicket } from '$lib/api/tickets';
+	import TicketModal from '$lib/components/TicketModal.svelte';
 	import '../app.css';
 
 	let { children } = $props();
 
 	onMount(installVerifyHandle);
 	onMount(initTheme);
+
+	// The footer "Submit a ticket" link only appears when the backend's Linear
+	// integration is configured; the modal files the issue via POST /api/tickets.
+	let ticketsEnabled = $state(false);
+	let ticketOpen = $state(false);
+	onMount(async () => {
+		try {
+			ticketsEnabled = await fetchTicketsEnabled();
+		} catch {
+			ticketsEnabled = false;
+		}
+	});
 
 	// The EPUB reader is an immersive, full-viewport view with its own chrome — suppress the
 	// global nav/footer there (as the verify harness already does via ?chrome=0).
@@ -67,6 +81,14 @@
 {#if showChrome}
 	<footer class="foot">
 		<span class="foot-mark">Cookmarks</span>
-		<span class="foot-note mono">Personal recipe archive · self-hosted</span>
+		{#if ticketsEnabled}
+			<button class="foot-ticket" type="button" onclick={() => (ticketOpen = true)}>
+				Submit a ticket
+			</button>
+		{/if}
 	</footer>
+
+	{#if ticketsEnabled}
+		<TicketModal bind:open={ticketOpen} onSubmit={submitTicket} />
+	{/if}
 {/if}

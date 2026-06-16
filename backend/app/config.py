@@ -36,5 +36,12 @@ class Settings(BaseSettings):
     celery_broker_url: str = "redis://localhost:6379/0"
     celery_result_backend: str = "redis://localhost:6379/1"
 
+    # Linear "Submit a ticket" integration — all supplied via the environment
+    # (COOKMARKS_LINEAR_*). The footer link stays hidden until both an API key and a
+    # team are set; the project is optional. See .env.example for the values.
+    linear_api_key: str = ""
+    linear_team_id: str = ""
+    linear_project_id: str = ""
+
 
 settings = Settings()

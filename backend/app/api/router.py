@@ -10,6 +10,7 @@ from app.api import (
     recipes,
     task_runs,
     tasks,
+    tickets,
 )
 
 api_router = APIRouter(prefix="/api")
@@ -22,3 +23,4 @@ api_router.include_router(lists.router)
 api_router.include_router(config.router)
 api_router.include_router(tasks.router)
 api_router.include_router(task_runs.router)
+api_router.include_router(tickets.router)
