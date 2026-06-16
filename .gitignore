@@ -35,6 +35,23 @@ docs/screenshots/
 # Claude Code (local config + sub-worktrees)
 .claude/
 
+# Agent / design artefacts — kept locally, never committed.
+CLAUDE.md
+AGENTS.md
+DESIGN.md
+design/
+
+# IDE
+.idea/
+.vscode/
+
+# Local data, secrets & collected static (underscore-prefixed dirs are local fixtures).
+_books/
+_eval/
+_test_calibre/
+_django_secret_key.txt
+staticfiles/
+
 # Eval suite: throwaway DB (also matched by *.sqlite3) + bulky per-run artefacts.
 # The append-only ledger backend/evals/index.jsonl is kept (committable history).
 backend/evals/runs/
