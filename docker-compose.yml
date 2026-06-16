@@ -8,4 +8,16 @@ services:
       - "8789:8789"
     volumes:
       - ./data:/data
+      # The Calibre library covers, EPUBs, recipe images and extraction all read
+      # from. Point COOKMARKS_CALIBRE_LIBRARY at the host library (in .env or the
+      # environment); it mounts read-only at the in-container path the app expects.
+      - ${COOKMARKS_CALIBRE_LIBRARY:-./calibre-library}:/library:ro
+    environment:
+      - COOKMARKS_CALIBRE_LIBRARY_PATH=/library
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8789/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     restart: unless-stopped

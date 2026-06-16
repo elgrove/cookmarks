@@ -1658,3 +1658,28 @@ book sync is wanted (`-v …:/calibre:ro` + `COOKMARKS_CALIBRE_LIBRARY_PATH=/cal
 reports ready; alembic lands on `/data/db.sqlite3` and survives a restart (idempotent); the
 `docker compose up` path verified end-to-end (on an alternate host port — 8789 was already held
 by an unrelated long-running container, left untouched). `data/` added to `.gitignore`.
+
+## Deploy hardening — Calibre mount, healthcheck, pinned base images
+
+A pre-production audit caught three gaps in the Docker setup. Fixed in `docker-compose.yml`
++ `Dockerfile`.
+
+**Calibre library is now a first-class compose mount.** The original compose only mounted
+`./data:/data` and treated the library as an ad-hoc `-v` for book sync. But covers, recipe
+images, EPUB download and the in-app reader all read from it too — without it those features
+404 in the container (the in-container default `Path.home()/books/calibre-all` →
+`/root/books/calibre-all` doesn't exist). Compose now mounts
+`${COOKMARKS_CALIBRE_LIBRARY:-./calibre-library}:/library:ro` and sets
+`COOKMARKS_CALIBRE_LIBRARY_PATH=/library`, so the operator points one env var at the host
+library and every file-serving feature works.
+
+**Healthcheck.** Added `curl` to the runtime image and a compose `healthcheck` hitting
+`/api/health` (`curl -fsS`, 30s interval, 20s start period) so Docker can detect a wedged
+container instead of reporting it up while the API is dead.
+
+**Pinned base images** for reproducible builds: `node:20.20.2-slim`, `alpine:3.23`,
+`python:3.11.14-slim` (were floating `node:20-slim` / `alpine` / `python:3.11-slim`).
+
+**Verified.** Image rebuilds clean with the pinned tags; container boots in `prod`; the exact
+healthcheck command (`curl -fsS http://localhost:8789/api/health`) runs inside the container
+and exits 0.

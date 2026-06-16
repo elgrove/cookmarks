@@ -2,7 +2,7 @@
 # worker, all supervised by s6-overlay.
 
 # Stage 1: build the Svelte SPA.
-FROM node:20-slim AS frontend-build
+FROM node:20.20.2-slim AS frontend-build
 WORKDIR /app/frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
@@ -10,7 +10,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # Stage 2: fetch the s6-overlay tarballs (multi-arch).
-FROM alpine AS s6-stage
+FROM alpine:3.23 AS s6-stage
 ARG S6_OVERLAY_VERSION=3.2.0.2
 RUN apk add --no-cache wget
 RUN wget -q "https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz" -O /s6-noarch.tar.xz \
@@ -18,7 +18,7 @@ RUN wget -q "https://github.com/just-containers/s6-overlay/releases/download/v${
     && wget -q "https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-aarch64.tar.xz" -O /s6-aarch64.tar.xz
 
 # Stage 3: Python backend + Redis + s6-overlay.
-FROM python:3.11-slim AS runtime
+FROM python:3.11.14-slim AS runtime
 ARG TARGETARCH
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -26,6 +26,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     sqlite3 \
     xz-utils \
     ca-certificates \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
