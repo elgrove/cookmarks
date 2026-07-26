@@ -14,6 +14,7 @@ full corpus); cheap enough for an on-demand lookup off the page's critical path.
 
 import struct
 import uuid
+from collections.abc import Iterable
 
 import sqlite_vec
 from sqlalchemy import text
@@ -91,6 +92,16 @@ class VectorStore:
             text("INSERT INTO recipe_embeddings (recipe_id, embedding) VALUES (:rid, :emb)"),
             {"rid": key, "emb": sqlite_vec.serialize_float32(embedding)},
         )
+
+    def delete(self, recipe_ids: Iterable[uuid.UUID]) -> None:
+        """Drop the stored vectors for `recipe_ids`. The vec0 table has no foreign key to
+        `recipes`, so deleting a recipe has to call this or its embedding lingers and
+        keeps surfacing in search."""
+        for recipe_id in recipe_ids:
+            self._session.execute(
+                text("DELETE FROM recipe_embeddings WHERE recipe_id = :rid"),
+                {"rid": self._key(recipe_id)},
+            )
 
     def embedded_ids(self) -> set[uuid.UUID]:
         """The ids of every recipe that already has a stored vector (for backfill)."""

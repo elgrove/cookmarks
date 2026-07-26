@@ -181,8 +181,10 @@
 			<h2 class="name">Sync Calibre library</h2>
 			<p class="desc">
 				Re-read the Calibre library and reconcile it — add newly-tagged cookbooks, refresh changed
-				metadata, and flag books that have left the selection. Recipes, favourites and lists are
-				never touched. The run's result (created, updated, orphaned) lands in Task Runs.
+				metadata, flag books that have left the tag/format selection, and remove books deleted
+				from the library along with their recipes. Recipes, favourites and lists are untouched
+				for books that remain. The run's result (created, updated, orphaned, deleted) lands in
+				Task Runs.
 			</p>
 		</div>
 

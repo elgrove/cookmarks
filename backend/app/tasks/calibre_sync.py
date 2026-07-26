@@ -11,7 +11,7 @@ import logging
 
 from app.config import settings
 from app.db import SessionLocal
-from app.services.calibre import read_calibre_books, sync_calibre
+from app.services.calibre import read_calibre_books, read_library_book_ids, sync_calibre
 from app.tasks.celery_app import celery_app
 from app.tasks.runs import complete_run, fail_run, start_run
 
@@ -26,19 +26,21 @@ def enqueue_calibre_sync(run_id: str) -> None:
 
 def run_calibre_sync() -> dict:
     """Read the configured Calibre library and reconcile it, returning the created/
-    updated/orphaned book titles. Raises (FileNotFoundError) if the library's
+    updated/orphaned/deleted book titles. Raises (FileNotFoundError) if the library's
     metadata.db is absent — recorded as a FAILED run by the task wrapper."""
     books = read_calibre_books(
         settings.calibre_library_path,
         tag=settings.calibre_sync_tag,
         book_format=settings.calibre_sync_format,
     )
+    library_ids = read_library_book_ids(settings.calibre_library_path)
     with SessionLocal() as session:
-        result = sync_calibre(session, books)
+        result = sync_calibre(session, books, library_ids=library_ids)
     return {
         "created": result.created,
         "updated": result.updated,
         "orphaned": result.orphaned,
+        "deleted": result.deleted,
     }
 
 

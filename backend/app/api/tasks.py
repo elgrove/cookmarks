@@ -58,7 +58,7 @@ def trigger_calibre_sync(session: SessionDep) -> TaskRunAck:
     """Queue a sync of the Calibre library into the v2 DB, upserting books by calibre_id.
     Records a queued TaskRun and dispatches to the worker; the count of books reconciled
     isn't known until the worker reads the library, so `queued` is 0 — the run's `detail`
-    carries the created/updated/orphaned result once it completes."""
+    carries the created/updated/orphaned/deleted result once it completes."""
     run = create_task_run(session, TaskType.CALIBRE_SYNC)
     enqueue_calibre_sync(str(run.id))
     return TaskRunAck(task="calibre_sync", status="queued", queued=0)

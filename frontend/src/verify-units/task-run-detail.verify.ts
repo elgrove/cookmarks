@@ -118,12 +118,17 @@ const unit: VerifiableUnit<Props> = {
 		},
 		{
 			id: 'calibre-sync',
-			description: 'a Calibre sync shows created / updated / orphaned counts',
+			description: 'a Calibre sync shows created / updated / orphaned / deleted counts',
 			props: {
 				run: maintenance({
 					id: 'm3',
 					task_type: 'calibre_sync',
-					detail: { created: ['A Book', 'Another'], updated: ['A Third'], orphaned: [] }
+					detail: {
+						created: ['A Book', 'Another'],
+						updated: ['A Third'],
+						orphaned: [],
+						deleted: ['A Removed Book']
+					}
 				})
 			}
 		},
@@ -272,13 +277,16 @@ const unit: VerifiableUnit<Props> = {
 		},
 		{
 			id: 'calibre-rows',
-			description: 'a Calibre sync shows created/updated/orphaned',
+			description: 'a Calibre sync shows created/updated/orphaned/deleted',
 			onlyFixtures: ['calibre-sync'],
 			check: ({ contract, root }) => {
 				if (contract['task-type'] !== 'calibre_sync') return `task-type=${contract['task-type']}`;
 				const text = root.textContent ?? '';
 				return (
-					(text.includes('Created') && text.includes('Updated') && text.includes('Orphaned')) ||
+					(text.includes('Created') &&
+						text.includes('Updated') &&
+						text.includes('Orphaned') &&
+						text.includes('Deleted')) ||
 					'calibre rows missing'
 				);
 			}
