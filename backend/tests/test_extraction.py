@@ -26,6 +26,7 @@ from app.tasks.extraction import (
     extract_recipes_from_book,
     extract_recipes_from_book_task,
     resume_extraction,
+    resume_extraction_task,
     save_recipes_from_graph_state,
 )
 
@@ -537,6 +538,65 @@ def test_end_to_end_stub_review_then_resume(e2e: tuple[sessionmaker[Session], Pa
         run = s.scalars(select(TaskRun)).one()
         assert run.status == TaskStatus.DONE
         assert run.recipes_found == 2
+
+
+def test_unreadable_epub_fails_the_run_instead_of_asking_for_review(
+    e2e: tuple[sessionmaker[Session], Path],
+) -> None:
+    """A corrupt/DRM'd EPUB reads as zero chapters. The run must FAIL, not sail through
+    an empty extraction and pause asking the human about photos in a book that never
+    opened (which is what shipped: the whole batch's failures showed up as REVIEW)."""
+    factory, library = e2e
+
+    with factory() as s:
+        c = get_config(s)
+        c.ai_provider = AIProviderEnum.STUB
+        s.commit()
+        book = Book(calibre_id=2, title="Corrupt", author="A", path="A/Corrupt (2)")
+        s.add(book)
+        run = TaskRun(task_type=TaskType.EXTRACTION, book_id=book.id, status=TaskStatus.QUEUED)
+        s.add(run)
+        s.commit()
+        book_id, run_id = str(book.id), str(run.id)
+
+    book_dir = library / "A" / "Corrupt (2)"
+    book_dir.mkdir(parents=True)
+    (book_dir / "book.epub").write_bytes(b"not a zip file at all")
+
+    with pytest.raises(ValueError, match="missing or corrupt"):
+        extract_recipes_from_book_task(book_id, run_id)
+
+    with factory() as s:
+        run = s.get(TaskRun, uuid.UUID(run_id))
+        assert run is not None
+        assert run.status == TaskStatus.FAILED
+        assert run.completed_at is not None
+
+
+def test_resume_without_a_checkpoint_fails_the_run(
+    e2e: tuple[sessionmaker[Session], Path],
+) -> None:
+    """Answering the review question on a run whose graph state is gone (DB replaced,
+    or paused by an older build) used to fabricate a stateless resume and die on a bare
+    KeyError, wedging the run in REVIEW forever. It now fails the run with a reason."""
+    factory, _library = e2e
+
+    with factory() as s:
+        book = Book(calibre_id=3, title="Orphan", author="A", path="A/Orphan (3)")
+        s.add(book)
+        run = TaskRun(task_type=TaskType.EXTRACTION, book_id=book.id, status=TaskStatus.REVIEW)
+        s.add(run)
+        s.commit()
+        run_id = str(run.id)
+
+    with pytest.raises(RuntimeError, match="saved graph state is gone"):
+        resume_extraction_task(run_id, "has_images")
+
+    with factory() as s:
+        run = s.get(TaskRun, uuid.UUID(run_id))
+        assert run is not None
+        assert run.status == TaskStatus.FAILED
+        assert any("saved graph state is gone" in e for e in run.errors)
 
 
 def test_resume_rejects_invalid_response() -> None:

@@ -75,6 +75,11 @@ def analyse_epub(state: ExtractionState) -> dict:
         logger.info(f"Analysing EPUB: {epub_path}")
 
         chapter_files = get_chapterlike_files_from_epub(epub_path)
+        if not chapter_files:
+            # A missing/corrupt/DRM'd EPUB reads as zero chapters. Without this the run
+            # extracts nothing, finds no images, and pauses at the review interrupt —
+            # asking the human about photos in a book that never opened.
+            raise ValueError(f"No readable chapters in EPUB {epub_path}; missing or corrupt")
         run.total_chapters = len(chapter_files)
 
         images_in_separate = has_separate_image_chapters(chapter_files)

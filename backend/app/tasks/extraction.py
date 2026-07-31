@@ -207,6 +207,17 @@ def resume_extraction(extraction_id: str, human_response: str) -> str:
 
     graph_config = {"configurable": {"thread_id": _thread_id(run_id)}}
     graph = get_extraction_graph()
+
+    # The checkpoint carries the state the remaining nodes read (report_id, epub_path,
+    # chapter files). If it's gone — DB replaced, run paused by an older build — then
+    # update_state would fabricate a state holding only the answer, and the next node
+    # dies on a bare KeyError, leaving the run wedged in REVIEW. Fail it honestly
+    # instead; re-extracting the book from scratch is the way back.
+    if "report_id" not in graph.get_state(graph_config).values:
+        raise RuntimeError(
+            f"Cannot resume run {run_id}: its saved graph state is gone. Re-run extraction."
+        )
+
     graph.update_state(graph_config, {"human_response": human_response}, as_node="await_human")
     result = graph.invoke(None, graph_config)
 
@@ -227,4 +238,10 @@ def extract_recipes_from_book_task(book_id: str, extraction_id: str | None = Non
 
 @celery_app.task(name="resume_extraction")
 def resume_extraction_task(extraction_id: str, human_response: str) -> str:
-    return resume_extraction(extraction_id, human_response)
+    try:
+        return resume_extraction(extraction_id, human_response)
+    except Exception as exc:
+        # Mirrors the trigger task: without this a crashed resume leaves the run in
+        # REVIEW, still offering the question that just failed to be answered.
+        _mark_run_failed(extraction_id, exc)
+        raise
