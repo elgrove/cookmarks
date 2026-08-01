@@ -82,6 +82,7 @@ export interface CalibreSyncDetail {
 	updated: string[];
 	orphaned: string[];
 	deleted: string[];
+	excluded: string[];
 }
 
 /** Every task run, newest first — the unified admin reporting index. `type` filters to

@@ -53,16 +53,27 @@
 		book,
 		onExtract,
 		review = null,
-		onAnswer
+		onAnswer,
+		onDelete
 	}: {
 		book: BookDetailData;
 		onExtract?: () => Promise<void> | void;
 		review?: ReviewQuestion | null;
 		onAnswer?: (value: string) => Promise<void> | void;
+		onDelete?: (opts: { exclude: boolean }) => Promise<void> | void;
 	} = $props();
 
 	let coverFailed = $state(false);
 	let expanded = $state(false);
+	let deleteMode = $state<'view' | 'confirm'>('view');
+	let exclude = $state(false);
+	let deleted = $state('');
+
+	function confirmDelete() {
+		deleted = exclude ? 'exclude' : 'plain';
+		onDelete?.({ exclude });
+		deleteMode = 'view';
+	}
 	let showCover = $derived(book.hasCover && !coverFailed);
 
 	// Calibre titles pack a subtitle behind a colon; the first segment is the display title.
@@ -86,6 +97,9 @@
 	data-verify-has-epub={book.hasEpub ? 'true' : 'false'}
 	data-verify-empty={book.recipeCount === 0 ? 'true' : 'false'}
 	data-verify-keywords={book.keywords.length}
+	data-verify-delete-mode={deleteMode}
+	data-verify-delete-exclude={exclude ? 'true' : 'false'}
+	data-verify-deleted={deleted}
 >
 	<nav class="crumb" aria-label="Breadcrumb">
 		<a href="/books">Books</a><span class="sep">›</span><a
@@ -179,6 +193,44 @@
 					</a>
 				{/if}
 				<ExtractButton recipeCount={book.recipeCount} {onExtract} />
+				{#if onDelete}
+					{#if deleteMode === 'confirm'}
+						<div class="confirm">
+							<p class="prompt">
+								Delete this book?
+								{#if book.recipeCount > 0}
+									Its {book.recipeCount}
+									{book.recipeCount === 1 ? 'recipe' : 'recipes'} are removed for good.
+								{/if}
+							</p>
+							<label class="exclude">
+								<input type="checkbox" bind:checked={exclude} />
+								Exclude from future Calibre syncs
+							</label>
+							<button class="btn danger confirm-delete" type="button" onclick={confirmDelete}>
+								Delete book
+							</button>
+							<button
+								class="btn ghost"
+								type="button"
+								onclick={() => {
+									deleteMode = 'view';
+									exclude = false;
+								}}
+							>
+								Cancel
+							</button>
+						</div>
+					{:else}
+						<button
+							class="btn ghost delete-btn"
+							type="button"
+							onclick={() => (deleteMode = 'confirm')}
+						>
+							Delete book
+						</button>
+					{/if}
+				{/if}
 			</div>
 
 			<dl class="meta">
@@ -505,6 +557,43 @@
 	.btn.ghost:hover {
 		border-color: var(--clay);
 		color: var(--clay-deep);
+	}
+	.btn.danger {
+		background: #b3402a;
+		color: var(--bg);
+		justify-content: center;
+	}
+	.btn.danger:hover {
+		background: #9a3623;
+	}
+
+	.confirm {
+		display: flex;
+		flex-direction: column;
+		gap: 0.6rem;
+		padding: 0.9rem;
+		border: 1px solid var(--line-strong);
+		border-radius: 3px;
+	}
+	.confirm .prompt {
+		font-family: var(--f-serif);
+		font-size: 0.98rem;
+		line-height: 1.45;
+		color: var(--muted);
+		margin: 0;
+	}
+	.exclude {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.5rem;
+		font-family: var(--f-grotesk);
+		font-size: 0.85rem;
+		color: var(--ink);
+		cursor: pointer;
+	}
+	.exclude input {
+		accent-color: var(--clay);
+		margin-top: 0.15rem;
 	}
 
 	dl.meta {

@@ -77,6 +77,17 @@ export async function fetchBookDetail(
 	return bookDetailSchema.parse(await res.json());
 }
 
+/** Delete a book and everything under it. With `exclude`, its Calibre id joins the
+ *  exclusion list so the next library sync doesn't bring it back. */
+export async function deleteBook(
+	id: string,
+	{ exclude = false }: { exclude?: boolean } = {},
+	fetchFn: typeof fetch = fetch
+): Promise<void> {
+	const res = await fetchFn(`/api/books/${id}?exclude=${exclude}`, { method: 'DELETE' });
+	if (!res.ok) throw new Error(`DELETE /api/books/${id} → ${res.status}`);
+}
+
 /** URL of the raw EPUB stream for a book (served by GET /api/books/{id}/epub). */
 export const epubUrl = (id: string): string => `/api/books/${id}/epub`;
 

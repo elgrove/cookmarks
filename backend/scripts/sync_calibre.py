@@ -47,7 +47,8 @@ def main() -> None:
 
     print(
         f"{len(result.created)} created, {len(result.updated)} updated, "
-        f"{len(result.orphaned)} orphaned, {len(result.deleted)} deleted."
+        f"{len(result.orphaned)} orphaned, {len(result.deleted)} deleted, "
+        f"{len(result.excluded)} excluded."
     )
     if result.orphaned:
         print("Orphaned (still in Calibre, outside the tag/format selection — left untouched):")

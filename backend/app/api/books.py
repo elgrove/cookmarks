@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response, status
 from fastapi.responses import FileResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
@@ -10,10 +10,12 @@ from app.covers import cover_path, has_cover
 from app.db import SessionDep
 from app.epub import epub_path, has_epub
 from app.models.book import Book
+from app.models.calibre_exclusion import CalibreExclusion
 from app.models.recipe import Recipe
 from app.models.recipe_list import RecipeList, RecipeListItem
 from app.schemas.book import BookDetail, BookFilter, BookSummary, RecipeIndexEntry
 from app.schemas.recipe import RecipeRow
+from app.services.calibre import delete_books
 
 router = APIRouter(tags=["books"])
 
@@ -91,6 +93,23 @@ def get_book(book_id: uuid.UUID, session: SessionDep) -> BookDetail:
             for r in recipes
         ],
     )
+
+
+@router.delete("/books/{book_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_book(book_id: uuid.UUID, session: SessionDep, exclude: bool = False) -> Response:
+    """Delete a book and everything under it (recipes, runs, list membership, embeddings).
+    With `exclude=true` the book's Calibre id is added to the exclusion list so the next
+    sync skips it — without that, a book still in the library is re-created on the next
+    sync (recipes gone)."""
+    book = session.get(Book, book_id)
+    if book is None:
+        raise HTTPException(status_code=404, detail="book not found")
+    if exclude:
+        # merge, not add: deleting the same Calibre book twice must not clash on the PK.
+        session.merge(CalibreExclusion(calibre_id=book.calibre_id, title=book.title))
+    delete_books(session, [book])
+    session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/books/{book_id}/cover")

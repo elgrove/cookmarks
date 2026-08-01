@@ -30,7 +30,11 @@ export const a11y: Verifier = {
 		const unlabelledInputs = Array.from(root.querySelectorAll('input, select, textarea')).filter(
 			(el) => {
 				const id = el.getAttribute('id');
-				const hasLabel = id ? root.querySelector(`label[for="${id}"]`) !== null : false;
+				// Either association counts: an explicit label[for], or an implicit
+				// wrapping label — both name the control per the HTML spec.
+				const hasLabel = id
+					? root.querySelector(`label[for="${id}"]`) !== null
+					: (el.closest('label')?.textContent?.trim() ?? '') !== '';
 				return !hasLabel && !el.getAttribute('aria-label');
 			}
 		);

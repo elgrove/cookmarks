@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import BookDetail, { type BookDetailData } from '$lib/components/BookDetail.svelte';
-	import { fetchBookDetail } from '$lib/api/books';
+	import { deleteBook, fetchBookDetail } from '$lib/api/books';
 	import { cleanTitle, pageTitle } from '$lib/title';
 	import {
 		fetchLatestRun,
@@ -88,6 +89,10 @@
 		onAnswer={answerReview}
 		onExtract={async () => {
 			await triggerExtraction(book!.id);
+		}}
+		onDelete={async ({ exclude }) => {
+			await deleteBook(book!.id, { exclude });
+			await goto('/books');
 		}}
 	/>
 {:else}

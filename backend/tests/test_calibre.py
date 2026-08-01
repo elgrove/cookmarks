@@ -7,7 +7,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Book, Recipe
+from app.models import Book, CalibreExclusion, Recipe
 from app.services.calibre import CalibreBook, read_books, read_calibre_books, sync_calibre
 from app.services.vector_store import EMBEDDING_DIMENSIONS, VectorStore
 
@@ -155,6 +155,18 @@ def test_sync_deletes_books_gone_from_the_library(session: Session) -> None:
     assert session.scalars(select(Recipe).where(Recipe.id.in_(recipe_ids))).all() == []
     assert VectorStore(session).embedded_ids().isdisjoint(recipe_ids)
     assert session.scalars(select(Book).where(Book.calibre_id == 2)).one().title == "No Recipes Yet"
+
+
+def test_sync_skips_excluded_books(session: Session) -> None:
+    """An excluded Calibre id is never re-created, however many times the sync runs."""
+    session.add(CalibreExclusion(calibre_id=100, title="Brand New"))
+    session.commit()
+
+    result = sync_calibre(session, [_make_book(100, "Brand New"), _make_book(101, "Allowed")])
+
+    assert result.excluded == ["Brand New"]
+    assert result.created == ["Allowed"]
+    assert session.scalars(select(Book).where(Book.calibre_id == 100)).all() == []
 
 
 def test_sync_is_idempotent(session: Session) -> None:
