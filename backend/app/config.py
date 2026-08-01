@@ -29,6 +29,11 @@ class Settings(BaseSettings):
     # The per-minute request budget is a user-tunable Config column, not a setting.
     extraction_threads: int = 16
 
+    # How long a run may sit QUEUED or RUNNING before startup treats it as abandoned.
+    # Well above the slowest real extraction, so a genuinely in-flight run is never
+    # reaped by an API restart that leaves the worker running.
+    stale_run_after_hours: int = 6
+
     # Celery broker + result backend. Redis in dev/prod (a separate worker process
     # runs extraction off the request thread, surviving restarts); overridable via
     # COOKMARKS_CELERY_BROKER_URL / _RESULT_BACKEND. Construction never connects, so
