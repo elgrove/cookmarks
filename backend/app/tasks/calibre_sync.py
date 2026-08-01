@@ -41,6 +41,7 @@ def run_calibre_sync() -> dict:
         "updated": result.updated,
         "orphaned": result.orphaned,
         "deleted": result.deleted,
+        "excluded": result.excluded,
     }
 
 

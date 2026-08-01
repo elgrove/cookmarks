@@ -116,7 +116,8 @@
 					{ label: 'Created', value: count(d.created?.length) },
 					{ label: 'Updated', value: count(d.updated?.length) },
 					{ label: 'Orphaned', value: count(d.orphaned?.length) },
-					{ label: 'Deleted', value: count(d.deleted?.length) }
+					{ label: 'Deleted', value: count(d.deleted?.length) },
+					{ label: 'Excluded', value: count(d.excluded?.length) }
 				];
 			}
 		}

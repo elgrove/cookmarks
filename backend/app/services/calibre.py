@@ -17,6 +17,7 @@ decoupled from sqlite entirely. The later operator endpoint reuses both.
 
 import logging
 import sqlite3
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
@@ -24,7 +25,7 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Book
+from app.models import Book, CalibreExclusion
 from app.services.vector_store import VectorStore
 
 logger = logging.getLogger(__name__)
@@ -72,12 +73,14 @@ class CalibreBook:
 class SyncResult:
     """Outcome of a sync, by book title. `deleted` books are gone from the Calibre
     library entirely (removed here too, recipes and all); `orphaned` ones are still in
-    the library but outside the tag/format selection — reported and left untouched."""
+    the library but outside the tag/format selection — reported and left untouched;
+    `excluded` ones are on the exclusion list and were skipped."""
 
     created: list[str]
     updated: list[str]
     orphaned: list[str]
     deleted: list[str]
+    excluded: list[str]
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -151,6 +154,19 @@ def read_library_book_ids(library_path: Path) -> set[int]:
         conn.close()
 
 
+def delete_books(session: Session, books: Iterable[Book]) -> None:
+    """Delete books and everything hanging off them. The row delete cascades to recipes,
+    runs and link tables through the schema's foreign keys, but the vec0 embedding table
+    has none — so this is the single place that purges those alongside. Does not commit."""
+    books = list(books)
+    if not books:
+        return
+    store = VectorStore(session)
+    for book in books:
+        store.delete(recipe.id for recipe in book.recipes)
+        session.delete(book)
+
+
 def sync_calibre(
     session: Session,
     calibre_books: list[CalibreBook],
@@ -159,18 +175,24 @@ def sync_calibre(
 ) -> SyncResult:
     """Upsert Calibre books by `calibre_id`, refreshing bibliographic fields and the
     `path` pointer. Recipes, list membership and keywords are never touched on a book
-    that survives.
+    that survives. Ids on the `CalibreExclusion` list are skipped entirely, so a book
+    deleted-and-excluded in the app never comes back.
 
     Books in v2 but absent from `calibre_books` are reported as orphaned. Pass
     `library_ids` (every id in the library) to also delete the ones that have left
     Calibre entirely — they cascade to their recipes, whose embeddings are purged
     alongside since the vec0 table has no foreign key. Without it nothing is deleted."""
     existing = {book.calibre_id: book for book in session.scalars(select(Book)).all()}
+    excluded_ids = set(session.scalars(select(CalibreExclusion.calibre_id)).all())
     created: list[str] = []
     updated: list[str] = []
+    excluded: list[str] = []
     seen: set[int] = set()
 
     for cb in calibre_books:
+        if cb.calibre_id in excluded_ids:
+            excluded.append(cb.title)
+            continue
         seen.add(cb.calibre_id)
         book = existing.get(cb.calibre_id)
         if book is None:
@@ -197,24 +219,30 @@ def sync_calibre(
             book.calibre_added_at = cb.calibre_added_at
             updated.append(cb.title)
 
-    missing = [book for cid, book in existing.items() if cid not in seen]
+    # An excluded id that somehow still has a row is reported as excluded, not orphaned.
+    missing = [
+        book for cid, book in existing.items() if cid not in seen and cid not in excluded_ids
+    ]
     gone = [] if library_ids is None else [b for b in missing if b.calibre_id not in library_ids]
     gone_ids = {book.calibre_id for book in gone}
     orphaned = [book.title for book in missing if book.calibre_id not in gone_ids]
 
-    store = VectorStore(session) if gone else None
-    for book in gone:
-        if store is not None:
-            store.delete(recipe.id for recipe in book.recipes)
-        session.delete(book)
+    delete_books(session, gone)
     deleted = [book.title for book in gone]
 
     session.commit()
     logger.info(
-        "Calibre sync: %d created, %d updated, %d orphaned, %d deleted",
+        "Calibre sync: %d created, %d updated, %d orphaned, %d deleted, %d excluded",
         len(created),
         len(updated),
         len(orphaned),
         len(deleted),
+        len(excluded),
     )
-    return SyncResult(created=created, updated=updated, orphaned=orphaned, deleted=deleted)
+    return SyncResult(
+        created=created,
+        updated=updated,
+        orphaned=orphaned,
+        deleted=deleted,
+        excluded=excluded,
+    )

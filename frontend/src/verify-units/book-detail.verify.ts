@@ -3,7 +3,11 @@ import { keywordHref } from '$lib/api/recipes';
 import type { VerifiableUnit } from '$lib/verify/types';
 import { z } from 'zod';
 
-type Props = { book: BookDetailData };
+type Props = { book: BookDetailData; onDelete?: (opts: { exclude: boolean }) => void };
+
+const DELETE_BTN = '.delete-btn';
+const CONFIRM_DELETE = '.confirm-delete';
+const EXCLUDE = '.exclude input';
 
 const recipeSchema = z.object({
 	id: z.string(),
@@ -147,6 +151,41 @@ const unit: VerifiableUnit<Props> = {
 			}
 		},
 		{
+			id: 'delete-confirm',
+			description: 'the delete action opens a confirm step with the exclusion box unticked',
+			props: { book: pastaGrannies, onDelete: () => {} },
+			act: ({ click }) => click(DELETE_BTN)
+		},
+		{
+			id: 'delete-plain',
+			description: 'confirming without ticking the box deletes but records no exclusion',
+			props: { book: pastaGrannies, onDelete: () => {} },
+			act: ({ click }) => {
+				click(DELETE_BTN);
+				click(CONFIRM_DELETE);
+			}
+		},
+		{
+			id: 'delete-excluded',
+			description: 'ticking the box before confirming deletes and excludes from future syncs',
+			props: { book: pastaGrannies, onDelete: () => {} },
+			act: ({ click }) => {
+				click(DELETE_BTN);
+				click(EXCLUDE);
+				click(CONFIRM_DELETE);
+			}
+		},
+		{
+			id: 'delete-confirm-empty-book',
+			description: 'probe: confirming on a zero-recipe book omits the recipe-loss warning',
+			probe: true,
+			props: {
+				book: { ...pastaGrannies, recipeCount: 0, recipes: [], keywords: [] },
+				onDelete: () => {}
+			},
+			act: ({ click }) => click(DELETE_BTN)
+		},
+		{
 			id: 'contract-lie',
 			description: 'expectFail: a deliberately-failing invariant proves the harness reports truthfully',
 			expectFail: true,
@@ -285,6 +324,57 @@ const unit: VerifiableUnit<Props> = {
 			onlyFixtures: ['no-recipes'],
 			check: ({ root }) =>
 				root.querySelector('a.browse') === null || 'browse link shown for an empty book'
+		},
+		{
+			id: 'delete-needs-confirm',
+			description: 'delete is a two-step action: no confirm panel until the action is clicked',
+			onlyFixtures: ['populated', 'no-cover', 'no-recipes'],
+			check: ({ contract, root }) => {
+				if (contract['delete-mode'] !== undefined && contract['delete-mode'] !== 'view')
+					return `delete-mode=${contract['delete-mode']} before any click`;
+				return root.querySelector(CONFIRM_DELETE) === null || 'confirm shown without a click';
+			}
+		},
+		{
+			id: 'delete-confirm-step',
+			description: 'the confirm step exposes a labelled exclusion box, unticked by default',
+			onlyFixtures: ['delete-confirm', 'delete-confirm-empty-book'],
+			check: ({ contract, root }) => {
+				if (contract['delete-mode'] !== 'confirm') return `delete-mode=${contract['delete-mode']}`;
+				if (contract['delete-exclude'] !== 'false')
+					return `delete-exclude=${contract['delete-exclude']} — must default off`;
+				if (!root.querySelector(CONFIRM_DELETE)) return 'confirm button missing';
+				const box = root.querySelector<HTMLInputElement>(EXCLUDE);
+				if (!box) return 'exclusion checkbox missing';
+				if (box.checked) return 'exclusion checkbox pre-ticked';
+				return (
+					(box.closest('label')?.textContent ?? '').includes('Calibre') ||
+					'exclusion checkbox is not labelled'
+				);
+			}
+		},
+		{
+			id: 'delete-warns-about-recipes',
+			description: 'the confirm names the recipes at stake, and says nothing of them when there are none',
+			onlyFixtures: ['delete-confirm', 'delete-confirm-empty-book'],
+			check: ({ root, props }) => {
+				const prompt = root.querySelector('.confirm .prompt')?.textContent ?? '';
+				if (!prompt.includes('Delete this book?')) return `prompt="${prompt.trim()}"`;
+				const mentions = prompt.includes(String(props.book.recipeCount));
+				if (props.book.recipeCount === 0)
+					return !prompt.includes('recipe') || `empty book warns about recipes: "${prompt.trim()}"`;
+				return mentions || `prompt omits the recipe count: "${prompt.trim()}"`;
+			}
+		},
+		{
+			id: 'delete-fires-handler',
+			description: 'confirming fires the delete handler with the exclusion choice, and closes the panel',
+			onlyFixtures: ['delete-plain', 'delete-excluded'],
+			check: ({ contract, fixture }) => {
+				const want = fixture.id === 'delete-excluded' ? 'exclude' : 'plain';
+				if (contract.deleted !== want) return `deleted=${contract.deleted} expected ${want}`;
+				return contract['delete-mode'] === 'view' || `delete-mode=${contract['delete-mode']}`;
+			}
 		},
 		{
 			id: 'intentional-fail',

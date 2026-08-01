@@ -3,8 +3,12 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.models import CalibreExclusion, Recipe, RecipeListItem
+from app.services.vector_store import EMBEDDING_DIMENSIONS, VectorStore
 
 EXPECTED_KEYS = {"id", "title", "author", "recipe_count", "has_cover", "pubdate", "keywords"}
 DETAIL_KEYS = {
@@ -155,3 +159,42 @@ def test_recipe_index_empty_for_bookless(client: TestClient) -> None:
 
 def test_recipe_index_404_for_unknown_book(client: TestClient) -> None:
     assert client.get(f"/api/books/{uuid.uuid4()}/recipe-index").status_code == 404
+
+
+def test_delete_book_removes_recipes_and_list_items(
+    client: TestClient, session: Session
+) -> None:
+    book_id = _book_id(client, "With Recipes")
+    rid = client.get(f"/api/books/{book_id}/recipe-index").json()[0]["id"]
+    client.post(f"/api/recipes/{rid}/favourite")
+    store = VectorStore(session)
+    store.upsert(uuid.UUID(rid), [0.1] * EMBEDDING_DIMENSIONS)
+
+    assert client.delete(f"/api/books/{book_id}").status_code == 204
+
+    assert client.get(f"/api/books/{book_id}").status_code == 404
+    assert session.get(Recipe, uuid.UUID(rid)) is None
+    assert session.scalars(select(RecipeListItem)).all() == []
+    assert VectorStore(session).embedded_ids() == set()
+
+
+def test_delete_book_404_for_unknown_book(client: TestClient) -> None:
+    assert client.delete(f"/api/books/{uuid.uuid4()}").status_code == 404
+
+
+def test_delete_book_without_exclude_records_no_exclusion(
+    client: TestClient, session: Session
+) -> None:
+    assert client.delete(f"/api/books/{_book_id(client, 'With Recipes')}").status_code == 204
+    assert session.scalars(select(CalibreExclusion)).all() == []
+
+
+def test_delete_book_with_exclude_records_the_calibre_id(
+    client: TestClient, session: Session
+) -> None:
+    book_id = _book_id(client, "With Recipes")
+    assert client.delete(f"/api/books/{book_id}?exclude=true").status_code == 204
+
+    exclusion = session.scalars(select(CalibreExclusion)).one()
+    assert exclusion.calibre_id == 1
+    assert exclusion.title == "With Recipes"
