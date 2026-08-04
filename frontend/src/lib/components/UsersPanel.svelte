@@ -114,7 +114,8 @@
 						<td class="mono role">{user.is_admin ? 'Admin' : 'Member'}</td>
 						<td class="mono when">{created(user.created_at)}</td>
 						<td class="actions">
-							{#if resettingId === user.id}
+							<div class="row-actions">
+								{#if resettingId === user.id}
 								<label class="sr-only" for={`pw-${user.id}`}>
 									New password for {user.username}
 								</label>
@@ -167,7 +168,8 @@
 								>
 									Delete
 								</button>
-							{/if}
+								{/if}
+							</div>
 						</td>
 					</tr>
 				{/each}
@@ -251,12 +253,14 @@
 		white-space: nowrap;
 	}
 	.actions {
+		padding-right: 0;
+	}
+	.row-actions {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
 		justify-content: flex-end;
 		gap: 0.5rem 0.9rem;
-		border-bottom: var(--border);
 	}
 	.link {
 		font-family: var(--f-grotesk);
@@ -275,7 +279,7 @@
 	.link:disabled {
 		color: var(--muted);
 		cursor: not-allowed;
-		text-decoration-style: dotted;
+		text-decoration: none;
 	}
 	.error {
 		font-family: var(--f-serif);
@@ -344,17 +348,6 @@
 		color: var(--muted);
 		background: transparent;
 		border-color: var(--line-strong);
-	}
-	.sr-only {
-		position: absolute;
-		width: 1px;
-		height: 1px;
-		padding: 0;
-		margin: -1px;
-		overflow: hidden;
-		clip: rect(0 0 0 0);
-		white-space: nowrap;
-		border: 0;
 	}
 	@media (max-width: 760px) {
 		/* Drop the "Added" column whole — header and cells — rather than leaving a

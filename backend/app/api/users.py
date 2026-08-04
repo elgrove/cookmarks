@@ -3,7 +3,7 @@ import uuid
 from fastapi import APIRouter, HTTPException, Response, status
 from sqlalchemy import select
 
-from app.api.deps import CurrentUser
+from app.api.deps import AdminUser
 from app.db import SessionDep
 from app.models.user import User
 from app.schemas.auth import PasswordReset, UserCreate, UserRead
@@ -30,12 +30,12 @@ def add_user(body: UserCreate, session: SessionDep) -> UserRead:
 
 
 @router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-def remove_user(user_id: uuid.UUID, session: SessionDep, admin: CurrentUser) -> Response:
+def remove_user(user_id: uuid.UUID, session: SessionDep, admin: AdminUser) -> Response:
     user = session.get(User, user_id)
     if user is None:
         raise HTTPException(status_code=404, detail="user not found")
     if user.id == admin.id:
-        raise HTTPException(status_code=409, detail="you cannot delete your own account")
+        raise HTTPException(status_code=409, detail="You cannot delete your own account.")
     try:
         delete_user(session, user)
     except UserError as exc:

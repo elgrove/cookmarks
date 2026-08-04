@@ -2,9 +2,9 @@
 
     uv run python -m scripts.create_user aaron --admin
 
-In production: `docker compose exec cookmarks python -m scripts.create_user <name> --admin`
-from the backend directory. The first account created adopts every pre-accounts list, so
-an existing deployment keeps its Favourites.
+In production: `docker compose exec cookmarks uv run python -m scripts.create_user <name>
+--admin`. The first account created adopts every pre-accounts list, so an existing
+deployment keeps its Favourites.
 """
 
 import argparse

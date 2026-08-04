@@ -112,10 +112,16 @@ def _reset_caches() -> Iterator[None]:
     _clear_query_embed_cache()
 
 
+# scrypt is deliberately slow; derive the seeded account's hash once for the whole
+# run rather than per test.
+TESTER_PASSWORD = "test-secret"
+TESTER_HASH = hash_password(TESTER_PASSWORD)
+
+
 def _seed(session: Session) -> None:
     # The account every `client` request runs as (see the dependency override below),
     # so the existing suite exercises the real routes without logging in.
-    session.add(User(username="tester", password_hash=hash_password("secret"), is_admin=True))
+    session.add(User(username="tester", password_hash=TESTER_HASH, is_admin=True))
     # Two books: one with recipes, one with none (the "pending extraction" path).
     # Distinct created_at so the default created_at DESC order is deterministic.
     with_recipes = Book(

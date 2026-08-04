@@ -179,7 +179,7 @@ def test_lists_are_private_to_their_owner(
     mine = client.post("/api/lists", json={"name": "Dinner"}).json()["id"]
     client.post(f"/api/recipes/{recipe_id}/favourite")
 
-    create_user(session, "plain", "pw")
+    create_user(session, "plain", "plain-password")
     act_as("plain")
 
     lists = client.get("/api/lists").json()
@@ -194,7 +194,7 @@ def test_favouriting_is_per_user(
     client: TestClient, session: Session, act_as: Callable[[str], User]
 ) -> None:
     recipe_id = _recipe_ids(client)[0]
-    create_user(session, "plain", "pw")
+    create_user(session, "plain", "plain-password")
 
     act_as("plain")
     assert client.post(f"/api/recipes/{recipe_id}/favourite").json()["is_favourite"] is True

@@ -7,9 +7,10 @@ import base64
 import hashlib
 import hmac
 import secrets
+import uuid
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.models.user import User, UserSession
@@ -44,16 +45,27 @@ def hash_password(password: str) -> str:
 
 
 def verify_password(password: str, stored: str) -> bool:
+    """False for any hash this module can't read — including the deliberately unusable
+    one the implicit user carries — rather than raising out of the login endpoint."""
     try:
         scheme, n, r, p, salt_b64, hash_b64 = stored.split("$")
         if scheme != "scrypt":
             return False
         salt = base64.b64decode(salt_b64)
         expected = base64.b64decode(hash_b64)
+        candidate = _derive(password, salt, int(n), int(r), int(p))
     except (ValueError, TypeError):
         return False
-    candidate = _derive(password, salt, int(n), int(r), int(p))
     return hmac.compare_digest(candidate, expected)
+
+
+# Derived against on an unknown username so a failed login costs the same work
+# whether or not the account exists — the response body alone wouldn't hide it.
+_DUMMY_HASH = hash_password(secrets.token_urlsafe(16))
+
+
+def verify_dummy_password(password: str) -> None:
+    verify_password(password, _DUMMY_HASH)
 
 
 def _token_hash(token: str) -> str:
@@ -62,6 +74,9 @@ def _token_hash(token: str) -> str:
 
 def create_session(session: Session, user: User) -> str:
     """Start a session for `user` and return the raw cookie token (never stored)."""
+    # Sweep expired rows while we're here: one that is never presented again would
+    # otherwise sit in the table forever.
+    session.execute(delete(UserSession).where(UserSession.expires_at <= datetime.now(UTC)))
     token = secrets.token_urlsafe(32)
     session.add(
         UserSession(
@@ -97,14 +112,7 @@ def delete_session(session: Session, token: str) -> None:
         session.commit()
 
 
-def implicit_user(session: Session) -> User:
-    """The single user every request resolves to under auth_mode="none": the oldest
-    account, or a freshly created `default` admin on an empty table. Personal state is
-    still keyed to it, so switching such a deployment to "session" loses nothing."""
-    user = session.scalar(select(User).order_by(User.created_at).limit(1))
-    if user is None:
-        user = User(username="default", password_hash=UNUSABLE_PASSWORD, is_admin=True)
-        session.add(user)
-        session.commit()
-        session.refresh(user)
-    return user
+def delete_sessions_for(session: Session, user_id: uuid.UUID) -> None:
+    """Sign a user out everywhere — a password reset must not leave the old cookies live."""
+    session.execute(delete(UserSession).where(UserSession.user_id == user_id))
+    session.commit()

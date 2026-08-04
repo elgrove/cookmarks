@@ -53,9 +53,23 @@ def upgrade() -> None:
             'fk_recipe_lists_user_id_users', 'users', ['user_id'], ['id'], ondelete='CASCADE'
         )
 
+    # One Favourites list per user, enforced by the database: two concurrent first
+    # requests from a new account would otherwise each create one (the API serves
+    # several list-reading endpoints, and prod runs more than one worker).
+    op.create_index(
+        'uq_recipe_lists_default_per_user',
+        'recipe_lists',
+        ['user_id'],
+        unique=True,
+        sqlite_where=sa.text('is_default = 1'),
+        postgresql_where=sa.text('is_default'),
+    )
+
 
 def downgrade() -> None:
     """Downgrade schema."""
+    op.drop_index('uq_recipe_lists_default_per_user', table_name='recipe_lists')
+
     with op.batch_alter_table('recipe_lists', schema=None) as batch_op:
         batch_op.drop_constraint('fk_recipe_lists_user_id_users', type_='foreignkey')
         batch_op.drop_index(batch_op.f('ix_recipe_lists_user_id'))

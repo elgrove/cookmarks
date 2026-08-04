@@ -2,6 +2,7 @@ import uuid
 
 from fastapi import APIRouter, HTTPException, Response, status
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import CurrentUser
@@ -30,17 +31,29 @@ def get_or_create_favourites(session: Session, user_id: uuid.UUID) -> RecipeList
     """The caller's default Favourites list, created on first use. Mirrors v1's
     `RecipeList.get_favourites`; called from the list reads so the default always
     appears even for a brand-new account."""
-    favourites = session.scalar(
-        select(RecipeList).where(
-            RecipeList.user_id == user_id, RecipeList.is_default.is_(True)
-        )
-    )
-    if favourites is None:
-        favourites = RecipeList(name="Favourites", is_default=True, user_id=user_id)
-        session.add(favourites)
+    existing = _favourites(session, user_id)
+    if existing is not None:
+        return existing
+    favourites = RecipeList(name="Favourites", is_default=True, user_id=user_id)
+    session.add(favourites)
+    try:
         session.commit()
-        session.refresh(favourites)
+    except IntegrityError:
+        # A concurrent request got there first (the unique index caught it) — serve its
+        # list rather than failing this request.
+        session.rollback()
+        raced = _favourites(session, user_id)
+        if raced is None:
+            raise
+        return raced
+    session.refresh(favourites)
     return favourites
+
+
+def _favourites(session: Session, user_id: uuid.UUID) -> RecipeList | None:
+    return session.scalar(
+        select(RecipeList).where(RecipeList.user_id == user_id, RecipeList.is_default.is_(True))
+    )
 
 
 def favourite_list_id(session: Session, user_id: uuid.UUID) -> uuid.UUID | None:

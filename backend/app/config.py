@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -14,7 +15,7 @@ class Settings(BaseSettings):
     # "session" (username + password, cookie sessions) or "none" (no accounts: every
     # request resolves to a single implicit user). Defaults to session so a deployment
     # that forgets the variable locks people out rather than letting them in.
-    auth_mode: str = "session"
+    auth_mode: Literal["session", "none"] = "session"
 
     db_path: Path = BACKEND_ROOT / "db.sqlite3"
 

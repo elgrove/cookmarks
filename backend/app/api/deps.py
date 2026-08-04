@@ -8,7 +8,8 @@ from fastapi import Depends, HTTPException, Request
 from app.config import settings
 from app.db import SessionDep
 from app.models.user import User
-from app.services.auth import COOKIE_NAME, implicit_user, resolve_session
+from app.services.auth import COOKIE_NAME, resolve_session
+from app.services.users import implicit_user
 
 
 def current_user(request: Request, session: SessionDep) -> User:

@@ -13,6 +13,7 @@ from app.main import app
 from app.models import Book, User
 from app.services.auth import COOKIE_NAME
 from app.services.users import create_user
+from tests.conftest import TESTER_PASSWORD
 
 
 @pytest.fixture
@@ -23,7 +24,7 @@ def anon(client: TestClient) -> Iterator[TestClient]:
 
 
 def test_login_sets_a_cookie_and_me_succeeds(anon: TestClient) -> None:
-    res = anon.post("/api/auth/login", json={"username": "tester", "password": "secret"})
+    res = anon.post("/api/auth/login", json={"username": "tester", "password": TESTER_PASSWORD})
     assert res.status_code == 200
     assert res.json()["username"] == "tester"
     assert COOKIE_NAME in res.cookies
@@ -56,7 +57,7 @@ def test_me_without_a_cookie_is_401(anon: TestClient) -> None:
 
 
 def test_logout_invalidates_the_session(anon: TestClient) -> None:
-    anon.post("/api/auth/login", json={"username": "tester", "password": "secret"})
+    anon.post("/api/auth/login", json={"username": "tester", "password": TESTER_PASSWORD})
     assert anon.post("/api/auth/logout").status_code == 204
     assert anon.get("/api/auth/me").status_code == 401
 
@@ -79,9 +80,9 @@ def test_reads_require_a_session(anon: TestClient) -> None:
 def test_non_admin_reads_but_cannot_reach_admin_surfaces(
     anon: TestClient, session: Session
 ) -> None:
-    create_user(session, "plain", "pw", is_admin=False)
+    create_user(session, "plain", "plain-password", is_admin=False)
     assert anon.post(
-        "/api/auth/login", json={"username": "plain", "password": "pw"}
+        "/api/auth/login", json={"username": "plain", "password": "plain-password"}
     ).status_code == 200
 
     assert anon.get("/api/books").status_code == 200
@@ -95,7 +96,7 @@ def test_non_admin_reads_but_cannot_reach_admin_surfaces(
 
 
 def test_admin_reaches_admin_surfaces(anon: TestClient) -> None:
-    anon.post("/api/auth/login", json={"username": "tester", "password": "secret"})
+    anon.post("/api/auth/login", json={"username": "tester", "password": TESTER_PASSWORD})
     assert anon.get("/api/config").status_code == 200
     assert anon.get("/api/users").status_code == 200
 
@@ -105,22 +106,22 @@ def test_health_stays_open(anon: TestClient) -> None:
 
 
 def test_password_reset_swaps_the_working_password(anon: TestClient, session: Session) -> None:
-    user = create_user(session, "plain", "old-pw")
-    anon.post("/api/auth/login", json={"username": "tester", "password": "secret"})
+    user = create_user(session, "plain", "old-password")
+    anon.post("/api/auth/login", json={"username": "tester", "password": TESTER_PASSWORD})
     assert anon.post(
-        f"/api/users/{user.id}/password", json={"password": "new-pw"}
+        f"/api/users/{user.id}/password", json={"password": "new-password"}
     ).status_code == 204
     anon.post("/api/auth/logout")
     assert anon.post(
-        "/api/auth/login", json={"username": "plain", "password": "old-pw"}
+        "/api/auth/login", json={"username": "plain", "password": "old-password"}
     ).status_code == 401
     assert anon.post(
-        "/api/auth/login", json={"username": "plain", "password": "new-pw"}
+        "/api/auth/login", json={"username": "plain", "password": "new-password"}
     ).status_code == 200
 
 
 def test_session_survives_a_second_request(anon: TestClient, session: Session) -> None:
-    anon.post("/api/auth/login", json={"username": "tester", "password": "secret"})
+    anon.post("/api/auth/login", json={"username": "tester", "password": TESTER_PASSWORD})
     assert session.scalar(select(User).where(User.username == "tester")) is not None
     assert anon.get("/api/lists").status_code == 200
     assert anon.get("/api/lists").status_code == 200

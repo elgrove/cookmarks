@@ -8,10 +8,10 @@ from app.services.auth import (
     create_session,
     delete_session,
     hash_password,
-    implicit_user,
     resolve_session,
     verify_password,
 )
+from app.services.users import implicit_user
 
 
 def _user(session: Session, username: str = "sessions-tester") -> User:

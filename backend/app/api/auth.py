@@ -11,6 +11,7 @@ from app.services.auth import (
     SESSION_TTL,
     create_session,
     delete_session,
+    verify_dummy_password,
     verify_password,
 )
 
@@ -27,8 +28,12 @@ def login(body: LoginRequest, response: Response, session: SessionDep) -> AuthMe
     """One generic failure for both an unknown username and a wrong password, so the
     response never confirms which accounts exist."""
     user = session.scalar(select(User).where(User.username == body.username))
-    if user is None or not verify_password(body.password, user.password_hash):
-        raise HTTPException(status_code=401, detail="incorrect username or password")
+    if user is None:
+        # Same work as a real check, so a missing account can't be spotted by timing.
+        verify_dummy_password(body.password)
+        raise HTTPException(status_code=401, detail="Incorrect username or password.")
+    if not verify_password(body.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Incorrect username or password.")
     token = create_session(session, user)
     # The deployment is plain HTTP on the LAN/tailnet, so the cookie is deliberately not
     # Secure. Lax keeps it on ordinary navigation while blocking cross-site POSTs.

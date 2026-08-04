@@ -192,7 +192,9 @@
 						Browse recipes <span class="ar" aria-hidden="true">›</span>
 					</a>
 				{/if}
-				<ExtractButton recipeCount={book.recipeCount} {onExtract} />
+				{#if onExtract}
+					<ExtractButton recipeCount={book.recipeCount} {onExtract} />
+				{/if}
 				{#if onDelete}
 					{#if deleteMode === 'confirm'}
 						<div class="confirm">
