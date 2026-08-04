@@ -11,6 +11,11 @@ class Settings(BaseSettings):
     version: str = "0.2.0"
     env: str = "dev"
 
+    # "session" (username + password, cookie sessions) or "none" (no accounts: every
+    # request resolves to a single implicit user). Defaults to session so a deployment
+    # that forgets the variable locks people out rather than letting them in.
+    auth_mode: str = "session"
+
     db_path: Path = BACKEND_ROOT / "db.sqlite3"
 
     # Absolute root of the Calibre library on this machine. Book.path is stored

@@ -1,8 +1,9 @@
 import uuid
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 
+from app.api.deps import require_admin
 from app.db import SessionDep
 from app.models.book import Book
 from app.models.enums import TaskStatus, TaskType
@@ -20,6 +21,7 @@ router = APIRouter(tags=["extraction"])
     "/books/{book_id}/extract",
     response_model=TaskRunRead,
     status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[Depends(require_admin)],
 )
 def trigger_extraction(book_id: uuid.UUID, session: SessionDep) -> TaskRunRead:
     """Queue recipe extraction for a book. Creates the run row up front (so a trigger
@@ -65,6 +67,7 @@ def latest_run(book_id: uuid.UUID, session: SessionDep) -> TaskRunRead | None:
     "/books/{book_id}/extract/{run_id}/resume",
     response_model=TaskRunRead,
     status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[Depends(require_admin)],
 )
 def resume_run(
     book_id: uuid.UUID, run_id: uuid.UUID, body: ResumeRequest, session: SessionDep

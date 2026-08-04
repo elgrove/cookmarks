@@ -17,6 +17,11 @@ class RecipeList(UUIDAuditBase):
 
     name: Mapped[str] = mapped_column(String(200))
     is_default: Mapped[bool] = mapped_column(default=False)
+    # Nullable only for the pre-accounts rows: the first user created adopts every
+    # orphan list. The application always sets it.
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True, default=None
+    )
 
     items: Mapped[list["RecipeListItem"]] = relationship(
         back_populates="recipe_list",

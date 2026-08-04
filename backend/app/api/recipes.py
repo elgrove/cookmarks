@@ -6,12 +6,14 @@ from fastapi import APIRouter, HTTPException, Query, Response
 from sqlalchemy import String, cast, func, literal_column, or_, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
+from app.api.deps import CurrentUser
+from app.api.lists import favourite_list_id
 from app.covers import has_cover
 from app.db import SessionDep
 from app.epub import read_epub_image
 from app.models.book import Book
 from app.models.recipe import Keyword, Recipe, recipe_keywords
-from app.models.recipe_list import RecipeList, RecipeListItem
+from app.models.recipe_list import RecipeListItem
 from app.schemas.recipe import (
     KeywordSummary,
     RecipeDetail,
@@ -279,10 +281,10 @@ def _neighbour(session: Session, recipe_id: uuid.UUID | None) -> RecipeNeighbour
     return RecipeNeighbour(id=row.id, name=row.name) if row else None
 
 
-def _is_favourite(session: Session, recipe_id: uuid.UUID) -> bool:
-    """Whether the recipe sits in the default Favourites list. A pure read — it
-    never creates the list, so an unstarred recipe on a fresh DB reads False."""
-    fav_id = session.scalar(select(RecipeList.id).where(RecipeList.is_default.is_(True)))
+def _is_favourite(session: Session, recipe_id: uuid.UUID, user_id: uuid.UUID) -> bool:
+    """Whether the recipe sits in the caller's Favourites list. A pure read — it
+    never creates the list, so an unstarred recipe on a fresh account reads False."""
+    fav_id = favourite_list_id(session, user_id)
     if fav_id is None:
         return False
     return (
@@ -365,6 +367,7 @@ def _search_neighbours(
 def get_recipe(
     recipe_id: uuid.UUID,
     session: SessionDep,
+    user: CurrentUser,
     context: str = "book",
     q: Annotated[str, Query()] = "",
     keyword: Annotated[list[str] | None, Query()] = None,
@@ -401,7 +404,7 @@ def get_recipe(
         yields=recipe.yields,
         keywords=sorted(k.name for k in recipe.keywords),
         has_image=recipe.image is not None,
-        is_favourite=_is_favourite(session, recipe.id),
+        is_favourite=_is_favourite(session, recipe.id, user.id),
         context=resolved_context,
         previous=previous,
         next=next_,

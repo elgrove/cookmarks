@@ -11,6 +11,7 @@ from typing import Any
 
 from fastapi.testclient import TestClient
 
+from app.schemas.auth import AuthMe, UserRead
 from app.schemas.book import BookFilter, BookSummary, RecipeIndexEntry
 from app.schemas.config import ConfigRead
 from app.schemas.extraction import ReviewQuestion
@@ -240,3 +241,27 @@ def test_book_keywords_task_endpoint_keys_match_contract(client: TestClient) -> 
     example = _example("taskrunack.example.json")
     body = client.post("/api/tasks/book-keywords", json={}).json()
     assert set(body.keys()) == set(example.keys())
+
+
+def test_auth_me_model_matches_contract() -> None:
+    example = _example("authme.example.json")
+    dumped = AuthMe.model_validate(example).model_dump(mode="json")
+    assert dumped == example
+
+
+def test_auth_me_endpoint_keys_match_contract(client: TestClient) -> None:
+    example = _example("authme.example.json")
+    body = client.get("/api/auth/me").json()
+    assert set(body.keys()) == set(example.keys())
+
+
+def test_user_model_matches_contract() -> None:
+    example = _example("user.example.json")
+    dumped = UserRead.model_validate(example).model_dump(mode="json")
+    assert dumped == example
+
+
+def test_users_endpoint_keys_match_contract(client: TestClient) -> None:
+    example = _example("user.example.json")
+    item = client.get("/api/users").json()[0]
+    assert set(item.keys()) == set(example.keys())

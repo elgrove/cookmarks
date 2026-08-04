@@ -1,10 +1,12 @@
 import uuid
 
-from fastapi import APIRouter, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.responses import FileResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
+from app.api.deps import CurrentUser, require_admin
+from app.api.lists import favourite_list_id
 from app.config import settings
 from app.covers import cover_path, has_cover
 from app.db import SessionDep
@@ -12,7 +14,7 @@ from app.epub import epub_path, has_epub
 from app.models.book import Book
 from app.models.calibre_exclusion import CalibreExclusion
 from app.models.recipe import Recipe
-from app.models.recipe_list import RecipeList, RecipeListItem
+from app.models.recipe_list import RecipeListItem
 from app.schemas.book import BookDetail, BookFilter, BookSummary, RecipeIndexEntry
 from app.schemas.recipe import RecipeRow
 from app.services.calibre import delete_books
@@ -95,7 +97,11 @@ def get_book(book_id: uuid.UUID, session: SessionDep) -> BookDetail:
     )
 
 
-@router.delete("/books/{book_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/books/{book_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_admin)],
+)
 def delete_book(book_id: uuid.UUID, session: SessionDep, exclude: bool = False) -> Response:
     """Delete a book and everything under it (recipes, runs, list membership, embeddings).
     With `exclude=true` the book's Calibre id is added to the exclusion list so the next
@@ -142,12 +148,14 @@ def book_epub(book_id: uuid.UUID, session: SessionDep) -> FileResponse:
 
 
 @router.get("/books/{book_id}/recipe-index", response_model=list[RecipeIndexEntry])
-def book_recipe_index(book_id: uuid.UUID, session: SessionDep) -> list[RecipeIndexEntry]:
+def book_recipe_index(
+    book_id: uuid.UUID, session: SessionDep, user: CurrentUser
+) -> list[RecipeIndexEntry]:
     """Every recipe in the book (id · name · favourite state), in book order — the in-book
     EPUB reader matches headings against this to offer a save-to-favourites button."""
     if session.get(Book, book_id) is None:
         raise HTTPException(status_code=404, detail="book not found")
-    fav_list_id = session.scalar(select(RecipeList.id).where(RecipeList.is_default.is_(True)))
+    fav_list_id = favourite_list_id(session, user.id)
     fav_ids: set[uuid.UUID] = set()
     if fav_list_id is not None:
         fav_ids = set(

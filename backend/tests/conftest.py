@@ -1,4 +1,4 @@
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
@@ -6,13 +6,15 @@ from typing import Any
 import pytest
 import sqlite_vec
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, select
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.api.deps import current_user
 from app.api.recipes import _clear_keyword_cache, _clear_search_order_cache
 from app.db import get_session
 from app.main import app
-from app.models import Base, Book, Keyword, Recipe
+from app.models import Base, Book, Keyword, Recipe, User
+from app.services.auth import hash_password
 from app.services.embeddings import _clear_query_embed_cache
 
 
@@ -111,6 +113,9 @@ def _reset_caches() -> Iterator[None]:
 
 
 def _seed(session: Session) -> None:
+    # The account every `client` request runs as (see the dependency override below),
+    # so the existing suite exercises the real routes without logging in.
+    session.add(User(username="tester", password_hash=hash_password("secret"), is_admin=True))
     # Two books: one with recipes, one with none (the "pending extraction" path).
     # Distinct created_at so the default created_at DESC order is deterministic.
     with_recipes = Book(
@@ -190,7 +195,28 @@ def client(session: Session) -> Iterator[TestClient]:
     def _use_test_session() -> Iterator[Session]:
         yield session
 
+    # Requests run as the seeded admin. The auth tests clear this override to exercise
+    # the real cookie path; everything else stays oblivious to accounts.
+    def _seeded_user() -> User:
+        user = session.scalar(select(User).where(User.username == "tester"))
+        assert user is not None
+        return user
+
     app.dependency_overrides[get_session] = _use_test_session
+    app.dependency_overrides[current_user] = _seeded_user
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def act_as(session: Session, client: TestClient) -> Callable[[str], User]:
+    """Run subsequent requests as another account, by username — for the per-user tests."""
+
+    def _act_as(username: str) -> User:
+        user = session.scalar(select(User).where(User.username == username))
+        assert user is not None, f"no such user: {username}"
+        app.dependency_overrides[current_user] = lambda: user
+        return user
+
+    return _act_as
