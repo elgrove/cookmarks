@@ -8,10 +8,13 @@
 	import '@fontsource/ibm-plex-mono/300.css';
 	import '@fontsource/ibm-plex-mono/400.css';
 	import { page } from '$app/stores';
+	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import { installVerifyHandle } from '$lib/verify/handle';
 	import { initTheme } from '$lib/theme';
 	import { fetchTicketsEnabled, submitTicket } from '$lib/api/tickets';
+	import { fetchMe, logout } from '$lib/api/auth';
+	import { currentUser } from '$lib/auth';
 	import TicketModal from '$lib/components/TicketModal.svelte';
 	import '../app.css';
 
@@ -19,6 +22,35 @@
 
 	onMount(installVerifyHandle);
 	onMount(initTheme);
+
+	// The session gate. /login and the verify harness are exempt — the harness mounts
+	// components against fixture props and must stay reachable without an account.
+	let openRoute = $derived(
+		$page.url.pathname === '/login' || $page.url.pathname.startsWith('/verify')
+	);
+	onMount(async () => {
+		if (openRoute) return;
+		try {
+			const me = await fetchMe();
+			currentUser.set(me);
+			if (!me) await goto('/login');
+		} catch (err) {
+			console.error('failed to resolve the session', err);
+		}
+	});
+
+	// A deployment running COOKMARKS_AUTH_MODE=none has no accounts to show.
+	let showAccount = $derived(!!$currentUser && $currentUser.auth_mode !== 'none');
+
+	async function signOut() {
+		try {
+			await logout();
+		} catch (err) {
+			console.error('failed to sign out', err);
+		}
+		currentUser.set(null);
+		await goto('/login');
+	}
 
 	// The footer "Submit a ticket" link only appears when the backend's Linear
 	// integration is configured; the modal files the issue via POST /api/tickets.
@@ -71,6 +103,10 @@
 				/>
 			</svg>
 		</a>
+		{#if showAccount}
+			<span class="who">{$currentUser?.username}</span>
+			<button class="signout" type="button" onclick={signOut}>Sign out</button>
+		{/if}
 	</nav>
 {/if}
 

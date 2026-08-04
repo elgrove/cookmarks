@@ -14,6 +14,9 @@ services:
       - ${COOKMARKS_CALIBRE_LIBRARY:-./calibre-library}:/library:ro
     environment:
       - COOKMARKS_CALIBRE_LIBRARY_PATH=/library
+      # "session" (the default): username + password login. "none" disables accounts
+      # entirely — every request runs as one implicit user and no cookie is checked.
+      - COOKMARKS_AUTH_MODE=${COOKMARKS_AUTH_MODE:-session}
       # Optional: enables the footer "Submit a ticket" link, which files issues into
       # the Cookmarks Linear project. The link stays hidden until the key + team are set.
       - COOKMARKS_LINEAR_API_KEY=${COOKMARKS_LINEAR_API_KEY:-}

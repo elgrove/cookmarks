@@ -37,6 +37,9 @@ COPY backend/pyproject.toml backend/uv.lock backend/.python-version ./
 RUN uv sync --frozen --no-cache --no-dev
 
 COPY backend/app/ ./app/
+# Maintenance entry points run with `docker compose exec` — seeding the first admin,
+# backfills.
+COPY backend/scripts/ ./scripts/
 COPY backend/alembic.ini ./alembic.ini
 COPY backend/alembic/ ./alembic/
 COPY --from=frontend-build /app/frontend/build ./static/frontend
