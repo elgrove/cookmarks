@@ -136,6 +136,19 @@ a {
 	letter-spacing: 0.08em;
 }
 
+/* Visually hidden, still read aloud — table captions, control labels. */
+.sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+	border: 0;
+}
+
 /* App shell / top nav — DESIGN §5. */
 .nav {
 	display: flex;
@@ -196,12 +209,47 @@ a {
 	color: var(--ink);
 }
 
+/* Account chrome, right of the admin icon. Absent entirely when the deployment runs
+   with COOKMARKS_AUTH_MODE=none. */
+.nav .who {
+	font-family: var(--f-mono);
+	font-size: 0.72rem;
+	letter-spacing: 0.08em;
+	color: var(--muted);
+}
+
+.nav .signout {
+	font-family: var(--f-grotesk);
+	font-size: 0.8rem;
+	color: var(--muted);
+	background: none;
+	border: none;
+	padding: 0;
+	text-decoration: underline;
+	text-underline-offset: 3px;
+	cursor: pointer;
+	transition: color 0.18s var(--ease-out);
+}
+.nav .signout:hover {
+	color: var(--ink);
+}
+
 /* Tighten the nav gap on mobile so the wordmark, links and toggle fit one row
    without horizontal scroll (DESIGN §8) — a proper drawer is future work. This
    sits after the base .nav rule so it wins at equal specificity. */
 @media (max-width: 760px) {
 	.nav {
-		gap: 1rem;
+		gap: 0.9rem;
+		/* Account chrome drops to a second line rather than being clipped off the
+		   right edge (DESIGN §8: no horizontal scroll). */
+		flex-wrap: wrap;
+	}
+	/* The username is redundant chrome on a phone; the sign-out control stays. */
+	.nav .who {
+		display: none;
+	}
+	.nav .signout {
+		margin-left: auto;
 	}
 }
 

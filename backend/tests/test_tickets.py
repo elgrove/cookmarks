@@ -1,11 +1,26 @@
+from collections.abc import Iterator
+
 import pytest
 from fastapi.testclient import TestClient
 
+from app.api.deps import current_user
 from app.config import settings
 from app.main import app
+from app.models import User
 from app.services.linear import LinearError
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def _signed_in() -> Iterator[None]:
+    """These routes are DB-free, so this module drives the app without the `client`
+    fixture — it still needs a signed-in caller, since /api/tickets is gated."""
+    app.dependency_overrides[current_user] = lambda: User(
+        username="tester", password_hash="!", is_admin=False
+    )
+    yield
+    app.dependency_overrides.clear()
 
 
 def test_tickets_disabled_without_config(monkeypatch: pytest.MonkeyPatch) -> None:

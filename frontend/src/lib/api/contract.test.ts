@@ -21,6 +21,7 @@ import { listDetailSchema, listMembershipSchema, listSummarySchema } from './lis
 import { taskRunSchema, reviewQuestionSchema } from './task-runs';
 import { configSchema } from './config';
 import { taskRunAckSchema } from './tasks';
+import { authMeSchema, userSchema } from './auth';
 
 // Frontend half of the API wire contract (see /contract/README.md): the Zod
 // schemas must accept the shared example the backend pins itself to, and reject
@@ -209,5 +210,27 @@ describe('api wire contract', () => {
 		const { queued, ...rest } = example;
 		const drifted = { ...rest, books_queued: queued };
 		expect(() => taskRunAckSchema.parse(drifted)).toThrow();
+	});
+
+	it('accepts the auth-me example', () => {
+		expect(() => authMeSchema.parse(load('authme.example.json'))).not.toThrow();
+	});
+
+	it('rejects an auth-me example with a drifted field name', () => {
+		const example = load('authme.example.json');
+		const { auth_mode, ...rest } = example;
+		const drifted = { ...rest, authMode: auth_mode };
+		expect(() => authMeSchema.parse(drifted)).toThrow();
+	});
+
+	it('accepts the user example', () => {
+		expect(() => userSchema.parse(load('user.example.json'))).not.toThrow();
+	});
+
+	it('rejects a user example with a drifted field name', () => {
+		const example = load('user.example.json');
+		const { is_admin, ...rest } = example;
+		const drifted = { ...rest, isAdmin: is_admin };
+		expect(() => userSchema.parse(drifted)).toThrow();
 	});
 });

@@ -6,15 +6,25 @@
 	} from '$lib/components/ConfigSettings.svelte';
 	import TasksPanel from '$lib/components/TasksPanel.svelte';
 	import TaskRunsPanel from '$lib/components/TaskRunsPanel.svelte';
+	import UsersPanel from '$lib/components/UsersPanel.svelte';
 	import { fetchConfig, updateConfig, type Config, type ConfigUpdate } from '$lib/api/config';
 	import { triggerBookKeywords, triggerDedupKeywords, triggerCalibreSync } from '$lib/api/tasks';
 	import { fetchTaskRuns, type TaskRun } from '$lib/api/task-runs';
+	import {
+		createUser,
+		deleteUser,
+		fetchUsers,
+		resetPassword,
+		type User
+	} from '$lib/api/auth';
+	import { currentUser } from '$lib/auth';
 	import { pageTitle } from '$lib/title';
 
 	const tabs: AdminTab[] = [
 		{ id: 'settings', label: 'Settings' },
 		{ id: 'tasks', label: 'Tasks' },
-		{ id: 'task-runs', label: 'Task Runs' }
+		{ id: 'task-runs', label: 'Task Runs' },
+		{ id: 'users', label: 'Users' }
 	];
 	let active = $state('settings');
 
@@ -68,9 +78,25 @@
 		}
 	}
 
+	// Accounts load lazily on first open, the same shape as the task-run history.
+	let usersStatus = $state<'idle' | 'loading' | 'error' | 'ready'>('idle');
+	let users = $state<User[]>([]);
+
+	async function loadUsers() {
+		usersStatus = 'loading';
+		try {
+			users = await fetchUsers();
+			usersStatus = 'ready';
+		} catch (err) {
+			console.error('failed to load users', err);
+			usersStatus = 'error';
+		}
+	}
+
 	function selectTab(id: string) {
 		active = id;
 		if (id === 'task-runs' && runsStatus === 'idle') loadRuns();
+		if (id === 'users' && usersStatus === 'idle') loadUsers();
 	}
 
 	onMount(load);
@@ -110,6 +136,27 @@
 			<button class="retry" onclick={loadRuns}>Try again</button>
 		{:else}
 			<p class="msg">Loading task-run history…</p>
+		{/if}
+	{:else if active === 'users'}
+		{#if usersStatus === 'ready'}
+			<UsersPanel
+				{users}
+				currentUserId={$currentUser?.id}
+				onCreate={async (input) => {
+					await createUser(input);
+					await loadUsers();
+				}}
+				onDelete={async (id) => {
+					await deleteUser(id);
+					await loadUsers();
+				}}
+				onResetPassword={(id, password) => resetPassword(id, password)}
+			/>
+		{:else if usersStatus === 'error'}
+			<p class="msg">Couldn’t load accounts.</p>
+			<button class="retry" onclick={loadUsers}>Try again</button>
+		{:else}
+			<p class="msg">Loading accounts…</p>
 		{/if}
 	{/if}
 </section>

@@ -1,7 +1,13 @@
 """The lists API: the default Favourites, custom named lists, membership and the
 favourite toggle. The DB is reseeded per test (conftest) so each starts clean."""
 
+from collections.abc import Callable
+
 from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
+
+from app.models import User
+from app.services.users import create_user
 
 
 def _recipe_ids(client: TestClient) -> list[str]:
@@ -163,3 +169,37 @@ def test_recipe_lists_membership(client: TestClient) -> None:
 def test_recipe_lists_missing_recipe(client: TestClient) -> None:
     missing = "00000000-0000-4000-8000-000000000000"
     assert client.get(f"/api/recipes/{missing}/lists").status_code == 404
+
+
+def test_lists_are_private_to_their_owner(
+    client: TestClient, session: Session, act_as: Callable[[str], User]
+) -> None:
+    """A second account sees none of the first's lists and gets its own Favourites."""
+    recipe_id = _recipe_ids(client)[0]
+    mine = client.post("/api/lists", json={"name": "Dinner"}).json()["id"]
+    client.post(f"/api/recipes/{recipe_id}/favourite")
+
+    create_user(session, "plain", "plain-password")
+    act_as("plain")
+
+    lists = client.get("/api/lists").json()
+    assert [lst["name"] for lst in lists] == ["Favourites"]
+    assert lists[0]["recipe_count"] == 0
+    # Someone else's list is a 404, not a 403 — its existence isn't disclosed.
+    assert client.get(f"/api/lists/{mine}").status_code == 404
+    assert client.get(f"/api/recipes/{recipe_id}").json()["is_favourite"] is False
+
+
+def test_favouriting_is_per_user(
+    client: TestClient, session: Session, act_as: Callable[[str], User]
+) -> None:
+    recipe_id = _recipe_ids(client)[0]
+    create_user(session, "plain", "plain-password")
+
+    act_as("plain")
+    assert client.post(f"/api/recipes/{recipe_id}/favourite").json()["is_favourite"] is True
+
+    act_as("tester")
+    book = next(b for b in client.get("/api/books").json() if b["title"] == "With Recipes")
+    index = client.get(f"/api/books/{book['id']}/recipe-index").json()
+    assert all(entry["is_favourite"] is False for entry in index)
