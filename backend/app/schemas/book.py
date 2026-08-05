@@ -26,6 +26,9 @@ class BookSummary(BaseModel):
     title: str
     author: str
     recipe_count: int
+    # How many of those recipes the caller has opened — the numerator of the read
+    # percentage, which the client derives so rounding lives in one place.
+    seen_count: int
     has_cover: bool
     pubdate: date | None
     keywords: list[str]
@@ -43,6 +46,7 @@ class BookDetail(BaseModel):
     pubdate: date | None
     description: str
     recipe_count: int
+    seen_count: int
     has_cover: bool
     has_epub: bool
     added: datetime | None

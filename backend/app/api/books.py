@@ -18,12 +18,13 @@ from app.models.recipe_list import RecipeListItem
 from app.schemas.book import BookDetail, BookFilter, BookSummary, RecipeIndexEntry
 from app.schemas.recipe import RecipeRow
 from app.services.calibre import delete_books
+from app.services.views import seen_count, seen_counts
 
 router = APIRouter(tags=["books"])
 
 
 @router.get("/books", response_model=list[BookSummary])
-def list_books(session: SessionDep) -> list[BookSummary]:
+def list_books(session: SessionDep, user: CurrentUser) -> list[BookSummary]:
     # One grouped query, not N+1. count(Recipe.id) (not *) so books with no
     # recipes correctly count 0 across the outer join.
     rows = session.execute(
@@ -34,12 +35,16 @@ def list_books(session: SessionDep) -> list[BookSummary]:
         # selectinload avoids an N+1 on each book's keywords for the card chips.
         .options(selectinload(Book.keywords))
     ).all()
+    # A second grouped query for the caller's seen counts across the whole library,
+    # rather than a per-book count.
+    seen = seen_counts(session, user.id)
     return [
         BookSummary(
             id=book.id,
             title=book.title,
             author=book.author,
             recipe_count=recipe_count,
+            seen_count=seen.get(book.id, 0),
             has_cover=has_cover(book),
             pubdate=book.pubdate,
             keywords=sorted(k.name for k in book.keywords),
@@ -60,7 +65,7 @@ def list_book_filters(session: SessionDep) -> list[BookFilter]:
 
 
 @router.get("/books/{book_id}", response_model=BookDetail)
-def get_book(book_id: uuid.UUID, session: SessionDep) -> BookDetail:
+def get_book(book_id: uuid.UUID, session: SessionDep, user: CurrentUser) -> BookDetail:
     book = session.get(Book, book_id)
     if book is None:
         raise HTTPException(status_code=404, detail="book not found")
@@ -86,6 +91,7 @@ def get_book(book_id: uuid.UUID, session: SessionDep) -> BookDetail:
         pubdate=book.pubdate,
         description=book.description,
         recipe_count=total,
+        seen_count=seen_count(session, user.id, book_id),
         has_cover=has_cover(book),
         has_epub=has_epub(book),
         added=book.calibre_added_at,

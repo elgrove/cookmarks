@@ -58,7 +58,7 @@ def seen_counts(
     )
     if book_ids is not None:
         query = query.where(Recipe.book_id.in_(book_ids))
-    return {book_id: count for book_id, count in session.execute(query)}
+    return dict(session.execute(query).tuples().all())
 
 
 def seen_count(session: Session, user_id: uuid.UUID, book_id: uuid.UUID) -> int:

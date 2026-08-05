@@ -2,7 +2,8 @@
   "stats": {
     "books": 192,
     "recipes": 13403,
-    "keywords": 4968
+    "keywords": 4968,
+    "recipes_seen": 1204
   },
   "book_of_the_day": {
     "id": "1b2c3d4e-5f6a-4b7c-8d9e-0f1a2b3c4d5e",
@@ -11,5 +12,15 @@
     "description": "An example description for the contract fixture.",
     "recipe_count": 220,
     "has_cover": false
-  }
+  },
+  "continue_reading": [
+    {
+      "id": "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+      "title": "Salt, Fat, Acid, Heat",
+      "author": "Samin Nosrat",
+      "recipe_count": 100,
+      "seen_count": 37,
+      "has_cover": true
+    }
+  ]
 }

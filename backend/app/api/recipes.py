@@ -26,8 +26,8 @@ from app.schemas.recipe import (
     SimilarRecipes,
 )
 from app.services import embeddings
-from app.services.views import as_utc, record_view
 from app.services.vector_store import VectorStore
+from app.services.views import as_utc, record_view
 
 router = APIRouter(tags=["recipes"])
 

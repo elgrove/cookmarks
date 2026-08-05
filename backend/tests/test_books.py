@@ -1,4 +1,5 @@
 import uuid
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -7,10 +8,20 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.models import CalibreExclusion, Recipe, RecipeListItem
+from app.models import CalibreExclusion, Recipe, RecipeListItem, User
+from app.services.users import create_user
 from app.services.vector_store import EMBEDDING_DIMENSIONS, VectorStore
 
-EXPECTED_KEYS = {"id", "title", "author", "recipe_count", "has_cover", "pubdate", "keywords"}
+EXPECTED_KEYS = {
+    "id",
+    "title",
+    "author",
+    "recipe_count",
+    "seen_count",
+    "has_cover",
+    "pubdate",
+    "keywords",
+}
 DETAIL_KEYS = {
     "id",
     "title",
@@ -19,6 +30,7 @@ DETAIL_KEYS = {
     "pubdate",
     "description",
     "recipe_count",
+    "seen_count",
     "has_cover",
     "has_epub",
     "added",
@@ -94,6 +106,34 @@ def test_book_detail_empty_recipes(client: TestClient) -> None:
     body = client.get(f"/api/books/{book_id}").json()
     assert body["recipe_count"] == 0
     assert body["recipes"] == []
+
+
+def test_seen_counts_report_recipes_opened(client: TestClient) -> None:
+    book_id = _book_id(client, "With Recipes")
+    recipes = client.get(f"/api/books/{book_id}").json()["recipes"]
+    for recipe in recipes[:2]:
+        client.post(f"/api/recipes/{recipe['id']}/seen")
+    # Re-opening one of them doesn't double-count: the percentage counts distinct recipes.
+    client.post(f"/api/recipes/{recipes[0]['id']}/seen")
+
+    assert client.get(f"/api/books/{book_id}").json()["seen_count"] == 2
+    summaries = {b["title"]: b for b in client.get("/api/books").json()}
+    assert summaries["With Recipes"]["seen_count"] == 2
+    assert summaries["No Recipes Yet"]["seen_count"] == 0
+
+
+def test_seen_counts_are_per_user(
+    client: TestClient, session: Session, act_as: Callable[[str], User]
+) -> None:
+    """One account's reading tells another nothing — the figure is per-person."""
+    create_user(session, "other", "other-password")
+
+    book_id = _book_id(client, "With Recipes")
+    recipe_id = client.get(f"/api/books/{book_id}").json()["recipes"][0]["id"]
+    client.post(f"/api/recipes/{recipe_id}/seen")
+
+    act_as("other")
+    assert client.get(f"/api/books/{book_id}").json()["seen_count"] == 0
 
 
 def test_book_detail_404_for_unknown_book(client: TestClient) -> None:
