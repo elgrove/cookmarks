@@ -17,9 +17,9 @@ class RecipeView(UUIDAuditBase):
     __tablename__ = "recipe_views"
     __table_args__ = (UniqueConstraint("user_id", "recipe_id"),)
 
-    user_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), index=True
-    )
+    # No index on user_id: the (user_id, recipe_id) unique constraint already indexes
+    # it as the leading column, which every lookup here goes through.
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     recipe_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("recipes.id", ondelete="CASCADE"), index=True
     )

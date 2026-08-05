@@ -125,15 +125,22 @@ def test_seen_counts_report_recipes_opened(client: TestClient) -> None:
 def test_seen_counts_are_per_user(
     client: TestClient, session: Session, act_as: Callable[[str], User]
 ) -> None:
-    """One account's reading tells another nothing — the figure is per-person."""
+    """Each account sees its own reading and nothing of anyone else's."""
     create_user(session, "other", "other-password")
 
     book_id = _book_id(client, "With Recipes")
-    recipe_id = client.get(f"/api/books/{book_id}").json()["recipes"][0]["id"]
-    client.post(f"/api/recipes/{recipe_id}/seen")
+    recipes = client.get(f"/api/books/{book_id}").json()["recipes"]
+    for recipe in recipes[:2]:
+        client.post(f"/api/recipes/{recipe['id']}/seen")
 
     act_as("other")
     assert client.get(f"/api/books/{book_id}").json()["seen_count"] == 0
+    client.post(f"/api/recipes/{recipes[0]['id']}/seen")
+    assert client.get(f"/api/books/{book_id}").json()["seen_count"] == 1
+
+    # The first account's figure is untouched by the second's reading.
+    act_as("tester")
+    assert client.get(f"/api/books/{book_id}").json()["seen_count"] == 2
 
 
 def test_book_detail_404_for_unknown_book(client: TestClient) -> None:

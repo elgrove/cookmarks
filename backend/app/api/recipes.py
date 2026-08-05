@@ -11,6 +11,7 @@ from app.api.lists import favourite_list_id
 from app.covers import has_cover
 from app.db import SessionDep
 from app.epub import read_epub_image
+from app.models.base import as_utc
 from app.models.book import Book
 from app.models.recipe import Keyword, Recipe, recipe_keywords
 from app.models.recipe_list import RecipeListItem
@@ -27,7 +28,7 @@ from app.schemas.recipe import (
 )
 from app.services import embeddings
 from app.services.vector_store import VectorStore
-from app.services.views import as_utc, record_view
+from app.services.views import record_view
 
 router = APIRouter(tags=["recipes"])
 

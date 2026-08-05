@@ -93,7 +93,7 @@
 
 	{#if readPct !== null}
 		<section class="progress-block">
-			<p class="label">Read so far</p>
+			<h2 class="label">Read so far</h2>
 			<p class="figure">
 				<span class="pct">{readPct}%</span>
 				<span class="of mono"
@@ -108,7 +108,7 @@
 
 	{#if continueReading.length}
 		<section class="continue">
-			<p class="label">Continue reading</p>
+			<h2 class="label">Continue reading</h2>
 			<ul class="strip">
 				{#each continueReading as book (book.id)}
 					{@const pct = readPercent(book.seenCount, book.recipeCount) ?? 0}
@@ -265,6 +265,12 @@
 		max-width: 26rem;
 	}
 
+	.progress-block h2,
+	.continue h2 {
+		margin: 0;
+		font-weight: 400;
+	}
+
 	.figure {
 		display: flex;
 		align-items: baseline;
@@ -337,8 +343,10 @@
 		color: var(--muted);
 	}
 
+	/* The strip's only readable statement of progress — the rule beside it is
+	   decorative — so it carries body-text contrast, not caption grey. */
 	.cbook-meta {
-		color: var(--faint);
+		color: var(--muted);
 		margin: 0;
 	}
 

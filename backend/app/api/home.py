@@ -13,7 +13,6 @@ from app.models.recipe import Keyword, Recipe
 from app.models.recipe_view import RecipeView
 from app.schemas.home import BookFeature, ContinueBook, HomeData, Stats
 
-# How many part-read books the "continue reading" strip carries.
 CONTINUE_LIMIT = 4
 
 

@@ -167,7 +167,11 @@ const unit: VerifiableUnit<Props> = {
 					return `rendered ${rows.length} strip rows, expected ${books.length}`;
 				for (let i = 0; i < books.length; i++) {
 					const book = books[i];
-					const want = Math.min(100, Math.round((100 * book.seenCount) / book.recipeCount));
+					// Mirrors readPercent, null branch included: no recipes means no percentage.
+					const want =
+						book.recipeCount === 0
+							? 0
+							: Math.max(0, Math.min(100, Math.round((100 * book.seenCount) / book.recipeCount)));
 					const href = rows[i].querySelector('a')?.getAttribute('href');
 					if (href !== `/books/${book.id}`) return `row ${i} href=${href}`;
 					const text = rows[i].textContent ?? '';

@@ -35,8 +35,6 @@ def list_books(session: SessionDep, user: CurrentUser) -> list[BookSummary]:
         # selectinload avoids an N+1 on each book's keywords for the card chips.
         .options(selectinload(Book.keywords))
     ).all()
-    # A second grouped query for the caller's seen counts across the whole library,
-    # rather than a per-book count.
     seen = seen_counts(session, user.id)
     return [
         BookSummary(

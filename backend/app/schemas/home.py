@@ -30,8 +30,6 @@ class ContinueBook(BaseModel):
     """A book the caller is part-way through: started, not finished, most recently
     read first."""
 
-    model_config = ConfigDict(from_attributes=True)
-
     id: uuid.UUID
     title: str
     author: str

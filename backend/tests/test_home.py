@@ -1,10 +1,12 @@
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Book, Recipe, RecipeView
+from app.models import Book, Recipe, RecipeView, User
+from app.services.users import create_user
 
 FEATURE_KEYS = {"id", "title", "author", "description", "recipe_count", "has_cover"}
 CONTINUE_KEYS = {"id", "title", "author", "recipe_count", "seen_count", "has_cover"}
@@ -61,6 +63,25 @@ def test_continue_reading_drops_finished_books(client: TestClient) -> None:
         client.post(f"/api/recipes/{recipe_id}/seen")
     # Every recipe seen — there is nothing left to continue.
     assert client.get("/api/home").json()["continue_reading"] == []
+
+
+def test_home_progress_is_per_user(
+    client: TestClient, session: Session, act_as: Callable[[str], User]
+) -> None:
+    """The strip and the read stat are one account's own — the user filter sits in the
+    strip's join, so it is worth pinning."""
+    create_user(session, "other", "other-password")
+    client.post(f"/api/recipes/{_recipe_ids(client)[0]}/seen")
+
+    act_as("other")
+    body = client.get("/api/home").json()
+    assert body["stats"]["recipes_seen"] == 0
+    assert body["continue_reading"] == []
+
+    act_as("tester")
+    body = client.get("/api/home").json()
+    assert body["stats"]["recipes_seen"] == 1
+    assert [b["title"] for b in body["continue_reading"]] == ["With Recipes"]
 
 
 def test_continue_reading_is_most_recent_first(client: TestClient, session: Session) -> None:

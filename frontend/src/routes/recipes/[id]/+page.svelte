@@ -26,9 +26,6 @@
 	let similar = $state<SimilarRecipesData | undefined>(undefined);
 	// Monotonic guard so a slow earlier fetch can't overwrite a newer navigation.
 	let seq = 0;
-	// Recipes already reported as seen this visit, so paging back and forth doesn't
-	// re-post the same view.
-	const marked = new Set<string>();
 
 	// The forward-carried context: the page's query params with a context ensured.
 	function contextQueryOf(params: URLSearchParams): string {
@@ -115,12 +112,11 @@
 				next: r.next
 			};
 			status = 'ready';
-			// Record the read for the book's progress figure — fire-and-forget, and
-			// never surfaced: a missed view must not break the page.
-			if (!marked.has(id)) {
-				marked.add(id);
-				markRecipeSeen(id).catch((err) => console.error('failed to record recipe view', err));
-			}
+			// Record the read for the book's progress figure — fire-and-forget, and never
+			// surfaced: a missed view must not break the page. Posted on every open; the
+			// server owns the repeat-view window, so a client-side guard would only stop
+			// it ever seeing a genuine second sitting.
+			markRecipeSeen(id).catch((err) => console.error('failed to record recipe view', err));
 			refreshMemberships(id).catch((err) =>
 				console.error('failed to load list memberships', err)
 			);

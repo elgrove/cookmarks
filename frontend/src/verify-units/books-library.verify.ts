@@ -215,7 +215,10 @@ const unit: VerifiableUnit<Props> = {
 				// The grid renders in the fixture's order, so rules and started books align.
 				for (let i = 0; i < started.length; i++) {
 					const book = started[i];
-					const want = Math.min(100, Math.round((100 * (book.seenCount ?? 0)) / book.recipeCount));
+					const want = Math.max(
+						0,
+						Math.min(100, Math.round((100 * (book.seenCount ?? 0)) / book.recipeCount))
+					);
 					const width = rules[i].querySelector<HTMLElement>('.progress-fill')?.style.width;
 					if (width !== `${want}%`) return `${book.title}: fill width=${width} expected ${want}%`;
 				}

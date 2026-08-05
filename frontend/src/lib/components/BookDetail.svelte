@@ -644,7 +644,7 @@
 		color: var(--clay-deep);
 	}
 	dd.read .of {
-		color: var(--faint);
+		color: var(--muted);
 		margin-left: 0.5rem;
 	}
 

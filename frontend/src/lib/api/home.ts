@@ -16,7 +16,6 @@ export const bookFeatureSchema = z.object({
 	has_cover: z.boolean()
 });
 
-// A book the reader is part-way through — the "continue reading" strip.
 export const continueBookSchema = z.object({
 	id: z.string().uuid(),
 	title: z.string(),
