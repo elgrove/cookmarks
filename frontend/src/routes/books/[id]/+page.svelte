@@ -51,6 +51,7 @@
 				pubdate: b.pubdate,
 				description: b.description,
 				recipeCount: b.recipe_count,
+				seenCount: b.seen_count,
 				hasCover: b.has_cover,
 				hasEpub: b.has_epub,
 				added: b.added,

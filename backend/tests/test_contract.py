@@ -20,6 +20,7 @@ from app.schemas.recipe import (
     KeywordSummary,
     RecipeDetail,
     RecipeSearchResults,
+    RecipeViewState,
     SemanticSearchResults,
     SimilarRecipes,
 )
@@ -49,6 +50,12 @@ def test_home_model_matches_contract() -> None:
 def test_recipe_detail_model_matches_contract() -> None:
     example = _example("recipe.example.json")
     dumped = RecipeDetail.model_validate(example).model_dump(mode="json")
+    assert dumped == example
+
+
+def test_recipe_view_state_model_matches_contract() -> None:
+    example = _example("recipeview.example.json")
+    dumped = RecipeViewState.model_validate(example).model_dump(mode="json")
     assert dumped == example
 
 

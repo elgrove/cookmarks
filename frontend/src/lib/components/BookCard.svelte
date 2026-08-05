@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { readPercent } from '$lib/progress';
 	import { cleanTitle } from '$lib/title';
 
 	let {
@@ -6,13 +7,19 @@
 		title,
 		author,
 		recipeCount,
-		hasCover
+		seenCount = 0,
+		hasCover,
+		showCount = true
 	}: {
 		id: string;
 		title: string;
 		author: string;
 		recipeCount: number;
+		seenCount?: number;
 		hasCover: boolean;
+		/** The count circle competes with the progress rule for the same clay, so
+		 *  surfaces that state the count in words (the home strip) turn it off. */
+		showCount?: boolean;
 	} = $props();
 
 	// Cards show the clean name only; the colon-subtitle is a detail-page affordance.
@@ -20,10 +27,18 @@
 
 	let coverFailed = $state(false);
 	let showCover = $derived(hasCover && !coverFailed);
-	// Extraction state lives on the cover as a count circle; fold the count into the
-	// link's accessible name since the circle itself is decorative.
+	// Read progress rides the bottom edge of the cover plate as a clay rule; a book
+	// nothing has been read from carries none.
+	let readPct = $derived(readPercent(seenCount, recipeCount));
+	let started = $derived(readPct !== null && seenCount > 0);
+	// Extraction and reading state live on the cover as a count circle and a rule;
+	// fold both into the link's accessible name since they are decorative.
 	let linkLabel = $derived(
-		recipeCount > 0 ? `${displayTitle}, ${recipeCount} recipes` : displayTitle
+		recipeCount === 0
+			? displayTitle
+			: started
+				? `${displayTitle}, ${seenCount} of ${recipeCount} recipes seen`
+				: `${displayTitle}, ${recipeCount} recipes`
 	);
 </script>
 
@@ -44,8 +59,13 @@
 				<!-- §7: missing cover → hairline plate bearing the title in serif. -->
 				<span class="plate-title" aria-hidden="true">{displayTitle}</span>
 			{/if}
-			{#if recipeCount > 0}
+			{#if showCount && recipeCount > 0}
 				<span class="count-badge" aria-hidden="true">{recipeCount}</span>
+			{/if}
+			{#if started}
+				<span class="progress" aria-hidden="true">
+					<span class="progress-fill" style:width={`${readPct}%`}></span>
+				</span>
 			{/if}
 		</div>
 	</a>
@@ -55,7 +75,8 @@
 	</div>
 	<!-- Mobile rows only (hidden on the desktop cover grid): recipe count + chevron. -->
 	<span class="row-aside" aria-hidden="true">
-		{#if recipeCount > 0}<span class="row-count">{recipeCount}</span>{/if}<span class="chev"
+		{#if showCount && recipeCount > 0}<span class="row-count">{recipeCount}</span>{/if}<span
+			class="chev"
 			>›</span
 		>
 	</span>
@@ -136,6 +157,23 @@
 		font-size: 0.8rem;
 		line-height: 1;
 		box-shadow: 0 0 0 2.5px var(--bg);
+	}
+
+	/* Read progress: a hairline rule along the plate's bottom edge, filled in clay
+	   as far as the book has been read. Absent until something has been read. */
+	.progress {
+		position: absolute;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		height: 3px;
+		background: var(--line);
+	}
+
+	.progress-fill {
+		display: block;
+		height: 100%;
+		background: var(--clay);
 	}
 
 	.meta {

@@ -3,7 +3,8 @@ import { z } from 'zod';
 export const statsSchema = z.object({
 	books: z.number().int().nonnegative(),
 	recipes: z.number().int().nonnegative(),
-	keywords: z.number().int().nonnegative()
+	keywords: z.number().int().nonnegative(),
+	recipes_seen: z.number().int().nonnegative()
 });
 
 export const bookFeatureSchema = z.object({
@@ -15,9 +16,19 @@ export const bookFeatureSchema = z.object({
 	has_cover: z.boolean()
 });
 
+export const continueBookSchema = z.object({
+	id: z.string().uuid(),
+	title: z.string(),
+	author: z.string(),
+	recipe_count: z.number().int().nonnegative(),
+	seen_count: z.number().int().nonnegative(),
+	has_cover: z.boolean()
+});
+
 export const homeSchema = z.object({
 	stats: statsSchema,
-	book_of_the_day: bookFeatureSchema.nullable()
+	book_of_the_day: bookFeatureSchema.nullable(),
+	continue_reading: z.array(continueBookSchema)
 });
 
 export type HomeResponse = z.infer<typeof homeSchema>;

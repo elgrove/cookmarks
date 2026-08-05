@@ -4,6 +4,7 @@
 		title: string;
 		author: string;
 		recipeCount: number;
+		seenCount?: number;
 		hasCover: boolean;
 		keywords?: string[];
 	};
@@ -65,6 +66,10 @@
 	});
 
 	let pendingCount = $derived(visible.filter((b) => b.recipeCount === 0).length);
+	// How many visible books have been started — one progress rule each.
+	let progressCount = $derived(
+		visible.filter((b) => (b.seenCount ?? 0) > 0 && b.recipeCount > 0).length
+	);
 	let filtered = $derived(Boolean(query) || extractedOnly || selectedKeywords.length > 0);
 	let countLabel = $derived(filtered ? `${visible.length} of ${books.length}` : `${books.length}`);
 
@@ -171,6 +176,7 @@
 	data-verify-total={books.length}
 	data-verify-empty={visible.length === 0 ? 'true' : 'false'}
 	data-verify-pending={pendingCount}
+	data-verify-progress-count={progressCount}
 	data-verify-sort={sort}
 	data-verify-query={query}
 	data-verify-extracted-only={extractedOnly ? 'true' : 'false'}
@@ -271,6 +277,7 @@
 						title={book.title}
 						author={book.author}
 						recipeCount={book.recipeCount}
+						seenCount={book.seenCount ?? 0}
 						hasCover={book.hasCover}
 					/>
 				</li>

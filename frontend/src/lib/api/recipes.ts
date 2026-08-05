@@ -43,6 +43,27 @@ export async function fetchRecipeDetail(
 	return recipeDetailSchema.parse(await res.json());
 }
 
+// Mirrors the RecipeViewState wire shape from POST /api/recipes/{id}/seen (snake_case).
+export const recipeViewStateSchema = z.object({
+	view_count: z.number().int().positive(),
+	first_viewed_at: z.string(),
+	last_viewed_at: z.string()
+});
+
+export type RecipeViewState = z.infer<typeof recipeViewStateSchema>;
+
+/** Record that the reader has opened this recipe — the input to a book's read
+ *  percentage. Callers fire this and forget it; a missed view must never break
+ *  the page. `fetchFn` is injectable for tests. */
+export async function markRecipeSeen(
+	id: string,
+	fetchFn: typeof fetch = fetch
+): Promise<RecipeViewState> {
+	const res = await fetchFn(`/api/recipes/${id}/seen`, { method: 'POST' });
+	if (!res.ok) throw new Error(`POST /api/recipes/${id}/seen → ${res.status}`);
+	return recipeViewStateSchema.parse(await res.json());
+}
+
 // Mirrors the wire shapes from GET /api/recipes and GET /api/keywords (snake_case).
 export const recipeSummarySchema = z.object({
 	id: z.string().uuid(),

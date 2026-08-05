@@ -23,6 +23,7 @@ const bookSchema = z.object({
 	pubdate: z.string().nullable(),
 	description: z.string(),
 	recipeCount: z.number().int().nonnegative(),
+	seenCount: z.number().int().nonnegative(),
 	hasCover: z.boolean(),
 	hasEpub: z.boolean(),
 	added: z.string().nullable(),
@@ -60,6 +61,7 @@ const pastaGrannies: BookDetailData = {
 	description:
 		'Learn how to make pasta like Italian nonnas do. Inspired by the hugely popular YouTube channel of the same name, Pasta Grannies is a collection of time-perfected Italian recipes from the people who have spent a lifetime cooking for love, not a living: Italian grandmothers. Featuring easy, accessible recipes from all over Italy, you will be transported into the very heart of the Italian home.',
 	recipeCount: 49,
+	seenCount: 12,
 	hasCover: true,
 	hasEpub: true,
 	added: '2025-05-22T20:56:10Z',
@@ -93,10 +95,36 @@ const unit: VerifiableUnit<Props> = {
 				book: {
 					...pastaGrannies,
 					recipeCount: 0,
+					seenCount: 0,
 					recipes: [],
 					hasCover: false,
 					keywords: []
 				}
+			}
+		},
+		{
+			id: 'unseen',
+			description: 'a book nothing has been read from yet reads 0%',
+			props: { book: { ...pastaGrannies, seenCount: 0 } }
+		},
+		{
+			id: 'fully-read',
+			description: 'every recipe seen reads 100%',
+			props: { book: { ...pastaGrannies, seenCount: 49 } }
+		},
+		{
+			id: 'seen-over-count',
+			description:
+				'probe: a stale seen count above the total clamps to 100%, never overflows',
+			probe: true,
+			props: { book: { ...pastaGrannies, seenCount: 80 } }
+		},
+		{
+			id: 'unextracted-progress',
+			description: 'probe: nothing extracted → no percentage at all, never NaN',
+			probe: true,
+			props: {
+				book: { ...pastaGrannies, recipeCount: 0, seenCount: 4, recipes: [], keywords: [] }
 			}
 		},
 		{
@@ -109,7 +137,8 @@ const unit: VerifiableUnit<Props> = {
 					isbn: null,
 					added: null,
 					recipes: recipes(3),
-					recipeCount: 3
+					recipeCount: 3,
+					seenCount: 1
 				}
 			}
 		},
@@ -180,7 +209,7 @@ const unit: VerifiableUnit<Props> = {
 			description: 'probe: confirming on a zero-recipe book omits the recipe-loss warning',
 			probe: true,
 			props: {
-				book: { ...pastaGrannies, recipeCount: 0, recipes: [], keywords: [] },
+				book: { ...pastaGrannies, recipeCount: 0, seenCount: 0, recipes: [], keywords: [] },
 				onDelete: () => {}
 			},
 			act: ({ click }) => click(DELETE_BTN)
@@ -205,6 +234,31 @@ const unit: VerifiableUnit<Props> = {
 			check: ({ contract, props }) =>
 				Number(contract['recipe-count']) === props.book.recipeCount ||
 				`count=${contract['recipe-count']} expected ${props.book.recipeCount}`
+		},
+		{
+			id: 'read-percentage',
+			description:
+				'read % is the seen share rounded and clamped to 0–100, and absent entirely when nothing is extracted',
+			check: ({ contract, root, props }) => {
+				const { seenCount, recipeCount } = props.book;
+				if (Number(contract['seen-count']) !== seenCount)
+					return `seen-count=${contract['seen-count']} expected ${seenCount}`;
+				const shown = contract['read-pct'] ?? '';
+				const row = [...root.querySelectorAll('dl.meta div')].find(
+					(d) => d.querySelector('dt')?.textContent?.trim() === 'Read'
+				);
+				if (recipeCount === 0) {
+					if (shown !== '') return `read-pct=${shown} for an unextracted book`;
+					return row === undefined || 'a read row is rendered with nothing extracted';
+				}
+				const want = Math.max(0, Math.min(100, Math.round((100 * seenCount) / recipeCount)));
+				if (Number(shown) !== want) return `read-pct=${shown} expected ${want}`;
+				if (!row) return 'no read row rendered';
+				return (
+					(row.textContent ?? '').includes(`${want}%`) ||
+					`read row text="${(row.textContent ?? '').trim()}"`
+				);
+			}
 		},
 		{
 			id: 'book-keywords',

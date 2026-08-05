@@ -1,14 +1,19 @@
+import uuid
 from datetime import date
 
 from fastapi import APIRouter
 from sqlalchemy import exists, func, select
 from sqlalchemy.orm import Session
 
+from app.api.deps import CurrentUser
 from app.covers import has_cover
 from app.db import SessionDep
 from app.models.book import Book
 from app.models.recipe import Keyword, Recipe
-from app.schemas.home import BookFeature, HomeData, Stats
+from app.models.recipe_view import RecipeView
+from app.schemas.home import BookFeature, ContinueBook, HomeData, Stats
+
+CONTINUE_LIMIT = 4
 
 
 def _book_of_the_day(session: Session) -> BookFeature | None:
@@ -36,14 +41,59 @@ def _book_of_the_day(session: Session) -> BookFeature | None:
     )
 
 
+def _continue_reading(session: Session, user_id: uuid.UUID) -> list[ContinueBook]:
+    """The books the caller has started but not finished, most recently read first.
+    A finished book has nothing left to continue, so it drops out of the strip."""
+    seen = func.count(RecipeView.id)
+    total = (
+        select(func.count(Recipe.id))
+        .where(Recipe.book_id == Book.id)
+        .correlate(Book)
+        .scalar_subquery()
+    )
+    rows = session.execute(
+        select(Book, seen, total)
+        .join(Recipe, Recipe.book_id == Book.id)
+        .join(
+            RecipeView,
+            (RecipeView.recipe_id == Recipe.id) & (RecipeView.user_id == user_id),
+        )
+        .group_by(Book.id)
+        .having(seen < total)
+        .order_by(func.max(RecipeView.last_viewed_at).desc())
+        .limit(CONTINUE_LIMIT)
+    ).all()
+    return [
+        ContinueBook(
+            id=book.id,
+            title=book.title,
+            author=book.author,
+            recipe_count=recipe_count,
+            seen_count=seen_count,
+            has_cover=has_cover(book),
+        )
+        for book, seen_count, recipe_count in rows
+    ]
+
+
 router = APIRouter(tags=["home"])
 
 
 @router.get("/home", response_model=HomeData)
-def home(session: SessionDep) -> HomeData:
+def home(session: SessionDep, user: CurrentUser) -> HomeData:
     stats = Stats(
         books=session.scalar(select(func.count()).select_from(Book)) or 0,
         recipes=session.scalar(select(func.count()).select_from(Recipe)) or 0,
         keywords=session.scalar(select(func.count()).select_from(Keyword)) or 0,
+        recipes_seen=session.scalar(
+            select(func.count())
+            .select_from(RecipeView)
+            .where(RecipeView.user_id == user.id)
+        )
+        or 0,
     )
-    return HomeData(stats=stats, book_of_the_day=_book_of_the_day(session))
+    return HomeData(
+        stats=stats,
+        book_of_the_day=_book_of_the_day(session),
+        continue_reading=_continue_reading(session, user.id),
+    )

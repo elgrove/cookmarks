@@ -9,19 +9,22 @@ const bookSchema = z.object({
 	title: z.string(),
 	author: z.string(),
 	recipeCount: z.number().int().nonnegative(),
+	seenCount: z.number().int().nonnegative().optional(),
 	hasCover: z.boolean(),
 	keywords: z.array(z.string()).optional()
 });
 
 // Incoming (recently-added) order is deliberately NOT alphabetical, so a title
 // sort visibly reorders the list. Keyword counts vary (one over the 3-chip cap, one
-// with none) so the card chip behaviour is exercised across the grid.
+// with none) so the card chip behaviour is exercised across the grid. Seen counts
+// mix started, untouched and finished books, so progress rules appear on some cards
+// and not others.
 const populated: LibraryBook[] = [
-	{ id: 'a1', title: 'Salt, Fat, Acid, Heat', author: 'Samin Nosrat', recipeCount: 100, hasCover: false, keywords: ['Fundamentals', 'Technique', 'Mediterranean', 'Reference'] },
-	{ id: 'a2', title: 'A Modern Way to Eat', author: 'Anna Jones', recipeCount: 200, hasCover: false, keywords: ['Vegetarian', 'Weeknight'] },
-	{ id: 'a3', title: 'The Nordic Baking Book', author: 'Magnus Nilsson', recipeCount: 84, hasCover: true, keywords: ['Baking', 'Nordic', 'Bread'] },
+	{ id: 'a1', title: 'Salt, Fat, Acid, Heat', author: 'Samin Nosrat', recipeCount: 100, seenCount: 37, hasCover: false, keywords: ['Fundamentals', 'Technique', 'Mediterranean', 'Reference'] },
+	{ id: 'a2', title: 'A Modern Way to Eat', author: 'Anna Jones', recipeCount: 200, seenCount: 0, hasCover: false, keywords: ['Vegetarian', 'Weeknight'] },
+	{ id: 'a3', title: 'The Nordic Baking Book', author: 'Magnus Nilsson', recipeCount: 84, seenCount: 84, hasCover: true, keywords: ['Baking', 'Nordic', 'Bread'] },
 	{ id: 'a4', title: 'A Modern Way to Cook', author: 'Anna Jones', recipeCount: 150, hasCover: false, keywords: [] },
-	{ id: 'a5', title: 'Persiana', author: 'Sabrina Ghayour', recipeCount: 92, hasCover: true, keywords: ['Persian', 'Middle Eastern', 'Mezze'] }
+	{ id: 'a5', title: 'Persiana', author: 'Sabrina Ghayour', recipeCount: 92, seenCount: 5, hasCover: true, keywords: ['Persian', 'Middle Eastern', 'Mezze'] }
 ];
 
 const SEARCH = 'input[type="search"]';
@@ -31,9 +34,11 @@ const EXTRACTED = '.extracted-checkbox';
 // A deliberate mix of extracted (recipeCount > 0) and unextracted (recipeCount === 0)
 // books, so the "Extracted only" filter visibly drops the pending ones.
 const mixed: LibraryBook[] = [
-	{ id: 'm1', title: 'Salt, Fat, Acid, Heat', author: 'Samin Nosrat', recipeCount: 100, hasCover: false },
-	{ id: 'm2', title: 'Just added, not yet extracted', author: 'Unknown', recipeCount: 0, hasCover: false },
-	{ id: 'm3', title: 'Persiana', author: 'Sabrina Ghayour', recipeCount: 92, hasCover: true },
+	{ id: 'm1', title: 'Salt, Fat, Acid, Heat', author: 'Samin Nosrat', recipeCount: 100, seenCount: 12, hasCover: false },
+	// A stale seen count on an unextracted book: the card must show no progress rule
+	// rather than dividing by zero.
+	{ id: 'm2', title: 'Just added, not yet extracted', author: 'Unknown', recipeCount: 0, seenCount: 3, hasCover: false },
+	{ id: 'm3', title: 'Persiana', author: 'Sabrina Ghayour', recipeCount: 92, seenCount: 0, hasCover: true },
 	{ id: 'm4', title: 'Another pending import', author: 'Unknown', recipeCount: 0, hasCover: false }
 ];
 
@@ -194,6 +199,47 @@ const unit: VerifiableUnit<Props> = {
 			check: ({ contract }) =>
 				(contract.empty === 'true' && contract.count === '0') ||
 				`expected empty=true count=0, saw empty=${contract.empty} count=${contract.count}`
+		},
+		{
+			id: 'progress-rules',
+			description:
+				'one progress rule per started book — none for untouched or unextracted ones — and each fill matches its read share',
+			onlyFixtures: ['populated', 'extracted-only-mixed'],
+			check: ({ contract, root, props }) => {
+				const started = props.books.filter((b) => (b.seenCount ?? 0) > 0 && b.recipeCount > 0);
+				if (Number(contract['progress-count']) !== started.length)
+					return `progress-count=${contract['progress-count']} expected ${started.length}`;
+				const rules = [...root.querySelectorAll('.progress')];
+				if (rules.length !== started.length)
+					return `rendered ${rules.length} progress rules, expected ${started.length}`;
+				// The grid renders in the fixture's order, so rules and started books align.
+				for (let i = 0; i < started.length; i++) {
+					const book = started[i];
+					const want = Math.max(
+						0,
+						Math.min(100, Math.round((100 * (book.seenCount ?? 0)) / book.recipeCount))
+					);
+					const width = rules[i].querySelector<HTMLElement>('.progress-fill')?.style.width;
+					if (width !== `${want}%`) return `${book.title}: fill width=${width} expected ${want}%`;
+				}
+				return true;
+			}
+		},
+		{
+			id: 'progress-in-link-label',
+			description:
+				'a started book folds its read count into the card link name rather than adding a second focus stop',
+			onlyFixtures: ['populated'],
+			check: ({ root, props }) => {
+				const started = props.books.find((b) => (b.seenCount ?? 0) > 0);
+				if (!started) return 'fixture has no started book';
+				const link = root.querySelector(`a[href="/books/${started.id}"]`);
+				const label = link?.getAttribute('aria-label') ?? '';
+				return (
+					label.includes(`${started.seenCount} of ${started.recipeCount} recipes seen`) ||
+					`link label="${label}"`
+				);
+			}
 		},
 		{
 			id: 'extracted-badges',

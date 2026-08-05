@@ -11,6 +11,7 @@ from app.api.lists import favourite_list_id
 from app.covers import has_cover
 from app.db import SessionDep
 from app.epub import read_epub_image
+from app.models.base import as_utc
 from app.models.book import Book
 from app.models.recipe import Keyword, Recipe, recipe_keywords
 from app.models.recipe_list import RecipeListItem
@@ -20,12 +21,14 @@ from app.schemas.recipe import (
     RecipeNeighbour,
     RecipeSearchResults,
     RecipeSummary,
+    RecipeViewState,
     SemanticResult,
     SemanticSearchResults,
     SimilarRecipes,
 )
 from app.services import embeddings
 from app.services.vector_store import VectorStore
+from app.services.views import record_view
 
 router = APIRouter(tags=["recipes"])
 
@@ -408,6 +411,23 @@ def get_recipe(
         context=resolved_context,
         previous=previous,
         next=next_,
+    )
+
+
+@router.post("/recipes/{recipe_id}/seen", response_model=RecipeViewState)
+def mark_recipe_seen(
+    recipe_id: uuid.UUID, session: SessionDep, user: CurrentUser
+) -> RecipeViewState:
+    """Record that the caller has opened this recipe — the input to a book's read
+    percentage. Explicit rather than a side effect of GET /recipes/{id}, so reading
+    a recipe stays a read."""
+    if session.get(Recipe, recipe_id) is None:
+        raise HTTPException(status_code=404, detail="recipe not found")
+    view = record_view(session, user.id, recipe_id)
+    return RecipeViewState(
+        view_count=view.view_count,
+        first_viewed_at=as_utc(view.created_at),
+        last_viewed_at=as_utc(view.last_viewed_at),
     )
 
 

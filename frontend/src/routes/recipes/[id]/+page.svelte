@@ -6,7 +6,7 @@
 	import SimilarRecipes, {
 		type SimilarRecipesData
 	} from '$lib/components/SimilarRecipes.svelte';
-	import { fetchRecipeDetail, fetchSimilarRecipes } from '$lib/api/recipes';
+	import { fetchRecipeDetail, fetchSimilarRecipes, markRecipeSeen } from '$lib/api/recipes';
 	import {
 		addRecipeToList,
 		createList,
@@ -112,6 +112,11 @@
 				next: r.next
 			};
 			status = 'ready';
+			// Record the read for the book's progress figure — fire-and-forget, and never
+			// surfaced: a missed view must not break the page. Posted on every open; the
+			// server owns the repeat-view window, so a client-side guard would only stop
+			// it ever seeing a genuine second sitting.
+			markRecipeSeen(id).catch((err) => console.error('failed to record recipe view', err));
 			refreshMemberships(id).catch((err) =>
 				console.error('failed to load list memberships', err)
 			);

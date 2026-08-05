@@ -14,6 +14,7 @@ import {
 	keywordSummarySchema,
 	recipeDetailSchema,
 	recipeSearchResultsSchema,
+	recipeViewStateSchema,
 	semanticSearchResultsSchema,
 	similarRecipesSchema
 } from './recipes';
@@ -84,6 +85,17 @@ describe('api wire contract', () => {
 		const { has_image, ...rest } = example;
 		const drifted = { ...rest, hasImage: has_image };
 		expect(() => recipeDetailSchema.parse(drifted)).toThrow();
+	});
+
+	it('accepts the recipe-view example', () => {
+		expect(() => recipeViewStateSchema.parse(load('recipeview.example.json'))).not.toThrow();
+	});
+
+	it('rejects a recipe-view example with a drifted field name', () => {
+		const example = load('recipeview.example.json');
+		const { view_count, ...rest } = example;
+		const drifted = { ...rest, viewCount: view_count };
+		expect(() => recipeViewStateSchema.parse(drifted)).toThrow();
 	});
 
 	it('accepts the recipes search example', () => {

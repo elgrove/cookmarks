@@ -6,6 +6,7 @@ export const bookSummarySchema = z.object({
 	title: z.string(),
 	author: z.string(),
 	recipe_count: z.number().int().nonnegative(),
+	seen_count: z.number().int().nonnegative(),
 	has_cover: z.boolean(),
 	pubdate: z.string().nullable(),
 	keywords: z.array(z.string())
@@ -58,6 +59,7 @@ export const bookDetailSchema = z.object({
 	pubdate: z.string().nullable(),
 	description: z.string(),
 	recipe_count: z.number().int().nonnegative(),
+	seen_count: z.number().int().nonnegative(),
 	has_cover: z.boolean(),
 	has_epub: z.boolean(),
 	added: z.string().nullable(),

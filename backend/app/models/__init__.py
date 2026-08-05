@@ -5,6 +5,7 @@ from app.models.config import Config
 from app.models.enums import AIProvider, ExtractionMethod, TaskStatus, TaskType
 from app.models.recipe import Keyword, Recipe, recipe_keywords
 from app.models.recipe_list import RecipeList, RecipeListItem
+from app.models.recipe_view import RecipeView
 from app.models.task_run import TaskRun
 from app.models.user import User, UserSession
 
@@ -19,6 +20,7 @@ __all__ = [
     "Recipe",
     "RecipeList",
     "RecipeListItem",
+    "RecipeView",
     "TaskRun",
     "TaskStatus",
     "TaskType",
