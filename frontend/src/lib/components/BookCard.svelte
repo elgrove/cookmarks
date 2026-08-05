@@ -8,7 +8,8 @@
 		author,
 		recipeCount,
 		seenCount = 0,
-		hasCover
+		hasCover,
+		showCount = true
 	}: {
 		id: string;
 		title: string;
@@ -16,6 +17,9 @@
 		recipeCount: number;
 		seenCount?: number;
 		hasCover: boolean;
+		/** The count circle competes with the progress rule for the same clay, so
+		 *  surfaces that state the count in words (the home strip) turn it off. */
+		showCount?: boolean;
 	} = $props();
 
 	// Cards show the clean name only; the colon-subtitle is a detail-page affordance.
@@ -55,7 +59,7 @@
 				<!-- §7: missing cover → hairline plate bearing the title in serif. -->
 				<span class="plate-title" aria-hidden="true">{displayTitle}</span>
 			{/if}
-			{#if recipeCount > 0}
+			{#if showCount && recipeCount > 0}
 				<span class="count-badge" aria-hidden="true">{recipeCount}</span>
 			{/if}
 			{#if started}
@@ -71,7 +75,8 @@
 	</div>
 	<!-- Mobile rows only (hidden on the desktop cover grid): recipe count + chevron. -->
 	<span class="row-aside" aria-hidden="true">
-		{#if recipeCount > 0}<span class="row-count">{recipeCount}</span>{/if}<span class="chev"
+		{#if showCount && recipeCount > 0}<span class="row-count">{recipeCount}</span>{/if}<span
+			class="chev"
 			>›</span
 		>
 	</span>
