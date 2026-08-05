@@ -16,6 +16,7 @@
 				title: b.title,
 				author: b.author,
 				recipeCount: b.recipe_count,
+				seenCount: b.seen_count,
 				hasCover: b.has_cover,
 				keywords: b.keywords
 			}));

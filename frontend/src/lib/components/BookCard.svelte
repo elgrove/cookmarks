@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { readPercent } from '$lib/progress';
 	import { cleanTitle } from '$lib/title';
 
 	let {
@@ -6,12 +7,14 @@
 		title,
 		author,
 		recipeCount,
+		seenCount = 0,
 		hasCover
 	}: {
 		id: string;
 		title: string;
 		author: string;
 		recipeCount: number;
+		seenCount?: number;
 		hasCover: boolean;
 	} = $props();
 
@@ -20,10 +23,18 @@
 
 	let coverFailed = $state(false);
 	let showCover = $derived(hasCover && !coverFailed);
-	// Extraction state lives on the cover as a count circle; fold the count into the
-	// link's accessible name since the circle itself is decorative.
+	// Read progress rides the bottom edge of the cover plate as a clay rule; a book
+	// nothing has been read from carries none.
+	let readPct = $derived(readPercent(seenCount, recipeCount));
+	let started = $derived(readPct !== null && seenCount > 0);
+	// Extraction and reading state live on the cover as a count circle and a rule;
+	// fold both into the link's accessible name since they are decorative.
 	let linkLabel = $derived(
-		recipeCount > 0 ? `${displayTitle}, ${recipeCount} recipes` : displayTitle
+		recipeCount === 0
+			? displayTitle
+			: started
+				? `${displayTitle}, ${seenCount} of ${recipeCount} recipes seen`
+				: `${displayTitle}, ${recipeCount} recipes`
 	);
 </script>
 
@@ -46,6 +57,11 @@
 			{/if}
 			{#if recipeCount > 0}
 				<span class="count-badge" aria-hidden="true">{recipeCount}</span>
+			{/if}
+			{#if started}
+				<span class="progress" aria-hidden="true">
+					<span class="progress-fill" style:width={`${readPct}%`}></span>
+				</span>
 			{/if}
 		</div>
 	</a>
@@ -136,6 +152,23 @@
 		font-size: 0.8rem;
 		line-height: 1;
 		box-shadow: 0 0 0 2.5px var(--bg);
+	}
+
+	/* Read progress: a hairline rule along the plate's bottom edge, filled in clay
+	   as far as the book has been read. Absent until something has been read. */
+	.progress {
+		position: absolute;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		height: 3px;
+		background: var(--line);
+	}
+
+	.progress-fill {
+		display: block;
+		height: 100%;
+		background: var(--clay);
 	}
 
 	.meta {

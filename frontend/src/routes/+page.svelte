@@ -1,16 +1,23 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import HomeLanding, { type BookOfTheDay } from '$lib/components/HomeLanding.svelte';
+	import HomeLanding, {
+		type BookOfTheDay,
+		type ContinueBook,
+		type ReadProgress
+	} from '$lib/components/HomeLanding.svelte';
 	import { fetchHome } from '$lib/api/home';
 	import { pageTitle } from '$lib/title';
 
 	let status = $state<'loading' | 'error' | 'ready'>('loading');
 	let bookOfTheDay = $state<BookOfTheDay | null>(null);
+	let progress = $state<ReadProgress>({ recipes: 0, recipesSeen: 0 });
+	let continueReading = $state<ContinueBook[]>([]);
 
 	async function load() {
 		status = 'loading';
 		try {
-			const b = (await fetchHome()).book_of_the_day;
+			const home = await fetchHome();
+			const b = home.book_of_the_day;
 			bookOfTheDay = b
 				? {
 						id: b.id,
@@ -21,6 +28,15 @@
 						hasCover: b.has_cover
 					}
 				: null;
+			progress = { recipes: home.stats.recipes, recipesSeen: home.stats.recipes_seen };
+			continueReading = home.continue_reading.map((c) => ({
+				id: c.id,
+				title: c.title,
+				author: c.author,
+				recipeCount: c.recipe_count,
+				seenCount: c.seen_count,
+				hasCover: c.has_cover
+			}));
 			status = 'ready';
 		} catch (err) {
 			console.error('failed to load home', err);
@@ -36,7 +52,7 @@
 </svelte:head>
 
 {#if status === 'ready'}
-	<HomeLanding {bookOfTheDay} />
+	<HomeLanding {bookOfTheDay} {progress} {continueReading} />
 {:else}
 	<div class="status">
 		{#if status === 'loading'}

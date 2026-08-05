@@ -13,6 +13,7 @@
 		pubdate: string | null;
 		description: string;
 		recipeCount: number;
+		seenCount: number;
 		hasCover: boolean;
 		hasEpub: boolean;
 		added: string | null;
@@ -43,6 +44,7 @@
 
 <script lang="ts">
 	import { plainText } from '$lib/html';
+	import { readPercent } from '$lib/progress';
 	import { cleanTitle, titleSubtitle } from '$lib/title';
 	import { keywordHref } from '$lib/api/recipes';
 	import ExtractButton from '$lib/components/ExtractButton.svelte';
@@ -85,6 +87,7 @@
 	let added = $derived(formatDay(book.added));
 	let shown = $derived(book.recipes.length);
 	let moreCount = $derived(Math.max(0, book.recipeCount - shown));
+	let readPct = $derived(readPercent(book.seenCount, book.recipeCount));
 </script>
 
 <article
@@ -92,6 +95,8 @@
 	data-verify-unit="book-detail"
 	data-verify-id={book.id}
 	data-verify-recipe-count={book.recipeCount}
+	data-verify-seen-count={book.seenCount}
+	data-verify-read-pct={readPct === null ? '' : readPct}
 	data-verify-shown={shown}
 	data-verify-has-cover={book.hasCover ? 'true' : 'false'}
 	data-verify-has-epub={book.hasEpub ? 'true' : 'false'}
@@ -240,6 +245,15 @@
 				{#if year}<div><dt>Published</dt><dd>{year}</dd></div>{/if}
 				{#if book.isbn}<div><dt>ISBN</dt><dd>{book.isbn}</dd></div>{/if}
 				<div><dt>Recipes</dt><dd>{book.recipeCount}</dd></div>
+				{#if readPct !== null}
+					<div>
+						<dt>Read</dt>
+						<dd class="read">
+							<span class="pct">{readPct}%</span>
+							<span class="of">{book.seenCount} of {book.recipeCount}</span>
+						</dd>
+					</div>
+				{/if}
 				{#if added}<div><dt>Added</dt><dd>{added}</dd></div>{/if}
 				<div><dt>Source</dt><dd>Calibre</dd></div>
 			</dl>
@@ -623,6 +637,15 @@
 		font-size: 0.8rem;
 		letter-spacing: 0;
 		text-align: right;
+	}
+	/* Read progress: the percentage leads, the fraction sits behind it as the
+	   quieter half of the figure. */
+	dd.read .pct {
+		color: var(--clay-deep);
+	}
+	dd.read .of {
+		color: var(--faint);
+		margin-left: 0.5rem;
 	}
 
 	@media (max-width: 900px) {
