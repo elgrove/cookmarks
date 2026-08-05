@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
@@ -85,6 +86,15 @@ class SemanticSearchResults(BaseModel):
     query: str
     total: int
     items: list[SemanticResult] = []
+
+
+class RecipeViewState(BaseModel):
+    """The caller's view record for a recipe, after recording an open: how many
+    sittings it has been read in, and when it was first and last seen."""
+
+    view_count: int
+    first_viewed_at: datetime
+    last_viewed_at: datetime
 
 
 class RecipeNeighbour(BaseModel):
