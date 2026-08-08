@@ -65,7 +65,9 @@ export const bookDetailSchema = z.object({
 	has_epub: z.boolean(),
 	added: z.string().nullable(),
 	keywords: z.array(z.string()),
-	recipes: z.array(recipeRowSchema)
+	recipes: z.array(recipeRowSchema),
+	// The first unread recipe in book order, so picking a book back up is one click.
+	next_unread: z.object({ id: z.string().uuid(), name: z.string() }).nullable()
 });
 
 export type BookDetailResponse = z.infer<typeof bookDetailSchema>;

@@ -66,7 +66,8 @@
 				bookId: it.book_id,
 				bookTitle: it.book_title,
 				bookAuthor: it.book_author,
-				keywords: it.keywords
+				keywords: it.keywords,
+				isSeen: it.is_seen
 			})),
 			moreHref:
 				r.items.length >= SIMILAR_FOOTER_LIMIT

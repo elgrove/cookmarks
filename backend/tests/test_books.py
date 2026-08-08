@@ -36,6 +36,7 @@ DETAIL_KEYS = {
     "added",
     "keywords",
     "recipes",
+    "next_unread",
 }
 
 
@@ -153,6 +154,19 @@ def test_recipe_rows_report_their_own_read_state(client: TestClient) -> None:
     rows = {r["id"]: r for r in client.get(f"/api/books/{book_id}").json()["recipes"]}
     assert rows[recipes[0]["id"]]["is_seen"] is True
     assert all(r["is_seen"] is False for rid, r in rows.items() if rid != recipes[0]["id"])
+
+
+def test_next_unread_walks_book_order_and_empties_when_finished(client: TestClient) -> None:
+    book_id = _book_id(client, "With Recipes")
+    first = client.get(f"/api/books/{book_id}").json()["next_unread"]
+    assert first is not None and first["name"] == "Recipe 0"
+
+    client.post(f"/api/recipes/{first['id']}/seen")
+    second = client.get(f"/api/books/{book_id}").json()["next_unread"]
+    assert second is not None and second["id"] != first["id"]
+
+    client.post(f"/api/books/{book_id}/seen")
+    assert client.get(f"/api/books/{book_id}").json()["next_unread"] is None
 
 
 def test_mark_book_read_and_reset(client: TestClient) -> None:

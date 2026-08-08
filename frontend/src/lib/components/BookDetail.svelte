@@ -20,6 +20,8 @@
 		added: string | null;
 		keywords: string[];
 		recipes: BookDetailRecipe[];
+		/** The first recipe not yet read, in book order — null once the book is done. */
+		nextUnread: { id: string; name: string } | null;
 	};
 
 	// Rotating chip tints (DESIGN §3.1), assigned deterministically per keyword.
@@ -131,6 +133,7 @@
 	data-verify-shown-seen={shownSeen}
 	data-verify-seen-action={seenAction}
 	data-verify-reset-mode={resetMode}
+	data-verify-next-unread={book.nextUnread?.id ?? ''}
 >
 	<nav class="crumb" aria-label="Breadcrumb">
 		<a href="/books">Books</a><span class="sep">›</span><a
@@ -235,6 +238,15 @@
 				{#if book.hasEpub}
 					<a class="btn primary read-epub" href={`/books/${book.id}/read`}>
 						Read book <span class="ar" aria-hidden="true">›</span>
+					</a>
+				{/if}
+				{#if book.nextUnread}
+					<a
+						class="btn ghost next-unread"
+						href={`/recipes/${book.nextUnread.id}?context=book`}
+						title={book.nextUnread.name}
+					>
+						Read next <span class="ar" aria-hidden="true">›</span>
 					</a>
 				{/if}
 				{#if book.recipeCount > 0}

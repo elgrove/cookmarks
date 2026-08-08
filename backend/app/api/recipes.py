@@ -15,6 +15,7 @@ from app.models.base import as_utc
 from app.models.book import Book
 from app.models.recipe import Keyword, Recipe, recipe_keywords
 from app.models.recipe_list import RecipeListItem
+from app.models.recipe_view import RecipeView
 from app.schemas.recipe import (
     KeywordSummary,
     RecipeDetail,
@@ -85,10 +86,20 @@ def _search_order(sort: Sort, seed: int) -> list:
 
 
 def _search_conditions(
-    q: str, keywords: list[str], book_id: uuid.UUID | None, author: str | None
+    q: str,
+    keywords: list[str],
+    book_id: uuid.UUID | None,
+    author: str | None,
+    unread_for: uuid.UUID | None = None,
 ) -> list:
     """The AND-narrowing filter shared by the result rows, total and facets."""
     conditions = []
+    if unread_for is not None:
+        conditions.append(
+            Recipe.id.notin_(
+                select(RecipeView.recipe_id).where(RecipeView.user_id == unread_for)
+            )
+        )
     if q:
         like = f"%{q}%"
         conditions.append(
@@ -118,6 +129,7 @@ def search_recipes(
     keyword: Annotated[list[str] | None, Query()] = None,
     book_id: uuid.UUID | None = None,
     author: Annotated[str | None, Query()] = None,
+    unread: bool = False,
     sort: Sort = "random",
     seed: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=100)] = 30,
@@ -125,13 +137,15 @@ def search_recipes(
 ) -> RecipeSearchResults:
     # The page is empty until *something* is asked for: a typed query or any
     # filter. Filters count as a query, so a keyword/book/author alone returns
-    # results; nothing set returns the resting (empty) state.
+    # results; nothing set returns the resting (empty) state. "Unread" narrows
+    # what is already asked for — on its own it would mean "everything I haven't
+    # read", which is the whole library.
     keywords = keyword or []
     q = q.strip()
     if not (q or keywords or book_id or author):
         return RecipeSearchResults(total=0, items=[])
 
-    conditions = _search_conditions(q, keywords, book_id, author)
+    conditions = _search_conditions(q, keywords, book_id, author, user.id if unread else None)
 
     filtered = select(Recipe.id).join(Book, Recipe.book_id == Book.id).where(*conditions)
     total = session.scalar(select(func.count()).select_from(filtered.subquery())) or 0
@@ -330,13 +344,24 @@ def _ordered_search_ids(
     author: str | None,
     sort: Sort,
     seed: int,
+    unread_for: uuid.UUID | None = None,
 ) -> list[uuid.UUID]:
-    key = (q, tuple(keywords), str(book_id) if book_id else None, author, sort, seed)
+    # `unread_for` is part of the key: an unread-filtered ordering is that reader's
+    # alone, and must never be served to another account from this cache.
+    key = (
+        q,
+        tuple(keywords),
+        str(book_id) if book_id else None,
+        author,
+        sort,
+        seed,
+        str(unread_for) if unread_for else None,
+    )
     cached = _SEARCH_ORDER_CACHE.get(key)
     if cached is not None:
         _SEARCH_ORDER_CACHE.move_to_end(key)
         return cached
-    conditions = _search_conditions(q, keywords, book_id, author)
+    conditions = _search_conditions(q, keywords, book_id, author, unread_for)
     ids = list(
         session.scalars(
             select(Recipe.id)
@@ -361,10 +386,11 @@ def _search_neighbours(
     author: str | None,
     sort: Sort,
     seed: int,
+    unread_for: uuid.UUID | None = None,
 ) -> tuple[RecipeNeighbour | None, RecipeNeighbour | None]:
     """Previous/next in the *search* ordering — the ordered ids (cached per search)
     indexed to this recipe. Returns (None, None) if it isn't in the result set."""
-    ids = _ordered_search_ids(session, q, keywords, book_id, author, sort, seed)
+    ids = _ordered_search_ids(session, q, keywords, book_id, author, sort, seed, unread_for)
     try:
         idx = ids.index(recipe.id)
     except ValueError:
@@ -384,6 +410,7 @@ def get_recipe(
     keyword: Annotated[list[str] | None, Query()] = None,
     book_id: uuid.UUID | None = None,
     author: Annotated[str | None, Query()] = None,
+    unread: bool = False,
     sort: Sort = "random",
     seed: Annotated[int, Query(ge=0)] = 0,
 ) -> RecipeDetail:
@@ -397,8 +424,19 @@ def get_recipe(
     book = recipe.book
     resolved_context = context if context in SUPPORTED_CONTEXTS else "book"
     if resolved_context == "search":
+        # The ordering is cached from the first recipe opened out of this search, so
+        # an unread-filtered walk keeps its neighbours even as reading them marks them
+        # read. If that entry has been evicted the pager simply goes quiet.
         previous, next_ = _search_neighbours(
-            session, recipe, q.strip(), keyword or [], book_id, author, sort, seed
+            session,
+            recipe,
+            q.strip(),
+            keyword or [],
+            book_id,
+            author,
+            sort,
+            seed,
+            user.id if unread else None,
         )
     else:
         previous, next_ = _book_neighbours(session, recipe)

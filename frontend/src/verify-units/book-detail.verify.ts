@@ -39,7 +39,8 @@ const bookSchema = z.object({
 	hasEpub: z.boolean(),
 	added: z.string().nullable(),
 	keywords: z.array(z.string()),
-	recipes: z.array(recipeSchema)
+	recipes: z.array(recipeSchema),
+	nextUnread: z.object({ id: z.string(), name: z.string() }).nullable()
 });
 
 function recipes(n: number, seen = 0): BookDetailData['recipes'] {
@@ -78,7 +79,8 @@ const pastaGrannies: BookDetailData = {
 	hasEpub: true,
 	added: '2025-05-22T20:56:10Z',
 	keywords: ['Italian', 'Pasta', 'Regional', 'Traditional'],
-	recipes: recipes(10, 4)
+	recipes: recipes(10, 4),
+	nextUnread: { id: 'r4', name: "Margherita's Cavati with Spring Vegetables" }
 };
 
 const unit: VerifiableUnit<Props> = {
@@ -121,9 +123,14 @@ const unit: VerifiableUnit<Props> = {
 		},
 		{
 			id: 'fully-read',
-			description: 'every recipe seen reads 100% and offers no "mark book read"',
+			description: 'every recipe seen reads 100%, with nothing left to read next',
 			props: {
-				book: { ...pastaGrannies, seenCount: 49, recipes: recipes(10, 10) },
+				book: {
+					...pastaGrannies,
+					seenCount: 49,
+					recipes: recipes(10, 10),
+					nextUnread: null
+				},
 				onMarkBookRead: () => {},
 				onResetProgress: () => {}
 			}
@@ -587,6 +594,21 @@ const unit: VerifiableUnit<Props> = {
 				if (contract['seen-action'] !== 'reset')
 					return `seen-action=${contract['seen-action']} expected reset`;
 				return contract['reset-mode'] === 'view' || `reset-mode=${contract['reset-mode']}`;
+			}
+		},
+		{
+			id: 'next-unread-action',
+			description:
+				'a book with something left offers a "Read next" link straight to it, and none once finished',
+			check: ({ contract, root, props }) => {
+				const target = props.book.nextUnread;
+				if ((contract['next-unread'] ?? '') !== (target?.id ?? ''))
+					return `next-unread=${contract['next-unread']} expected ${target?.id ?? ''}`;
+				const link = root.querySelector('a.next-unread');
+				if (!target) return link === null || 'a "Read next" link remains with nothing unread';
+				if (!link) return 'no "Read next" link for a book with unread recipes';
+				const want = `/recipes/${target.id}?context=book`;
+				return link.getAttribute('href') === want || `href=${link.getAttribute('href')}`;
 			}
 		},
 		{

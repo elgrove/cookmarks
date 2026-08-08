@@ -181,6 +181,23 @@ const unit: VerifiableUnit<Props> = {
 			}
 		},
 		{
+			id: 'unread-filter',
+			description: 'the unread narrowing is applied, and read rows are marked as read',
+			props: {
+				status: 'results',
+				criteria: { q: 'dal', unread: true },
+				results: {
+					total: 2,
+					items: [
+						recipe({ id: 'r1', name: 'Dal Makhani', is_seen: true }),
+						recipe({ id: 'r2', name: 'Tarka Dal', keywords: ['lentils'] })
+					],
+					facets: chips
+				},
+				keywords: chips
+			}
+		},
+		{
 			id: 'contract-lie',
 			description: 'sentinel: a deliberately-failing invariant proves the harness reports truthfully',
 			expectFail: true,
@@ -192,6 +209,37 @@ const unit: VerifiableUnit<Props> = {
 		}
 	],
 	invariants: [
+		{
+			id: 'read-rows-marked',
+			description: 'each result row carries its own read state, matching the results given',
+			check: ({ root, props }) => {
+				const items = props.results?.items ?? [];
+				const rows = [...root.querySelectorAll('.rows > li')];
+				if (rows.length !== items.length)
+					return `${rows.length} rows for ${items.length} results`;
+				for (const [i, row] of rows.entries()) {
+					const want = items[i].is_seen ? 'true' : 'false';
+					if (row.getAttribute('data-verify-seen') !== want)
+						return `row ${i} seen=${row.getAttribute('data-verify-seen')} expected ${want}`;
+				}
+				return true;
+			}
+		},
+		{
+			id: 'unread-narrowing',
+			description: 'the unread narrowing is reported on the contract and counted as a filter',
+			onlyFixtures: ['unread-filter', 'results'],
+			check: ({ contract, root, props }) => {
+				const want = props.criteria?.unread ? 'true' : 'false';
+				if (contract.unread !== want) return `unread=${contract.unread} expected ${want}`;
+				const box = root.querySelector<HTMLInputElement>('.check input[type="checkbox"]');
+				if (!box) return 'no unread control rendered';
+				return (
+					box.checked === Boolean(props.criteria?.unread) ||
+					`unread box checked=${box.checked}`
+				);
+			}
+		},
 		{
 			id: 'resting-empty',
 			description: 'the resting state is inactive and shows no results',

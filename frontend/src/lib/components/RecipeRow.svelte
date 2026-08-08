@@ -6,6 +6,8 @@
 		bookTitle: string;
 		bookAuthor: string;
 		keywords: string[];
+		/** Whether the reader has opened this one — marks the row as already read. */
+		isSeen?: boolean;
 	};
 </script>
 
@@ -24,6 +26,7 @@
 		bookTitle,
 		bookAuthor,
 		keywords,
+		isSeen = false,
 		contextQuery = '',
 		onRemove,
 		onKeyword
@@ -48,9 +51,12 @@
 	}
 </script>
 
-<li class="row">
+<li class="row" data-verify-seen={isSeen ? 'true' : 'false'}>
 	<div class="line">
-		<a class="name" href={`/recipes/${id}${contextQuery ? `?${contextQuery}` : ''}`}>{name}</a>
+		<a class="name" class:read={isSeen} href={`/recipes/${id}${contextQuery ? `?${contextQuery}` : ''}`}
+			>{name}</a
+		>
+		{#if isSeen}<span class="read-flag">Read</span>{/if}
 		<a class="source" href={`/books/${bookId}`}>
 			{displayTitle}<span class="sep" aria-hidden="true">·</span><span class="author">{bookAuthor}</span>
 		</a>
@@ -104,6 +110,20 @@
 
 	.name:hover {
 		color: var(--clay-deep);
+	}
+	/* A row already read steps back rather than disappearing — the list still reads
+	   as one list, with what's behind you quieter. */
+	.name.read {
+		color: var(--muted);
+	}
+
+	.read-flag {
+		font-family: var(--f-mono);
+		font-size: 0.62rem;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: var(--clay-deep);
+		white-space: nowrap;
 	}
 
 	.source {

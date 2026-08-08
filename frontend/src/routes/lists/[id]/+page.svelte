@@ -31,7 +31,8 @@
 					bookId: r.book_id,
 					bookTitle: r.book_title,
 					bookAuthor: r.book_author,
-					keywords: r.keywords
+					keywords: r.keywords,
+					isSeen: r.is_seen
 				}))
 			};
 			status = 'ready';

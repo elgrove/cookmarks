@@ -62,7 +62,8 @@
 					name: r.name,
 					keywords: r.keywords,
 					isSeen: r.is_seen
-				}))
+				})),
+				nextUnread: b.next_unread
 			};
 			status = 'ready';
 			void loadLatestRun(id);
@@ -81,6 +82,9 @@
 		if (!row || row.isSeen === seen) return;
 		row.isSeen = seen;
 		book.seenCount += seen ? 1 : -1;
+		// Reading the recipe the "Read next" action points at consumes it; the next
+		// one after it arrives with the next load rather than a round-trip now.
+		if (seen && book.nextUnread?.id === recipeId) book.nextUnread = null;
 		try {
 			await (seen ? markRecipeSeen(recipeId) : unmarkRecipeSeen(recipeId));
 		} catch (err) {
@@ -89,19 +93,22 @@
 		}
 	}
 
+	// A book-wide change paints immediately, then reloads: the percentage, every row
+	// and the next-unread target all move together, and none of them can be guessed
+	// from the counts alone.
 	async function setBookRead(read: boolean) {
 		if (!book) return;
 		const id = book.id;
 		for (const row of book.recipes) row.isSeen = read;
 		book.seenCount = read ? book.recipeCount : 0;
+		book.nextUnread = null;
 		try {
-			const state = read ? await markBookRead(id) : await resetBookProgress(id);
-			book.recipeCount = state.recipe_count;
-			book.seenCount = state.seen_count;
+			if (read) await markBookRead(id);
+			else await resetBookProgress(id);
 		} catch (err) {
 			console.error('failed to change book read state', err);
-			await load();
 		}
+		await load();
 	}
 
 	async function answerReview(value: string) {

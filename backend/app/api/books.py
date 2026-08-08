@@ -15,6 +15,7 @@ from app.models.book import Book
 from app.models.calibre_exclusion import CalibreExclusion
 from app.models.recipe import Recipe
 from app.models.recipe_list import RecipeListItem
+from app.models.recipe_view import RecipeView
 from app.schemas.book import (
     BookDetail,
     BookFilter,
@@ -22,7 +23,7 @@ from app.schemas.book import (
     BookSummary,
     RecipeIndexEntry,
 )
-from app.schemas.recipe import RecipeRow
+from app.schemas.recipe import RecipeNeighbour, RecipeRow
 from app.services.calibre import delete_books
 from app.services.views import (
     clear_book_views,
@@ -94,6 +95,17 @@ def get_book(book_id: uuid.UUID, session: SessionDep, user: CurrentUser) -> Book
         .all()
     )
     seen_ids = seen_recipe_ids(session, user.id, [r.id for r in recipes])
+    unread = session.execute(
+        select(Recipe.id, Recipe.name)
+        .where(
+            Recipe.book_id == book_id,
+            Recipe.id.notin_(
+                select(RecipeView.recipe_id).where(RecipeView.user_id == user.id)
+            ),
+        )
+        .order_by(Recipe.order.asc())
+        .limit(1)
+    ).first()
     return BookDetail(
         id=book.id,
         title=book.title,
@@ -116,6 +128,7 @@ def get_book(book_id: uuid.UUID, session: SessionDep, user: CurrentUser) -> Book
             )
             for r in recipes
         ],
+        next_unread=RecipeNeighbour(id=unread.id, name=unread.name) if unread else None,
     )
 
 

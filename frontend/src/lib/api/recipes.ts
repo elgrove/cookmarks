@@ -150,6 +150,9 @@ export type SearchCriteria = {
 	keywords?: string[];
 	bookId?: string;
 	author?: string;
+	/** Narrow to recipes the reader hasn't opened yet. Narrows a search; on its own
+	 *  it is not a query (the resting state stays empty). */
+	unread?: boolean;
 	sort?: SortKey;
 	// Stable shuffle seed for `sort: 'random'`, so pagination keeps one ordering.
 	seed?: number;
@@ -168,6 +171,7 @@ export function criteriaToParams(c: SearchCriteria): URLSearchParams {
 	for (const kw of c.keywords ?? []) p.append('keyword', kw);
 	if (c.bookId) p.set('book_id', c.bookId);
 	if (c.author) p.set('author', c.author);
+	if (c.unread) p.set('unread', 'true');
 	if (c.sort) p.set('sort', c.sort);
 	if (c.seed != null) p.set('seed', String(c.seed));
 	if (c.limit != null) p.set('limit', String(c.limit));
@@ -204,6 +208,7 @@ export function criteriaFromParams(p: URLSearchParams): SearchCriteria {
 	if (bookId) c.bookId = bookId;
 	const author = p.get('author');
 	if (author) c.author = author;
+	if (p.get('unread') === 'true') c.unread = true;
 	const sort = p.get('sort');
 	if (sort === 'name' || sort === 'recent' || sort === 'random' || sort === 'book') c.sort = sort;
 	const seed = p.get('seed');

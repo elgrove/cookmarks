@@ -3,7 +3,7 @@ from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict
 
-from app.schemas.recipe import RecipeRow
+from app.schemas.recipe import RecipeNeighbour, RecipeRow
 
 
 class BookFilter(BaseModel):
@@ -52,6 +52,9 @@ class BookDetail(BaseModel):
     added: datetime | None
     keywords: list[str]
     recipes: list[RecipeRow]
+    # The first recipe in book order the caller hasn't read, so picking a book back up
+    # is one click rather than a hunt through the index. None once the book is finished.
+    next_unread: RecipeNeighbour | None
 
 
 class BookReadState(BaseModel):
