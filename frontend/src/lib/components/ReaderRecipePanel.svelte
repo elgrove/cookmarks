@@ -4,7 +4,8 @@
 		createList,
 		fetchRecipeLists,
 		removeRecipeFromList,
-		type ListMembership
+		type ListMembership,
+		type ListSummary
 	} from '$lib/api/lists';
 
 	/** A rectangle in app-viewport coordinates (the trigger's, iframe offset already applied). */
@@ -15,7 +16,7 @@
 		fetchRecipeLists: (recipeId: string) => Promise<ListMembership[]>;
 		addRecipeToList: (listId: string, recipeId: string) => Promise<void>;
 		removeRecipeFromList: (listId: string, recipeId: string) => Promise<void>;
-		createList: (name: string) => Promise<{ id: string; name: string; is_default: boolean }>;
+		createList: (name: string) => Promise<Pick<ListSummary, 'id' | 'name' | 'is_default'>>;
 	};
 
 	export type ReaderRecipePanelProps = {
@@ -92,13 +93,21 @@
 		busy = 'create';
 		try {
 			const created = await api.createList(name);
-			await api.addRecipeToList(created.id, recipeId);
+			newName = '';
+			lastCreated = created.name;
+			// The list now exists server-side either way — show it, unticked if the add failed,
+			// so a retry is a toggle rather than a duplicate create.
+			let contains = true;
+			try {
+				await api.addRecipeToList(created.id, recipeId);
+			} catch (e) {
+				console.error('could not add recipe to new list', e);
+				contains = false;
+			}
 			lists = [
 				...lists,
-				{ id: created.id, name: created.name, is_default: created.is_default, contains: true }
+				{ id: created.id, name: created.name, is_default: created.is_default, contains }
 			];
-			lastCreated = created.name;
-			newName = '';
 		} catch (e) {
 			console.error('list create failed', e);
 		} finally {
@@ -107,12 +116,22 @@
 	}
 
 	const PANEL_W = 270;
+	const GUTTER = 8;
+	// Clamp to the viewport, and cap the height to the space below the chosen top edge —
+	// position: fixed means anything past the fold would be unreachable, not scrollable.
 	let style = $derived.by(() => {
-		const x = Math.round(Math.min(Math.max(8, anchor.x - 40), window.innerWidth - PANEL_W - 8));
-		const y = Math.round(Math.min(anchor.y + anchor.h + 8, window.innerHeight - 280));
-		return `left:${x}px; top:${y}px; width:${PANEL_W}px;`;
+		const x = Math.round(Math.max(GUTTER, Math.min(anchor.x - 40, window.innerWidth - PANEL_W - GUTTER)));
+		const y = Math.round(Math.max(GUTTER, Math.min(anchor.y + anchor.h + 8, window.innerHeight - 280)));
+		const maxH = Math.min(Math.round(window.innerHeight * 0.55), window.innerHeight - y - GUTTER);
+		return `left:${x}px; top:${y}px; width:${PANEL_W}px; max-height:${maxH}px;`;
 	});
 </script>
+
+<svelte:window
+	onkeydown={(e) => {
+		if (e.key === 'Escape') onClose();
+	}}
+/>
 
 <button class="scrim" aria-label="Close" onclick={onClose}></button>
 
