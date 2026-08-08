@@ -1,4 +1,13 @@
 {
   "recipe_count": 100,
-  "seen_count": 100
+  "reading": {
+    "mode": "book",
+    "fraction": 1.0,
+    "anchor": {
+      "id": "9f8e7d6c-5b4a-4039-8281-7060504a3b2c",
+      "name": "Buttermilk-Marinated Roast Chicken"
+    },
+    "location": "epubcfi(/6/14!/4/2/44)",
+    "finished": true
+  }
 }

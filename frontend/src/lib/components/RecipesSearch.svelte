@@ -58,7 +58,6 @@
 	let bookId = $state(seed.bookId ?? '');
 	let author = $state(seed.author ?? '');
 	let sort = $state<SortKey>(seed.sort ?? 'random');
-	let unread = $state(seed.unread ?? false);
 	let offset = $state(seed.offset ?? 0);
 	// The active search mode is live in the box (a button press flips it); seeded
 	// from the prop so a restored ?mode=idea URL opens in semantic mode.
@@ -77,7 +76,7 @@
 	// while collapsed. Desktop shows everything and ignores `filtersOpen` (CSS).
 	let filtersOpen = $state(false);
 	let activeFilterCount = $derived(
-		(bookId ? 1 : 0) + (author ? 1 : 0) + (unread ? 1 : 0) + selected.length
+		(bookId ? 1 : 0) + (author ? 1 : 0) + selected.length
 	);
 
 	// A concise placeholder on narrow screens — the full prompt overflows the box
@@ -104,7 +103,6 @@
 			keywords: selected,
 			bookId: bookId || undefined,
 			author: author || undefined,
-			unread,
 			sort,
 			seed: sort === 'random' ? randomSeed : undefined
 		})
@@ -215,7 +213,6 @@
 			keywords: selected,
 			bookId: bookId || undefined,
 			author: author || undefined,
-			unread,
 			sort,
 			seed: sort === 'random' ? randomSeed : undefined,
 			limit,
@@ -303,7 +300,6 @@
 	data-verify-book={bookId}
 	data-verify-author={author}
 	data-verify-sort={sort}
-	data-verify-unread={unread ? 'true' : 'false'}
 >
 	<header class="head">
 		<h1 class="display">Recipes</h1>
@@ -401,22 +397,6 @@
 			</select>
 		</label>
 
-		<label class="filter check">
-			<span class="label">Unread</span>
-			<span class="checkrow">
-				<input
-					type="checkbox"
-					aria-label="Only recipes I haven't read"
-					checked={unread}
-					oninput={(e) => {
-						unread = e.currentTarget.checked;
-						emitKeyword();
-					}}
-				/>
-				<span class="checktext">Not read yet</span>
-			</span>
-		</label>
-
 		<label class="filter">
 			<span class="label">Sort</span>
 			<select
@@ -504,7 +484,6 @@
 						bookTitle={r.book_title}
 						bookAuthor={r.book_author}
 						keywords={r.keywords}
-						isSeen={r.is_seen}
 						contextQuery={isSemantic ? '' : contextQuery}
 						onKeyword={narrowByKeyword}
 					/>
@@ -664,25 +643,6 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 0.55rem;
-	}
-
-	/* The unread narrowing sits with the selects, but reads as a switch rather than
-	   a list — it has two states, not a vocabulary. */
-	.checkrow {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.45rem;
-		font-family: var(--f-grotesk);
-		font-size: 0.9rem;
-		color: var(--ink);
-		border: var(--border);
-		border-radius: 3px;
-		padding: 0.4rem 0.7rem;
-		cursor: pointer;
-	}
-	.checkrow input {
-		accent-color: var(--clay);
-		cursor: pointer;
 	}
 
 	.select {

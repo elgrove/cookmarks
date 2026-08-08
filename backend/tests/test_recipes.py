@@ -1,6 +1,5 @@
 import uuid
 import zipfile
-from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -11,8 +10,6 @@ from sqlalchemy.orm import Session
 from app.api.recipes import _clear_keyword_cache
 from app.config import settings
 from app.models import Keyword, Recipe
-from app.models.user import User
-from app.services.users import create_user
 
 # Matches the image member recorded on the seeded "Recipe 0" (see tests/conftest.py).
 RECIPE0_IMAGE_MEMBER = "OPS/images/recipe-0.jpg"
@@ -32,7 +29,6 @@ RECIPE_KEYS = {
     "keywords",
     "has_image",
     "is_favourite",
-    "is_seen",
     "context",
     "previous",
     "next",
@@ -75,47 +71,6 @@ def test_search_matches_ingredients(client: TestClient) -> None:
 def test_search_matches_book_author(client: TestClient) -> None:
     body = client.get("/api/recipes", params={"q": "author one"}).json()
     assert body["total"] == 3
-
-
-def test_unread_filter_narrows_to_what_is_left(client: TestClient) -> None:
-    client.post(f"/api/recipes/{_recipe_id(client, 'Recipe 0')}/seen")
-
-    body = client.get("/api/recipes", params={"q": "recipe", "unread": "true"}).json()
-    assert body["total"] == 2
-    assert {r["name"] for r in body["items"]} == {"Recipe 1", "Recipe 2"}
-    assert all(r["is_seen"] is False for r in body["items"])
-    # The facets describe the narrowed set, not the whole search.
-    assert "Pasta" not in {f["name"] for f in body["facets"]}
-
-    # Unfiltered, the read one is still there and marked.
-    unfiltered = client.get("/api/recipes", params={"q": "recipe"}).json()
-    assert unfiltered["total"] == 3
-    assert [r["is_seen"] for r in unfiltered["items"] if r["name"] == "Recipe 0"] == [True]
-
-
-def test_unread_filter_is_per_user(
-    client: TestClient, session: Session, act_as: Callable[[str], User]
-) -> None:
-    create_user(session, "other", "other-password")
-    client.post(f"/api/recipes/{_recipe_id(client, 'Recipe 0')}/seen")
-
-    act_as("other")
-    body = client.get("/api/recipes", params={"q": "recipe", "unread": "true"}).json()
-    assert body["total"] == 3
-
-
-def test_unread_alone_still_rests_empty(client: TestClient) -> None:
-    # "Unread" narrows a search; it is not itself a query for the whole library.
-    assert client.get("/api/recipes", params={"unread": "true"}).json()["total"] == 0
-
-
-def test_unread_search_neighbours_stay_within_the_filter(client: TestClient) -> None:
-    """Prev/next walks the unread list it came from, not the unfiltered search."""
-    client.post(f"/api/recipes/{_recipe_id(client, 'Recipe 1')}/seen")
-    params = {"context": "search", "q": "recipe", "sort": "name", "unread": "true"}
-    body = client.get(f"/api/recipes/{_recipe_id(client, 'Recipe 0')}", params=params).json()
-    assert body["next"] is not None
-    assert body["next"]["name"] == "Recipe 2"
 
 
 def test_keyword_filter(client: TestClient) -> None:

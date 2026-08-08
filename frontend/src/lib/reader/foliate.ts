@@ -10,6 +10,8 @@ export interface FoliateTOCItem {
 
 export interface FoliateRelocateDetail {
 	fraction: number;
+	/** Canonical location of the current page, for reopening the book where it was left. */
+	cfi?: string;
 	tocItem?: { label?: string; href?: string };
 }
 
@@ -19,10 +21,17 @@ export interface FoliateRenderer {
 	next(): void;
 }
 
+/** One spine document. `createDocument` parses it without rendering, which is how a
+ *  recipe is located in the text without paging through the book. */
+export interface FoliateSection {
+	createDocument?(): Promise<Document>;
+}
+
 export interface FoliateBook {
 	toc?: FoliateTOCItem[];
 	dir?: string;
 	metadata?: Record<string, unknown>;
+	sections?: FoliateSection[];
 }
 
 export interface FoliateView extends HTMLElement {
@@ -34,6 +43,8 @@ export interface FoliateView extends HTMLElement {
 	goRight(): Promise<void>;
 	book: FoliateBook;
 	renderer: FoliateRenderer;
+	/** The canonical location of a range within the section at `index`. */
+	getCFI(index: number, range: Range): string;
 }
 
 /** Dynamically load the vendored engine — registers the `<foliate-view>` custom element.

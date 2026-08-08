@@ -4,7 +4,7 @@ export const statsSchema = z.object({
 	books: z.number().int().nonnegative(),
 	recipes: z.number().int().nonnegative(),
 	keywords: z.number().int().nonnegative(),
-	recipes_seen: z.number().int().nonnegative()
+	books_read: z.number().int().nonnegative()
 });
 
 export const bookFeatureSchema = z.object({
@@ -16,12 +16,15 @@ export const bookFeatureSchema = z.object({
 	has_cover: z.boolean()
 });
 
+// A book part-way through, in the mode it was last read in: `fraction` is how far
+// through, and `resume_recipe_id` is the recipe both modes pick back up at.
 export const continueBookSchema = z.object({
 	id: z.string().uuid(),
 	title: z.string(),
 	author: z.string(),
-	recipe_count: z.number().int().nonnegative(),
-	seen_count: z.number().int().nonnegative(),
+	mode: z.enum(['book', 'recipes']),
+	fraction: z.number().min(0).max(1),
+	resume_recipe_id: z.string().uuid().nullable(),
 	has_cover: z.boolean()
 });
 

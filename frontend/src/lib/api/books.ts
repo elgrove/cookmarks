@@ -6,7 +6,8 @@ export const bookSummarySchema = z.object({
 	title: z.string(),
 	author: z.string(),
 	recipe_count: z.number().int().nonnegative(),
-	seen_count: z.number().int().nonnegative(),
+	// How far through the book the reader is, 0 to 1; null for one never opened.
+	progress: z.number().min(0).max(1).nullable(),
 	has_cover: z.boolean(),
 	pubdate: z.string().nullable(),
 	keywords: z.array(z.string())
@@ -48,9 +49,26 @@ export async function fetchBookFilters(fetchFn: typeof fetch = fetch): Promise<B
 export const recipeRowSchema = z.object({
 	id: z.string().uuid(),
 	name: z.string(),
-	keywords: z.array(z.string()),
-	is_seen: z.boolean()
+	keywords: z.array(z.string())
 });
+
+// How far through a book the reader is, and which way they were reading it. Progress is
+// measured in recipes either way, so the two modes share one position; `location` is the
+// EPUB reader's own page, so returning to the pages lands where they were left.
+export const readingModeSchema = z.enum(['book', 'recipes']);
+
+export const recipeRefSchema = z.object({ id: z.string().uuid(), name: z.string() });
+
+export const readingStateSchema = z.object({
+	mode: readingModeSchema,
+	fraction: z.number().min(0).max(1),
+	anchor: recipeRefSchema.nullable(),
+	location: z.string().nullable(),
+	finished: z.boolean()
+});
+
+export type ReadingMode = z.infer<typeof readingModeSchema>;
+export type ReadingState = z.infer<typeof readingStateSchema>;
 
 export const bookDetailSchema = z.object({
 	id: z.string().uuid(),
@@ -60,14 +78,14 @@ export const bookDetailSchema = z.object({
 	pubdate: z.string().nullable(),
 	description: z.string(),
 	recipe_count: z.number().int().nonnegative(),
-	seen_count: z.number().int().nonnegative(),
 	has_cover: z.boolean(),
 	has_epub: z.boolean(),
 	added: z.string().nullable(),
 	keywords: z.array(z.string()),
 	recipes: z.array(recipeRowSchema),
-	// The first unread recipe in book order, so picking a book back up is one click.
-	next_unread: z.object({ id: z.string().uuid(), name: z.string() }).nullable()
+	reading: readingStateSchema.nullable(),
+	// Where reading the recipes picks up: the furthest reached, or the book's first.
+	resume_recipe: recipeRefSchema.nullable()
 });
 
 export type BookDetailResponse = z.infer<typeof bookDetailSchema>;
@@ -82,16 +100,40 @@ export async function fetchBookDetail(
 	return bookDetailSchema.parse(await res.json());
 }
 
-// Mirrors BookReadState from POST/DELETE /api/books/{id}/seen (snake_case): the two
-// numbers the read percentage is derived from, after a bulk change.
+/** A reader reporting where it has got to: the recipe reached, and (from the EPUB
+ *  reader) the page it is on. */
+export type ReadingReport = {
+	mode: ReadingMode;
+	recipe_id?: string | null;
+	location?: string | null;
+};
+
+/** Record where a reader has got to — this is what puts a book in progress, and moves
+ *  its shared position. `keepalive` so the last report survives the page being closed. */
+export async function reportReading(
+	id: string,
+	report: ReadingReport,
+	fetchFn: typeof fetch = fetch
+): Promise<void> {
+	const res = await fetchFn(`/api/books/${id}/reading`, {
+		method: 'PUT',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify(report),
+		keepalive: true
+	});
+	if (!res.ok) throw new Error(`PUT /api/books/${id}/reading → ${res.status}`);
+}
+
+// Mirrors BookReadState from POST/DELETE /api/books/{id}/seen (snake_case): the book's
+// reading after a bulk change, taken from the server rather than guessed.
 export const bookReadStateSchema = z.object({
 	recipe_count: z.number().int().nonnegative(),
-	seen_count: z.number().int().nonnegative()
+	reading: readingStateSchema.nullable()
 });
 
 export type BookReadState = z.infer<typeof bookReadStateSchema>;
 
-/** Mark every recipe in a book as read. */
+/** Declare the book read: it finishes, whichever way it was being read. */
 export async function markBookRead(
 	id: string,
 	fetchFn: typeof fetch = fetch
@@ -101,7 +143,7 @@ export async function markBookRead(
 	return bookReadStateSchema.parse(await res.json());
 }
 
-/** Forget the reader's progress through a book, returning it to 0%. */
+/** Forget the reader's progress through a book, returning it to unstarted. */
 export async function resetBookProgress(
 	id: string,
 	fetchFn: typeof fetch = fetch

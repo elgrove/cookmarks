@@ -6,7 +6,12 @@
 		type FoliateTOCItem,
 		type FoliateView
 	} from '$lib/reader/foliate';
-	import { epubUrl, fetchRecipeIndex } from '$lib/api/books';
+	import {
+		epubUrl,
+		fetchRecipeIndex,
+		reportReading,
+		type ReadingState
+	} from '$lib/api/books';
 	import { toggleFavourite } from '$lib/api/lists';
 	import {
 		buildRecipeIndex,
@@ -17,8 +22,14 @@
 	import { resolvedTheme, toggleTheme } from '$lib/theme';
 	import ReaderChrome, { type TocEntry } from './ReaderChrome.svelte';
 
-	type Props = { bookId: string; title: string; author: string };
-	let { bookId, title, author }: Props = $props();
+	type Props = {
+		bookId: string;
+		title: string;
+		author: string;
+		/** How far the book has been read, either way, if it has been opened before. */
+		resume?: ReadingState | null;
+	};
+	let { bookId, title, author, resume = null }: Props = $props();
 
 	let host = $state<HTMLDivElement>();
 	let view: FoliateView | null = null;
@@ -156,6 +167,64 @@
 		if (view && status === 'ready') applyStyles();
 	});
 
+	// The section on screen, so the recipes its pages carry past can be reported.
+	let currentDoc: Document | null = null;
+
+	/** The furthest recipe the current page has reached: matched headings sit in the
+	 *  content document, and in paginated flow anything on or behind the current page
+	 *  has a rect left of the viewport's right edge. */
+	function reachedRecipeId(): string | null {
+		const doc = currentDoc;
+		const width = doc?.defaultView?.innerWidth;
+		if (!doc || !width) return null;
+		let reached: string | null = null;
+		for (const el of doc.querySelectorAll<HTMLElement>('[data-cm-fav]')) {
+			if (el.getBoundingClientRect().left < width) reached = el.dataset.cmFav ?? reached;
+		}
+		return reached;
+	}
+
+	/** Find a recipe in the book's own text, for opening the pages where the recipe walk
+	 *  left off. Sections are parsed, not rendered, and the scan stops at the first hit;
+	 *  a recipe whose title the book doesn't spell the same way simply isn't found. */
+	async function locateRecipe(el: FoliateView, name: string): Promise<string | null> {
+		const wanted = normaliseTitle(name);
+		const sections = el.book?.sections ?? [];
+		for (const [index, section] of sections.entries()) {
+			if (!section.createDocument) continue;
+			const doc = await section.createDocument();
+			const heading = [...doc.querySelectorAll('h1, h2, h3, h4, h5, h6, b, strong')].find(
+				(node) => normaliseTitle(node.textContent ?? '') === wanted
+			);
+			if (!heading) continue;
+			const range = doc.createRange();
+			range.selectNodeContents(heading);
+			return el.getCFI(index, range);
+		}
+		return null;
+	}
+
+	// Reading is reported back as the reader moves, at most once every few seconds, with
+	// the latest flushed when the reader closes.
+	const SAVE_INTERVAL_MS = 5000;
+	let pending: { recipe_id: string | null; location: string | null } | null = null;
+	let lastSaved = 0;
+
+	function flushPosition() {
+		if (!pending) return;
+		const { recipe_id, location } = pending;
+		pending = null;
+		lastSaved = Date.now();
+		reportReading(bookId, { mode: 'book', recipe_id, location }).catch((e) =>
+			console.warn('could not report reading position', e)
+		);
+	}
+
+	function recordPosition(location: string | null) {
+		pending = { recipe_id: reachedRecipeId(), location };
+		if (Date.now() - lastSaved >= SAVE_INTERVAL_MS) flushPosition();
+	}
+
 	function onKeydown(e: KeyboardEvent) {
 		if (e.key === 'ArrowLeft') view?.prev();
 		else if (e.key === 'ArrowRight') view?.next();
@@ -190,10 +259,13 @@
 					const detail = (e as CustomEvent<FoliateRelocateDetail>).detail ?? ({} as FoliateRelocateDetail);
 					if (typeof detail.fraction === 'number') progress = detail.fraction;
 					currentHref = detail.tocItem?.href ?? currentHref;
+					recordPosition(detail.cfi ?? null);
 				});
 				el.addEventListener('load', (e: Event) => {
 					const detail = (e as CustomEvent<{ doc: Document }>).detail;
-					if (detail?.doc) injectFavourites(detail.doc);
+					if (!detail?.doc) return;
+					currentDoc = detail.doc;
+					injectFavourites(detail.doc);
 				});
 
 				// Ready before open() renders the first section, so its headings get matched too.
@@ -207,7 +279,16 @@
 				el.renderer.setAttribute('max-column-count', '2');
 				applyStyles();
 				toc = flattenToc(el.book?.toc);
-				el.renderer.next(); // render the first page
+				// The pages resume where they were left; arriving from the recipe walk, they
+				// open at the recipe it reached instead — one position, either way in.
+				const target =
+					resume?.mode === 'book' && resume.location
+						? resume.location
+						: resume?.anchor
+							? await locateRecipe(el, resume.anchor.name)
+							: null;
+				if (target) await el.goTo(target).catch(() => el.renderer.next());
+				else el.renderer.next(); // render the first page
 				status = 'ready';
 			} catch (err) {
 				if (!cancelled) {
@@ -218,9 +299,12 @@
 		})();
 
 		window.addEventListener('keydown', onKeydown);
+		window.addEventListener('pagehide', flushPosition);
 		return () => {
 			cancelled = true;
+			flushPosition();
 			window.removeEventListener('keydown', onKeydown);
+			window.removeEventListener('pagehide', flushPosition);
 			view?.remove();
 			view = null;
 		};

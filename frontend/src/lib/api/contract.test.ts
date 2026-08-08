@@ -59,8 +59,8 @@ describe('api wire contract', () => {
 
 	it('rejects a book read-state example with a drifted field name', () => {
 		const example = load('bookreadstate.example.json');
-		const { seen_count, ...rest } = example;
-		const drifted = { ...rest, seenCount: seen_count };
+		const { recipe_count, ...rest } = example;
+		const drifted = { ...rest, recipeCount: recipe_count };
 		expect(() => bookReadStateSchema.parse(drifted)).toThrow();
 	});
 

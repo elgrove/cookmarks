@@ -3,7 +3,6 @@
 		id: string;
 		name: string;
 		keywords: string[];
-		isSeen: boolean;
 	};
 
 	export type BookDetailData = {
@@ -14,14 +13,16 @@
 		pubdate: string | null;
 		description: string;
 		recipeCount: number;
-		seenCount: number;
 		hasCover: boolean;
 		hasEpub: boolean;
 		added: string | null;
 		keywords: string[];
 		recipes: BookDetailRecipe[];
-		/** The first recipe not yet read, in book order — null once the book is done. */
-		nextUnread: { id: string; name: string } | null;
+		/** How the book is being read and how far through it — measured in recipes
+		 *  either way. Null until the book has been opened. */
+		reading: { mode: 'book' | 'recipes'; fraction: number; finished: boolean } | null;
+		/** Where reading the recipes picks up: the furthest reached, or the first. */
+		resumeRecipe: { id: string; name: string } | null;
 	};
 
 	// Rotating chip tints (DESIGN §3.1), assigned deterministically per keyword.
@@ -47,7 +48,6 @@
 
 <script lang="ts">
 	import { plainText } from '$lib/html';
-	import { readPercent } from '$lib/progress';
 	import { cleanTitle, titleSubtitle } from '$lib/title';
 	import { keywordHref } from '$lib/api/recipes';
 	import ExtractButton from '$lib/components/ExtractButton.svelte';
@@ -60,7 +60,6 @@
 		review = null,
 		onAnswer,
 		onDelete,
-		onToggleSeen,
 		onMarkBookRead,
 		onResetProgress
 	}: {
@@ -69,7 +68,6 @@
 		review?: ReviewQuestion | null;
 		onAnswer?: (value: string) => Promise<void> | void;
 		onDelete?: (opts: { exclude: boolean }) => Promise<void> | void;
-		onToggleSeen?: (recipeId: string, seen: boolean) => Promise<void> | void;
 		onMarkBookRead?: () => Promise<void> | void;
 		onResetProgress?: () => Promise<void> | void;
 	} = $props();
@@ -90,11 +88,6 @@
 		deleteMode = 'view';
 	}
 
-	function toggleSeen(recipe: BookDetailRecipe) {
-		seenAction = `${recipe.isSeen ? 'unmark' : 'mark'}:${recipe.id}`;
-		onToggleSeen?.(recipe.id, !recipe.isSeen);
-	}
-
 	function confirmReset() {
 		seenAction = 'reset';
 		onResetProgress?.();
@@ -111,8 +104,12 @@
 	let added = $derived(formatDay(book.added));
 	let shown = $derived(book.recipes.length);
 	let moreCount = $derived(Math.max(0, book.recipeCount - shown));
-	let readPct = $derived(readPercent(book.seenCount, book.recipeCount));
-	let shownSeen = $derived(book.recipes.filter((r) => r.isSeen).length);
+	// A book is read either way — its own pages, or its recipes one at a time — and both
+	// share one position. Whichever mode it was last read in leads the actions, and only
+	// that one is "continued".
+	let mode = $derived(book.reading?.mode ?? null);
+	let started = $derived(!!book.reading && !book.reading.finished && book.reading.fraction > 0);
+	let readPct = $derived(book.reading ? Math.round(book.reading.fraction * 100) : null);
 </script>
 
 <article
@@ -120,7 +117,6 @@
 	data-verify-unit="book-detail"
 	data-verify-id={book.id}
 	data-verify-recipe-count={book.recipeCount}
-	data-verify-seen-count={book.seenCount}
 	data-verify-read-pct={readPct === null ? '' : readPct}
 	data-verify-shown={shown}
 	data-verify-has-cover={book.hasCover ? 'true' : 'false'}
@@ -130,10 +126,11 @@
 	data-verify-delete-mode={deleteMode}
 	data-verify-delete-exclude={exclude ? 'true' : 'false'}
 	data-verify-deleted={deleted}
-	data-verify-shown-seen={shownSeen}
 	data-verify-seen-action={seenAction}
 	data-verify-reset-mode={resetMode}
-	data-verify-next-unread={book.nextUnread?.id ?? ''}
+	data-verify-resume-recipe={book.resumeRecipe?.id ?? ''}
+	data-verify-reading-mode={mode ?? ''}
+	data-verify-started={started ? 'true' : 'false'}
 >
 	<nav class="crumb" aria-label="Breadcrumb">
 		<a href="/books">Books</a><span class="sep">›</span><a
@@ -179,10 +176,10 @@
 			{:else}
 				<ul class="index">
 					{#each book.recipes as recipe (recipe.id)}
-						<li data-verify-recipe={recipe.id} data-verify-seen={recipe.isSeen ? 'true' : 'false'}>
+						<li data-verify-recipe={recipe.id}>
 							<div class="entry">
 								<div class="rtext">
-									<div class="rname" class:read={recipe.isSeen}>
+									<div class="rname">
 										<a href={`/recipes/${recipe.id}`}>{recipe.name}</a>
 									</div>
 									{#if recipe.keywords.length}
@@ -193,20 +190,6 @@
 										</div>
 									{/if}
 								</div>
-								{#if onToggleSeen}
-									<button
-										class="seen-toggle"
-										type="button"
-										aria-pressed={recipe.isSeen}
-										title={recipe.isSeen ? 'Mark as unread' : 'Mark as read'}
-										onclick={() => toggleSeen(recipe)}
-									>
-										<span class="tick" aria-hidden="true">{recipe.isSeen ? '✓' : '+'}</span>
-										Read
-									</button>
-								{:else if recipe.isSeen}
-									<span class="read-flag">Read</span>
-								{/if}
 							</div>
 						</li>
 					{/each}
@@ -235,18 +218,30 @@
 			</div>
 
 			<div class="actions">
+				<!-- Two ways to read a book, one shared position; the mode last read leads. -->
 				{#if book.hasEpub}
-					<a class="btn primary read-epub" href={`/books/${book.id}/read`}>
-						Read book <span class="ar" aria-hidden="true">›</span>
+					<a
+						class="btn read-epub"
+						class:primary={mode !== 'recipes'}
+						class:ghost={mode === 'recipes'}
+						style:order={mode === 'recipes' ? 2 : 1}
+						href={`/books/${book.id}/read`}
+					>
+						{started ? 'Continue book' : 'Read book'}
+						<span class="ar" aria-hidden="true">›</span>
 					</a>
 				{/if}
-				{#if book.nextUnread}
+				{#if book.resumeRecipe}
 					<a
-						class="btn ghost next-unread"
-						href={`/recipes/${book.nextUnread.id}?context=book`}
-						title={book.nextUnread.name}
+						class="btn read-recipes"
+						class:primary={mode === 'recipes' || !book.hasEpub}
+						class:ghost={mode !== 'recipes' && book.hasEpub}
+						style:order={mode === 'recipes' ? 1 : 2}
+						href={`/recipes/${book.resumeRecipe.id}?context=book`}
+						title={book.resumeRecipe.name}
 					>
-						Read next <span class="ar" aria-hidden="true">›</span>
+						{started ? 'Continue recipes' : 'Read recipes'}
+						<span class="ar" aria-hidden="true">›</span>
 					</a>
 				{/if}
 				{#if book.recipeCount > 0}
@@ -254,7 +249,7 @@
 						Browse recipes <span class="ar" aria-hidden="true">›</span>
 					</a>
 				{/if}
-				{#if onMarkBookRead && book.recipeCount > 0 && book.seenCount < book.recipeCount}
+				{#if onMarkBookRead && !book.reading?.finished}
 					<button
 						class="btn ghost mark-read"
 						type="button"
@@ -266,7 +261,7 @@
 						Mark book read <span class="ar" aria-hidden="true">✓</span>
 					</button>
 				{/if}
-				{#if onResetProgress && book.seenCount > 0}
+				{#if onResetProgress && book.reading}
 					{#if resetMode === 'confirm'}
 						<div class="confirm">
 							<p class="prompt">
@@ -342,7 +337,7 @@
 						<dt>Read</dt>
 						<dd class="read">
 							<span class="pct">{readPct}%</span>
-							<span class="of">{book.seenCount} of {book.recipeCount}</span>
+							{#if book.reading?.finished}<span class="of">finished</span>{/if}
 						</dd>
 					</div>
 				{/if}
@@ -508,48 +503,6 @@
 		font-size: 1.12rem;
 		line-height: 1.3;
 	}
-	/* A read recipe steps back rather than striking through — the index still reads
-	   as an index, with the ones behind you quieter. */
-	.rname.read a {
-		color: var(--muted);
-	}
-
-	.seen-toggle,
-	.read-flag {
-		font-family: var(--f-mono);
-		font-size: 0.64rem;
-		letter-spacing: 0.1em;
-		text-transform: uppercase;
-		white-space: nowrap;
-	}
-	.seen-toggle {
-		display: inline-flex;
-		align-items: baseline;
-		gap: 0.35rem;
-		background: none;
-		border: none;
-		padding: 0.15rem 0;
-		color: var(--faint);
-		cursor: pointer;
-		transition: color 0.18s var(--ease-out);
-	}
-	.seen-toggle .tick {
-		font-size: 0.85rem;
-		line-height: 1;
-	}
-	.seen-toggle:hover {
-		color: var(--clay-deep);
-	}
-	.seen-toggle[aria-pressed='true'] {
-		color: var(--clay-deep);
-	}
-	.seen-toggle:focus-visible {
-		outline: 2px solid var(--clay);
-		outline-offset: 2px;
-	}
-	.read-flag {
-		color: var(--clay-deep);
-	}
 	.rname a {
 		text-decoration: none;
 		transition: color 0.18s var(--ease-out);
@@ -674,6 +627,10 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.6rem;
+	}
+	/* The two reading modes sit above every other action, in progress order. */
+	.actions > :global(*:not(.read-epub):not(.read-recipes)) {
+		order: 3;
 	}
 	.btn {
 		font-family: var(--f-grotesk);

@@ -9,7 +9,7 @@ const bookSchema = z.object({
 	title: z.string(),
 	author: z.string(),
 	recipeCount: z.number().int().nonnegative(),
-	seenCount: z.number().int().nonnegative().optional(),
+	progress: z.number().min(0).max(1).nullable().optional(),
 	hasCover: z.boolean(),
 	keywords: z.array(z.string()).optional()
 });
@@ -20,11 +20,11 @@ const bookSchema = z.object({
 // mix started, untouched and finished books, so progress rules appear on some cards
 // and not others.
 const populated: LibraryBook[] = [
-	{ id: 'a1', title: 'Salt, Fat, Acid, Heat', author: 'Samin Nosrat', recipeCount: 100, seenCount: 37, hasCover: false, keywords: ['Fundamentals', 'Technique', 'Mediterranean', 'Reference'] },
-	{ id: 'a2', title: 'A Modern Way to Eat', author: 'Anna Jones', recipeCount: 200, seenCount: 0, hasCover: false, keywords: ['Vegetarian', 'Weeknight'] },
-	{ id: 'a3', title: 'The Nordic Baking Book', author: 'Magnus Nilsson', recipeCount: 84, seenCount: 84, hasCover: true, keywords: ['Baking', 'Nordic', 'Bread'] },
+	{ id: 'a1', title: 'Salt, Fat, Acid, Heat', author: 'Samin Nosrat', recipeCount: 100, progress: 0.37, hasCover: false, keywords: ['Fundamentals', 'Technique', 'Mediterranean', 'Reference'] },
+	{ id: 'a2', title: 'A Modern Way to Eat', author: 'Anna Jones', recipeCount: 200, progress: 0, hasCover: false, keywords: ['Vegetarian', 'Weeknight'] },
+	{ id: 'a3', title: 'The Nordic Baking Book', author: 'Magnus Nilsson', recipeCount: 84, progress: 1, hasCover: true, keywords: ['Baking', 'Nordic', 'Bread'] },
 	{ id: 'a4', title: 'A Modern Way to Cook', author: 'Anna Jones', recipeCount: 150, hasCover: false, keywords: [] },
-	{ id: 'a5', title: 'Persiana', author: 'Sabrina Ghayour', recipeCount: 92, seenCount: 5, hasCover: true, keywords: ['Persian', 'Middle Eastern', 'Mezze'] }
+	{ id: 'a5', title: 'Persiana', author: 'Sabrina Ghayour', recipeCount: 92, progress: 0.05, hasCover: true, keywords: ['Persian', 'Middle Eastern', 'Mezze'] }
 ];
 
 const SEARCH = 'input[type="search"]';
@@ -34,11 +34,10 @@ const EXTRACTED = '.extracted-checkbox';
 // A deliberate mix of extracted (recipeCount > 0) and unextracted (recipeCount === 0)
 // books, so the "Extracted only" filter visibly drops the pending ones.
 const mixed: LibraryBook[] = [
-	{ id: 'm1', title: 'Salt, Fat, Acid, Heat', author: 'Samin Nosrat', recipeCount: 100, seenCount: 12, hasCover: false },
-	// A stale seen count on an unextracted book: the card must show no progress rule
-	// rather than dividing by zero.
-	{ id: 'm2', title: 'Just added, not yet extracted', author: 'Unknown', recipeCount: 0, seenCount: 3, hasCover: false },
-	{ id: 'm3', title: 'Persiana', author: 'Sabrina Ghayour', recipeCount: 92, seenCount: 0, hasCover: true },
+	{ id: 'm1', title: 'Salt, Fat, Acid, Heat', author: 'Samin Nosrat', recipeCount: 100, progress: 0.12, hasCover: false },
+	// An unextracted book that was somehow opened: no recipes to be part-way through.
+	{ id: 'm2', title: 'Just added, not yet extracted', author: 'Unknown', recipeCount: 0, progress: 0, hasCover: false },
+	{ id: 'm3', title: 'Persiana', author: 'Sabrina Ghayour', recipeCount: 92, progress: null, hasCover: true },
 	{ id: 'm4', title: 'Another pending import', author: 'Unknown', recipeCount: 0, hasCover: false }
 ];
 
@@ -203,10 +202,10 @@ const unit: VerifiableUnit<Props> = {
 		{
 			id: 'progress-rules',
 			description:
-				'one progress rule per started book — none for untouched or unextracted ones — and each fill matches its read share',
+				'one progress rule per started book — none for untouched ones — and each fill matches how far through it is',
 			onlyFixtures: ['populated', 'extracted-only-mixed'],
 			check: ({ contract, root, props }) => {
-				const started = props.books.filter((b) => (b.seenCount ?? 0) > 0 && b.recipeCount > 0);
+				const started = props.books.filter((b) => (b.progress ?? 0) > 0);
 				if (Number(contract['progress-count']) !== started.length)
 					return `progress-count=${contract['progress-count']} expected ${started.length}`;
 				const rules = [...root.querySelectorAll('.progress')];
@@ -217,7 +216,7 @@ const unit: VerifiableUnit<Props> = {
 					const book = started[i];
 					const want = Math.max(
 						0,
-						Math.min(100, Math.round((100 * (book.seenCount ?? 0)) / book.recipeCount))
+						Math.min(100, Math.round(100 * (book.progress ?? 0)))
 					);
 					const width = rules[i].querySelector<HTMLElement>('.progress-fill')?.style.width;
 					if (width !== `${want}%`) return `${book.title}: fill width=${width} expected ${want}%`;
@@ -228,15 +227,15 @@ const unit: VerifiableUnit<Props> = {
 		{
 			id: 'progress-in-link-label',
 			description:
-				'a started book folds its read count into the card link name rather than adding a second focus stop',
+				'a started book folds how far through it is into the card link name rather than adding a second focus stop',
 			onlyFixtures: ['populated'],
 			check: ({ root, props }) => {
-				const started = props.books.find((b) => (b.seenCount ?? 0) > 0);
+				const started = props.books.find((b) => (b.progress ?? 0) > 0);
 				if (!started) return 'fixture has no started book';
 				const link = root.querySelector(`a[href="/books/${started.id}"]`);
 				const label = link?.getAttribute('aria-label') ?? '';
 				return (
-					label.includes(`${started.seenCount} of ${started.recipeCount} recipes seen`) ||
+					label.includes(`${Math.round(100 * (started.progress ?? 0))}% read`) ||
 					`link label="${label}"`
 				);
 			}

@@ -17,7 +17,7 @@ EXPECTED_KEYS = {
     "title",
     "author",
     "recipe_count",
-    "seen_count",
+    "progress",
     "has_cover",
     "pubdate",
     "keywords",
@@ -30,13 +30,13 @@ DETAIL_KEYS = {
     "pubdate",
     "description",
     "recipe_count",
-    "seen_count",
     "has_cover",
     "has_epub",
     "added",
     "keywords",
     "recipes",
-    "next_unread",
+    "reading",
+    "resume_recipe",
 }
 
 
@@ -94,7 +94,7 @@ def test_book_detail_recipes_capped_and_shaped(client: TestClient) -> None:
     recipes = client.get(f"/api/books/{book_id}").json()["recipes"]
     assert 0 < len(recipes) <= 10
     for row in recipes:
-        assert set(row.keys()) == {"id", "name", "keywords", "is_seen"}
+        assert set(row.keys()) == {"id", "name", "keywords"}
         assert isinstance(row["keywords"], list)
     # The seeded "Recipe 0" carries two keywords, sorted.
     keyworded = next((r for r in recipes if r["name"] == "Recipe 0"), None)
@@ -109,64 +109,68 @@ def test_book_detail_empty_recipes(client: TestClient) -> None:
     assert body["recipes"] == []
 
 
-def test_seen_counts_report_recipes_opened(client: TestClient) -> None:
+def test_progress_reports_how_far_through_the_book(client: TestClient) -> None:
+    """Progress is measured in recipes: reaching the second of three is two thirds in."""
     book_id = _book_id(client, "With Recipes")
-    recipes = client.get(f"/api/books/{book_id}").json()["recipes"]
-    for recipe in recipes[:2]:
-        client.post(f"/api/recipes/{recipe['id']}/seen")
-    # Re-opening one of them doesn't double-count: the percentage counts distinct recipes.
-    client.post(f"/api/recipes/{recipes[0]['id']}/seen")
+    ids = [r["id"] for r in client.get(f"/api/books/{book_id}/recipe-index").json()]
+    client.put(f"/api/books/{book_id}/reading", json={"mode": "recipes", "recipe_id": ids[1]})
 
-    assert client.get(f"/api/books/{book_id}").json()["seen_count"] == 2
+    assert client.get(f"/api/books/{book_id}").json()["reading"]["fraction"] == 2 / 3
     summaries = {b["title"]: b for b in client.get("/api/books").json()}
-    assert summaries["With Recipes"]["seen_count"] == 2
-    assert summaries["No Recipes Yet"]["seen_count"] == 0
+    assert summaries["With Recipes"]["progress"] == 2 / 3
+    # A book never opened reports no progress at all, rather than 0%.
+    assert summaries["No Recipes Yet"]["progress"] is None
 
 
-def test_seen_counts_are_per_user(
+def test_progress_only_moves_forwards(client: TestClient) -> None:
+    """Re-reading an earlier recipe doesn't undo the reading that got past it."""
+    book_id = _book_id(client, "With Recipes")
+    ids = [r["id"] for r in client.get(f"/api/books/{book_id}/recipe-index").json()]
+    client.put(f"/api/books/{book_id}/reading", json={"mode": "recipes", "recipe_id": ids[2]})
+    client.put(f"/api/books/{book_id}/reading", json={"mode": "recipes", "recipe_id": ids[0]})
+
+    reading = client.get(f"/api/books/{book_id}").json()["reading"]
+    assert reading["fraction"] == 1.0
+    assert reading["anchor"]["id"] == ids[2]
+
+
+def test_progress_is_per_user(
     client: TestClient, session: Session, act_as: Callable[[str], User]
 ) -> None:
     """Each account sees its own reading and nothing of anyone else's."""
     create_user(session, "other", "other-password")
 
     book_id = _book_id(client, "With Recipes")
-    recipes = client.get(f"/api/books/{book_id}").json()["recipes"]
-    for recipe in recipes[:2]:
-        client.post(f"/api/recipes/{recipe['id']}/seen")
+    ids = [r["id"] for r in client.get(f"/api/books/{book_id}/recipe-index").json()]
+    client.put(f"/api/books/{book_id}/reading", json={"mode": "recipes", "recipe_id": ids[1]})
 
     act_as("other")
-    assert client.get(f"/api/books/{book_id}").json()["seen_count"] == 0
-    client.post(f"/api/recipes/{recipes[0]['id']}/seen")
-    assert client.get(f"/api/books/{book_id}").json()["seen_count"] == 1
+    assert client.get(f"/api/books/{book_id}").json()["reading"] is None
+    client.put(f"/api/books/{book_id}/reading", json={"mode": "recipes", "recipe_id": ids[0]})
+    assert client.get(f"/api/books/{book_id}").json()["reading"]["fraction"] == 1 / 3
 
-    # The first account's figure is untouched by the second's reading.
+    # The first account's position is untouched by the second's reading.
     act_as("tester")
-    assert client.get(f"/api/books/{book_id}").json()["seen_count"] == 2
+    assert client.get(f"/api/books/{book_id}").json()["reading"]["fraction"] == 2 / 3
 
 
-def test_recipe_rows_report_their_own_read_state(client: TestClient) -> None:
-    """The index marks *which* recipes make up the percentage, not just how many."""
+def test_resume_recipe_is_the_furthest_reached_or_the_first(client: TestClient) -> None:
     book_id = _book_id(client, "With Recipes")
-    recipes = client.get(f"/api/books/{book_id}").json()["recipes"]
-    assert all(r["is_seen"] is False for r in recipes)
+    ids = [r["id"] for r in client.get(f"/api/books/{book_id}/recipe-index").json()]
+    # Never opened: the recipes start at the beginning.
+    assert client.get(f"/api/books/{book_id}").json()["resume_recipe"]["id"] == ids[0]
 
-    client.post(f"/api/recipes/{recipes[0]['id']}/seen")
-    rows = {r["id"]: r for r in client.get(f"/api/books/{book_id}").json()["recipes"]}
-    assert rows[recipes[0]["id"]]["is_seen"] is True
-    assert all(r["is_seen"] is False for rid, r in rows.items() if rid != recipes[0]["id"])
+    client.put(f"/api/books/{book_id}/reading", json={"mode": "book", "recipe_id": ids[1]})
+    assert client.get(f"/api/books/{book_id}").json()["resume_recipe"]["id"] == ids[1]
 
 
-def test_next_unread_walks_book_order_and_empties_when_finished(client: TestClient) -> None:
+def test_reading_a_recipe_alone_moves_nothing(client: TestClient) -> None:
+    """Opening a recipe is recorded, but only reading it as part of the book is reading
+    the book — so a recipe met through search starts nothing."""
     book_id = _book_id(client, "With Recipes")
-    first = client.get(f"/api/books/{book_id}").json()["next_unread"]
-    assert first is not None and first["name"] == "Recipe 0"
-
-    client.post(f"/api/recipes/{first['id']}/seen")
-    second = client.get(f"/api/books/{book_id}").json()["next_unread"]
-    assert second is not None and second["id"] != first["id"]
-
-    client.post(f"/api/books/{book_id}/seen")
-    assert client.get(f"/api/books/{book_id}").json()["next_unread"] is None
+    recipe_id = client.get(f"/api/books/{book_id}/recipe-index").json()[0]["id"]
+    client.post(f"/api/recipes/{recipe_id}/seen")
+    assert client.get(f"/api/books/{book_id}").json()["reading"] is None
 
 
 def test_mark_book_read_and_reset(client: TestClient) -> None:
@@ -175,16 +179,22 @@ def test_mark_book_read_and_reset(client: TestClient) -> None:
 
     marked = client.post(f"/api/books/{book_id}/seen")
     assert marked.status_code == 200
-    assert marked.json() == {"recipe_count": total, "seen_count": total}
-    assert all(r["is_seen"] for r in client.get(f"/api/books/{book_id}").json()["recipes"])
+    assert marked.json()["recipe_count"] == total
+    assert marked.json()["reading"] == {
+        "mode": "book",
+        "fraction": 1.0,
+        "anchor": None,
+        "location": None,
+        "finished": True,
+    }
 
     # Marking a book already read changes nothing — no duplicate view rows.
-    assert client.post(f"/api/books/{book_id}/seen").json()["seen_count"] == total
+    assert client.post(f"/api/books/{book_id}/seen").json()["reading"]["finished"] is True
 
     reset = client.delete(f"/api/books/{book_id}/seen")
     assert reset.status_code == 200
-    assert reset.json() == {"recipe_count": total, "seen_count": 0}
-    assert client.get(f"/api/books/{book_id}").json()["seen_count"] == 0
+    assert reset.json() == {"recipe_count": total, "reading": None}
+    assert client.get(f"/api/books/{book_id}").json()["reading"] is None
 
 
 def test_mark_book_read_keeps_an_existing_sitting_count(client: TestClient) -> None:
@@ -206,17 +216,95 @@ def test_mark_book_read_is_per_user(
     client.post(f"/api/books/{book_id}/seen")
 
     act_as("other")
-    assert client.get(f"/api/books/{book_id}").json()["seen_count"] == 0
+    assert client.get(f"/api/books/{book_id}").json()["reading"] is None
     # Resetting one account's progress leaves the other's reading intact.
     client.delete(f"/api/books/{book_id}/seen")
     act_as("tester")
-    body = client.get(f"/api/books/{book_id}").json()
-    assert body["seen_count"] == body["recipe_count"]
+    assert client.get(f"/api/books/{book_id}").json()["reading"]["finished"] is True
 
 
 def test_book_read_state_404s_for_unknown_book(client: TestClient) -> None:
     assert client.post(f"/api/books/{uuid.uuid4()}/seen").status_code == 404
     assert client.delete(f"/api/books/{uuid.uuid4()}/seen").status_code == 404
+
+
+def test_reading_is_saved_and_returned(client: TestClient) -> None:
+    book_id = _book_id(client, "With Recipes")
+    ids = [r["id"] for r in client.get(f"/api/books/{book_id}/recipe-index").json()]
+    assert client.get(f"/api/books/{book_id}").json()["reading"] is None
+
+    saved = client.put(
+        f"/api/books/{book_id}/reading",
+        json={"mode": "book", "recipe_id": ids[0], "location": "epubcfi(/6/4!/2)"},
+    )
+    assert saved.status_code == 200
+    assert saved.json() == {
+        "mode": "book",
+        "fraction": 1 / 3,
+        "anchor": {"id": ids[0], "name": "Recipe 0"},
+        "location": "epubcfi(/6/4!/2)",
+        "finished": False,
+    }
+
+    # A second report moves the position rather than adding a row.
+    client.put(
+        f"/api/books/{book_id}/reading",
+        json={"mode": "book", "recipe_id": ids[1], "location": "epubcfi(/6/8)"},
+    )
+    reading = client.get(f"/api/books/{book_id}").json()["reading"]
+    assert (reading["anchor"]["id"], reading["location"]) == (ids[1], "epubcfi(/6/8)")
+
+
+def test_the_two_modes_share_one_position(client: TestClient) -> None:
+    """Recipes read in the app carry the reader forwards, and vice versa."""
+    book_id = _book_id(client, "With Recipes")
+    ids = [r["id"] for r in client.get(f"/api/books/{book_id}/recipe-index").json()]
+
+    client.put(f"/api/books/{book_id}/reading", json={"mode": "recipes", "recipe_id": ids[1]})
+    body = client.get(f"/api/books/{book_id}").json()
+    # Opening the pages resumes at the recipe the walk reached.
+    assert body["reading"]["mode"] == "recipes"
+    assert body["resume_recipe"]["id"] == ids[1]
+
+    client.put(
+        f"/api/books/{book_id}/reading",
+        json={"mode": "book", "recipe_id": ids[2], "location": "epubcfi(/6/8)"},
+    )
+    body = client.get(f"/api/books/{book_id}").json()
+    assert body["reading"]["mode"] == "book"
+    assert body["resume_recipe"]["id"] == ids[2]
+
+
+def test_reading_records_a_view_of_the_recipe_reached(client: TestClient) -> None:
+    """The record of what has been looked at keeps being collected, unshown."""
+    book_id = _book_id(client, "With Recipes")
+    ids = [r["id"] for r in client.get(f"/api/books/{book_id}/recipe-index").json()]
+    client.put(f"/api/books/{book_id}/reading", json={"mode": "book", "recipe_id": ids[0]})
+    assert client.get("/api/home").json()["recently_read"][0]["id"] == ids[0]
+
+
+def test_marking_a_book_read_finishes_its_reading(client: TestClient) -> None:
+    book_id = _book_id(client, "With Recipes")
+    ids = [r["id"] for r in client.get(f"/api/books/{book_id}/recipe-index").json()]
+    client.put(f"/api/books/{book_id}/reading", json={"mode": "book", "recipe_id": ids[0]})
+    client.post(f"/api/books/{book_id}/seen")
+    reading = client.get(f"/api/books/{book_id}").json()["reading"]
+    assert (reading["fraction"], reading["finished"]) == (1.0, True)
+
+    # Resetting the book forgets where reading got to as well.
+    client.delete(f"/api/books/{book_id}/seen")
+    assert client.get(f"/api/books/{book_id}").json()["reading"] is None
+
+
+def test_reading_rejects_a_recipe_from_another_book(client: TestClient) -> None:
+    book_id = _book_id(client, "With Recipes")
+    other_id = _book_id(client, "No Recipes Yet")
+    recipe_id = client.get(f"/api/books/{book_id}/recipe-index").json()[0]["id"]
+    resp = client.put(f"/api/books/{other_id}/reading", json={"recipe_id": recipe_id})
+    assert resp.status_code == 404
+    assert (
+        client.put(f"/api/books/{uuid.uuid4()}/reading", json={"mode": "book"}).status_code == 404
+    )
 
 
 def test_book_detail_404_for_unknown_book(client: TestClient) -> None:

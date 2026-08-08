@@ -21,7 +21,6 @@ export const recipeDetailSchema = z.object({
 	keywords: z.array(z.string()),
 	has_image: z.boolean(),
 	is_favourite: z.boolean(),
-	is_seen: z.boolean(),
 	context: z.string(),
 	previous: recipeNeighbourSchema.nullable(),
 	next: recipeNeighbourSchema.nullable()
@@ -53,9 +52,8 @@ export const recipeViewStateSchema = z.object({
 
 export type RecipeViewState = z.infer<typeof recipeViewStateSchema>;
 
-/** Record that the reader has opened this recipe — the input to a book's read
- *  percentage. Callers fire this and forget it; a missed view must never break
- *  the page. `fetchFn` is injectable for tests. */
+/** Record that the reader has opened this recipe. Kept as a record of what has been
+ *  looked at, not shown as read state; callers fire it and forget it. */
 export async function markRecipeSeen(
 	id: string,
 	fetchFn: typeof fetch = fetch
@@ -65,13 +63,6 @@ export async function markRecipeSeen(
 	return recipeViewStateSchema.parse(await res.json());
 }
 
-/** Forget that this recipe was read — the undo for one opened by accident, since
- *  views are recorded automatically. Idempotent. `fetchFn` is injectable for tests. */
-export async function unmarkRecipeSeen(id: string, fetchFn: typeof fetch = fetch): Promise<void> {
-	const res = await fetchFn(`/api/recipes/${id}/seen`, { method: 'DELETE' });
-	if (!res.ok) throw new Error(`DELETE /api/recipes/${id}/seen → ${res.status}`);
-}
-
 // Mirrors the wire shapes from GET /api/recipes and GET /api/keywords (snake_case).
 export const recipeSummarySchema = z.object({
 	id: z.string().uuid(),
@@ -79,8 +70,7 @@ export const recipeSummarySchema = z.object({
 	book_id: z.string().uuid(),
 	book_title: z.string(),
 	book_author: z.string(),
-	keywords: z.array(z.string()),
-	is_seen: z.boolean()
+	keywords: z.array(z.string())
 });
 
 export const keywordSummarySchema = z.object({
@@ -150,9 +140,6 @@ export type SearchCriteria = {
 	keywords?: string[];
 	bookId?: string;
 	author?: string;
-	/** Narrow to recipes the reader hasn't opened yet. Narrows a search; on its own
-	 *  it is not a query (the resting state stays empty). */
-	unread?: boolean;
 	sort?: SortKey;
 	// Stable shuffle seed for `sort: 'random'`, so pagination keeps one ordering.
 	seed?: number;
@@ -171,7 +158,6 @@ export function criteriaToParams(c: SearchCriteria): URLSearchParams {
 	for (const kw of c.keywords ?? []) p.append('keyword', kw);
 	if (c.bookId) p.set('book_id', c.bookId);
 	if (c.author) p.set('author', c.author);
-	if (c.unread) p.set('unread', 'true');
 	if (c.sort) p.set('sort', c.sort);
 	if (c.seed != null) p.set('seed', String(c.seed));
 	if (c.limit != null) p.set('limit', String(c.limit));
@@ -208,7 +194,6 @@ export function criteriaFromParams(p: URLSearchParams): SearchCriteria {
 	if (bookId) c.bookId = bookId;
 	const author = p.get('author');
 	if (author) c.author = author;
-	if (p.get('unread') === 'true') c.unread = true;
 	const sort = p.get('sort');
 	if (sort === 'name' || sort === 'recent' || sort === 'random' || sort === 'book') c.sort = sort;
 	const seed = p.get('seed');

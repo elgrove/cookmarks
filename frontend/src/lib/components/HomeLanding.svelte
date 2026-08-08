@@ -8,17 +8,26 @@
 		hasCover: boolean;
 	};
 
-	/** A book the reader is part-way through. */
+	/** A book part-way through, in the mode it was last read in. */
 	export type ContinueBook = {
 		id: string;
 		title: string;
 		author: string;
-		recipeCount: number;
-		seenCount: number;
+		mode: 'book' | 'recipes';
+		fraction: number;
+		/** The recipe both modes pick back up at, once one has been reached. */
+		resumeRecipeId: string | null;
 		hasCover: boolean;
 	};
 
-	/** A recipe read recently — the trail back to where reading left off. */
+	/** Back into the mode this book was left in — its pages, or the recipe it reached. */
+	function resumeHref(book: ContinueBook): string {
+		return book.mode === 'recipes' && book.resumeRecipeId
+			? `/recipes/${book.resumeRecipeId}?context=book`
+			: `/books/${book.id}/read`;
+	}
+
+	/** A recipe opened recently — the trail back to where reading left off. */
 	export type RecentRecipe = {
 		id: string;
 		name: string;
@@ -26,8 +35,8 @@
 		bookTitle: string;
 	};
 
-	/** Library-wide reading progress: recipes seen against the whole collection. */
-	export type ReadProgress = { recipes: number; recipesSeen: number };
+	/** Library-wide reading: books read through against the whole collection. */
+	export type ReadProgress = { books: number; booksRead: number };
 </script>
 
 <script lang="ts">
@@ -38,7 +47,7 @@
 
 	let {
 		bookOfTheDay,
-		progress = { recipes: 0, recipesSeen: 0 },
+		progress = { books: 0, booksRead: 0 },
 		continueReading = [],
 		recentlyRead = []
 	}: {
@@ -56,7 +65,7 @@
 	let description = $derived(bookOfTheDay ? plainText(bookOfTheDay.description) : '');
 
 	// An empty library has no percentage to report, rather than 0% or NaN.
-	let readPct = $derived(readPercent(progress.recipesSeen, progress.recipes));
+	let readPct = $derived(readPercent(progress.booksRead, progress.books));
 
 	// Books in progress are what brings you back, so they lead the page and take the
 	// masthead. With nothing part-read the feature leads instead, as it always did.
@@ -79,18 +88,18 @@
 			<h1 class="display">Continue reading</h1>
 			<ul class="strip">
 				{#each continueReading as book, i (book.id)}
-					{@const pct = readPercent(book.seenCount, book.recipeCount) ?? 0}
+					{@const pct = Math.round(book.fraction * 100)}
 					<li class="cell" style={`animation-delay: ${Math.min(i * 60, 240)}ms`}>
 						<BookCard
 							id={book.id}
 							title={book.title}
 							author={book.author}
-							recipeCount={book.recipeCount}
-							seenCount={book.seenCount}
 							hasCover={book.hasCover}
+							href={resumeHref(book)}
+							progress={book.fraction}
 							showCount={false}
 						/>
-						<p class="cbook-meta mono">{book.seenCount} of {book.recipeCount} · {pct}%</p>
+						<p class="cbook-meta mono">{pct}% through</p>
 					</li>
 				{/each}
 			</ul>
@@ -136,7 +145,7 @@
 
 	{#if recentlyRead.length}
 		<section class="recent">
-			<h2 class="label">Recently read</h2>
+			<h2 class="label">Recently opened</h2>
 			<ol class="recent-index">
 				{#each recentlyRead as r, i (r.id)}
 					<li>
@@ -155,7 +164,7 @@
 			<p class="figure">
 				<span class="pct">{readPct}%</span>
 				<span class="of mono"
-					>{nf.format(progress.recipesSeen)} of {nf.format(progress.recipes)} recipes</span
+					>{nf.format(progress.booksRead)} of {nf.format(progress.books)} books</span
 				>
 			</p>
 			<div class="rule" aria-hidden="true">

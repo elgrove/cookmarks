@@ -20,7 +20,6 @@ from app.schemas.recipe_list import (
     ListRename,
     ListSummary,
 )
-from app.services.views import seen_recipe_ids
 
 router = APIRouter(tags=["lists"])
 
@@ -88,7 +87,6 @@ def _recipe_summaries(
         .order_by(RecipeListItem.position, RecipeListItem.created_at.desc())
         .options(selectinload(Recipe.keywords))
     ).all()
-    seen_ids = seen_recipe_ids(session, user_id, [recipe.id for recipe, _ in rows])
     return [
         RecipeSummary(
             id=recipe.id,
@@ -97,7 +95,6 @@ def _recipe_summaries(
             book_title=book.title,
             book_author=book.author,
             keywords=sorted(k.name for k in recipe.keywords),
-            is_seen=recipe.id in seen_ids,
         )
         for recipe, book in rows
     ]

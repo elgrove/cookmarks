@@ -3,15 +3,17 @@ from datetime import date
 
 from fastapi import APIRouter
 from sqlalchemy import exists, func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 from app.api.deps import CurrentUser
 from app.covers import has_cover
 from app.db import SessionDep
 from app.models.book import Book
+from app.models.book_reading import BookReading
 from app.models.recipe import Keyword, Recipe
 from app.models.recipe_view import RecipeView
 from app.schemas.home import BookFeature, ContinueBook, HomeData, RecentRecipe, Stats
+from app.services.reading import fraction
 
 CONTINUE_LIMIT = 4
 RECENT_LIMIT = 6
@@ -43,38 +45,49 @@ def _book_of_the_day(session: Session) -> BookFeature | None:
 
 
 def _continue_reading(session: Session, user_id: uuid.UUID) -> list[ContinueBook]:
-    """The books the caller has started but not finished, most recently read first.
-    A finished book has nothing left to continue, so it drops out of the strip."""
-    seen = func.count(RecipeView.id)
+    """The books the caller is part-way through, most recently read first, each in the
+    mode it was last read in. Progress is measured in recipes whichever way the book is
+    being read, so the strip reads the same for both. A book read to its last recipe —
+    or declared read on the book page — has nothing left to continue and drops out."""
     total = (
         select(func.count(Recipe.id))
         .where(Recipe.book_id == Book.id)
         .correlate(Book)
         .scalar_subquery()
     )
+    anchor = aliased(Recipe)
     rows = session.execute(
-        select(Book, seen, total)
-        .join(Recipe, Recipe.book_id == Book.id)
-        .join(
-            RecipeView,
-            (RecipeView.recipe_id == Recipe.id) & (RecipeView.user_id == user_id),
-        )
-        .group_by(Book.id)
-        .having(seen < total)
-        .order_by(func.max(RecipeView.last_viewed_at).desc())
+        select(Book, BookReading.mode, BookReading.anchor_recipe_id, anchor.order, total)
+        .join(BookReading, BookReading.book_id == Book.id)
+        .outerjoin(anchor, anchor.id == BookReading.anchor_recipe_id)
+        .where(BookReading.user_id == user_id, BookReading.finished.is_(False))
+        .order_by(BookReading.last_read_at.desc())
         .limit(CONTINUE_LIMIT)
     ).all()
-    return [
-        ContinueBook(
-            id=book.id,
-            title=book.title,
-            author=book.author,
-            recipe_count=recipe_count,
-            seen_count=seen_count,
-            has_cover=has_cover(book),
+    strip = []
+    for book, mode, anchor_id, anchor_order, total_count in rows:
+        progress = fraction(False, anchor_order, total_count)
+        if progress >= 1.0:
+            continue  # read to the last recipe: nothing left to continue
+        strip.append(
+            ContinueBook(
+                id=book.id,
+                title=book.title,
+                author=book.author,
+                mode=mode,
+                fraction=progress,
+                resume_recipe_id=anchor_id or _first_recipe_id(session, book.id),
+                has_cover=has_cover(book),
+            )
         )
-        for book, seen_count, recipe_count in rows
-    ]
+    return strip
+
+
+def _first_recipe_id(session: Session, book_id: uuid.UUID) -> uuid.UUID | None:
+    """Where a book not yet carried past a recipe starts: its first, in book order."""
+    return session.scalar(
+        select(Recipe.id).where(Recipe.book_id == book_id).order_by(Recipe.order.asc()).limit(1)
+    )
 
 
 def _recently_read(session: Session, user_id: uuid.UUID) -> list[RecentRecipe]:
@@ -103,10 +116,10 @@ def home(session: SessionDep, user: CurrentUser) -> HomeData:
         books=session.scalar(select(func.count()).select_from(Book)) or 0,
         recipes=session.scalar(select(func.count()).select_from(Recipe)) or 0,
         keywords=session.scalar(select(func.count()).select_from(Keyword)) or 0,
-        recipes_seen=session.scalar(
+        books_read=session.scalar(
             select(func.count())
-            .select_from(RecipeView)
-            .where(RecipeView.user_id == user.id)
+            .select_from(BookReading)
+            .where(BookReading.user_id == user.id, BookReading.finished.is_(True))
         )
         or 0,
     )

@@ -11,7 +11,7 @@
 
 	let status = $state<'loading' | 'error' | 'ready'>('loading');
 	let bookOfTheDay = $state<BookOfTheDay | null>(null);
-	let progress = $state<ReadProgress>({ recipes: 0, recipesSeen: 0 });
+	let progress = $state<ReadProgress>({ books: 0, booksRead: 0 });
 	let continueReading = $state<ContinueBook[]>([]);
 	let recentlyRead = $state<RecentRecipe[]>([]);
 
@@ -30,13 +30,14 @@
 						hasCover: b.has_cover
 					}
 				: null;
-			progress = { recipes: home.stats.recipes, recipesSeen: home.stats.recipes_seen };
+			progress = { books: home.stats.books, booksRead: home.stats.books_read };
 			continueReading = home.continue_reading.map((c) => ({
 				id: c.id,
 				title: c.title,
 				author: c.author,
-				recipeCount: c.recipe_count,
-				seenCount: c.seen_count,
+				mode: c.mode,
+				fraction: c.fraction,
+				resumeRecipeId: c.resume_recipe_id,
 				hasCover: c.has_cover
 			}));
 			recentlyRead = home.recently_read.map((r) => ({

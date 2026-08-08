@@ -137,7 +137,6 @@
 					bookTitle={recipe.bookTitle}
 					bookAuthor={recipe.bookAuthor}
 					keywords={recipe.keywords}
-					isSeen={recipe.isSeen}
 					onRemove={() => removeRecipe(recipe.id)}
 				/>
 			{/each}

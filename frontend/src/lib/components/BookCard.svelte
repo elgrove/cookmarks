@@ -1,25 +1,29 @@
 <script lang="ts">
-	import { readPercent } from '$lib/progress';
 	import { cleanTitle } from '$lib/title';
 
 	let {
 		id,
 		title,
 		author,
-		recipeCount,
-		seenCount = 0,
+		recipeCount = 0,
 		hasCover,
-		showCount = true
+		showCount = true,
+		href = `/books/${id}`,
+		progress = null
 	}: {
 		id: string;
 		title: string;
 		author: string;
-		recipeCount: number;
-		seenCount?: number;
+		recipeCount?: number;
 		hasCover: boolean;
 		/** The count circle competes with the progress rule for the same clay, so
 		 *  surfaces that state the count in words (the home strip) turn it off. */
 		showCount?: boolean;
+		/** Where the card leads; the book page unless a surface has somewhere better
+		 *  (the continue strip goes straight back to where reading stopped). */
+		href?: string;
+		/** How far through the book the reader is, 0 to 1; null for one never opened. */
+		progress?: number | null;
 	} = $props();
 
 	// Cards show the clean name only; the colon-subtitle is a detail-page affordance.
@@ -29,15 +33,15 @@
 	let showCover = $derived(hasCover && !coverFailed);
 	// Read progress rides the bottom edge of the cover plate as a clay rule; a book
 	// nothing has been read from carries none.
-	let readPct = $derived(readPercent(seenCount, recipeCount));
-	let started = $derived(readPct !== null && seenCount > 0);
+	let readPct = $derived(progress === null ? null : Math.round(progress * 100));
+	let started = $derived(readPct !== null && readPct > 0);
 	// Extraction and reading state live on the cover as a count circle and a rule;
 	// fold both into the link's accessible name since they are decorative.
 	let linkLabel = $derived(
-		recipeCount === 0
-			? displayTitle
-			: started
-				? `${displayTitle}, ${seenCount} of ${recipeCount} recipes seen`
+		started
+			? `${displayTitle}, ${readPct}% read`
+			: recipeCount === 0
+				? displayTitle
 				: `${displayTitle}, ${recipeCount} recipes`
 	);
 </script>
@@ -45,7 +49,7 @@
 <article class="card">
 	<!-- A single stretched link covers the whole card surface (cover plate + meta),
 	     so a click anywhere navigates to the book. -->
-	<a class="card-link" href={`/books/${id}`} aria-label={linkLabel}>
+	<a class="card-link" {href} aria-label={linkLabel}>
 		<div class="plate">
 			{#if showCover}
 				<img

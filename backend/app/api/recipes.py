@@ -13,9 +13,9 @@ from app.db import SessionDep
 from app.epub import read_epub_image
 from app.models.base import as_utc
 from app.models.book import Book
+from app.models.enums import ReadingMode
 from app.models.recipe import Keyword, Recipe, recipe_keywords
 from app.models.recipe_list import RecipeListItem
-from app.models.recipe_view import RecipeView
 from app.schemas.recipe import (
     KeywordSummary,
     RecipeDetail,
@@ -28,8 +28,9 @@ from app.schemas.recipe import (
     SimilarRecipes,
 )
 from app.services import embeddings
+from app.services.reading import touch_reading
 from app.services.vector_store import VectorStore
-from app.services.views import forget_view, record_view, seen_recipe_ids
+from app.services.views import forget_view, record_view
 
 router = APIRouter(tags=["recipes"])
 
@@ -52,10 +53,8 @@ _SHUFFLE_HASH = 2654435761
 SUPPORTED_CONTEXTS = {"book", "search"}
 
 
-def _summary(recipe: Recipe, book: Book, seen_ids: set[uuid.UUID]) -> RecipeSummary:
-    """A recipe as a text-first list row (search results, similar-recipe lists).
-    `seen_ids` is the caller's read set for the page, resolved in one query by the
-    caller rather than per row."""
+def _summary(recipe: Recipe, book: Book) -> RecipeSummary:
+    """A recipe as a text-first list row (search results, similar-recipe lists)."""
     return RecipeSummary(
         id=recipe.id,
         name=recipe.name,
@@ -63,7 +62,6 @@ def _summary(recipe: Recipe, book: Book, seen_ids: set[uuid.UUID]) -> RecipeSumm
         book_title=book.title,
         book_author=book.author,
         keywords=sorted(k.name for k in recipe.keywords),
-        is_seen=recipe.id in seen_ids,
     )
 
 
@@ -90,16 +88,9 @@ def _search_conditions(
     keywords: list[str],
     book_id: uuid.UUID | None,
     author: str | None,
-    unread_for: uuid.UUID | None = None,
 ) -> list:
     """The AND-narrowing filter shared by the result rows, total and facets."""
     conditions = []
-    if unread_for is not None:
-        conditions.append(
-            Recipe.id.notin_(
-                select(RecipeView.recipe_id).where(RecipeView.user_id == unread_for)
-            )
-        )
     if q:
         like = f"%{q}%"
         conditions.append(
@@ -129,7 +120,6 @@ def search_recipes(
     keyword: Annotated[list[str] | None, Query()] = None,
     book_id: uuid.UUID | None = None,
     author: Annotated[str | None, Query()] = None,
-    unread: bool = False,
     sort: Sort = "random",
     seed: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=100)] = 30,
@@ -137,15 +127,13 @@ def search_recipes(
 ) -> RecipeSearchResults:
     # The page is empty until *something* is asked for: a typed query or any
     # filter. Filters count as a query, so a keyword/book/author alone returns
-    # results; nothing set returns the resting (empty) state. "Unread" narrows
-    # what is already asked for — on its own it would mean "everything I haven't
-    # read", which is the whole library.
+    # results; nothing set returns the resting (empty) state.
     keywords = keyword or []
     q = q.strip()
     if not (q or keywords or book_id or author):
         return RecipeSearchResults(total=0, items=[])
 
-    conditions = _search_conditions(q, keywords, book_id, author, user.id if unread else None)
+    conditions = _search_conditions(q, keywords, book_id, author)
 
     filtered = select(Recipe.id).join(Book, Recipe.book_id == Book.id).where(*conditions)
     total = session.scalar(select(func.count()).select_from(filtered.subquery())) or 0
@@ -160,8 +148,7 @@ def search_recipes(
         .options(selectinload(Recipe.keywords))
     ).all()
 
-    seen_ids = seen_recipe_ids(session, user.id, [recipe.id for recipe, _ in rows])
-    items = [_summary(recipe, book, seen_ids) for recipe, book in rows]
+    items = [_summary(recipe, book) for recipe, book in rows]
 
     # Facets: the keywords most common among the matching recipes, so the chips
     # can re-rank to what narrows further. Already-selected keywords are dropped
@@ -213,7 +200,6 @@ def semantic_search(
         .options(selectinload(Recipe.keywords))
     ).all()
     by_id = {recipe.id: (recipe, book) for recipe, book in rows}
-    seen_ids = seen_recipe_ids(session, user.id, ids)
 
     # Walk `matches` (already distance-ordered) so the response preserves relevance
     # order — the SELECT above returns rows in id order, not distance order.
@@ -231,7 +217,6 @@ def semantic_search(
                 book_title=book.title,
                 book_author=book.author,
                 keywords=sorted(k.name for k in recipe.keywords),
-                is_seen=recipe.id in seen_ids,
                 distance=distance,
             )
         )
@@ -344,10 +329,7 @@ def _ordered_search_ids(
     author: str | None,
     sort: Sort,
     seed: int,
-    unread_for: uuid.UUID | None = None,
 ) -> list[uuid.UUID]:
-    # `unread_for` is part of the key: an unread-filtered ordering is that reader's
-    # alone, and must never be served to another account from this cache.
     key = (
         q,
         tuple(keywords),
@@ -355,13 +337,12 @@ def _ordered_search_ids(
         author,
         sort,
         seed,
-        str(unread_for) if unread_for else None,
     )
     cached = _SEARCH_ORDER_CACHE.get(key)
     if cached is not None:
         _SEARCH_ORDER_CACHE.move_to_end(key)
         return cached
-    conditions = _search_conditions(q, keywords, book_id, author, unread_for)
+    conditions = _search_conditions(q, keywords, book_id, author)
     ids = list(
         session.scalars(
             select(Recipe.id)
@@ -386,11 +367,10 @@ def _search_neighbours(
     author: str | None,
     sort: Sort,
     seed: int,
-    unread_for: uuid.UUID | None = None,
 ) -> tuple[RecipeNeighbour | None, RecipeNeighbour | None]:
     """Previous/next in the *search* ordering — the ordered ids (cached per search)
     indexed to this recipe. Returns (None, None) if it isn't in the result set."""
-    ids = _ordered_search_ids(session, q, keywords, book_id, author, sort, seed, unread_for)
+    ids = _ordered_search_ids(session, q, keywords, book_id, author, sort, seed)
     try:
         idx = ids.index(recipe.id)
     except ValueError:
@@ -410,7 +390,6 @@ def get_recipe(
     keyword: Annotated[list[str] | None, Query()] = None,
     book_id: uuid.UUID | None = None,
     author: Annotated[str | None, Query()] = None,
-    unread: bool = False,
     sort: Sort = "random",
     seed: Annotated[int, Query(ge=0)] = 0,
 ) -> RecipeDetail:
@@ -425,18 +404,10 @@ def get_recipe(
     resolved_context = context if context in SUPPORTED_CONTEXTS else "book"
     if resolved_context == "search":
         # The ordering is cached from the first recipe opened out of this search, so
-        # an unread-filtered walk keeps its neighbours even as reading them marks them
-        # read. If that entry has been evicted the pager simply goes quiet.
+        # the pager stays consistent as the reader walks it. If that entry has been
+        # evicted the pager simply goes quiet.
         previous, next_ = _search_neighbours(
-            session,
-            recipe,
-            q.strip(),
-            keyword or [],
-            book_id,
-            author,
-            sort,
-            seed,
-            user.id if unread else None,
+            session, recipe, q.strip(), keyword or [], book_id, author, sort, seed
         )
     else:
         previous, next_ = _book_neighbours(session, recipe)
@@ -454,7 +425,6 @@ def get_recipe(
         keywords=sorted(k.name for k in recipe.keywords),
         has_image=recipe.image is not None,
         is_favourite=_is_favourite(session, recipe.id, user.id),
-        is_seen=bool(seen_recipe_ids(session, user.id, [recipe.id])),
         context=resolved_context,
         previous=previous,
         next=next_,
@@ -463,14 +433,20 @@ def get_recipe(
 
 @router.post("/recipes/{recipe_id}/seen", response_model=RecipeViewState)
 def mark_recipe_seen(
-    recipe_id: uuid.UUID, session: SessionDep, user: CurrentUser
+    recipe_id: uuid.UUID, session: SessionDep, user: CurrentUser, context: str | None = None
 ) -> RecipeViewState:
     """Record that the caller has opened this recipe — the input to a book's read
     percentage. Explicit rather than a side effect of GET /recipes/{id}, so reading
-    a recipe stays a read."""
-    if session.get(Recipe, recipe_id) is None:
+    a recipe stays a read.
+
+    Read in its book's context, it is also a step through the book itself, which puts
+    the book in progress in recipes mode."""
+    recipe = session.get(Recipe, recipe_id)
+    if recipe is None:
         raise HTTPException(status_code=404, detail="recipe not found")
     view = record_view(session, user.id, recipe_id)
+    if context == "book":
+        touch_reading(session, user.id, recipe.book_id, ReadingMode.RECIPES)
     return RecipeViewState(
         view_count=view.view_count,
         first_viewed_at=as_utc(view.created_at),
@@ -530,12 +506,11 @@ def _load_ordered(
         .options(selectinload(Recipe.keywords))
     ).all()
     by_id = {recipe.id: (recipe, book) for recipe, book in rows}
-    seen_ids = seen_recipe_ids(session, user_id, ids)
     out: list[RecipeSummary] = []
     for rid in ids:
         pair = by_id.get(rid)
         if pair is not None:
-            out.append(_summary(pair[0], pair[1], seen_ids))
+            out.append(_summary(pair[0], pair[1]))
     return out
 
 
@@ -558,8 +533,7 @@ def _keyword_neighbours(
         .limit(limit)
         .options(selectinload(Recipe.keywords))
     ).all()
-    seen_ids = seen_recipe_ids(session, user_id, [r.id for r, _ in rows])
-    return [_summary(recipe, book, seen_ids) for recipe, book in rows]
+    return [_summary(recipe, book) for recipe, book in rows]
 
 
 @router.get("/recipes/{recipe_id}/similar", response_model=SimilarRecipes)

@@ -121,7 +121,6 @@ def test_endpoint_ranks_and_shapes_results(client: TestClient, session: Session)
         "book_title",
         "book_author",
         "keywords",
-        "is_seen",
         "distance",
     }
     # Distances are non-decreasing — closest first.

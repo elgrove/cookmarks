@@ -4,7 +4,6 @@
 	import { page } from '$app/stores';
 	import BookDetail, { type BookDetailData } from '$lib/components/BookDetail.svelte';
 	import { deleteBook, fetchBookDetail, markBookRead, resetBookProgress } from '$lib/api/books';
-	import { markRecipeSeen, unmarkRecipeSeen } from '$lib/api/recipes';
 	import { cleanTitle, pageTitle } from '$lib/title';
 	import { currentUser } from '$lib/auth';
 	import {
@@ -52,7 +51,6 @@
 				pubdate: b.pubdate,
 				description: b.description,
 				recipeCount: b.recipe_count,
-				seenCount: b.seen_count,
 				hasCover: b.has_cover,
 				hasEpub: b.has_epub,
 				added: b.added,
@@ -60,10 +58,16 @@
 				recipes: b.recipes.map((r) => ({
 					id: r.id,
 					name: r.name,
-					keywords: r.keywords,
-					isSeen: r.is_seen
+					keywords: r.keywords
 				})),
-				nextUnread: b.next_unread
+				reading: b.reading
+					? {
+							mode: b.reading.mode,
+							fraction: b.reading.fraction,
+							finished: b.reading.finished
+						}
+					: null,
+				resumeRecipe: b.resume_recipe
 			};
 			status = 'ready';
 			void loadLatestRun(id);
@@ -73,35 +77,14 @@
 		}
 	}
 
-	// Read-state changes apply optimistically — the index and the percentage move on
-	// the click, and the server call is what could still fail. On failure the page
-	// reloads from the server rather than leaving a lie on screen.
-	async function toggleSeen(recipeId: string, seen: boolean) {
-		if (!book) return;
-		const row = book.recipes.find((r) => r.id === recipeId);
-		if (!row || row.isSeen === seen) return;
-		row.isSeen = seen;
-		book.seenCount += seen ? 1 : -1;
-		// Reading the recipe the "Read next" action points at consumes it; the next
-		// one after it arrives with the next load rather than a round-trip now.
-		if (seen && book.nextUnread?.id === recipeId) book.nextUnread = null;
-		try {
-			await (seen ? markRecipeSeen(recipeId) : unmarkRecipeSeen(recipeId));
-		} catch (err) {
-			console.error('failed to change read state', err);
-			await load();
-		}
-	}
-
-	// A book-wide change paints immediately, then reloads: the percentage, every row
-	// and the next-unread target all move together, and none of them can be guessed
-	// from the counts alone.
+	// Finishing or resetting paints immediately, then reloads from the server: the
+	// percentage and both mode actions move together off the one change.
 	async function setBookRead(read: boolean) {
 		if (!book) return;
 		const id = book.id;
-		for (const row of book.recipes) row.isSeen = read;
-		book.seenCount = read ? book.recipeCount : 0;
-		book.nextUnread = null;
+		book.reading = read
+			? { mode: book.reading?.mode ?? 'book', fraction: 1, finished: true }
+			: null;
 		try {
 			if (read) await markBookRead(id);
 			else await resetBookProgress(id);
@@ -134,7 +117,6 @@
 		{book}
 		review={$currentUser?.is_admin ? review : null}
 		onAnswer={answerReview}
-		onToggleSeen={toggleSeen}
 		onMarkBookRead={() => setBookRead(true)}
 		onResetProgress={() => setBookRead(false)}
 		onExtract={$currentUser?.is_admin
