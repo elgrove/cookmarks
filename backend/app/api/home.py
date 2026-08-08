@@ -11,9 +11,10 @@ from app.db import SessionDep
 from app.models.book import Book
 from app.models.recipe import Keyword, Recipe
 from app.models.recipe_view import RecipeView
-from app.schemas.home import BookFeature, ContinueBook, HomeData, Stats
+from app.schemas.home import BookFeature, ContinueBook, HomeData, RecentRecipe, Stats
 
 CONTINUE_LIMIT = 4
+RECENT_LIMIT = 6
 
 
 def _book_of_the_day(session: Session) -> BookFeature | None:
@@ -76,6 +77,23 @@ def _continue_reading(session: Session, user_id: uuid.UUID) -> list[ContinueBook
     ]
 
 
+def _recently_read(session: Session, user_id: uuid.UUID) -> list[RecentRecipe]:
+    """The recipes the caller opened most recently — the trail back to whatever they
+    were in the middle of, which the per-book strip alone can't point at."""
+    rows = session.execute(
+        select(Recipe.id, Recipe.name, Book.id, Book.title)
+        .join(RecipeView, RecipeView.recipe_id == Recipe.id)
+        .join(Book, Book.id == Recipe.book_id)
+        .where(RecipeView.user_id == user_id)
+        .order_by(RecipeView.last_viewed_at.desc())
+        .limit(RECENT_LIMIT)
+    ).all()
+    return [
+        RecentRecipe(id=rid, name=name, book_id=book_id, book_title=book_title)
+        for rid, name, book_id, book_title in rows
+    ]
+
+
 router = APIRouter(tags=["home"])
 
 
@@ -96,4 +114,5 @@ def home(session: SessionDep, user: CurrentUser) -> HomeData:
         stats=stats,
         book_of_the_day=_book_of_the_day(session),
         continue_reading=_continue_reading(session, user.id),
+        recently_read=_recently_read(session, user.id),
     )

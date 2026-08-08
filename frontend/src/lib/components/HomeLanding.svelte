@@ -18,6 +18,14 @@
 		hasCover: boolean;
 	};
 
+	/** A recipe read recently — the trail back to where reading left off. */
+	export type RecentRecipe = {
+		id: string;
+		name: string;
+		bookId: string;
+		bookTitle: string;
+	};
+
 	/** Library-wide reading progress: recipes seen against the whole collection. */
 	export type ReadProgress = { recipes: number; recipesSeen: number };
 </script>
@@ -31,11 +39,13 @@
 	let {
 		bookOfTheDay,
 		progress = { recipes: 0, recipesSeen: 0 },
-		continueReading = []
+		continueReading = [],
+		recentlyRead = []
 	}: {
 		bookOfTheDay: BookOfTheDay | null;
 		progress?: ReadProgress;
 		continueReading?: ContinueBook[];
+		recentlyRead?: RecentRecipe[];
 	} = $props();
 
 	const nf = new Intl.NumberFormat('en-GB');
@@ -61,6 +71,7 @@
 	data-verify-has-feature={bookOfTheDay ? 'true' : 'false'}
 	data-verify-read-pct={readPct === null ? '' : readPct}
 	data-verify-continue-count={continueReading.length}
+	data-verify-recent-count={recentlyRead.length}
 	data-verify-lead={lead}
 >
 	{#if continueReading.length}
@@ -121,6 +132,21 @@
 		</section>
 	{:else if lead === 'empty'}
 		<p class="empty">No books yet.</p>
+	{/if}
+
+	{#if recentlyRead.length}
+		<section class="recent">
+			<h2 class="label">Recently read</h2>
+			<ol class="recent-index">
+				{#each recentlyRead as r, i (r.id)}
+					<li>
+						<span class="num mono" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
+						<a class="rtitle" href={`/recipes/${r.id}`}>{r.name}</a>
+						<a class="rbook" href={`/books/${r.bookId}`}>{cleanTitle(r.bookTitle)}</a>
+					</li>
+				{/each}
+			</ol>
+		</section>
 	{/if}
 
 	{#if readPct !== null}
@@ -299,6 +325,57 @@
 		font-style: italic;
 		font-size: 1.4rem;
 		color: var(--muted);
+	}
+
+	/* Where reading left off, as a numbered index (DESIGN §4): recipe name leading,
+	   its book trailing in the quieter grotesque. */
+	.recent {
+		margin-top: 3.5rem;
+		padding-top: 1.5rem;
+		border-top: var(--border);
+	}
+	.recent h2 {
+		margin: 0 0 0.6rem;
+		font-weight: 400;
+	}
+	.recent-index {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		max-width: 46rem;
+	}
+	.recent-index li {
+		display: grid;
+		grid-template-columns: 2.2rem 1fr auto;
+		align-items: baseline;
+		gap: 0.5rem 1rem;
+		padding: 0.7rem 0;
+		border-bottom: var(--border);
+	}
+	.recent-index .num {
+		font-size: 0.72rem;
+		color: var(--clay);
+	}
+	.rtitle {
+		font-family: var(--f-serif);
+		font-size: 1.05rem;
+		line-height: 1.3;
+		color: var(--ink);
+		text-decoration: none;
+		transition: color 0.18s var(--ease-out);
+	}
+	.rtitle:hover {
+		color: var(--clay-deep);
+	}
+	.rbook {
+		font-family: var(--f-grotesk);
+		font-size: 0.8rem;
+		color: var(--muted);
+		text-decoration: none;
+		text-align: right;
+	}
+	.rbook:hover {
+		color: var(--ink);
 	}
 
 	/* The library-wide figure closes the page — a ledger line, not a headline. */

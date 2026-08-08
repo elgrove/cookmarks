@@ -38,7 +38,18 @@ class ContinueBook(BaseModel):
     has_cover: bool
 
 
+class RecentRecipe(BaseModel):
+    """A recipe the caller read recently, most recent first — where they left off,
+    at recipe rather than book granularity."""
+
+    id: uuid.UUID
+    name: str
+    book_id: uuid.UUID
+    book_title: str
+
+
 class HomeData(BaseModel):
     stats: Stats
     book_of_the_day: BookFeature | None
     continue_reading: list[ContinueBook]
+    recently_read: list[RecentRecipe]

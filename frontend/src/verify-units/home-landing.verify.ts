@@ -1,7 +1,8 @@
 import HomeLanding, {
 	type BookOfTheDay,
 	type ContinueBook,
-	type ReadProgress
+	type ReadProgress,
+	type RecentRecipe
 } from '$lib/components/HomeLanding.svelte';
 import type { VerifiableUnit } from '$lib/verify/types';
 import { z } from 'zod';
@@ -10,6 +11,7 @@ type Props = {
 	bookOfTheDay: BookOfTheDay | null;
 	progress?: ReadProgress;
 	continueReading?: ContinueBook[];
+	recentlyRead?: RecentRecipe[];
 };
 
 const bookSchema = z.object({
@@ -28,6 +30,13 @@ const continueSchema = z.object({
 	recipeCount: z.number().int().nonnegative(),
 	seenCount: z.number().int().nonnegative(),
 	hasCover: z.boolean()
+});
+
+const recentSchema = z.object({
+	id: z.string(),
+	name: z.string(),
+	bookId: z.string(),
+	bookTitle: z.string()
 });
 
 const progressSchema = z.object({
@@ -64,6 +73,17 @@ const started: ContinueBook[] = [
 	}
 ];
 
+const recent: RecentRecipe[] = [
+	{
+		id: 'r1',
+		name: 'Buttermilk-Marinated Roast Chicken',
+		bookId: 'c1',
+		bookTitle: 'Salt, Fat, Acid, Heat: Mastering the Elements of Good Cooking'
+	},
+	{ id: 'r2', name: 'Shirazi Salad', bookId: 'c2', bookTitle: 'Persiana' },
+	{ id: 'r3', name: 'Tahdig', bookId: 'c2', bookTitle: 'Persiana' }
+];
+
 const unit: VerifiableUnit<Props> = {
 	id: 'home-landing',
 	title: 'Home landing',
@@ -74,7 +94,8 @@ const unit: VerifiableUnit<Props> = {
 	propsSchema: z.object({
 		bookOfTheDay: bookSchema.nullable(),
 		progress: progressSchema.optional(),
-		continueReading: z.array(continueSchema).optional()
+		continueReading: z.array(continueSchema).optional(),
+		recentlyRead: z.array(recentSchema).optional()
 	}),
 	fixtures: [
 		{
@@ -83,7 +104,39 @@ const unit: VerifiableUnit<Props> = {
 			props: {
 				bookOfTheDay: feature,
 				progress: { recipes: 13403, recipesSeen: 1204 },
-				continueReading: started
+				continueReading: started,
+				recentlyRead: recent
+			}
+		},
+		{
+			id: 'recent-only',
+			description:
+				'probe: recipes read across finished books — a recent index with no strip to lead',
+			probe: true,
+			props: {
+				bookOfTheDay: feature,
+				progress: { recipes: 13403, recipesSeen: 1204 },
+				continueReading: [],
+				recentlyRead: recent
+			}
+		},
+		{
+			id: 'long-recent-name',
+			description: 'probe: an overlong recipe and book title in the recent index must not break',
+			probe: true,
+			props: {
+				bookOfTheDay: feature,
+				progress: { recipes: 13403, recipesSeen: 1204 },
+				continueReading: [],
+				recentlyRead: [
+					{
+						id: 'rx',
+						name: 'Grand-mère’s Slow-Braised Bourguignon with Crème Fraîche, Sauté Mushrooms & Rather More Title Than Any One Line Will Hold',
+						bookId: 'c1',
+						bookTitle:
+							'An Unreasonably Long Cookbook Title: With A Subtitle That Also Refuses To Stop'
+					}
+				]
 			}
 		},
 		{
@@ -138,6 +191,33 @@ const unit: VerifiableUnit<Props> = {
 		}
 	],
 	invariants: [
+		{
+			id: 'recent-index',
+			description:
+				'the recent index lists each recipe read, numbered, linking to the recipe and its book',
+			check: ({ contract, root, props }) => {
+				const items = props.recentlyRead ?? [];
+				if (Number(contract['recent-count']) !== items.length)
+					return `recent-count=${contract['recent-count']} expected ${items.length}`;
+				const rows = [...root.querySelectorAll('.recent-index li')];
+				if (rows.length !== items.length) return `${rows.length} rows for ${items.length} recipes`;
+				if (!items.length)
+					return root.querySelector('.recent') === null || 'a recent section with nothing in it';
+				for (const [i, row] of rows.entries()) {
+					const recipe = row.querySelector('.rtitle');
+					const want = `/recipes/${items[i].id}`;
+					if (recipe?.getAttribute('href') !== want)
+						return `row ${i} recipe href=${recipe?.getAttribute('href')} expected ${want}`;
+					if ((recipe.textContent ?? '').trim() !== items[i].name)
+						return `row ${i} name="${(recipe.textContent ?? '').trim()}"`;
+					const book = row.querySelector('.rbook');
+					const wantBook = `/books/${items[i].bookId}`;
+					if (book?.getAttribute('href') !== wantBook)
+						return `row ${i} book href=${book?.getAttribute('href')} expected ${wantBook}`;
+				}
+				return true;
+			}
+		},
 		{
 			id: 'feature-consistency',
 			description: 'the feature renders exactly when a book of the day is supplied',

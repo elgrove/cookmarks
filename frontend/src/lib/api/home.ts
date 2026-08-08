@@ -25,10 +25,20 @@ export const continueBookSchema = z.object({
 	has_cover: z.boolean()
 });
 
+// A recipe the reader opened recently — the trail back into whatever they were
+// part-way through, at recipe rather than book granularity.
+export const recentRecipeSchema = z.object({
+	id: z.string().uuid(),
+	name: z.string(),
+	book_id: z.string().uuid(),
+	book_title: z.string()
+});
+
 export const homeSchema = z.object({
 	stats: statsSchema,
 	book_of_the_day: bookFeatureSchema.nullable(),
-	continue_reading: z.array(continueBookSchema)
+	continue_reading: z.array(continueBookSchema),
+	recently_read: z.array(recentRecipeSchema)
 });
 
 export type HomeResponse = z.infer<typeof homeSchema>;

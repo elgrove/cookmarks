@@ -22,5 +22,13 @@
       "seen_count": 37,
       "has_cover": true
     }
+  ],
+  "recently_read": [
+    {
+      "id": "9f8e7d6c-5b4a-4039-8281-7060504a3b2c",
+      "name": "Buttermilk-Marinated Roast Chicken",
+      "book_id": "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+      "book_title": "Salt, Fat, Acid, Heat"
+    }
   ]
 }

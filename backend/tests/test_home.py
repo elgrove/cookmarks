@@ -10,6 +10,7 @@ from app.services.users import create_user
 
 FEATURE_KEYS = {"id", "title", "author", "description", "recipe_count", "has_cover"}
 CONTINUE_KEYS = {"id", "title", "author", "recipe_count", "seen_count", "has_cover"}
+RECENT_KEYS = {"id", "name", "book_id", "book_title"}
 
 
 def _recipe_ids(client: TestClient) -> list[str]:
@@ -27,6 +28,7 @@ def test_home_shape(client: TestClient) -> None:
     # plus "Italian" carried only on the book.
     assert body["stats"] == {"books": 2, "recipes": 3, "keywords": 3, "recipes_seen": 0}
     assert body["continue_reading"] == []
+    assert body["recently_read"] == []
 
 
 def test_home_book_of_the_day(client: TestClient) -> None:
@@ -65,6 +67,28 @@ def test_continue_reading_drops_finished_books(client: TestClient) -> None:
     assert client.get("/api/home").json()["continue_reading"] == []
 
 
+def test_recently_read_is_most_recent_first(client: TestClient) -> None:
+    ids = _recipe_ids(client)
+    for recipe_id in ids:
+        client.post(f"/api/recipes/{recipe_id}/seen")
+
+    recent = client.get("/api/home").json()["recently_read"]
+    assert set(recent[0].keys()) == RECENT_KEYS
+    assert [r["id"] for r in recent] == list(reversed(ids))
+    assert recent[0]["book_title"] == "With Recipes"
+
+    # Re-opening an earlier one brings it back to the front.
+    client.post(f"/api/recipes/{ids[0]}/seen")
+    assert client.get("/api/home").json()["recently_read"][0]["id"] == ids[0]
+
+
+def test_recently_read_forgets_an_unmarked_recipe(client: TestClient) -> None:
+    recipe_id = _recipe_ids(client)[0]
+    client.post(f"/api/recipes/{recipe_id}/seen")
+    client.delete(f"/api/recipes/{recipe_id}/seen")
+    assert client.get("/api/home").json()["recently_read"] == []
+
+
 def test_home_progress_is_per_user(
     client: TestClient, session: Session, act_as: Callable[[str], User]
 ) -> None:
@@ -77,6 +101,7 @@ def test_home_progress_is_per_user(
     body = client.get("/api/home").json()
     assert body["stats"]["recipes_seen"] == 0
     assert body["continue_reading"] == []
+    assert body["recently_read"] == []
 
     act_as("tester")
     body = client.get("/api/home").json()
