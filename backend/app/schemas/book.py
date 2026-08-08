@@ -54,6 +54,15 @@ class BookDetail(BaseModel):
     recipes: list[RecipeRow]
 
 
+class BookReadState(BaseModel):
+    """A book's reading progress after marking it read or resetting it — the two
+    numbers the percentage is derived from, so the client re-derives rather than
+    guessing what the bulk change did."""
+
+    recipe_count: int
+    seen_count: int
+
+
 class RecipeIndexEntry(BaseModel):
     """A book's recipe reduced to what the in-book reader matcher needs: id, name,
     favourite state. The full set (uncapped), so headings can be matched to recipes."""

@@ -3,16 +3,27 @@ import { keywordHref } from '$lib/api/recipes';
 import type { VerifiableUnit } from '$lib/verify/types';
 import { z } from 'zod';
 
-type Props = { book: BookDetailData; onDelete?: (opts: { exclude: boolean }) => void };
+type Props = {
+	book: BookDetailData;
+	onDelete?: (opts: { exclude: boolean }) => void;
+	onToggleSeen?: (recipeId: string, seen: boolean) => void;
+	onMarkBookRead?: () => void;
+	onResetProgress?: () => void;
+};
 
 const DELETE_BTN = '.delete-btn';
 const CONFIRM_DELETE = '.confirm-delete';
 const EXCLUDE = '.exclude input';
+const SEEN_TOGGLE = '.index li:first-child .seen-toggle';
+const MARK_READ = '.mark-read';
+const RESET_BTN = '.reset-btn';
+const CONFIRM_RESET = '.confirm-reset';
 
 const recipeSchema = z.object({
 	id: z.string(),
 	name: z.string(),
-	keywords: z.array(z.string())
+	keywords: z.array(z.string()),
+	isSeen: z.boolean()
 });
 
 const bookSchema = z.object({
@@ -31,7 +42,7 @@ const bookSchema = z.object({
 	recipes: z.array(recipeSchema)
 });
 
-function recipes(n: number): BookDetailData['recipes'] {
+function recipes(n: number, seen = 0): BookDetailData['recipes'] {
 	const names = [
 		"Rosetta's Trofie with Basil Sauce",
 		"Maurizio's Pesto alla Genovese",
@@ -48,7 +59,8 @@ function recipes(n: number): BookDetailData['recipes'] {
 	return Array.from({ length: n }, (_, i) => ({
 		id: `r${i}`,
 		name: names[i % names.length],
-		keywords: kw[i % kw.length]
+		keywords: kw[i % kw.length],
+		isSeen: i < seen
 	}));
 }
 
@@ -66,7 +78,7 @@ const pastaGrannies: BookDetailData = {
 	hasEpub: true,
 	added: '2025-05-22T20:56:10Z',
 	keywords: ['Italian', 'Pasta', 'Regional', 'Traditional'],
-	recipes: recipes(10)
+	recipes: recipes(10, 4)
 };
 
 const unit: VerifiableUnit<Props> = {
@@ -104,13 +116,72 @@ const unit: VerifiableUnit<Props> = {
 		},
 		{
 			id: 'unseen',
-			description: 'a book nothing has been read from yet reads 0%',
-			props: { book: { ...pastaGrannies, seenCount: 0 } }
+			description: 'a book nothing has been read from yet reads 0% and marks no rows',
+			props: { book: { ...pastaGrannies, seenCount: 0, recipes: recipes(10) } }
 		},
 		{
 			id: 'fully-read',
-			description: 'every recipe seen reads 100%',
-			props: { book: { ...pastaGrannies, seenCount: 49 } }
+			description: 'every recipe seen reads 100% and offers no "mark book read"',
+			props: {
+				book: { ...pastaGrannies, seenCount: 49, recipes: recipes(10, 10) },
+				onMarkBookRead: () => {},
+				onResetProgress: () => {}
+			}
+		},
+		{
+			id: 'read-actions',
+			description: 'a part-read book offers both the per-recipe toggles and the book-level actions',
+			props: {
+				book: pastaGrannies,
+				onToggleSeen: () => {},
+				onMarkBookRead: () => {},
+				onResetProgress: () => {}
+			}
+		},
+		{
+			id: 'mark-row-read',
+			description: 'toggling an unread row asks to mark it read',
+			props: { book: { ...pastaGrannies, recipes: recipes(10) }, onToggleSeen: () => {} },
+			act: ({ click }) => click(SEEN_TOGGLE)
+		},
+		{
+			id: 'unmark-row-read',
+			description: 'toggling a row already read asks to forget it — the undo for an accidental open',
+			props: { book: { ...pastaGrannies, recipes: recipes(10, 10) }, onToggleSeen: () => {} },
+			act: ({ click }) => click(SEEN_TOGGLE)
+		},
+		{
+			id: 'mark-book-read',
+			description: 'the book-level action fires immediately — marking read destroys nothing',
+			props: { book: pastaGrannies, onMarkBookRead: () => {} },
+			act: ({ click }) => click(MARK_READ)
+		},
+		{
+			id: 'reset-confirm',
+			description: 'resetting progress opens a confirm step rather than discarding on one click',
+			props: { book: pastaGrannies, onResetProgress: () => {} },
+			act: ({ click }) => click(RESET_BTN)
+		},
+		{
+			id: 'reset-progress',
+			description: 'confirming the reset fires the handler and closes the panel',
+			props: { book: pastaGrannies, onResetProgress: () => {} },
+			act: ({ click }) => {
+				click(RESET_BTN);
+				click(CONFIRM_RESET);
+			}
+		},
+		{
+			id: 'read-actions-unread-book',
+			description:
+				'probe: a book with nothing read offers "mark book read" but nothing to reset',
+			probe: true,
+			props: {
+				book: { ...pastaGrannies, seenCount: 0, recipes: recipes(10) },
+				onToggleSeen: () => {},
+				onMarkBookRead: () => {},
+				onResetProgress: () => {}
+			}
 		},
 		{
 			id: 'seen-over-count',
@@ -136,7 +207,7 @@ const unit: VerifiableUnit<Props> = {
 					title: 'Persiana',
 					isbn: null,
 					added: null,
-					recipes: recipes(3),
+					recipes: recipes(3, 1),
 					recipeCount: 3,
 					seenCount: 1
 				}
@@ -172,7 +243,8 @@ const unit: VerifiableUnit<Props> = {
 						{
 							id: 'rx',
 							name: 'A recipe with an unusually long descriptive name that keeps going and going past one line',
-							keywords: ['Pasta', 'Vegetarian', 'Quick', 'Sauce', 'Tuscany', 'Soup', 'Beans', 'Pesto']
+							keywords: ['Pasta', 'Vegetarian', 'Quick', 'Sauce', 'Tuscany', 'Soup', 'Beans', 'Pesto'],
+							isSeen: true
 						}
 					],
 					recipeCount: 49
@@ -428,6 +500,89 @@ const unit: VerifiableUnit<Props> = {
 				const want = fixture.id === 'delete-excluded' ? 'exclude' : 'plain';
 				if (contract.deleted !== want) return `deleted=${contract.deleted} expected ${want}`;
 				return contract['delete-mode'] === 'view' || `delete-mode=${contract['delete-mode']}`;
+			}
+		},
+		{
+			id: 'row-read-state',
+			description:
+				'every index row declares its own read state, matching the props and the shown-seen contract',
+			check: ({ contract, root, props }) => {
+				const rows = [...root.querySelectorAll('.index li')];
+				if (rows.length !== props.book.recipes.length)
+					return `${rows.length} rows for ${props.book.recipes.length} recipes`;
+				for (const [i, row] of rows.entries()) {
+					const recipe = props.book.recipes[i];
+					if (row.getAttribute('data-verify-recipe') !== recipe.id)
+						return `row ${i} id=${row.getAttribute('data-verify-recipe')} expected ${recipe.id}`;
+					const want = recipe.isSeen ? 'true' : 'false';
+					if (row.getAttribute('data-verify-seen') !== want)
+						return `row ${i} seen=${row.getAttribute('data-verify-seen')} expected ${want}`;
+					const toggle = row.querySelector('.seen-toggle');
+					if (toggle && toggle.getAttribute('aria-pressed') !== want)
+						return `row ${i} toggle aria-pressed=${toggle.getAttribute('aria-pressed')}`;
+				}
+				const seen = props.book.recipes.filter((r) => r.isSeen).length;
+				return (
+					Number(contract['shown-seen']) === seen ||
+					`shown-seen=${contract['shown-seen']} expected ${seen}`
+				);
+			}
+		},
+		{
+			id: 'seen-toggle-intent',
+			description: 'toggling a row asks for the opposite of its current state, naming that recipe',
+			onlyFixtures: ['mark-row-read', 'unmark-row-read'],
+			check: ({ contract, props }) => {
+				const first = props.book.recipes[0];
+				const want = `${first.isSeen ? 'unmark' : 'mark'}:${first.id}`;
+				return (
+					contract['seen-action'] === want ||
+					`seen-action=${contract['seen-action']} expected ${want}`
+				);
+			}
+		},
+		{
+			id: 'mark-book-read-offered',
+			description:
+				'the book-level mark-read action is offered only while something is still unread',
+			onlyFixtures: ['read-actions', 'read-actions-unread-book', 'fully-read'],
+			check: ({ root, props }) => {
+				const { seenCount, recipeCount } = props.book;
+				const shown = root.querySelector(MARK_READ) !== null;
+				const want = seenCount < recipeCount;
+				return shown === want || `mark-read shown=${shown} with ${seenCount}/${recipeCount} read`;
+			}
+		},
+		{
+			id: 'mark-book-read-fires',
+			description: 'the book-level mark-read action fires on one click — nothing is lost by it',
+			onlyFixtures: ['mark-book-read'],
+			check: ({ contract }) =>
+				contract['seen-action'] === 'book-read' || `seen-action=${contract['seen-action']}`
+		},
+		{
+			id: 'reset-needs-confirm',
+			description:
+				'reset is a two-step action, and is offered only when there is progress to lose',
+			onlyFixtures: ['read-actions', 'read-actions-unread-book'],
+			check: ({ contract, root, props }) => {
+				if (contract['reset-mode'] !== 'view') return `reset-mode=${contract['reset-mode']}`;
+				if (root.querySelector(CONFIRM_RESET)) return 'reset confirm shown without a click';
+				const shown = root.querySelector(RESET_BTN) !== null;
+				const want = props.book.seenCount > 0;
+				return shown === want || `reset shown=${shown}, seenCount=${props.book.seenCount}`;
+			}
+		},
+		{
+			id: 'reset-fires-handler',
+			description: 'confirming the reset fires the handler and closes the panel',
+			onlyFixtures: ['reset-confirm', 'reset-progress'],
+			check: ({ contract, fixture }) => {
+				if (fixture.id === 'reset-confirm')
+					return contract['reset-mode'] === 'confirm' || `reset-mode=${contract['reset-mode']}`;
+				if (contract['seen-action'] !== 'reset')
+					return `seen-action=${contract['seen-action']} expected reset`;
+				return contract['reset-mode'] === 'view' || `reset-mode=${contract['reset-mode']}`;
 			}
 		},
 		{

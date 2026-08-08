@@ -3,6 +3,7 @@
 		id: string;
 		name: string;
 		keywords: string[];
+		isSeen: boolean;
 	};
 
 	export type BookDetailData = {
@@ -56,13 +57,19 @@
 		onExtract,
 		review = null,
 		onAnswer,
-		onDelete
+		onDelete,
+		onToggleSeen,
+		onMarkBookRead,
+		onResetProgress
 	}: {
 		book: BookDetailData;
 		onExtract?: () => Promise<void> | void;
 		review?: ReviewQuestion | null;
 		onAnswer?: (value: string) => Promise<void> | void;
 		onDelete?: (opts: { exclude: boolean }) => Promise<void> | void;
+		onToggleSeen?: (recipeId: string, seen: boolean) => Promise<void> | void;
+		onMarkBookRead?: () => Promise<void> | void;
+		onResetProgress?: () => Promise<void> | void;
 	} = $props();
 
 	let coverFailed = $state(false);
@@ -70,11 +77,26 @@
 	let deleteMode = $state<'view' | 'confirm'>('view');
 	let exclude = $state(false);
 	let deleted = $state('');
+	let resetMode = $state<'view' | 'confirm'>('view');
+	// The last read-state action asked for, so the harness can verify the intent
+	// this component emits (the owning route holds the state and re-renders).
+	let seenAction = $state('');
 
 	function confirmDelete() {
 		deleted = exclude ? 'exclude' : 'plain';
 		onDelete?.({ exclude });
 		deleteMode = 'view';
+	}
+
+	function toggleSeen(recipe: BookDetailRecipe) {
+		seenAction = `${recipe.isSeen ? 'unmark' : 'mark'}:${recipe.id}`;
+		onToggleSeen?.(recipe.id, !recipe.isSeen);
+	}
+
+	function confirmReset() {
+		seenAction = 'reset';
+		onResetProgress?.();
+		resetMode = 'view';
 	}
 	let showCover = $derived(book.hasCover && !coverFailed);
 
@@ -88,6 +110,7 @@
 	let shown = $derived(book.recipes.length);
 	let moreCount = $derived(Math.max(0, book.recipeCount - shown));
 	let readPct = $derived(readPercent(book.seenCount, book.recipeCount));
+	let shownSeen = $derived(book.recipes.filter((r) => r.isSeen).length);
 </script>
 
 <article
@@ -105,6 +128,9 @@
 	data-verify-delete-mode={deleteMode}
 	data-verify-delete-exclude={exclude ? 'true' : 'false'}
 	data-verify-deleted={deleted}
+	data-verify-shown-seen={shownSeen}
+	data-verify-seen-action={seenAction}
+	data-verify-reset-mode={resetMode}
 >
 	<nav class="crumb" aria-label="Breadcrumb">
 		<a href="/books">Books</a><span class="sep">›</span><a
@@ -150,15 +176,35 @@
 			{:else}
 				<ul class="index">
 					{#each book.recipes as recipe (recipe.id)}
-						<li>
-							<div class="rname"><a href={`/recipes/${recipe.id}`}>{recipe.name}</a></div>
-							{#if recipe.keywords.length}
-								<div class="chips">
-									{#each recipe.keywords as kw (kw)}
-										<a class="chip {chipClass(kw)}" href={keywordHref(kw)}>{kw}</a>
-									{/each}
+						<li data-verify-recipe={recipe.id} data-verify-seen={recipe.isSeen ? 'true' : 'false'}>
+							<div class="entry">
+								<div class="rtext">
+									<div class="rname" class:read={recipe.isSeen}>
+										<a href={`/recipes/${recipe.id}`}>{recipe.name}</a>
+									</div>
+									{#if recipe.keywords.length}
+										<div class="chips">
+											{#each recipe.keywords as kw (kw)}
+												<a class="chip {chipClass(kw)}" href={keywordHref(kw)}>{kw}</a>
+											{/each}
+										</div>
+									{/if}
 								</div>
-							{/if}
+								{#if onToggleSeen}
+									<button
+										class="seen-toggle"
+										type="button"
+										aria-pressed={recipe.isSeen}
+										title={recipe.isSeen ? 'Mark as unread' : 'Mark as read'}
+										onclick={() => toggleSeen(recipe)}
+									>
+										<span class="tick" aria-hidden="true">{recipe.isSeen ? '✓' : '+'}</span>
+										Read
+									</button>
+								{:else if recipe.isSeen}
+									<span class="read-flag">Read</span>
+								{/if}
+							</div>
 						</li>
 					{/each}
 				</ul>
@@ -196,6 +242,41 @@
 					<a class="btn ghost browse" href={`/recipes?book_id=${book.id}&sort=book`}>
 						Browse recipes <span class="ar" aria-hidden="true">›</span>
 					</a>
+				{/if}
+				{#if onMarkBookRead && book.recipeCount > 0 && book.seenCount < book.recipeCount}
+					<button
+						class="btn ghost mark-read"
+						type="button"
+						onclick={() => {
+							seenAction = 'book-read';
+							onMarkBookRead();
+						}}
+					>
+						Mark book read <span class="ar" aria-hidden="true">✓</span>
+					</button>
+				{/if}
+				{#if onResetProgress && book.seenCount > 0}
+					{#if resetMode === 'confirm'}
+						<div class="confirm">
+							<p class="prompt">
+								Forget which of this book's recipes you've read? The percentage returns to zero.
+							</p>
+							<button class="btn danger confirm-reset" type="button" onclick={confirmReset}>
+								Reset progress
+							</button>
+							<button class="btn ghost" type="button" onclick={() => (resetMode = 'view')}>
+								Cancel
+							</button>
+						</div>
+					{:else}
+						<button
+							class="btn ghost reset-btn"
+							type="button"
+							onclick={() => (resetMode = 'confirm')}
+						>
+							Reset progress <span class="ar" aria-hidden="true">↺</span>
+						</button>
+					{/if}
 				{/if}
 				{#if onExtract}
 					<ExtractButton recipeCount={book.recipeCount} {onExtract} />
@@ -403,10 +484,60 @@
 	.index li:first-child {
 		border-top: var(--border-strong);
 	}
+	/* The row's text and its read toggle share a line; the toggle holds the right
+	   edge so the ticks line up down the index. */
+	.entry {
+		display: grid;
+		grid-template-columns: 1fr auto;
+		gap: 1rem;
+		align-items: baseline;
+	}
 	.rname {
 		font-family: var(--f-serif);
 		font-size: 1.12rem;
 		line-height: 1.3;
+	}
+	/* A read recipe steps back rather than striking through — the index still reads
+	   as an index, with the ones behind you quieter. */
+	.rname.read a {
+		color: var(--muted);
+	}
+
+	.seen-toggle,
+	.read-flag {
+		font-family: var(--f-mono);
+		font-size: 0.64rem;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		white-space: nowrap;
+	}
+	.seen-toggle {
+		display: inline-flex;
+		align-items: baseline;
+		gap: 0.35rem;
+		background: none;
+		border: none;
+		padding: 0.15rem 0;
+		color: var(--faint);
+		cursor: pointer;
+		transition: color 0.18s var(--ease-out);
+	}
+	.seen-toggle .tick {
+		font-size: 0.85rem;
+		line-height: 1;
+	}
+	.seen-toggle:hover {
+		color: var(--clay-deep);
+	}
+	.seen-toggle[aria-pressed='true'] {
+		color: var(--clay-deep);
+	}
+	.seen-toggle:focus-visible {
+		outline: 2px solid var(--clay);
+		outline-offset: 2px;
+	}
+	.read-flag {
+		color: var(--clay-deep);
 	}
 	.rname a {
 		text-decoration: none;

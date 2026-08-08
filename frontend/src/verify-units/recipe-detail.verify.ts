@@ -3,7 +3,9 @@ import { keywordHref } from '$lib/api/recipes';
 import type { VerifiableUnit } from '$lib/verify/types';
 import { z } from 'zod';
 
-type Props = { recipe: RecipeDetailData };
+type Props = { recipe: RecipeDetailData; onToggleSeen?: (seen: boolean) => void };
+
+const READ_TOGGLE = '.read';
 
 const recipeSchema = z.object({
 	id: z.string(),
@@ -19,6 +21,7 @@ const recipeSchema = z.object({
 	keywords: z.array(z.string()),
 	hasImage: z.boolean(),
 	isFavourite: z.boolean(),
+	isSeen: z.boolean(),
 	context: z.string(),
 	contextQuery: z.string(),
 	searchHref: z.string().nullable(),
@@ -53,6 +56,7 @@ const trofie: RecipeDetailData = {
 	keywords: ['Pasta', 'Pesto', 'Vegetarian', 'Liguria'],
 	hasImage: false,
 	isFavourite: false,
+	isSeen: true,
 	context: 'book',
 	contextQuery: 'context=book',
 	searchHref: null,
@@ -161,6 +165,23 @@ const unit: VerifiableUnit<Props> = {
 					keywords: ['Beef', 'Braise', 'French', 'Sunday', 'Slow', 'Winter', 'Stew']
 				}
 			}
+		},
+		{
+			id: 'read-state',
+			description: 'a recipe already read offers the toggle that forgets it',
+			props: { recipe: trofie, onToggleSeen: () => {} }
+		},
+		{
+			id: 'unread-state',
+			description: 'probe: a recipe not yet recorded reads Unread and offers to mark it',
+			probe: true,
+			props: { recipe: { ...trofie, isSeen: false }, onToggleSeen: () => {} }
+		},
+		{
+			id: 'read-toggled',
+			description: 'clicking the read toggle fires the handler',
+			props: { recipe: trofie, onToggleSeen: () => {} },
+			act: ({ click }) => click(READ_TOGGLE)
 		},
 		{
 			id: 'contract-lie',
@@ -344,6 +365,37 @@ const unit: VerifiableUnit<Props> = {
 					'breadcrumb missing "Search results"'
 				);
 			}
+		},
+		{
+			id: 'read-toggle-state',
+			description:
+				'the read toggle reports the recipe\'s read state through aria-pressed and its label',
+			onlyFixtures: ['read-state', 'unread-state'],
+			check: ({ contract, root, props }) => {
+				const want = props.recipe.isSeen ? 'true' : 'false';
+				if (contract.seen !== want) return `contract seen=${contract.seen} expected ${want}`;
+				const button = root.querySelector(READ_TOGGLE);
+				if (!button) return 'no read toggle rendered';
+				if (button.getAttribute('aria-pressed') !== want)
+					return `aria-pressed=${button.getAttribute('aria-pressed')} expected ${want}`;
+				const label = button.getAttribute('aria-label') ?? '';
+				const asks = props.recipe.isSeen ? 'unread' : 'read';
+				return label.includes(asks) || `read toggle label="${label}" must offer "${asks}"`;
+			}
+		},
+		{
+			id: 'read-toggle-fires',
+			description: 'clicking the read toggle fires the handler',
+			onlyFixtures: ['read-toggled'],
+			check: ({ contract }) =>
+				contract['seen-clicked'] === 'true' || `seen-clicked=${contract['seen-clicked']}`
+		},
+		{
+			id: 'read-toggle-hidden',
+			description: 'without a handler the page shows no read control at all',
+			onlyFixtures: ['populated', 'minimal'],
+			check: ({ root }) =>
+				root.querySelector(READ_TOGGLE) === null || 'read toggle rendered without a handler'
 		},
 		{
 			id: 'intentional-fail',

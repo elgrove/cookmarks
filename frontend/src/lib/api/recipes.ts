@@ -21,6 +21,7 @@ export const recipeDetailSchema = z.object({
 	keywords: z.array(z.string()),
 	has_image: z.boolean(),
 	is_favourite: z.boolean(),
+	is_seen: z.boolean(),
 	context: z.string(),
 	previous: recipeNeighbourSchema.nullable(),
 	next: recipeNeighbourSchema.nullable()
@@ -64,6 +65,13 @@ export async function markRecipeSeen(
 	return recipeViewStateSchema.parse(await res.json());
 }
 
+/** Forget that this recipe was read — the undo for one opened by accident, since
+ *  views are recorded automatically. Idempotent. `fetchFn` is injectable for tests. */
+export async function unmarkRecipeSeen(id: string, fetchFn: typeof fetch = fetch): Promise<void> {
+	const res = await fetchFn(`/api/recipes/${id}/seen`, { method: 'DELETE' });
+	if (!res.ok) throw new Error(`DELETE /api/recipes/${id}/seen → ${res.status}`);
+}
+
 // Mirrors the wire shapes from GET /api/recipes and GET /api/keywords (snake_case).
 export const recipeSummarySchema = z.object({
 	id: z.string().uuid(),
@@ -71,7 +79,8 @@ export const recipeSummarySchema = z.object({
 	book_id: z.string().uuid(),
 	book_title: z.string(),
 	book_author: z.string(),
-	keywords: z.array(z.string())
+	keywords: z.array(z.string()),
+	is_seen: z.boolean()
 });
 
 export const keywordSummarySchema = z.object({

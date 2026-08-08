@@ -3,7 +3,8 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import BookDetail, { type BookDetailData } from '$lib/components/BookDetail.svelte';
-	import { deleteBook, fetchBookDetail } from '$lib/api/books';
+	import { deleteBook, fetchBookDetail, markBookRead, resetBookProgress } from '$lib/api/books';
+	import { markRecipeSeen, unmarkRecipeSeen } from '$lib/api/recipes';
 	import { cleanTitle, pageTitle } from '$lib/title';
 	import { currentUser } from '$lib/auth';
 	import {
@@ -56,13 +57,50 @@
 				hasEpub: b.has_epub,
 				added: b.added,
 				keywords: b.keywords,
-				recipes: b.recipes
+				recipes: b.recipes.map((r) => ({
+					id: r.id,
+					name: r.name,
+					keywords: r.keywords,
+					isSeen: r.is_seen
+				}))
 			};
 			status = 'ready';
 			void loadLatestRun(id);
 		} catch (err) {
 			console.error('failed to load book', err);
 			status = 'error';
+		}
+	}
+
+	// Read-state changes apply optimistically — the index and the percentage move on
+	// the click, and the server call is what could still fail. On failure the page
+	// reloads from the server rather than leaving a lie on screen.
+	async function toggleSeen(recipeId: string, seen: boolean) {
+		if (!book) return;
+		const row = book.recipes.find((r) => r.id === recipeId);
+		if (!row || row.isSeen === seen) return;
+		row.isSeen = seen;
+		book.seenCount += seen ? 1 : -1;
+		try {
+			await (seen ? markRecipeSeen(recipeId) : unmarkRecipeSeen(recipeId));
+		} catch (err) {
+			console.error('failed to change read state', err);
+			await load();
+		}
+	}
+
+	async function setBookRead(read: boolean) {
+		if (!book) return;
+		const id = book.id;
+		for (const row of book.recipes) row.isSeen = read;
+		book.seenCount = read ? book.recipeCount : 0;
+		try {
+			const state = read ? await markBookRead(id) : await resetBookProgress(id);
+			book.recipeCount = state.recipe_count;
+			book.seenCount = state.seen_count;
+		} catch (err) {
+			console.error('failed to change book read state', err);
+			await load();
 		}
 	}
 
@@ -89,6 +127,9 @@
 		{book}
 		review={$currentUser?.is_admin ? review : null}
 		onAnswer={answerReview}
+		onToggleSeen={toggleSeen}
+		onMarkBookRead={() => setBookRead(true)}
+		onResetProgress={() => setBookRead(false)}
 		onExtract={$currentUser?.is_admin
 			? async () => {
 					await triggerExtraction(book!.id);

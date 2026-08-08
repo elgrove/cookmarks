@@ -11,7 +11,8 @@ function recipe(over: Partial<RecipeSummary> = {}): RecipeSummary {
 		book_id: over.book_id ?? 'b1',
 		book_title: over.book_title ?? 'Made in India',
 		book_author: over.book_author ?? 'Meera Sodha',
-		keywords: over.keywords ?? ['lentils', 'vegetarian']
+		keywords: over.keywords ?? ['lentils', 'vegetarian'],
+		is_seen: over.is_seen ?? false
 	};
 }
 

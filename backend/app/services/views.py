@@ -5,7 +5,7 @@ import uuid
 from collections.abc import Sequence
 from datetime import timedelta
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.models.base import as_utc, utcnow
@@ -35,6 +35,55 @@ def record_view(session: Session, user_id: uuid.UUID, recipe_id: uuid.UUID) -> R
         view.last_viewed_at = now
     session.commit()
     return view
+
+
+def forget_view(session: Session, user_id: uuid.UUID, recipe_id: uuid.UUID) -> None:
+    """Drop the user's view of a recipe — the undo for one opened by accident. The
+    sitting count goes with it: an unread recipe has never been read."""
+    session.execute(
+        delete(RecipeView).where(
+            RecipeView.user_id == user_id, RecipeView.recipe_id == recipe_id
+        )
+    )
+    session.commit()
+
+
+def seen_recipe_ids(
+    session: Session, user_id: uuid.UUID, recipe_ids: Sequence[uuid.UUID]
+) -> set[uuid.UUID]:
+    """Which of these recipes the user has seen — one query for a whole page of rows,
+    so a list can mark its read entries without an N+1."""
+    if not recipe_ids:
+        return set()
+    return set(
+        session.scalars(
+            select(RecipeView.recipe_id).where(
+                RecipeView.user_id == user_id, RecipeView.recipe_id.in_(recipe_ids)
+            )
+        ).all()
+    )
+
+
+def mark_book_seen(session: Session, user_id: uuid.UUID, book_id: uuid.UUID) -> None:
+    """Record every recipe in the book as seen. Recipes already seen keep their
+    existing sitting count and timestamp — marking the book read is not a re-read."""
+    already_seen = select(RecipeView.recipe_id).where(RecipeView.user_id == user_id)
+    unseen = session.scalars(
+        select(Recipe.id).where(Recipe.book_id == book_id, Recipe.id.notin_(already_seen))
+    ).all()
+    session.add_all([RecipeView(user_id=user_id, recipe_id=rid) for rid in unseen])
+    session.commit()
+
+
+def clear_book_views(session: Session, user_id: uuid.UUID, book_id: uuid.UUID) -> None:
+    """Forget the user's reading of a whole book, returning it to 0%."""
+    session.execute(
+        delete(RecipeView).where(
+            RecipeView.user_id == user_id,
+            RecipeView.recipe_id.in_(select(Recipe.id).where(Recipe.book_id == book_id)),
+        )
+    )
+    session.commit()
 
 
 def seen_counts(

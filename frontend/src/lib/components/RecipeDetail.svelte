@@ -13,6 +13,9 @@
 		keywords: string[];
 		hasImage: boolean;
 		isFavourite: boolean;
+		/** Whether this recipe counts towards its book's read percentage. Opening the
+		 *  page records it; the toggle is the way back out of an accidental open. */
+		isSeen: boolean;
 		/** The navigation ordering this page was reached through ('book' | 'search'). */
 		context: string;
 		/** The query string carried into prev/next links so they keep this ordering. */
@@ -45,6 +48,7 @@
 		recipe,
 		lists,
 		onToggleFavourite,
+		onToggleSeen,
 		onToggleList,
 		onCreateList
 	}: {
@@ -52,9 +56,14 @@
 		/** List memberships for the add-to-list control; the picker is shown once loaded. */
 		lists?: ListMembership[];
 		onToggleFavourite?: () => void;
+		onToggleSeen?: (seen: boolean) => void;
 		onToggleList?: (listId: string, contains: boolean) => void;
 		onCreateList?: (name: string) => void;
 	} = $props();
+
+	// Local echo of a read-toggle click, so the harness can verify the handler fired
+	// even though the parent owns `isSeen` and won't change it in isolation.
+	let seenClicked = $state(false);
 
 	let coverFailed = $state(false);
 	let imageFailed = $state(false);
@@ -76,6 +85,22 @@
 		recipeName={recipe.name}
 		onToggle={onToggleFavourite}
 	/>
+	{#if onToggleSeen}
+		<button
+			class="read"
+			class:on={recipe.isSeen}
+			type="button"
+			aria-pressed={recipe.isSeen}
+			aria-label={`Mark “${recipe.name}” as ${recipe.isSeen ? 'unread' : 'read'}`}
+			onclick={() => {
+				seenClicked = true;
+				onToggleSeen(!recipe.isSeen);
+			}}
+		>
+			<span class="tick" aria-hidden="true">{recipe.isSeen ? '✓' : '○'}</span>
+			<span class="text">{recipe.isSeen ? 'Read' : 'Unread'}</span>
+		</button>
+	{/if}
 	{#if lists}
 		<ListPicker {lists} onToggle={onToggleList} onCreate={onCreateList} />
 	{/if}
@@ -90,6 +115,8 @@
 	data-verify-keywords={recipe.keywords.length}
 	data-verify-has-image={recipe.hasImage ? 'true' : 'false'}
 	data-verify-favourite={recipe.isFavourite ? 'true' : 'false'}
+	data-verify-seen={recipe.isSeen ? 'true' : 'false'}
+	data-verify-seen-clicked={seenClicked ? 'true' : 'false'}
 	data-verify-context={recipe.context}
 	data-verify-prev={recipe.previous?.id ?? ''}
 	data-verify-next={recipe.next?.id ?? ''}
@@ -420,6 +447,36 @@
 		gap: 0.6rem;
 		margin-top: 1.3rem;
 	}
+	/* Read state, sharing the favourite button's shape: opening the recipe records it,
+	   and this is the way back out of an accidental open. */
+	.read {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.45rem;
+		font-family: var(--f-grotesk);
+		font-weight: 600;
+		font-size: 0.9rem;
+		padding: 0.7rem 1rem;
+		border-radius: 3px;
+		background: transparent;
+		color: var(--ink);
+		border: 1px solid var(--line-strong);
+		cursor: pointer;
+		transition:
+			border-color 0.18s var(--ease-out),
+			color 0.18s var(--ease-out);
+	}
+	.read:hover,
+	.read.on {
+		border-color: var(--clay);
+		color: var(--clay-deep);
+	}
+	.read .tick {
+		font-size: 1rem;
+		line-height: 1;
+		color: var(--clay);
+	}
+
 	/* Yield heads the ingredients column in the image layout. */
 	.yield-lead {
 		margin: 0 0 0.85rem;

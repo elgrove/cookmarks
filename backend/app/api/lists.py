@@ -20,6 +20,7 @@ from app.schemas.recipe_list import (
     ListRename,
     ListSummary,
 )
+from app.services.views import seen_recipe_ids
 
 router = APIRouter(tags=["lists"])
 
@@ -76,7 +77,9 @@ def _owned(session: Session, list_id: uuid.UUID, user_id: uuid.UUID) -> RecipeLi
     return lst
 
 
-def _recipe_summaries(session: Session, list_id: uuid.UUID) -> list[RecipeSummary]:
+def _recipe_summaries(
+    session: Session, user_id: uuid.UUID, list_id: uuid.UUID
+) -> list[RecipeSummary]:
     rows = session.execute(
         select(Recipe, Book)
         .join(RecipeListItem, RecipeListItem.recipe_id == Recipe.id)
@@ -85,6 +88,7 @@ def _recipe_summaries(session: Session, list_id: uuid.UUID) -> list[RecipeSummar
         .order_by(RecipeListItem.position, RecipeListItem.created_at.desc())
         .options(selectinload(Recipe.keywords))
     ).all()
+    seen_ids = seen_recipe_ids(session, user_id, [recipe.id for recipe, _ in rows])
     return [
         RecipeSummary(
             id=recipe.id,
@@ -93,6 +97,7 @@ def _recipe_summaries(session: Session, list_id: uuid.UUID) -> list[RecipeSummar
             book_title=book.title,
             book_author=book.author,
             keywords=sorted(k.name for k in recipe.keywords),
+            is_seen=recipe.id in seen_ids,
         )
         for recipe, book in rows
     ]
@@ -133,7 +138,7 @@ def create_list(body: ListCreate, session: SessionDep, user: CurrentUser) -> Lis
 @router.get("/lists/{list_id}", response_model=ListDetail)
 def get_list(list_id: uuid.UUID, session: SessionDep, user: CurrentUser) -> ListDetail:
     lst = _owned(session, list_id, user.id)
-    recipes = _recipe_summaries(session, list_id)
+    recipes = _recipe_summaries(session, user.id, list_id)
     return ListDetail(
         id=lst.id,
         name=lst.name,

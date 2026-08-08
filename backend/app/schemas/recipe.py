@@ -13,6 +13,9 @@ class RecipeRow(BaseModel):
     id: uuid.UUID
     name: str
     keywords: list[str]
+    # Whether the caller has read this one — the per-row detail behind the book's
+    # read percentage, so an index can show *which* recipes make up the number.
+    is_seen: bool
 
 
 class RecipeSummary(BaseModel):
@@ -26,6 +29,7 @@ class RecipeSummary(BaseModel):
     book_title: str
     book_author: str
     keywords: list[str]
+    is_seen: bool
 
 
 class KeywordSummary(BaseModel):
@@ -132,6 +136,7 @@ class RecipeDetail(BaseModel):
     keywords: list[str]
     has_image: bool
     is_favourite: bool
+    is_seen: bool
     context: str
     previous: RecipeNeighbour | None
     next: RecipeNeighbour | None

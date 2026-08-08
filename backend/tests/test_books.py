@@ -93,7 +93,7 @@ def test_book_detail_recipes_capped_and_shaped(client: TestClient) -> None:
     recipes = client.get(f"/api/books/{book_id}").json()["recipes"]
     assert 0 < len(recipes) <= 10
     for row in recipes:
-        assert set(row.keys()) == {"id", "name", "keywords"}
+        assert set(row.keys()) == {"id", "name", "keywords", "is_seen"}
         assert isinstance(row["keywords"], list)
     # The seeded "Recipe 0" carries two keywords, sorted.
     keyworded = next((r for r in recipes if r["name"] == "Recipe 0"), None)
@@ -141,6 +141,68 @@ def test_seen_counts_are_per_user(
     # The first account's figure is untouched by the second's reading.
     act_as("tester")
     assert client.get(f"/api/books/{book_id}").json()["seen_count"] == 2
+
+
+def test_recipe_rows_report_their_own_read_state(client: TestClient) -> None:
+    """The index marks *which* recipes make up the percentage, not just how many."""
+    book_id = _book_id(client, "With Recipes")
+    recipes = client.get(f"/api/books/{book_id}").json()["recipes"]
+    assert all(r["is_seen"] is False for r in recipes)
+
+    client.post(f"/api/recipes/{recipes[0]['id']}/seen")
+    rows = {r["id"]: r for r in client.get(f"/api/books/{book_id}").json()["recipes"]}
+    assert rows[recipes[0]["id"]]["is_seen"] is True
+    assert all(r["is_seen"] is False for rid, r in rows.items() if rid != recipes[0]["id"])
+
+
+def test_mark_book_read_and_reset(client: TestClient) -> None:
+    book_id = _book_id(client, "With Recipes")
+    total = client.get(f"/api/books/{book_id}").json()["recipe_count"]
+
+    marked = client.post(f"/api/books/{book_id}/seen")
+    assert marked.status_code == 200
+    assert marked.json() == {"recipe_count": total, "seen_count": total}
+    assert all(r["is_seen"] for r in client.get(f"/api/books/{book_id}").json()["recipes"])
+
+    # Marking a book already read changes nothing — no duplicate view rows.
+    assert client.post(f"/api/books/{book_id}/seen").json()["seen_count"] == total
+
+    reset = client.delete(f"/api/books/{book_id}/seen")
+    assert reset.status_code == 200
+    assert reset.json() == {"recipe_count": total, "seen_count": 0}
+    assert client.get(f"/api/books/{book_id}").json()["seen_count"] == 0
+
+
+def test_mark_book_read_keeps_an_existing_sitting_count(client: TestClient) -> None:
+    """A recipe already read isn't re-read by marking the book: its record stands."""
+    book_id = _book_id(client, "With Recipes")
+    recipe_id = client.get(f"/api/books/{book_id}").json()["recipes"][0]["id"]
+    first = client.post(f"/api/recipes/{recipe_id}/seen").json()
+
+    client.post(f"/api/books/{book_id}/seen")
+    after = client.post(f"/api/recipes/{recipe_id}/seen").json()
+    assert after["first_viewed_at"] == first["first_viewed_at"]
+
+
+def test_mark_book_read_is_per_user(
+    client: TestClient, session: Session, act_as: Callable[[str], User]
+) -> None:
+    create_user(session, "other", "other-password")
+    book_id = _book_id(client, "With Recipes")
+    client.post(f"/api/books/{book_id}/seen")
+
+    act_as("other")
+    assert client.get(f"/api/books/{book_id}").json()["seen_count"] == 0
+    # Resetting one account's progress leaves the other's reading intact.
+    client.delete(f"/api/books/{book_id}/seen")
+    act_as("tester")
+    body = client.get(f"/api/books/{book_id}").json()
+    assert body["seen_count"] == body["recipe_count"]
+
+
+def test_book_read_state_404s_for_unknown_book(client: TestClient) -> None:
+    assert client.post(f"/api/books/{uuid.uuid4()}/seen").status_code == 404
+    assert client.delete(f"/api/books/{uuid.uuid4()}/seen").status_code == 404
 
 
 def test_book_detail_404_for_unknown_book(client: TestClient) -> None:

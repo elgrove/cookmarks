@@ -12,7 +12,7 @@ from typing import Any
 from fastapi.testclient import TestClient
 
 from app.schemas.auth import AuthMe, UserRead
-from app.schemas.book import BookFilter, BookSummary, RecipeIndexEntry
+from app.schemas.book import BookFilter, BookReadState, BookSummary, RecipeIndexEntry
 from app.schemas.config import ConfigRead
 from app.schemas.extraction import ReviewQuestion
 from app.schemas.home import HomeData
@@ -68,6 +68,12 @@ def test_book_filter_model_matches_contract() -> None:
 def test_recipe_index_entry_model_matches_contract() -> None:
     example = _example("recipeindex.example.json")
     dumped = RecipeIndexEntry.model_validate(example).model_dump(mode="json")
+    assert dumped == example
+
+
+def test_book_read_state_model_matches_contract() -> None:
+    example = _example("bookreadstate.example.json")
+    dumped = BookReadState.model_validate(example).model_dump(mode="json")
     assert dumped == example
 
 

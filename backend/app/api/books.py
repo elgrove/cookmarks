@@ -3,7 +3,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.responses import FileResponse
 from sqlalchemy import func, select
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import CurrentUser, require_admin
 from app.api.lists import favourite_list_id
@@ -15,10 +15,22 @@ from app.models.book import Book
 from app.models.calibre_exclusion import CalibreExclusion
 from app.models.recipe import Recipe
 from app.models.recipe_list import RecipeListItem
-from app.schemas.book import BookDetail, BookFilter, BookSummary, RecipeIndexEntry
+from app.schemas.book import (
+    BookDetail,
+    BookFilter,
+    BookReadState,
+    BookSummary,
+    RecipeIndexEntry,
+)
 from app.schemas.recipe import RecipeRow
 from app.services.calibre import delete_books
-from app.services.views import seen_count, seen_counts
+from app.services.views import (
+    clear_book_views,
+    mark_book_seen,
+    seen_count,
+    seen_counts,
+    seen_recipe_ids,
+)
 
 router = APIRouter(tags=["books"])
 
@@ -81,6 +93,7 @@ def get_book(book_id: uuid.UUID, session: SessionDep, user: CurrentUser) -> Book
         )
         .all()
     )
+    seen_ids = seen_recipe_ids(session, user.id, [r.id for r in recipes])
     return BookDetail(
         id=book.id,
         title=book.title,
@@ -95,10 +108,43 @@ def get_book(book_id: uuid.UUID, session: SessionDep, user: CurrentUser) -> Book
         added=book.calibre_added_at,
         keywords=sorted(k.name for k in book.keywords),
         recipes=[
-            RecipeRow(id=r.id, name=r.name, keywords=sorted(k.name for k in r.keywords))
+            RecipeRow(
+                id=r.id,
+                name=r.name,
+                keywords=sorted(k.name for k in r.keywords),
+                is_seen=r.id in seen_ids,
+            )
             for r in recipes
         ],
     )
+
+
+def _read_state(session: Session, user_id: uuid.UUID, book_id: uuid.UUID) -> BookReadState:
+    total = (
+        session.scalar(select(func.count(Recipe.id)).where(Recipe.book_id == book_id)) or 0
+    )
+    return BookReadState(recipe_count=total, seen_count=seen_count(session, user_id, book_id))
+
+
+@router.post("/books/{book_id}/seen", response_model=BookReadState)
+def mark_book_read(book_id: uuid.UUID, session: SessionDep, user: CurrentUser) -> BookReadState:
+    """Mark every recipe in the book as read — for a book worked through on paper,
+    where opening all of it one page at a time would be the only alternative."""
+    if session.get(Book, book_id) is None:
+        raise HTTPException(status_code=404, detail="book not found")
+    mark_book_seen(session, user.id, book_id)
+    return _read_state(session, user.id, book_id)
+
+
+@router.delete("/books/{book_id}/seen", response_model=BookReadState)
+def reset_book_progress(
+    book_id: uuid.UUID, session: SessionDep, user: CurrentUser
+) -> BookReadState:
+    """Forget the caller's reading of this book, returning it to 0%."""
+    if session.get(Book, book_id) is None:
+        raise HTTPException(status_code=404, detail="book not found")
+    clear_book_views(session, user.id, book_id)
+    return _read_state(session, user.id, book_id)
 
 
 @router.delete(

@@ -48,7 +48,8 @@ export async function fetchBookFilters(fetchFn: typeof fetch = fetch): Promise<B
 export const recipeRowSchema = z.object({
 	id: z.string().uuid(),
 	name: z.string(),
-	keywords: z.array(z.string())
+	keywords: z.array(z.string()),
+	is_seen: z.boolean()
 });
 
 export const bookDetailSchema = z.object({
@@ -77,6 +78,35 @@ export async function fetchBookDetail(
 	const res = await fetchFn(`/api/books/${id}`);
 	if (!res.ok) throw new Error(`GET /api/books/${id} → ${res.status}`);
 	return bookDetailSchema.parse(await res.json());
+}
+
+// Mirrors BookReadState from POST/DELETE /api/books/{id}/seen (snake_case): the two
+// numbers the read percentage is derived from, after a bulk change.
+export const bookReadStateSchema = z.object({
+	recipe_count: z.number().int().nonnegative(),
+	seen_count: z.number().int().nonnegative()
+});
+
+export type BookReadState = z.infer<typeof bookReadStateSchema>;
+
+/** Mark every recipe in a book as read. */
+export async function markBookRead(
+	id: string,
+	fetchFn: typeof fetch = fetch
+): Promise<BookReadState> {
+	const res = await fetchFn(`/api/books/${id}/seen`, { method: 'POST' });
+	if (!res.ok) throw new Error(`POST /api/books/${id}/seen → ${res.status}`);
+	return bookReadStateSchema.parse(await res.json());
+}
+
+/** Forget the reader's progress through a book, returning it to 0%. */
+export async function resetBookProgress(
+	id: string,
+	fetchFn: typeof fetch = fetch
+): Promise<BookReadState> {
+	const res = await fetchFn(`/api/books/${id}/seen`, { method: 'DELETE' });
+	if (!res.ok) throw new Error(`DELETE /api/books/${id}/seen → ${res.status}`);
+	return bookReadStateSchema.parse(await res.json());
 }
 
 /** Delete a book and everything under it. With `exclude`, its Calibre id joins the

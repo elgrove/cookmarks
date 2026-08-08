@@ -6,7 +6,12 @@
 	import SimilarRecipes, {
 		type SimilarRecipesData
 	} from '$lib/components/SimilarRecipes.svelte';
-	import { fetchRecipeDetail, fetchSimilarRecipes, markRecipeSeen } from '$lib/api/recipes';
+	import {
+		fetchRecipeDetail,
+		fetchSimilarRecipes,
+		markRecipeSeen,
+		unmarkRecipeSeen
+	} from '$lib/api/recipes';
 	import {
 		addRecipeToList,
 		createList,
@@ -105,6 +110,7 @@
 				keywords: r.keywords,
 				hasImage: r.has_image,
 				isFavourite: r.is_favourite,
+				isSeen: r.is_seen,
 				context: r.context,
 				contextQuery,
 				searchHref,
@@ -116,7 +122,11 @@
 			// surfaced: a missed view must not break the page. Posted on every open; the
 			// server owns the repeat-view window, so a client-side guard would only stop
 			// it ever seeing a genuine second sitting.
-			markRecipeSeen(id).catch((err) => console.error('failed to record recipe view', err));
+			markRecipeSeen(id)
+				.then(() => {
+					if (recipe && recipe.id === id) recipe.isSeen = true;
+				})
+				.catch((err) => console.error('failed to record recipe view', err));
 			refreshMemberships(id).catch((err) =>
 				console.error('failed to load list memberships', err)
 			);
@@ -138,6 +148,18 @@
 			await refreshMemberships(id);
 		} catch (err) {
 			console.error('failed to toggle favourite', err);
+		}
+	}
+
+	async function onToggleSeen(seen: boolean) {
+		if (!recipe) return;
+		const id = recipe.id;
+		recipe.isSeen = seen;
+		try {
+			await (seen ? markRecipeSeen(id) : unmarkRecipeSeen(id));
+		} catch (err) {
+			console.error('failed to change read state', err);
+			if (recipe && recipe.id === id) recipe.isSeen = !seen;
 		}
 	}
 
@@ -230,6 +252,7 @@
 			{recipe}
 			lists={memberships}
 			{onToggleFavourite}
+			{onToggleSeen}
 			{onToggleList}
 			{onCreateList}
 		/>

@@ -10,6 +10,7 @@
       "book_title": "Made in India",
       "book_author": "Meera Sodha",
       "keywords": ["lentils", "slow", "vegetarian"],
+      "is_seen": true,
       "distance": 0.184
     },
     {
@@ -19,6 +20,7 @@
       "book_title": "River Café Cook Book",
       "book_author": "Rose Gray",
       "keywords": ["soup", "tuscan", "vegetarian"],
+      "is_seen": false,
       "distance": 0.312
     }
   ]

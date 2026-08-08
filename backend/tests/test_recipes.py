@@ -29,6 +29,7 @@ RECIPE_KEYS = {
     "keywords",
     "has_image",
     "is_favourite",
+    "is_seen",
     "context",
     "previous",
     "next",
