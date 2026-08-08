@@ -13,6 +13,7 @@ class RecipeRow(BaseModel):
     id: uuid.UUID
     name: str
     keywords: list[str]
+    # Whether the caller has read this one — the per-row detail behind the book's
 
 
 class RecipeSummary(BaseModel):

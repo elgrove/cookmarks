@@ -1,7 +1,8 @@
 import HomeLanding, {
 	type BookOfTheDay,
 	type ContinueBook,
-	type ReadProgress
+	type ReadProgress,
+	type RecentRecipe
 } from '$lib/components/HomeLanding.svelte';
 import type { VerifiableUnit } from '$lib/verify/types';
 import { z } from 'zod';
@@ -10,6 +11,7 @@ type Props = {
 	bookOfTheDay: BookOfTheDay | null;
 	progress?: ReadProgress;
 	continueReading?: ContinueBook[];
+	recentlyRead?: RecentRecipe[];
 };
 
 const bookSchema = z.object({
@@ -25,14 +27,22 @@ const continueSchema = z.object({
 	id: z.string(),
 	title: z.string(),
 	author: z.string(),
-	recipeCount: z.number().int().nonnegative(),
-	seenCount: z.number().int().nonnegative(),
+	mode: z.enum(['book', 'recipes']),
+	fraction: z.number().min(0).max(1),
+	resumeRecipeId: z.string().nullable(),
 	hasCover: z.boolean()
 });
 
+const recentSchema = z.object({
+	id: z.string(),
+	name: z.string(),
+	bookId: z.string(),
+	bookTitle: z.string()
+});
+
 const progressSchema = z.object({
-	recipes: z.number().int().nonnegative(),
-	recipesSeen: z.number().int().nonnegative()
+	books: z.number().int().nonnegative(),
+	booksRead: z.number().int().nonnegative()
 });
 
 const feature: BookOfTheDay = {
@@ -50,18 +60,31 @@ const started: ContinueBook[] = [
 		id: 'c1',
 		title: 'Salt, Fat, Acid, Heat',
 		author: 'Samin Nosrat',
-		recipeCount: 100,
-		seenCount: 37,
+		mode: 'book',
+		fraction: 0.37,
+		resumeRecipeId: 'r1',
 		hasCover: false
 	},
 	{
 		id: 'c2',
 		title: 'Persiana',
 		author: 'Sabrina Ghayour',
-		recipeCount: 92,
-		seenCount: 4,
+		mode: 'recipes',
+		fraction: 0.04,
+		resumeRecipeId: 'r9',
 		hasCover: true
 	}
+];
+
+const recent: RecentRecipe[] = [
+	{
+		id: 'r1',
+		name: 'Buttermilk-Marinated Roast Chicken',
+		bookId: 'c1',
+		bookTitle: 'Salt, Fat, Acid, Heat: Mastering the Elements of Good Cooking'
+	},
+	{ id: 'r2', name: 'Shirazi Salad', bookId: 'c2', bookTitle: 'Persiana' },
+	{ id: 'r3', name: 'Tahdig', bookId: 'c2', bookTitle: 'Persiana' }
 ];
 
 const unit: VerifiableUnit<Props> = {
@@ -74,7 +97,8 @@ const unit: VerifiableUnit<Props> = {
 	propsSchema: z.object({
 		bookOfTheDay: bookSchema.nullable(),
 		progress: progressSchema.optional(),
-		continueReading: z.array(continueSchema).optional()
+		continueReading: z.array(continueSchema).optional(),
+		recentlyRead: z.array(recentSchema).optional()
 	}),
 	fixtures: [
 		{
@@ -82,8 +106,40 @@ const unit: VerifiableUnit<Props> = {
 			description: 'books part-read lead the page; the feature and read figure follow',
 			props: {
 				bookOfTheDay: feature,
-				progress: { recipes: 13403, recipesSeen: 1204 },
-				continueReading: started
+				progress: { books: 192, booksRead: 24 },
+				continueReading: started,
+				recentlyRead: recent
+			}
+		},
+		{
+			id: 'recent-only',
+			description:
+				'probe: recipes read across finished books — a recent index with no strip to lead',
+			probe: true,
+			props: {
+				bookOfTheDay: feature,
+				progress: { books: 192, booksRead: 24 },
+				continueReading: [],
+				recentlyRead: recent
+			}
+		},
+		{
+			id: 'long-recent-name',
+			description: 'probe: an overlong recipe and book title in the recent index must not break',
+			probe: true,
+			props: {
+				bookOfTheDay: feature,
+				progress: { books: 192, booksRead: 24 },
+				continueReading: [],
+				recentlyRead: [
+					{
+						id: 'rx',
+						name: 'Grand-mère’s Slow-Braised Bourguignon with Crème Fraîche, Sauté Mushrooms & Rather More Title Than Any One Line Will Hold',
+						bookId: 'c1',
+						bookTitle:
+							'An Unreasonably Long Cookbook Title: With A Subtitle That Also Refuses To Stop'
+					}
+				]
 			}
 		},
 		{
@@ -91,7 +147,7 @@ const unit: VerifiableUnit<Props> = {
 			description: 'one part-read book still leads, without stretching across the page',
 			props: {
 				bookOfTheDay: feature,
-				progress: { recipes: 13403, recipesSeen: 37 },
+				progress: { books: 192, booksRead: 1 },
 				continueReading: [started[0]]
 			}
 		},
@@ -107,12 +163,12 @@ const unit: VerifiableUnit<Props> = {
 			probe: true,
 			props: {
 				bookOfTheDay: feature,
-				progress: { recipes: 13403, recipesSeen: 1204 },
+				progress: { books: 192, booksRead: 24 },
 				continueReading: [
 					started[0],
 					started[1],
-					{ ...started[0], id: 'c3', title: 'The Nordic Baking Book', author: 'Magnus Nilsson', recipeCount: 84, seenCount: 80 },
-					{ ...started[1], id: 'c4', title: 'A Modern Way to Eat', author: 'Anna Jones', recipeCount: 200, seenCount: 1 }
+					{ ...started[0], id: 'c3', title: 'The Nordic Baking Book', author: 'Magnus Nilsson', fraction: 0.95 },
+					{ ...started[1], id: 'c4', title: 'A Modern Way to Eat', author: 'Anna Jones', fraction: 0.005 }
 				]
 			}
 		},
@@ -122,8 +178,18 @@ const unit: VerifiableUnit<Props> = {
 			probe: true,
 			props: {
 				bookOfTheDay: feature,
-				progress: { recipes: 13403, recipesSeen: 0 },
+				progress: { books: 192, booksRead: 0 },
 				continueReading: []
+			}
+		},
+		{
+			id: 'just-opened',
+			description: 'probe: a book opened but not yet moved through — 0%, no rule to draw',
+			probe: true,
+			props: {
+				bookOfTheDay: feature,
+				progress: { books: 192, booksRead: 0 },
+				continueReading: [{ ...started[0], fraction: 0 }]
 			}
 		},
 		{
@@ -132,12 +198,39 @@ const unit: VerifiableUnit<Props> = {
 			probe: true,
 			props: {
 				bookOfTheDay: feature,
-				progress: { recipes: 100, recipesSeen: 100 },
-				continueReading: [{ ...started[0], seenCount: 100 }]
+				progress: { books: 12, booksRead: 12 },
+				continueReading: [{ ...started[0], fraction: 1 }]
 			}
 		}
 	],
 	invariants: [
+		{
+			id: 'recent-index',
+			description:
+				'the recent index lists each recipe read, numbered, linking to the recipe and its book',
+			check: ({ contract, root, props }) => {
+				const items = props.recentlyRead ?? [];
+				if (Number(contract['recent-count']) !== items.length)
+					return `recent-count=${contract['recent-count']} expected ${items.length}`;
+				const rows = [...root.querySelectorAll('.recent-index li')];
+				if (rows.length !== items.length) return `${rows.length} rows for ${items.length} recipes`;
+				if (!items.length)
+					return root.querySelector('.recent') === null || 'a recent section with nothing in it';
+				for (const [i, row] of rows.entries()) {
+					const recipe = row.querySelector('.rtitle');
+					const want = `/recipes/${items[i].id}`;
+					if (recipe?.getAttribute('href') !== want)
+						return `row ${i} recipe href=${recipe?.getAttribute('href')} expected ${want}`;
+					if ((recipe.textContent ?? '').trim() !== items[i].name)
+						return `row ${i} name="${(recipe.textContent ?? '').trim()}"`;
+					const book = row.querySelector('.rbook');
+					const wantBook = `/books/${items[i].bookId}`;
+					if (book?.getAttribute('href') !== wantBook)
+						return `row ${i} book href=${book?.getAttribute('href')} expected ${wantBook}`;
+				}
+				return true;
+			}
+		},
 		{
 			id: 'feature-consistency',
 			description: 'the feature renders exactly when a book of the day is supplied',
@@ -166,7 +259,7 @@ const unit: VerifiableUnit<Props> = {
 						? books.length > 0
 						: cls === 'feature'
 							? props.bookOfTheDay !== null
-							: (props.progress?.recipes ?? 0) > 0
+							: (props.progress?.books ?? 0) > 0
 				);
 				if (order.join('|') !== expected.join('|'))
 					return `section order=${order.join('|')} expected ${expected.join('|')}`;
@@ -201,18 +294,18 @@ const unit: VerifiableUnit<Props> = {
 		{
 			id: 'read-percentage',
 			description:
-				'the library read figure is the seen share rounded and clamped, and absent when there is nothing to read',
+				'the library read figure is the share of books read through, rounded and clamped, and absent for an empty library',
 			check: ({ contract, root, props }) => {
-				const { recipes = 0, recipesSeen = 0 } = props.progress ?? {};
+				const { books = 0, booksRead = 0 } = props.progress ?? {};
 				const shown = contract['read-pct'] ?? '';
-				if (recipes === 0) {
+				if (books === 0) {
 					if (shown !== '') return `read-pct=${shown} with an empty library`;
 					return (
 						root.querySelector('.progress-block') === null ||
-						'a read figure is rendered with no recipes'
+						'a read figure is rendered with no books'
 					);
 				}
-				const want = Math.max(0, Math.min(100, Math.round((100 * recipesSeen) / recipes)));
+				const want = Math.max(0, Math.min(100, Math.round((100 * booksRead) / books)));
 				if (Number(shown) !== want) return `read-pct=${shown} expected ${want}`;
 				const pct = root.querySelector('.progress-block .pct')?.textContent?.trim();
 				return pct === `${want}%` || `figure="${pct}" expected ${want}%`;
@@ -221,7 +314,7 @@ const unit: VerifiableUnit<Props> = {
 		{
 			id: 'continue-strip',
 			description:
-				'the strip renders one book card per supplied book, each linking to its book and stating its own read share',
+				'the strip renders one book card per supplied book, each leading back into the reader and stating how far through it is',
 			check: ({ contract, root, props }) => {
 				const books = props.continueReading ?? [];
 				if (Number(contract['continue-count']) !== books.length)
@@ -231,21 +324,24 @@ const unit: VerifiableUnit<Props> = {
 					return `rendered ${cells.length} strip cards, expected ${books.length}`;
 				for (let i = 0; i < books.length; i++) {
 					const book = books[i];
-					// Mirrors readPercent, null branch included: no recipes means no percentage.
-					const want =
-						book.recipeCount === 0
-							? 0
-							: Math.max(0, Math.min(100, Math.round((100 * book.seenCount) / book.recipeCount)));
+					const want = Math.round(book.fraction * 100);
 					// One nav link per card — the card's own stretched link, no second focus stop.
-					const links = cells[i].querySelectorAll('a[href^="/books/"]');
+					const links = cells[i].querySelectorAll('a[href]');
 					if (links.length !== 1) return `card ${i} has ${links.length} nav links, expected 1`;
-					if (links[0].getAttribute('href') !== `/books/${book.id}`)
-						return `card ${i} href=${links[0].getAttribute('href')}`;
+					// Continuing resumes the mode the book was left in, never the book page.
+					const wantHref =
+						book.mode === 'recipes' && book.resumeRecipeId
+							? `/recipes/${book.resumeRecipeId}?context=book`
+							: `/books/${book.id}/read`;
+					if (links[0].getAttribute('href') !== wantHref)
+						return `card ${i} href=${links[0].getAttribute('href')} expected ${wantHref}`;
 					const text = cells[i].textContent ?? '';
-					if (!text.includes(`${book.seenCount} of ${book.recipeCount}`))
-						return `card ${i} omits its read count: "${text.trim()}"`;
+					if (!text.includes(`${want}% through`))
+						return `card ${i} omits how far through it is: "${text.trim()}"`;
+					// A book only just opened has nothing to draw, so it carries no rule at all.
 					const width = cells[i].querySelector<HTMLElement>('.progress-fill')?.style.width;
-					if (width !== `${want}%`) return `card ${i} fill width=${width} expected ${want}%`;
+					const wantWidth = want === 0 ? undefined : `${want}%`;
+					if (width !== wantWidth) return `card ${i} fill width=${width} expected ${wantWidth}`;
 					// The meta line states the count in words, so the card's clay circle is off.
 					if (cells[i].querySelector('.count-badge'))
 						return `card ${i} shows a count circle beside the written count`;

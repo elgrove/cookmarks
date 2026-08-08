@@ -3,11 +3,19 @@ import { keywordHref } from '$lib/api/recipes';
 import type { VerifiableUnit } from '$lib/verify/types';
 import { z } from 'zod';
 
-type Props = { book: BookDetailData; onDelete?: (opts: { exclude: boolean }) => void };
+type Props = {
+	book: BookDetailData;
+	onDelete?: (opts: { exclude: boolean }) => void;
+	onMarkBookRead?: () => void;
+	onResetProgress?: () => void;
+};
 
 const DELETE_BTN = '.delete-btn';
 const CONFIRM_DELETE = '.confirm-delete';
 const EXCLUDE = '.exclude input';
+const MARK_READ = '.mark-read';
+const RESET_BTN = '.reset-btn';
+const CONFIRM_RESET = '.confirm-reset';
 
 const recipeSchema = z.object({
 	id: z.string(),
@@ -23,12 +31,19 @@ const bookSchema = z.object({
 	pubdate: z.string().nullable(),
 	description: z.string(),
 	recipeCount: z.number().int().nonnegative(),
-	seenCount: z.number().int().nonnegative(),
 	hasCover: z.boolean(),
 	hasEpub: z.boolean(),
 	added: z.string().nullable(),
 	keywords: z.array(z.string()),
-	recipes: z.array(recipeSchema)
+	recipes: z.array(recipeSchema),
+	reading: z
+		.object({
+			mode: z.enum(['book', 'recipes']),
+			fraction: z.number().min(0).max(1),
+			finished: z.boolean()
+		})
+		.nullable(),
+	resumeRecipe: z.object({ id: z.string(), name: z.string() }).nullable()
 });
 
 function recipes(n: number): BookDetailData['recipes'] {
@@ -61,12 +76,13 @@ const pastaGrannies: BookDetailData = {
 	description:
 		'Learn how to make pasta like Italian nonnas do. Inspired by the hugely popular YouTube channel of the same name, Pasta Grannies is a collection of time-perfected Italian recipes from the people who have spent a lifetime cooking for love, not a living: Italian grandmothers. Featuring easy, accessible recipes from all over Italy, you will be transported into the very heart of the Italian home.',
 	recipeCount: 49,
-	seenCount: 12,
 	hasCover: true,
 	hasEpub: true,
 	added: '2025-05-22T20:56:10Z',
 	keywords: ['Italian', 'Pasta', 'Regional', 'Traditional'],
-	recipes: recipes(10)
+	recipes: recipes(10),
+	reading: null,
+	resumeRecipe: { id: 'r4', name: "Margherita's Cavati with Spring Vegetables" }
 };
 
 const unit: VerifiableUnit<Props> = {
@@ -95,36 +111,122 @@ const unit: VerifiableUnit<Props> = {
 				book: {
 					...pastaGrannies,
 					recipeCount: 0,
-					seenCount: 0,
 					recipes: [],
+					resumeRecipe: null,
 					hasCover: false,
 					keywords: []
 				}
 			}
 		},
 		{
-			id: 'unseen',
-			description: 'a book nothing has been read from yet reads 0%',
-			props: { book: { ...pastaGrannies, seenCount: 0 } }
+			id: 'unopened',
+			description: 'a book never opened offers both ways in and reports no progress at all',
+			props: { book: pastaGrannies }
 		},
 		{
-			id: 'fully-read',
-			description: 'every recipe seen reads 100%',
-			props: { book: { ...pastaGrannies, seenCount: 49 } }
+			id: 'finished',
+			description: 'a book declared read reads 100% and offers to start it over, not continue',
+			props: {
+				book: {
+					...pastaGrannies,
+					reading: { mode: 'book', fraction: 1, finished: true }
+				},
+				onResetProgress: () => {}
+			}
 		},
 		{
-			id: 'seen-over-count',
-			description:
-				'probe: a stale seen count above the total clamps to 100%, never overflows',
+			id: 'reading-the-book',
+			description: 'a book part-way through the reader leads with continuing its pages',
+			props: {
+				book: { ...pastaGrannies, reading: { mode: 'book', fraction: 0.42, finished: false } }
+			}
+		},
+		{
+			id: 'reading-the-recipes',
+			description: 'a book being read recipe by recipe leads with continuing the recipes',
+			props: {
+				book: {
+					...pastaGrannies,
+					reading: { mode: 'recipes', fraction: 0.24, finished: false }
+				}
+			}
+		},
+		{
+			id: 'reading-finished',
+			description: 'probe: a book read to the end is startable again, not endlessly "continuing"',
 			probe: true,
-			props: { book: { ...pastaGrannies, seenCount: 80 } }
+			props: {
+				book: { ...pastaGrannies, reading: { mode: 'book', fraction: 1, finished: true } }
+			}
+		},
+		{
+			id: 'read-actions',
+			description: 'a book part-way through offers the book-level read actions',
+			props: {
+				book: {
+					...pastaGrannies,
+					reading: { mode: 'recipes', fraction: 0.24, finished: false }
+				},
+				onMarkBookRead: () => {},
+				onResetProgress: () => {}
+			}
+		},
+		{
+			id: 'mark-book-read',
+			description: 'the book-level action fires immediately — marking read destroys nothing',
+			props: { book: pastaGrannies, onMarkBookRead: () => {} },
+			act: ({ click }) => click(MARK_READ)
+		},
+		{
+			id: 'reset-confirm',
+			description: 'resetting progress opens a confirm step rather than discarding on one click',
+			props: {
+				book: {
+					...pastaGrannies,
+					reading: { mode: 'book', fraction: 0.42, finished: false }
+				},
+				onResetProgress: () => {}
+			},
+			act: ({ click }) => click(RESET_BTN)
+		},
+		{
+			id: 'reset-progress',
+			description: 'confirming the reset fires the handler and closes the panel',
+			props: {
+				book: {
+					...pastaGrannies,
+					reading: { mode: 'book', fraction: 0.42, finished: false }
+				},
+				onResetProgress: () => {}
+			},
+			act: ({ click }) => {
+				click(RESET_BTN);
+				click(CONFIRM_RESET);
+			}
+		},
+		{
+			id: 'read-actions-unopened-book',
+			description:
+				'probe: a book never opened offers "mark book read" but has no progress to reset',
+			probe: true,
+			props: {
+				book: pastaGrannies,
+				onMarkBookRead: () => {},
+				onResetProgress: () => {}
+			}
 		},
 		{
 			id: 'unextracted-progress',
-			description: 'probe: nothing extracted → no percentage at all, never NaN',
+			description: 'probe: nothing extracted → no recipes to read, and no way in through them',
 			probe: true,
 			props: {
-				book: { ...pastaGrannies, recipeCount: 0, seenCount: 4, recipes: [], keywords: [] }
+				book: {
+					...pastaGrannies,
+					recipeCount: 0,
+					recipes: [],
+					keywords: [],
+					resumeRecipe: null
+				}
 			}
 		},
 		{
@@ -137,14 +239,13 @@ const unit: VerifiableUnit<Props> = {
 					isbn: null,
 					added: null,
 					recipes: recipes(3),
-					recipeCount: 3,
-					seenCount: 1
+					recipeCount: 3
 				}
 			}
 		},
 		{
 			id: 'no-epub',
-			description: 'a book with no EPUB on disk offers no "Read epub" action',
+			description: 'a book with no EPUB on disk offers no reader action at all',
 			props: { book: { ...pastaGrannies, hasEpub: false } }
 		},
 		{
@@ -209,7 +310,13 @@ const unit: VerifiableUnit<Props> = {
 			description: 'probe: confirming on a zero-recipe book omits the recipe-loss warning',
 			probe: true,
 			props: {
-				book: { ...pastaGrannies, recipeCount: 0, seenCount: 0, recipes: [], keywords: [] },
+				book: {
+					...pastaGrannies,
+					recipeCount: 0,
+					recipes: [],
+					keywords: [],
+					resumeRecipe: null
+				},
 				onDelete: () => {}
 			},
 			act: ({ click }) => click(DELETE_BTN)
@@ -238,20 +345,18 @@ const unit: VerifiableUnit<Props> = {
 		{
 			id: 'read-percentage',
 			description:
-				'read % is the seen share rounded and clamped to 0–100, and absent entirely when nothing is extracted',
+				'read % is how far through the book reading has got, and absent entirely for a book never opened',
 			check: ({ contract, root, props }) => {
-				const { seenCount, recipeCount } = props.book;
-				if (Number(contract['seen-count']) !== seenCount)
-					return `seen-count=${contract['seen-count']} expected ${seenCount}`;
+				const { reading } = props.book;
 				const shown = contract['read-pct'] ?? '';
 				const row = [...root.querySelectorAll('dl.meta div')].find(
 					(d) => d.querySelector('dt')?.textContent?.trim() === 'Read'
 				);
-				if (recipeCount === 0) {
-					if (shown !== '') return `read-pct=${shown} for an unextracted book`;
-					return row === undefined || 'a read row is rendered with nothing extracted';
+				if (!reading) {
+					if (shown !== '') return `read-pct=${shown} for a book never opened`;
+					return row === undefined || 'a read row is rendered for a book never opened';
 				}
-				const want = Math.max(0, Math.min(100, Math.round((100 * seenCount) / recipeCount)));
+				const want = Math.round(100 * reading.fraction);
 				if (Number(shown) !== want) return `read-pct=${shown} expected ${want}`;
 				if (!row) return 'no read row rendered';
 				return (
@@ -344,7 +449,7 @@ const unit: VerifiableUnit<Props> = {
 		},
 		{
 			id: 'read-epub-link',
-			description: 'a book with an EPUB offers a "Read epub" action linking to its reader',
+			description: 'a book with an EPUB leads with a "Read book" action linking to its reader',
 			onlyFixtures: ['populated', 'no-cover', 'no-subtitle', 'long-title'],
 			check: ({ root, contract, props }) => {
 				if (contract['has-epub'] !== 'true') return `has-epub contract=${contract['has-epub']}`;
@@ -354,12 +459,72 @@ const unit: VerifiableUnit<Props> = {
 			}
 		},
 		{
+			id: 'both-reading-modes-offered',
+			description:
+				'a book is offered both ways to read it — its pages and its recipes — each pointing at its own entry',
+			onlyFixtures: ['populated', 'reading-the-book', 'reading-the-recipes'],
+			check: ({ root, props }) => {
+				const book = props.book;
+				const pages = root.querySelector('a.read-epub');
+				const recipes = root.querySelector('a.read-recipes');
+				if (!pages) return 'no way to read the book itself';
+				if (!recipes) return 'no way to read the recipes';
+				if (pages.getAttribute('href') !== `/books/${book.id}/read`)
+					return `pages href=${pages.getAttribute('href')}`;
+				const wantRecipes = `/recipes/${book.resumeRecipe?.id}?context=book`;
+				return (
+					recipes.getAttribute('href') === wantRecipes ||
+					`recipes href=${recipes.getAttribute('href')} expected ${wantRecipes}`
+				);
+			}
+		},
+		{
+			id: 'active-mode-leads',
+			description:
+				'the mode a book was last read in leads the actions as the primary, saying "continue" and how far in',
+			onlyFixtures: ['populated', 'reading-the-book', 'reading-the-recipes', 'reading-finished'],
+			check: ({ root, contract, props }) => {
+				const { reading } = props.book;
+				const mode = reading?.mode ?? null;
+				if (contract['reading-mode'] !== (mode ?? ''))
+					return `reading-mode=${contract['reading-mode']} expected ${mode ?? ''}`;
+
+				const started = !!reading && !reading.finished && reading.fraction > 0;
+				if (contract.started !== String(started))
+					return `started=${contract.started} expected ${started}`;
+
+				const pages = root.querySelector('a.read-epub');
+				const recipes = root.querySelector('a.read-recipes');
+				// A book in progress is continued whichever way you go back into it.
+				const wantPages = started ? 'Continue book' : 'Read book';
+				const wantRecipes = started ? 'Continue recipes' : 'Read recipes';
+				if (!(pages?.textContent ?? '').trim().startsWith(wantPages))
+					return `pages action reads "${pages?.textContent?.trim()}", expected "${wantPages}"`;
+				if (!(recipes?.textContent ?? '').trim().startsWith(wantRecipes))
+					return `recipes action reads "${recipes?.textContent?.trim()}", expected "${wantRecipes}"`;
+
+				// Exactly one primary: the mode in play, or the pages when neither is.
+				const primaries = [...root.querySelectorAll('.actions .btn.primary')];
+				if (primaries.length !== 1) return `${primaries.length} primary actions, expected 1`;
+				const wantPrimary = mode === 'recipes' ? recipes : pages;
+				return primaries[0] === wantPrimary || `the wrong mode leads: "${primaries[0].className}"`;
+			}
+		},
+		{
 			id: 'read-epub-hidden',
-			description: 'a book without an EPUB shows no "Read epub" action',
+			description:
+				'a book without an EPUB offers only its recipes — no dead reader button in their place',
 			onlyFixtures: ['no-epub'],
 			check: ({ root, contract }) => {
 				if (contract['has-epub'] !== 'false') return `has-epub contract=${contract['has-epub']}`;
-				return root.querySelector('a.read-epub') === null || 'read-epub link shown without an epub';
+				if (root.querySelector('a.read-epub')) return 'reader link shown without an epub';
+				// With no pages to read, the recipes take the lead instead.
+				const primaries = [...root.querySelectorAll('.actions .btn.primary')];
+				if (!primaries.length) return true;
+				return (
+					(primaries.length === 1 && primaries[0].classList.contains('read-recipes')) ||
+					'a primary action remains that is not the recipes'
+				);
 			}
 		},
 		{
@@ -428,6 +593,82 @@ const unit: VerifiableUnit<Props> = {
 				const want = fixture.id === 'delete-excluded' ? 'exclude' : 'plain';
 				if (contract.deleted !== want) return `deleted=${contract.deleted} expected ${want}`;
 				return contract['delete-mode'] === 'view' || `delete-mode=${contract['delete-mode']}`;
+			}
+		},
+		{
+			id: 'index-rows-carry-no-read-state',
+			description:
+				'the index names each recipe and nothing more — reading is a property of the book, not its rows',
+			check: ({ root, props }) => {
+				const rows = [...root.querySelectorAll('.index li')];
+				if (rows.length !== props.book.recipes.length)
+					return `${rows.length} rows for ${props.book.recipes.length} recipes`;
+				for (const [i, row] of rows.entries()) {
+					const recipe = props.book.recipes[i];
+					if (row.getAttribute('data-verify-recipe') !== recipe.id)
+						return `row ${i} id=${row.getAttribute('data-verify-recipe')} expected ${recipe.id}`;
+					if (row.hasAttribute('data-verify-seen')) return `row ${i} still declares read state`;
+					if (row.querySelector('.seen-toggle, .read-flag'))
+						return `row ${i} still offers a read control`;
+				}
+				return true;
+			}
+		},
+		{
+			id: 'mark-book-read-offered',
+			description: 'the book-level mark-read action is offered until the book is finished',
+			onlyFixtures: ['read-actions', 'read-actions-unopened-book', 'finished'],
+			check: ({ root, props }) => {
+				const shown = root.querySelector(MARK_READ) !== null;
+				const want = !props.book.reading?.finished;
+				return shown === want || `mark-read shown=${shown}, finished=${props.book.reading?.finished}`;
+			}
+		},
+		{
+			id: 'mark-book-read-fires',
+			description: 'the book-level mark-read action fires on one click — nothing is lost by it',
+			onlyFixtures: ['mark-book-read'],
+			check: ({ contract }) =>
+				contract['seen-action'] === 'book-read' || `seen-action=${contract['seen-action']}`
+		},
+		{
+			id: 'reset-needs-confirm',
+			description:
+				'reset is a two-step action, and is offered only when there is a reading to forget',
+			onlyFixtures: ['read-actions', 'read-actions-unopened-book'],
+			check: ({ contract, root, props }) => {
+				if (contract['reset-mode'] !== 'view') return `reset-mode=${contract['reset-mode']}`;
+				if (root.querySelector(CONFIRM_RESET)) return 'reset confirm shown without a click';
+				const shown = root.querySelector(RESET_BTN) !== null;
+				const want = props.book.reading !== null;
+				return shown === want || `reset shown=${shown}, reading=${props.book.reading}`;
+			}
+		},
+		{
+			id: 'reset-fires-handler',
+			description: 'confirming the reset fires the handler and closes the panel',
+			onlyFixtures: ['reset-confirm', 'reset-progress'],
+			check: ({ contract, fixture }) => {
+				if (fixture.id === 'reset-confirm')
+					return contract['reset-mode'] === 'confirm' || `reset-mode=${contract['reset-mode']}`;
+				if (contract['seen-action'] !== 'reset')
+					return `seen-action=${contract['seen-action']} expected reset`;
+				return contract['reset-mode'] === 'view' || `reset-mode=${contract['reset-mode']}`;
+			}
+		},
+		{
+			id: 'recipes-mode-resumes-at-the-shared-position',
+			description:
+				'reading the recipes picks up at the book\'s own position, and is absent when it has no recipes',
+			check: ({ contract, root, props }) => {
+				const target = props.book.resumeRecipe;
+				if ((contract['resume-recipe'] ?? '') !== (target?.id ?? ''))
+					return `resume-recipe=${contract['resume-recipe']} expected ${target?.id ?? ''}`;
+				const link = root.querySelector('a.read-recipes');
+				if (!target) return link === null || 'a recipes action remains with no recipes to read';
+				if (!link) return 'no recipes action for a book with recipes';
+				const want = `/recipes/${target.id}?context=book`;
+				return link.getAttribute('href') === want || `href=${link.getAttribute('href')}`;
 			}
 		},
 		{

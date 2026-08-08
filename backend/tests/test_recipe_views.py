@@ -50,5 +50,30 @@ def test_view_after_the_window_bumps_the_count(client: TestClient, session: Sess
     assert client.post(f"/api/recipes/{recipe_id}/seen").json()["view_count"] == 2
 
 
+def test_unmarking_forgets_the_view(client: TestClient, session: Session) -> None:
+    recipe_id = _recipe_id(session)
+    client.post(f"/api/recipes/{recipe_id}/seen")
+
+    assert client.delete(f"/api/recipes/{recipe_id}/seen").status_code == 204
+    assert session.scalars(select(RecipeView)).all() == []
+
+    # Reading it again starts a fresh record rather than resuming the old count.
+    assert client.post(f"/api/recipes/{recipe_id}/seen").json()["view_count"] == 1
+
+
+def test_unmarking_an_unread_recipe_is_a_no_op(client: TestClient, session: Session) -> None:
+    assert client.delete(f"/api/recipes/{_recipe_id(session)}/seen").status_code == 204
+
+
+def test_views_are_recorded_without_being_reported_back(client: TestClient, session: Session) -> None:
+    """Views keep being collected — they feed a book's reading — but a recipe carries
+    no read state of its own on the wire any more."""
+    recipe_id = _recipe_id(session)
+    assert "is_seen" not in client.get(f"/api/recipes/{recipe_id}").json()
+    client.post(f"/api/recipes/{recipe_id}/seen")
+    assert session.scalars(select(RecipeView)).all() != []
+
+
 def test_unknown_recipe_is_404(client: TestClient) -> None:
     assert client.post(f"/api/recipes/{uuid.uuid4()}/seen").status_code == 404
+    assert client.delete(f"/api/recipes/{uuid.uuid4()}/seen").status_code == 404

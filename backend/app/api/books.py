@@ -3,7 +3,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.responses import FileResponse
 from sqlalchemy import func, select
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import CurrentUser, require_admin
 from app.api.lists import favourite_list_id
@@ -12,13 +12,33 @@ from app.covers import cover_path, has_cover
 from app.db import SessionDep
 from app.epub import epub_path, has_epub
 from app.models.book import Book
+from app.models.book_reading import BookReading
 from app.models.calibre_exclusion import CalibreExclusion
 from app.models.recipe import Recipe
 from app.models.recipe_list import RecipeListItem
-from app.schemas.book import BookDetail, BookFilter, BookSummary, RecipeIndexEntry
-from app.schemas.recipe import RecipeRow
+from app.schemas.book import (
+    BookDetail,
+    BookFilter,
+    BookReadState,
+    BookSummary,
+    ReadingState,
+    ReadingUpdate,
+    RecipeIndexEntry,
+)
+from app.schemas.recipe import RecipeNeighbour, RecipeRow
 from app.services.calibre import delete_books
-from app.services.views import seen_count, seen_counts
+from app.services.reading import (
+    finish_reading,
+    forget_reading,
+    fraction,
+    get_reading,
+    progress_of,
+    reading_positions,
+    recipe_count,
+    resume_recipe,
+    touch_reading,
+)
+from app.services.views import clear_book_views, mark_book_seen
 
 router = APIRouter(tags=["books"])
 
@@ -35,14 +55,16 @@ def list_books(session: SessionDep, user: CurrentUser) -> list[BookSummary]:
         # selectinload avoids an N+1 on each book's keywords for the card chips.
         .options(selectinload(Book.keywords))
     ).all()
-    seen = seen_counts(session, user.id)
+    positions = reading_positions(session, user.id)
     return [
         BookSummary(
             id=book.id,
             title=book.title,
             author=book.author,
             recipe_count=recipe_count,
-            seen_count=seen.get(book.id, 0),
+            progress=(
+                fraction(*positions[book.id], recipe_count) if book.id in positions else None
+            ),
             has_cover=has_cover(book),
             pubdate=book.pubdate,
             keywords=sorted(k.name for k in book.keywords),
@@ -81,6 +103,8 @@ def get_book(book_id: uuid.UUID, session: SessionDep, user: CurrentUser) -> Book
         )
         .all()
     )
+    reading = get_reading(session, user.id, book_id)
+    resume = resume_recipe(session, reading, book_id)
     return BookDetail(
         id=book.id,
         title=book.title,
@@ -89,16 +113,95 @@ def get_book(book_id: uuid.UUID, session: SessionDep, user: CurrentUser) -> Book
         pubdate=book.pubdate,
         description=book.description,
         recipe_count=total,
-        seen_count=seen_count(session, user.id, book_id),
         has_cover=has_cover(book),
         has_epub=has_epub(book),
         added=book.calibre_added_at,
         keywords=sorted(k.name for k in book.keywords),
         recipes=[
-            RecipeRow(id=r.id, name=r.name, keywords=sorted(k.name for k in r.keywords))
+            RecipeRow(
+                id=r.id,
+                name=r.name,
+                keywords=sorted(k.name for k in r.keywords),
+            )
             for r in recipes
         ],
+        reading=_reading_state(session, reading, total),
+        resume_recipe=RecipeNeighbour(id=resume.id, name=resume.name) if resume else None,
     )
+
+
+def _reading_state(
+    session: Session, reading: BookReading | None, total: int
+) -> ReadingState | None:
+    if reading is None:
+        return None
+    anchor = (
+        session.get(Recipe, reading.anchor_recipe_id) if reading.anchor_recipe_id else None
+    )
+    return ReadingState(
+        mode=reading.mode,
+        fraction=progress_of(session, reading, total),
+        anchor=RecipeNeighbour(id=anchor.id, name=anchor.name) if anchor else None,
+        location=reading.location,
+        finished=reading.finished,
+    )
+
+
+@router.put("/books/{book_id}/reading", response_model=ReadingState)
+def save_reading_position(
+    book_id: uuid.UUID, body: ReadingUpdate, session: SessionDep, user: CurrentUser
+) -> ReadingState:
+    """Record where a reader has got to — the act that puts a book in progress, and every
+    move through it after. Both modes report here, so they share one position."""
+    if session.get(Book, book_id) is None:
+        raise HTTPException(status_code=404, detail="book not found")
+    if body.recipe_id is not None:
+        recipe = session.get(Recipe, body.recipe_id)
+        if recipe is None or recipe.book_id != book_id:
+            raise HTTPException(status_code=404, detail="recipe not in this book")
+    reading = touch_reading(
+        session,
+        user.id,
+        book_id,
+        body.mode,
+        recipe_id=body.recipe_id,
+        location=body.location,
+    )
+    state = _reading_state(session, reading, recipe_count(session, book_id))
+    assert state is not None
+    return state
+
+
+def _read_state(session: Session, user_id: uuid.UUID, book_id: uuid.UUID) -> BookReadState:
+    total = recipe_count(session, book_id)
+    return BookReadState(
+        recipe_count=total,
+        reading=_reading_state(session, get_reading(session, user_id, book_id), total),
+    )
+
+
+@router.post("/books/{book_id}/seen", response_model=BookReadState)
+def mark_book_read(book_id: uuid.UUID, session: SessionDep, user: CurrentUser) -> BookReadState:
+    """Mark every recipe in the book as read — for a book worked through on paper,
+    where opening all of it one page at a time would be the only alternative."""
+    if session.get(Book, book_id) is None:
+        raise HTTPException(status_code=404, detail="book not found")
+    mark_book_seen(session, user.id, book_id)
+    # A book declared read is finished reading too, so it leaves the continue strip.
+    finish_reading(session, user.id, book_id)
+    return _read_state(session, user.id, book_id)
+
+
+@router.delete("/books/{book_id}/seen", response_model=BookReadState)
+def reset_book_progress(
+    book_id: uuid.UUID, session: SessionDep, user: CurrentUser
+) -> BookReadState:
+    """Forget the caller's reading of this book, returning it to 0%."""
+    if session.get(Book, book_id) is None:
+        raise HTTPException(status_code=404, detail="book not found")
+    clear_book_views(session, user.id, book_id)
+    forget_reading(session, user.id, book_id)
+    return _read_state(session, user.id, book_id)
 
 
 @router.delete(

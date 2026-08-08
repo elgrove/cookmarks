@@ -6,6 +6,7 @@
 		bookTitle: string;
 		bookAuthor: string;
 		keywords: string[];
+		/** Whether the reader has opened this one — marks the row as already read. */
 	};
 </script>
 
@@ -105,7 +106,6 @@
 	.name:hover {
 		color: var(--clay-deep);
 	}
-
 	.source {
 		margin-left: auto;
 		font-family: var(--f-grotesk);

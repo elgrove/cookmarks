@@ -75,7 +75,9 @@
 	// disclosure to save vertical space; the count keeps applied filters visible
 	// while collapsed. Desktop shows everything and ignores `filtersOpen` (CSS).
 	let filtersOpen = $state(false);
-	let activeFilterCount = $derived((bookId ? 1 : 0) + (author ? 1 : 0) + selected.length);
+	let activeFilterCount = $derived(
+		(bookId ? 1 : 0) + (author ? 1 : 0) + selected.length
+	);
 
 	// A concise placeholder on narrow screens — the full prompt overflows the box
 	// once the magnifier + AI buttons claim their width.

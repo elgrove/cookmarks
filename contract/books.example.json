@@ -3,8 +3,12 @@
   "title": "Salt, Fat, Acid, Heat",
   "author": "Samin Nosrat",
   "recipe_count": 100,
-  "seen_count": 37,
   "has_cover": true,
   "pubdate": "2017-04-25",
-  "keywords": ["Fundamentals", "Technique", "Mediterranean"]
+  "keywords": [
+    "Fundamentals",
+    "Technique",
+    "Mediterranean"
+  ],
+  "progress": 0.37
 }

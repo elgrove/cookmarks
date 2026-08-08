@@ -2,11 +2,16 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import EpubReader from '$lib/components/EpubReader.svelte';
-	import { fetchBookDetail } from '$lib/api/books';
+	import { fetchBookDetail, type ReadingState } from '$lib/api/books';
 	import { cleanTitle, pageTitle } from '$lib/title';
 
 	let status = $state<'loading' | 'error' | 'no-epub' | 'ready'>('loading');
-	let book = $state<{ id: string; title: string; author: string } | null>(null);
+	let book = $state<{
+		id: string;
+		title: string;
+		author: string;
+		reading: ReadingState | null;
+	} | null>(null);
 
 	async function load() {
 		status = 'loading';
@@ -17,7 +22,7 @@
 		}
 		try {
 			const b = await fetchBookDetail(id);
-			book = { id: b.id, title: cleanTitle(b.title), author: b.author };
+			book = { id: b.id, title: cleanTitle(b.title), author: b.author, reading: b.reading };
 			status = b.has_epub ? 'ready' : 'no-epub';
 		} catch (err) {
 			console.error('failed to load book for reader', err);
@@ -35,7 +40,7 @@
 </svelte:head>
 
 {#if status === 'ready' && book}
-	<EpubReader bookId={book.id} title={book.title} author={book.author} />
+	<EpubReader bookId={book.id} title={book.title} author={book.author} resume={book.reading} />
 {:else}
 	<div class="status">
 		{#if status === 'loading'}

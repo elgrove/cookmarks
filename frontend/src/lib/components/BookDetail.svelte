@@ -13,12 +13,16 @@
 		pubdate: string | null;
 		description: string;
 		recipeCount: number;
-		seenCount: number;
 		hasCover: boolean;
 		hasEpub: boolean;
 		added: string | null;
 		keywords: string[];
 		recipes: BookDetailRecipe[];
+		/** How the book is being read and how far through it — measured in recipes
+		 *  either way. Null until the book has been opened. */
+		reading: { mode: 'book' | 'recipes'; fraction: number; finished: boolean } | null;
+		/** Where reading the recipes picks up: the furthest reached, or the first. */
+		resumeRecipe: { id: string; name: string } | null;
 	};
 
 	// Rotating chip tints (DESIGN §3.1), assigned deterministically per keyword.
@@ -44,7 +48,6 @@
 
 <script lang="ts">
 	import { plainText } from '$lib/html';
-	import { readPercent } from '$lib/progress';
 	import { cleanTitle, titleSubtitle } from '$lib/title';
 	import { keywordHref } from '$lib/api/recipes';
 	import ExtractButton from '$lib/components/ExtractButton.svelte';
@@ -56,13 +59,17 @@
 		onExtract,
 		review = null,
 		onAnswer,
-		onDelete
+		onDelete,
+		onMarkBookRead,
+		onResetProgress
 	}: {
 		book: BookDetailData;
 		onExtract?: () => Promise<void> | void;
 		review?: ReviewQuestion | null;
 		onAnswer?: (value: string) => Promise<void> | void;
 		onDelete?: (opts: { exclude: boolean }) => Promise<void> | void;
+		onMarkBookRead?: () => Promise<void> | void;
+		onResetProgress?: () => Promise<void> | void;
 	} = $props();
 
 	let coverFailed = $state(false);
@@ -70,11 +77,21 @@
 	let deleteMode = $state<'view' | 'confirm'>('view');
 	let exclude = $state(false);
 	let deleted = $state('');
+	let resetMode = $state<'view' | 'confirm'>('view');
+	// The last read-state action asked for, so the harness can verify the intent
+	// this component emits (the owning route holds the state and re-renders).
+	let seenAction = $state('');
 
 	function confirmDelete() {
 		deleted = exclude ? 'exclude' : 'plain';
 		onDelete?.({ exclude });
 		deleteMode = 'view';
+	}
+
+	function confirmReset() {
+		seenAction = 'reset';
+		onResetProgress?.();
+		resetMode = 'view';
 	}
 	let showCover = $derived(book.hasCover && !coverFailed);
 
@@ -87,7 +104,12 @@
 	let added = $derived(formatDay(book.added));
 	let shown = $derived(book.recipes.length);
 	let moreCount = $derived(Math.max(0, book.recipeCount - shown));
-	let readPct = $derived(readPercent(book.seenCount, book.recipeCount));
+	// A book is read either way — its own pages, or its recipes one at a time — and both
+	// share one position. Whichever mode it was last read in leads the actions, and only
+	// that one is "continued".
+	let mode = $derived(book.reading?.mode ?? null);
+	let started = $derived(!!book.reading && !book.reading.finished && book.reading.fraction > 0);
+	let readPct = $derived(book.reading ? Math.round(book.reading.fraction * 100) : null);
 </script>
 
 <article
@@ -95,7 +117,6 @@
 	data-verify-unit="book-detail"
 	data-verify-id={book.id}
 	data-verify-recipe-count={book.recipeCount}
-	data-verify-seen-count={book.seenCount}
 	data-verify-read-pct={readPct === null ? '' : readPct}
 	data-verify-shown={shown}
 	data-verify-has-cover={book.hasCover ? 'true' : 'false'}
@@ -105,6 +126,11 @@
 	data-verify-delete-mode={deleteMode}
 	data-verify-delete-exclude={exclude ? 'true' : 'false'}
 	data-verify-deleted={deleted}
+	data-verify-seen-action={seenAction}
+	data-verify-reset-mode={resetMode}
+	data-verify-resume-recipe={book.resumeRecipe?.id ?? ''}
+	data-verify-reading-mode={mode ?? ''}
+	data-verify-started={started ? 'true' : 'false'}
 >
 	<nav class="crumb" aria-label="Breadcrumb">
 		<a href="/books">Books</a><span class="sep">›</span><a
@@ -150,15 +176,21 @@
 			{:else}
 				<ul class="index">
 					{#each book.recipes as recipe (recipe.id)}
-						<li>
-							<div class="rname"><a href={`/recipes/${recipe.id}`}>{recipe.name}</a></div>
-							{#if recipe.keywords.length}
-								<div class="chips">
-									{#each recipe.keywords as kw (kw)}
-										<a class="chip {chipClass(kw)}" href={keywordHref(kw)}>{kw}</a>
-									{/each}
+						<li data-verify-recipe={recipe.id}>
+							<div class="entry">
+								<div class="rtext">
+									<div class="rname">
+										<a href={`/recipes/${recipe.id}`}>{recipe.name}</a>
+									</div>
+									{#if recipe.keywords.length}
+										<div class="chips">
+											{#each recipe.keywords as kw (kw)}
+												<a class="chip {chipClass(kw)}" href={keywordHref(kw)}>{kw}</a>
+											{/each}
+										</div>
+									{/if}
 								</div>
-							{/if}
+							</div>
 						</li>
 					{/each}
 				</ul>
@@ -186,16 +218,71 @@
 			</div>
 
 			<div class="actions">
-				<button class="btn primary" type="button">Read book <span class="ar" aria-hidden="true">›</span></button>
+				<!-- Two ways to read a book, one shared position; the mode last read leads. -->
 				{#if book.hasEpub}
-					<a class="btn ghost read-epub" href={`/books/${book.id}/read`}>
-						Read epub <span class="ar" aria-hidden="true">›</span>
+					<a
+						class="btn read-epub"
+						class:primary={mode !== 'recipes'}
+						class:ghost={mode === 'recipes'}
+						style:order={mode === 'recipes' ? 2 : 1}
+						href={`/books/${book.id}/read`}
+					>
+						{started ? 'Continue book' : 'Read book'}
+						<span class="ar" aria-hidden="true">›</span>
+					</a>
+				{/if}
+				{#if book.resumeRecipe}
+					<a
+						class="btn read-recipes"
+						class:primary={mode === 'recipes' || !book.hasEpub}
+						class:ghost={mode !== 'recipes' && book.hasEpub}
+						style:order={mode === 'recipes' ? 1 : 2}
+						href={`/recipes/${book.resumeRecipe.id}?context=book`}
+						title={book.resumeRecipe.name}
+					>
+						{started ? 'Continue recipes' : 'Read recipes'}
+						<span class="ar" aria-hidden="true">›</span>
 					</a>
 				{/if}
 				{#if book.recipeCount > 0}
 					<a class="btn ghost browse" href={`/recipes?book_id=${book.id}&sort=book`}>
 						Browse recipes <span class="ar" aria-hidden="true">›</span>
 					</a>
+				{/if}
+				{#if onMarkBookRead && !book.reading?.finished}
+					<button
+						class="btn ghost mark-read"
+						type="button"
+						onclick={() => {
+							seenAction = 'book-read';
+							onMarkBookRead();
+						}}
+					>
+						Mark book read <span class="ar" aria-hidden="true">✓</span>
+					</button>
+				{/if}
+				{#if onResetProgress && book.reading}
+					{#if resetMode === 'confirm'}
+						<div class="confirm">
+							<p class="prompt">
+								Forget which of this book's recipes you've read? The percentage returns to zero.
+							</p>
+							<button class="btn danger confirm-reset" type="button" onclick={confirmReset}>
+								Reset progress
+							</button>
+							<button class="btn ghost" type="button" onclick={() => (resetMode = 'view')}>
+								Cancel
+							</button>
+						</div>
+					{:else}
+						<button
+							class="btn ghost reset-btn"
+							type="button"
+							onclick={() => (resetMode = 'confirm')}
+						>
+							Reset progress <span class="ar" aria-hidden="true">↺</span>
+						</button>
+					{/if}
 				{/if}
 				{#if onExtract}
 					<ExtractButton recipeCount={book.recipeCount} {onExtract} />
@@ -250,7 +337,7 @@
 						<dt>Read</dt>
 						<dd class="read">
 							<span class="pct">{readPct}%</span>
-							<span class="of">{book.seenCount} of {book.recipeCount}</span>
+							{#if book.reading?.finished}<span class="of">finished</span>{/if}
 						</dd>
 					</div>
 				{/if}
@@ -403,6 +490,14 @@
 	.index li:first-child {
 		border-top: var(--border-strong);
 	}
+	/* The row's text and its read toggle share a line; the toggle holds the right
+	   edge so the ticks line up down the index. */
+	.entry {
+		display: grid;
+		grid-template-columns: 1fr auto;
+		gap: 1rem;
+		align-items: baseline;
+	}
 	.rname {
 		font-family: var(--f-serif);
 		font-size: 1.12rem;
@@ -532,6 +627,10 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.6rem;
+	}
+	/* The two reading modes sit above every other action, in progress order. */
+	.actions > :global(*:not(.read-epub):not(.read-recipes)) {
+		order: 3;
 	}
 	.btn {
 		font-family: var(--f-grotesk);

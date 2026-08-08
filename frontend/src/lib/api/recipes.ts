@@ -52,9 +52,8 @@ export const recipeViewStateSchema = z.object({
 
 export type RecipeViewState = z.infer<typeof recipeViewStateSchema>;
 
-/** Record that the reader has opened this recipe — the input to a book's read
- *  percentage. Callers fire this and forget it; a missed view must never break
- *  the page. `fetchFn` is injectable for tests. */
+/** Record that the reader has opened this recipe. Kept as a record of what has been
+ *  looked at, not shown as read state; callers fire it and forget it. */
 export async function markRecipeSeen(
 	id: string,
 	fetchFn: typeof fetch = fetch

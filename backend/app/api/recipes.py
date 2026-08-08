@@ -2,7 +2,7 @@ import uuid
 from collections import OrderedDict
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, HTTPException, Query, Response
+from fastapi import APIRouter, HTTPException, Query, Response, status
 from sqlalchemy import String, cast, func, literal_column, or_, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
@@ -13,6 +13,7 @@ from app.db import SessionDep
 from app.epub import read_epub_image
 from app.models.base import as_utc
 from app.models.book import Book
+from app.models.enums import ReadingMode
 from app.models.recipe import Keyword, Recipe, recipe_keywords
 from app.models.recipe_list import RecipeListItem
 from app.schemas.recipe import (
@@ -27,8 +28,9 @@ from app.schemas.recipe import (
     SimilarRecipes,
 )
 from app.services import embeddings
+from app.services.reading import touch_reading
 from app.services.vector_store import VectorStore
-from app.services.views import record_view
+from app.services.views import forget_view, record_view
 
 router = APIRouter(tags=["recipes"])
 
@@ -82,7 +84,10 @@ def _search_order(sort: Sort, seed: int) -> list:
 
 
 def _search_conditions(
-    q: str, keywords: list[str], book_id: uuid.UUID | None, author: str | None
+    q: str,
+    keywords: list[str],
+    book_id: uuid.UUID | None,
+    author: str | None,
 ) -> list:
     """The AND-narrowing filter shared by the result rows, total and facets."""
     conditions = []
@@ -110,6 +115,7 @@ def _search_conditions(
 @router.get("/recipes", response_model=RecipeSearchResults)
 def search_recipes(
     session: SessionDep,
+    user: CurrentUser,
     q: Annotated[str, Query()] = "",
     keyword: Annotated[list[str] | None, Query()] = None,
     book_id: uuid.UUID | None = None,
@@ -171,6 +177,7 @@ def search_recipes(
 @router.get("/recipes/semantic", response_model=SemanticSearchResults)
 def semantic_search(
     session: SessionDep,
+    user: CurrentUser,
     q: Annotated[str, Query()] = "",
     limit: Annotated[int, Query(ge=1, le=100)] = 30,
 ) -> SemanticSearchResults:
@@ -323,7 +330,14 @@ def _ordered_search_ids(
     sort: Sort,
     seed: int,
 ) -> list[uuid.UUID]:
-    key = (q, tuple(keywords), str(book_id) if book_id else None, author, sort, seed)
+    key = (
+        q,
+        tuple(keywords),
+        str(book_id) if book_id else None,
+        author,
+        sort,
+        seed,
+    )
     cached = _SEARCH_ORDER_CACHE.get(key)
     if cached is not None:
         _SEARCH_ORDER_CACHE.move_to_end(key)
@@ -389,6 +403,9 @@ def get_recipe(
     book = recipe.book
     resolved_context = context if context in SUPPORTED_CONTEXTS else "book"
     if resolved_context == "search":
+        # The ordering is cached from the first recipe opened out of this search, so
+        # the pager stays consistent as the reader walks it. If that entry has been
+        # evicted the pager simply goes quiet.
         previous, next_ = _search_neighbours(
             session, recipe, q.strip(), keyword or [], book_id, author, sort, seed
         )
@@ -416,19 +433,38 @@ def get_recipe(
 
 @router.post("/recipes/{recipe_id}/seen", response_model=RecipeViewState)
 def mark_recipe_seen(
-    recipe_id: uuid.UUID, session: SessionDep, user: CurrentUser
+    recipe_id: uuid.UUID, session: SessionDep, user: CurrentUser, context: str | None = None
 ) -> RecipeViewState:
     """Record that the caller has opened this recipe — the input to a book's read
     percentage. Explicit rather than a side effect of GET /recipes/{id}, so reading
-    a recipe stays a read."""
-    if session.get(Recipe, recipe_id) is None:
+    a recipe stays a read.
+
+    Read in its book's context, it is also a step through the book itself, which puts
+    the book in progress in recipes mode."""
+    recipe = session.get(Recipe, recipe_id)
+    if recipe is None:
         raise HTTPException(status_code=404, detail="recipe not found")
     view = record_view(session, user.id, recipe_id)
+    if context == "book":
+        touch_reading(session, user.id, recipe.book_id, ReadingMode.RECIPES)
     return RecipeViewState(
         view_count=view.view_count,
         first_viewed_at=as_utc(view.created_at),
         last_viewed_at=as_utc(view.last_viewed_at),
     )
+
+
+@router.delete("/recipes/{recipe_id}/seen", status_code=status.HTTP_204_NO_CONTENT)
+def unmark_recipe_seen(
+    recipe_id: uuid.UUID, session: SessionDep, user: CurrentUser
+) -> Response:
+    """Forget that the caller read this recipe. Views are recorded automatically on
+    open, so without this an accidental tap is permanent. Idempotent: unmarking one
+    that was never read is a no-op."""
+    if session.get(Recipe, recipe_id) is None:
+        raise HTTPException(status_code=404, detail="recipe not found")
+    forget_view(session, user.id, recipe_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/recipes/{recipe_id}/image")
@@ -457,7 +493,9 @@ def recipe_image(recipe_id: uuid.UUID, session: SessionDep) -> Response:
 SIMILAR_LIMIT_DEFAULT = 30
 
 
-def _load_ordered(session: Session, ids: list[uuid.UUID]) -> list[RecipeSummary]:
+def _load_ordered(
+    session: Session, user_id: uuid.UUID, ids: list[uuid.UUID]
+) -> list[RecipeSummary]:
     """Recipe summaries for `ids`, in that order — the KNN ranking is the order."""
     if not ids:
         return []
@@ -476,7 +514,9 @@ def _load_ordered(session: Session, ids: list[uuid.UUID]) -> list[RecipeSummary]
     return out
 
 
-def _keyword_neighbours(session: Session, recipe: Recipe, limit: int) -> list[RecipeSummary]:
+def _keyword_neighbours(
+    session: Session, user_id: uuid.UUID, recipe: Recipe, limit: int
+) -> list[RecipeSummary]:
     """Recipes sharing the most keywords with `recipe` (itself excluded) — the fallback
     when there's no embedding. Empty when the recipe carries no keywords to match on."""
     keyword_ids = [k.id for k in recipe.keywords]
@@ -500,6 +540,7 @@ def _keyword_neighbours(session: Session, recipe: Recipe, limit: int) -> list[Re
 def similar_recipes(
     recipe_id: uuid.UUID,
     session: SessionDep,
+    user: CurrentUser,
     limit: Annotated[int, Query(ge=1, le=50)] = SIMILAR_LIMIT_DEFAULT,
 ) -> SimilarRecipes:
     recipe = session.scalar(
@@ -514,6 +555,8 @@ def similar_recipes(
         neighbours = store.search_excluding(embedding, recipe_id, limit=limit)
         return SimilarRecipes(
             basis="vector",
-            items=_load_ordered(session, [nid for nid, _ in neighbours]),
+            items=_load_ordered(session, user.id, [nid for nid, _ in neighbours]),
         )
-    return SimilarRecipes(basis="keyword", items=_keyword_neighbours(session, recipe, limit))
+    return SimilarRecipes(
+        basis="keyword", items=_keyword_neighbours(session, user.id, recipe, limit)
+    )

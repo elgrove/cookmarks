@@ -7,6 +7,7 @@
 		type SimilarRecipesData
 	} from '$lib/components/SimilarRecipes.svelte';
 	import { fetchRecipeDetail, fetchSimilarRecipes, markRecipeSeen } from '$lib/api/recipes';
+	import { reportReading } from '$lib/api/books';
 	import {
 		addRecipeToList,
 		createList,
@@ -81,6 +82,9 @@
 		similar = undefined;
 		try {
 			const contextQuery = contextQueryOf(params);
+			// Only an explicit book context is a step through the book itself — arriving at
+			// a recipe from a list or the recent index reads the recipe, not its book.
+			const walkingTheBook = params.get('context') === 'book';
 			const r = await fetchRecipeDetail(id, fetch, contextQuery);
 			if (mine !== seq) return;
 			// For a search context, the breadcrumb links back to the originating search.
@@ -112,11 +116,16 @@
 				next: r.next
 			};
 			status = 'ready';
-			// Record the read for the book's progress figure — fire-and-forget, and never
-			// surfaced: a missed view must not break the page. Posted on every open; the
-			// server owns the repeat-view window, so a client-side guard would only stop
-			// it ever seeing a genuine second sitting.
+			// Record the open — fire-and-forget, and never surfaced: kept as a record of
+			// what has been looked at, not shown back as read state.
 			markRecipeSeen(id).catch((err) => console.error('failed to record recipe view', err));
+			// Read in its book's context, this is a step through the book itself, moving
+			// the book's shared reading position to this recipe.
+			if (walkingTheBook) {
+				reportReading(r.book_id, { mode: 'recipes', recipe_id: id }).catch((err) =>
+					console.error('failed to report reading', err)
+				);
+			}
 			refreshMemberships(id).catch((err) =>
 				console.error('failed to load list memberships', err)
 			);

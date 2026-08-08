@@ -76,7 +76,9 @@ def _owned(session: Session, list_id: uuid.UUID, user_id: uuid.UUID) -> RecipeLi
     return lst
 
 
-def _recipe_summaries(session: Session, list_id: uuid.UUID) -> list[RecipeSummary]:
+def _recipe_summaries(
+    session: Session, user_id: uuid.UUID, list_id: uuid.UUID
+) -> list[RecipeSummary]:
     rows = session.execute(
         select(Recipe, Book)
         .join(RecipeListItem, RecipeListItem.recipe_id == Recipe.id)
@@ -133,7 +135,7 @@ def create_list(body: ListCreate, session: SessionDep, user: CurrentUser) -> Lis
 @router.get("/lists/{list_id}", response_model=ListDetail)
 def get_list(list_id: uuid.UUID, session: SessionDep, user: CurrentUser) -> ListDetail:
     lst = _owned(session, list_id, user.id)
-    recipes = _recipe_summaries(session, list_id)
+    recipes = _recipe_summaries(session, user.id, list_id)
     return ListDetail(
         id=lst.id,
         name=lst.name,

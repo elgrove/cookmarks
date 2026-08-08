@@ -13,6 +13,8 @@
 		keywords: string[];
 		hasImage: boolean;
 		isFavourite: boolean;
+		/** Whether this recipe counts towards its book's read percentage. Opening the
+		 *  page records it; the toggle is the way back out of an accidental open. */
 		/** The navigation ordering this page was reached through ('book' | 'search'). */
 		context: string;
 		/** The query string carried into prev/next links so they keep this ordering. */

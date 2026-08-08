@@ -7,11 +7,20 @@
       "book_id": "1f2e3d4c-5b6a-4789-9a0b-1c2d3e4f5a6b",
       "book_title": "Salt, Fat, Acid, Heat",
       "book_author": "Samin Nosrat",
-      "keywords": ["chicken", "roast"]
+      "keywords": [
+        "chicken",
+        "roast"
+      ]
     }
   ],
   "facets": [
-    { "name": "roast", "recipe_count": 1 },
-    { "name": "dinner", "recipe_count": 1 }
+    {
+      "name": "roast",
+      "recipe_count": 1
+    },
+    {
+      "name": "dinner",
+      "recipe_count": 1
+    }
   ]
 }

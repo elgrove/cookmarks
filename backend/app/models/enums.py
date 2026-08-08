@@ -25,6 +25,14 @@ class TaskStatus(StrEnum):
     FAILED = "failed"
 
 
+class ReadingMode(StrEnum):
+    """The two ways a book is read: its own pages in the EPUB reader, or its extracted
+    recipes one at a time in book order."""
+
+    BOOK = "book"
+    RECIPES = "recipes"
+
+
 class ExtractionMethod(StrEnum):
     FILE = "file"
     BLOCK = "block"

@@ -3,7 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import BookDetail, { type BookDetailData } from '$lib/components/BookDetail.svelte';
-	import { deleteBook, fetchBookDetail } from '$lib/api/books';
+	import { deleteBook, fetchBookDetail, markBookRead, resetBookProgress } from '$lib/api/books';
 	import { cleanTitle, pageTitle } from '$lib/title';
 	import { currentUser } from '$lib/auth';
 	import {
@@ -51,12 +51,23 @@
 				pubdate: b.pubdate,
 				description: b.description,
 				recipeCount: b.recipe_count,
-				seenCount: b.seen_count,
 				hasCover: b.has_cover,
 				hasEpub: b.has_epub,
 				added: b.added,
 				keywords: b.keywords,
-				recipes: b.recipes
+				recipes: b.recipes.map((r) => ({
+					id: r.id,
+					name: r.name,
+					keywords: r.keywords
+				})),
+				reading: b.reading
+					? {
+							mode: b.reading.mode,
+							fraction: b.reading.fraction,
+							finished: b.reading.finished
+						}
+					: null,
+				resumeRecipe: b.resume_recipe
 			};
 			status = 'ready';
 			void loadLatestRun(id);
@@ -64,6 +75,23 @@
 			console.error('failed to load book', err);
 			status = 'error';
 		}
+	}
+
+	// Finishing or resetting paints immediately, then reloads from the server: the
+	// percentage and both mode actions move together off the one change.
+	async function setBookRead(read: boolean) {
+		if (!book) return;
+		const id = book.id;
+		book.reading = read
+			? { mode: book.reading?.mode ?? 'book', fraction: 1, finished: true }
+			: null;
+		try {
+			if (read) await markBookRead(id);
+			else await resetBookProgress(id);
+		} catch (err) {
+			console.error('failed to change book read state', err);
+		}
+		await load();
 	}
 
 	async function answerReview(value: string) {
@@ -89,6 +117,8 @@
 		{book}
 		review={$currentUser?.is_admin ? review : null}
 		onAnswer={answerReview}
+		onMarkBookRead={() => setBookRead(true)}
+		onResetProgress={() => setBookRead(false)}
 		onExtract={$currentUser?.is_admin
 			? async () => {
 					await triggerExtraction(book!.id);

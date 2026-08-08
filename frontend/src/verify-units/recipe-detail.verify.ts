@@ -5,6 +5,8 @@ import { z } from 'zod';
 
 type Props = { recipe: RecipeDetailData };
 
+const READ_TOGGLE = '.read';
+
 const recipeSchema = z.object({
 	id: z.string(),
 	bookId: z.string(),
@@ -343,6 +345,15 @@ const unit: VerifiableUnit<Props> = {
 					(root.querySelector('.crumb')?.textContent ?? '').includes('Search results') ||
 					'breadcrumb missing "Search results"'
 				);
+			}
+		},
+		{
+			id: 'no-recipe-read-state',
+			description:
+				'a recipe carries no read state of its own — reading is a property of books now',
+			check: ({ root, contract }) => {
+				if (root.querySelector(READ_TOGGLE)) return 'a read toggle survives on the recipe page';
+				return contract.seen === undefined || `a seen contract survives: ${contract.seen}`;
 			}
 		},
 		{

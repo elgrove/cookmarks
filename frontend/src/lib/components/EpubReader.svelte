@@ -6,19 +6,32 @@
 		type FoliateTOCItem,
 		type FoliateView
 	} from '$lib/reader/foliate';
-	import { epubUrl, fetchRecipeIndex } from '$lib/api/books';
+	import {
+		epubUrl,
+		fetchRecipeIndex,
+		reportReading,
+		type ReadingState
+	} from '$lib/api/books';
 	import { toggleFavourite } from '$lib/api/lists';
 	import {
 		buildRecipeIndex,
 		matchHeading,
 		normaliseTitle,
+		type RecipeMatch,
 		type RecipeNameIndex
 	} from '$lib/reader/match';
 	import { resolvedTheme, toggleTheme } from '$lib/theme';
 	import ReaderChrome, { type TocEntry } from './ReaderChrome.svelte';
+	import ReaderRecipePanel, { type PanelAnchor } from './ReaderRecipePanel.svelte';
 
-	type Props = { bookId: string; title: string; author: string };
-	let { bookId, title, author }: Props = $props();
+	type Props = {
+		bookId: string;
+		title: string;
+		author: string;
+		/** How far the book has been read, either way, if it has been opened before. */
+		resume?: ReadingState | null;
+	};
+	let { bookId, title, author, resume = null }: Props = $props();
 
 	let host = $state<HTMLDivElement>();
 	let view: FoliateView | null = null;
@@ -30,6 +43,8 @@
 	let currentHref = $state<string | null>(null);
 	let progress = $state(0);
 	let fontScale = $state(1);
+	// The save-to-list popover for a matched recipe, opened from its injected `+`.
+	let panel = $state<{ recipe: RecipeMatch; anchor: PanelAnchor } | null>(null);
 
 	// Page-ground / ink / link colours injected into the book's own (cross-document) iframe,
 	// since the app's CSS custom properties don't reach it. Values track DESIGN.md tokens.
@@ -49,20 +64,21 @@
 			html { color-scheme: ${theme}; font-size: ${Math.round(scale * 100)}%; }
 			p, li, blockquote, dd { line-height: 1.6; }
 		`;
-		// The save-to-favourites control we inject next to matched recipe titles: a circular star
-		// button mirroring the app's FavouriteToggle — clay star, hairline border that turns clay
-		// when hovered or saved, transparent fill. Star-only so it stays small against the title.
+		// The controls we inject next to matched recipe titles: a circular star button mirroring
+		// the app's FavouriteToggle (clay star, hairline border that turns clay when hovered or
+		// saved, transparent fill), and a matching `+` circle that opens the save-to-list popover.
 		const fav = `
-			.cm-fav { box-sizing: border-box; display: inline-flex; align-items: center;
+			.cm-fav, .cm-plus { box-sizing: border-box; display: inline-flex; align-items: center;
 				justify-content: center; width: 1.7em; height: 1.7em; padding: 0;
 				margin-inline-start: 0.75em; vertical-align: middle; font-size: 0.8rem;
 				font-style: normal; text-transform: none; line-height: 1; cursor: pointer;
 				border-radius: 50%; border: 1.5px solid ${c.line}; background: transparent;
 				color: ${c.clay} !important; -webkit-text-fill-color: ${c.clay};
 				transition: border-color 0.18s ease, transform 0.12s ease; }
-			.cm-fav:hover { border-color: ${c.clay}; transform: scale(1.08); }
+			.cm-fav:hover, .cm-plus:hover { border-color: ${c.clay}; transform: scale(1.08); }
 			.cm-fav.is-fav { border-color: ${c.clay}; }
 			.cm-fav[disabled] { opacity: 0.5; cursor: default; }
+			.cm-plus { margin-inline-start: 0.4em; }
 		`;
 		if (theme === 'light') {
 			return `
@@ -96,12 +112,23 @@
 		view?.renderer.setStyles?.(contentCss(fontScale, $resolvedTheme));
 	}
 
-	// As each section renders, find the lines that name one of the book's recipes and inject a
-	// save-to-favourites pill right after the title. Runs in the (same-origin) content document.
+	/** An in-content element's rect translated to app-viewport coords (content iframe offset added). */
+	function appAnchor(el: HTMLElement, doc: Document): PanelAnchor {
+		const r = el.getBoundingClientRect();
+		const frame = doc.defaultView?.frameElement?.getBoundingClientRect();
+		return { x: r.left + (frame?.left ?? 0), y: r.top + (frame?.top ?? 0), w: r.width, h: r.height };
+	}
+
+	// The latest injected star's re-render per recipe, so a favourite change made in the
+	// popover updates the in-book star too.
+	const starSync = new Map<string, () => void>();
+
+	// As each section renders, find the lines that name one of the book's recipes and inject the
+	// controls right after the title. Runs in the (same-origin) content document.
 	// Cookbook EPUBs rarely use semantic headings — titles are often bold lines (e.g. Calibre's
 	// `<p><b>…</b></p>`) — so we consider headings *and* bold elements, exclude cross-reference
 	// links, and require an exact name match on the (looser) bold candidates to avoid false hits.
-	function injectFavourites(doc: Document) {
+	function injectControls(doc: Document) {
 		const index = recipeIndex;
 		if (!index) return;
 		doc.querySelectorAll('h1, h2, h3, h4, h5, h6, b, strong').forEach((node) => {
@@ -119,8 +146,8 @@
 			const btn = doc.createElement('button');
 			btn.className = 'cm-fav';
 			btn.type = 'button';
-			let fav = match.isFavourite;
 			const render = () => {
+				const fav = match.isFavourite;
 				btn.textContent = fav ? '★' : '☆';
 				btn.setAttribute('aria-pressed', String(fav));
 				btn.setAttribute(
@@ -130,13 +157,13 @@
 				btn.classList.toggle('is-fav', fav);
 			};
 			render();
+			starSync.set(match.id, render);
 			btn.addEventListener('click', (ev) => {
 				ev.preventDefault();
 				ev.stopPropagation();
 				btn.disabled = true;
 				toggleFavourite(match.id)
 					.then((next) => {
-						fav = next;
 						match.isFavourite = next; // keep the index in sync if the section re-renders
 						render();
 					})
@@ -145,7 +172,19 @@
 						btn.disabled = false;
 					});
 			});
-			el.append(btn);
+
+			const plus = doc.createElement('button');
+			plus.className = 'cm-plus';
+			plus.type = 'button';
+			plus.textContent = '+';
+			plus.setAttribute('aria-label', `Save ${match.name} to a list`);
+			plus.addEventListener('click', (ev) => {
+				ev.preventDefault();
+				ev.stopPropagation();
+				panel = { recipe: match, anchor: appAnchor(plus, doc) };
+			});
+
+			el.append(btn, plus);
 		});
 	}
 
@@ -155,6 +194,64 @@
 		void $resolvedTheme;
 		if (view && status === 'ready') applyStyles();
 	});
+
+	// The section on screen, so the recipes its pages carry past can be reported.
+	let currentDoc: Document | null = null;
+
+	/** The furthest recipe the current page has reached: matched headings sit in the
+	 *  content document, and in paginated flow anything on or behind the current page
+	 *  has a rect left of the viewport's right edge. */
+	function reachedRecipeId(): string | null {
+		const doc = currentDoc;
+		const width = doc?.defaultView?.innerWidth;
+		if (!doc || !width) return null;
+		let reached: string | null = null;
+		for (const el of doc.querySelectorAll<HTMLElement>('[data-cm-fav]')) {
+			if (el.getBoundingClientRect().left < width) reached = el.dataset.cmFav ?? reached;
+		}
+		return reached;
+	}
+
+	/** Find a recipe in the book's own text, for opening the pages where the recipe walk
+	 *  left off. Sections are parsed, not rendered, and the scan stops at the first hit;
+	 *  a recipe whose title the book doesn't spell the same way simply isn't found. */
+	async function locateRecipe(el: FoliateView, name: string): Promise<string | null> {
+		const wanted = normaliseTitle(name);
+		const sections = el.book?.sections ?? [];
+		for (const [index, section] of sections.entries()) {
+			if (!section.createDocument) continue;
+			const doc = await section.createDocument();
+			const heading = [...doc.querySelectorAll('h1, h2, h3, h4, h5, h6, b, strong')].find(
+				(node) => normaliseTitle(node.textContent ?? '') === wanted
+			);
+			if (!heading) continue;
+			const range = doc.createRange();
+			range.selectNodeContents(heading);
+			return el.getCFI(index, range);
+		}
+		return null;
+	}
+
+	// Reading is reported back as the reader moves, at most once every few seconds, with
+	// the latest flushed when the reader closes.
+	const SAVE_INTERVAL_MS = 5000;
+	let pending: { recipe_id: string | null; location: string | null } | null = null;
+	let lastSaved = 0;
+
+	function flushPosition() {
+		if (!pending) return;
+		const { recipe_id, location } = pending;
+		pending = null;
+		lastSaved = Date.now();
+		reportReading(bookId, { mode: 'book', recipe_id, location }).catch((e) =>
+			console.warn('could not report reading position', e)
+		);
+	}
+
+	function recordPosition(location: string | null) {
+		pending = { recipe_id: reachedRecipeId(), location };
+		if (Date.now() - lastSaved >= SAVE_INTERVAL_MS) flushPosition();
+	}
 
 	function onKeydown(e: KeyboardEvent) {
 		if (e.key === 'ArrowLeft') view?.prev();
@@ -190,10 +287,14 @@
 					const detail = (e as CustomEvent<FoliateRelocateDetail>).detail ?? ({} as FoliateRelocateDetail);
 					if (typeof detail.fraction === 'number') progress = detail.fraction;
 					currentHref = detail.tocItem?.href ?? currentHref;
+					recordPosition(detail.cfi ?? null);
+					panel = null; // a page turn leaves the popover's anchor stale
 				});
 				el.addEventListener('load', (e: Event) => {
 					const detail = (e as CustomEvent<{ doc: Document }>).detail;
-					if (detail?.doc) injectFavourites(detail.doc);
+					if (!detail?.doc) return;
+					currentDoc = detail.doc;
+					injectControls(detail.doc);
 				});
 
 				// Ready before open() renders the first section, so its headings get matched too.
@@ -207,7 +308,16 @@
 				el.renderer.setAttribute('max-column-count', '2');
 				applyStyles();
 				toc = flattenToc(el.book?.toc);
-				el.renderer.next(); // render the first page
+				// The pages resume where they were left; arriving from the recipe walk, they
+				// open at the recipe it reached instead — one position, either way in.
+				const target =
+					resume?.mode === 'book' && resume.location
+						? resume.location
+						: resume?.anchor
+							? await locateRecipe(el, resume.anchor.name)
+							: null;
+				if (target) await el.goTo(target).catch(() => el.renderer.next());
+				else el.renderer.next(); // render the first page
 				status = 'ready';
 			} catch (err) {
 				if (!cancelled) {
@@ -218,9 +328,12 @@
 		})();
 
 		window.addEventListener('keydown', onKeydown);
+		window.addEventListener('pagehide', flushPosition);
 		return () => {
 			cancelled = true;
+			flushPosition();
 			window.removeEventListener('keydown', onKeydown);
+			window.removeEventListener('pagehide', flushPosition);
 			view?.remove();
 			view = null;
 		};
@@ -256,6 +369,20 @@
 		</div>
 	{/if}
 </ReaderChrome>
+
+{#if panel}
+	<ReaderRecipePanel
+		recipeId={panel.recipe.id}
+		recipeName={panel.recipe.name}
+		anchor={panel.anchor}
+		onClose={() => (panel = null)}
+		onFavouriteChange={(fav) => {
+			if (!panel) return;
+			panel.recipe.isFavourite = fav;
+			starSync.get(panel.recipe.id)?.();
+		}}
+	/>
+{/if}
 
 <style>
 	.host {

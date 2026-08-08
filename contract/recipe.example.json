@@ -13,14 +13,23 @@
   ],
   "instructions": [
     "The day before, season the chicken generously and submerge it in the buttermilk.",
-    "Roast at 220°C, turning once, until the juices run clear, about 50 minutes.",
+    "Roast at 220\u00b0C, turning once, until the juices run clear, about 50 minutes.",
     "Rest for 10 minutes before carving."
   ],
   "yields": "Serves 4",
-  "keywords": ["Chicken", "Roast"],
+  "keywords": [
+    "Chicken",
+    "Roast"
+  ],
   "has_image": false,
   "is_favourite": true,
   "context": "book",
-  "previous": { "id": "1f2e3d4c-5b6a-4079-8281-7060504a3b2c", "name": "Buttermilk Biscuits" },
-  "next": { "id": "2a3b4c5d-6e7f-4081-8291-a0b1c2d3e4f5", "name": "Cast-Iron Roast Potatoes" }
+  "previous": {
+    "id": "1f2e3d4c-5b6a-4079-8281-7060504a3b2c",
+    "name": "Buttermilk Biscuits"
+  },
+  "next": {
+    "id": "2a3b4c5d-6e7f-4081-8291-a0b1c2d3e4f5",
+    "name": "Cast-Iron Roast Potatoes"
+  }
 }

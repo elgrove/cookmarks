@@ -8,18 +8,35 @@
 		hasCover: boolean;
 	};
 
-	/** A book the reader is part-way through. */
+	/** A book part-way through, in the mode it was last read in. */
 	export type ContinueBook = {
 		id: string;
 		title: string;
 		author: string;
-		recipeCount: number;
-		seenCount: number;
+		mode: 'book' | 'recipes';
+		fraction: number;
+		/** The recipe both modes pick back up at, once one has been reached. */
+		resumeRecipeId: string | null;
 		hasCover: boolean;
 	};
 
-	/** Library-wide reading progress: recipes seen against the whole collection. */
-	export type ReadProgress = { recipes: number; recipesSeen: number };
+	/** Back into the mode this book was left in — its pages, or the recipe it reached. */
+	function resumeHref(book: ContinueBook): string {
+		return book.mode === 'recipes' && book.resumeRecipeId
+			? `/recipes/${book.resumeRecipeId}?context=book`
+			: `/books/${book.id}/read`;
+	}
+
+	/** A recipe opened recently — the trail back to where reading left off. */
+	export type RecentRecipe = {
+		id: string;
+		name: string;
+		bookId: string;
+		bookTitle: string;
+	};
+
+	/** Library-wide reading: books read through against the whole collection. */
+	export type ReadProgress = { books: number; booksRead: number };
 </script>
 
 <script lang="ts">
@@ -30,12 +47,14 @@
 
 	let {
 		bookOfTheDay,
-		progress = { recipes: 0, recipesSeen: 0 },
-		continueReading = []
+		progress = { books: 0, booksRead: 0 },
+		continueReading = [],
+		recentlyRead = []
 	}: {
 		bookOfTheDay: BookOfTheDay | null;
 		progress?: ReadProgress;
 		continueReading?: ContinueBook[];
+		recentlyRead?: RecentRecipe[];
 	} = $props();
 
 	const nf = new Intl.NumberFormat('en-GB');
@@ -46,7 +65,7 @@
 	let description = $derived(bookOfTheDay ? plainText(bookOfTheDay.description) : '');
 
 	// An empty library has no percentage to report, rather than 0% or NaN.
-	let readPct = $derived(readPercent(progress.recipesSeen, progress.recipes));
+	let readPct = $derived(readPercent(progress.booksRead, progress.books));
 
 	// Books in progress are what brings you back, so they lead the page and take the
 	// masthead. With nothing part-read the feature leads instead, as it always did.
@@ -61,6 +80,7 @@
 	data-verify-has-feature={bookOfTheDay ? 'true' : 'false'}
 	data-verify-read-pct={readPct === null ? '' : readPct}
 	data-verify-continue-count={continueReading.length}
+	data-verify-recent-count={recentlyRead.length}
 	data-verify-lead={lead}
 >
 	{#if continueReading.length}
@@ -68,18 +88,18 @@
 			<h1 class="display">Continue reading</h1>
 			<ul class="strip">
 				{#each continueReading as book, i (book.id)}
-					{@const pct = readPercent(book.seenCount, book.recipeCount) ?? 0}
+					{@const pct = Math.round(book.fraction * 100)}
 					<li class="cell" style={`animation-delay: ${Math.min(i * 60, 240)}ms`}>
 						<BookCard
 							id={book.id}
 							title={book.title}
 							author={book.author}
-							recipeCount={book.recipeCount}
-							seenCount={book.seenCount}
 							hasCover={book.hasCover}
+							href={resumeHref(book)}
+							progress={book.fraction}
 							showCount={false}
 						/>
-						<p class="cbook-meta mono">{book.seenCount} of {book.recipeCount} · {pct}%</p>
+						<p class="cbook-meta mono">{pct}% through</p>
 					</li>
 				{/each}
 			</ul>
@@ -123,13 +143,28 @@
 		<p class="empty">No books yet.</p>
 	{/if}
 
+	{#if recentlyRead.length}
+		<section class="recent">
+			<h2 class="label">Recently opened</h2>
+			<ol class="recent-index">
+				{#each recentlyRead as r, i (r.id)}
+					<li>
+						<span class="num mono" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
+						<a class="rtitle" href={`/recipes/${r.id}`}>{r.name}</a>
+						<a class="rbook" href={`/books/${r.bookId}`}>{cleanTitle(r.bookTitle)}</a>
+					</li>
+				{/each}
+			</ol>
+		</section>
+	{/if}
+
 	{#if readPct !== null}
 		<section class="progress-block">
 			<h2 class="label">Read so far</h2>
 			<p class="figure">
 				<span class="pct">{readPct}%</span>
 				<span class="of mono"
-					>{nf.format(progress.recipesSeen)} of {nf.format(progress.recipes)} recipes</span
+					>{nf.format(progress.booksRead)} of {nf.format(progress.books)} books</span
 				>
 			</p>
 			<div class="rule" aria-hidden="true">
@@ -299,6 +334,57 @@
 		font-style: italic;
 		font-size: 1.4rem;
 		color: var(--muted);
+	}
+
+	/* Where reading left off, as a numbered index (DESIGN §4): recipe name leading,
+	   its book trailing in the quieter grotesque. */
+	.recent {
+		margin-top: 3.5rem;
+		padding-top: 1.5rem;
+		border-top: var(--border);
+	}
+	.recent h2 {
+		margin: 0 0 0.6rem;
+		font-weight: 400;
+	}
+	.recent-index {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		max-width: 46rem;
+	}
+	.recent-index li {
+		display: grid;
+		grid-template-columns: 2.2rem 1fr auto;
+		align-items: baseline;
+		gap: 0.5rem 1rem;
+		padding: 0.7rem 0;
+		border-bottom: var(--border);
+	}
+	.recent-index .num {
+		font-size: 0.72rem;
+		color: var(--clay);
+	}
+	.rtitle {
+		font-family: var(--f-serif);
+		font-size: 1.05rem;
+		line-height: 1.3;
+		color: var(--ink);
+		text-decoration: none;
+		transition: color 0.18s var(--ease-out);
+	}
+	.rtitle:hover {
+		color: var(--clay-deep);
+	}
+	.rbook {
+		font-family: var(--f-grotesk);
+		font-size: 0.8rem;
+		color: var(--muted);
+		text-decoration: none;
+		text-align: right;
+	}
+	.rbook:hover {
+		color: var(--ink);
 	}
 
 	/* The library-wide figure closes the page — a ledger line, not a headline. */
