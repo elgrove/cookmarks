@@ -215,7 +215,7 @@ const unit: VerifiableUnit<Props> = {
 		},
 		{
 			id: 'no-epub',
-			description: 'a book with no EPUB on disk offers no "Read epub" action',
+			description: 'a book with no EPUB on disk offers no reader action at all',
 			props: { book: { ...pastaGrannies, hasEpub: false } }
 		},
 		{
@@ -416,7 +416,7 @@ const unit: VerifiableUnit<Props> = {
 		},
 		{
 			id: 'read-epub-link',
-			description: 'a book with an EPUB offers a "Read epub" action linking to its reader',
+			description: 'a book with an EPUB leads with a "Read book" action linking to its reader',
 			onlyFixtures: ['populated', 'no-cover', 'no-subtitle', 'long-title'],
 			check: ({ root, contract, props }) => {
 				if (contract['has-epub'] !== 'true') return `has-epub contract=${contract['has-epub']}`;
@@ -427,11 +427,15 @@ const unit: VerifiableUnit<Props> = {
 		},
 		{
 			id: 'read-epub-hidden',
-			description: 'a book without an EPUB shows no "Read epub" action',
+			description: 'a book without an EPUB shows no reader action — no dead button in its place',
 			onlyFixtures: ['no-epub'],
 			check: ({ root, contract }) => {
 				if (contract['has-epub'] !== 'false') return `has-epub contract=${contract['has-epub']}`;
-				return root.querySelector('a.read-epub') === null || 'read-epub link shown without an epub';
+				if (root.querySelector('a.read-epub')) return 'reader link shown without an epub';
+				return (
+					root.querySelector('.actions .btn.primary') === null ||
+					'a primary action remains with nothing to read'
+				);
 			}
 		},
 		{

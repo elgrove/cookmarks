@@ -232,10 +232,9 @@
 			</div>
 
 			<div class="actions">
-				<button class="btn primary" type="button">Read book <span class="ar" aria-hidden="true">›</span></button>
 				{#if book.hasEpub}
-					<a class="btn ghost read-epub" href={`/books/${book.id}/read`}>
-						Read epub <span class="ar" aria-hidden="true">›</span>
+					<a class="btn primary read-epub" href={`/books/${book.id}/read`}>
+						Read book <span class="ar" aria-hidden="true">›</span>
 					</a>
 				{/if}
 				{#if book.recipeCount > 0}
