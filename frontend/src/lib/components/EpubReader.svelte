@@ -17,10 +17,12 @@
 		buildRecipeIndex,
 		matchHeading,
 		normaliseTitle,
+		type RecipeMatch,
 		type RecipeNameIndex
 	} from '$lib/reader/match';
 	import { resolvedTheme, toggleTheme } from '$lib/theme';
 	import ReaderChrome, { type TocEntry } from './ReaderChrome.svelte';
+	import ReaderRecipePanel, { type PanelAnchor } from './ReaderRecipePanel.svelte';
 
 	type Props = {
 		bookId: string;
@@ -41,6 +43,8 @@
 	let currentHref = $state<string | null>(null);
 	let progress = $state(0);
 	let fontScale = $state(1);
+	// The save-to-list popover for a matched recipe, opened from its injected `+`.
+	let panel = $state<{ recipe: RecipeMatch; anchor: PanelAnchor } | null>(null);
 
 	// Page-ground / ink / link colours injected into the book's own (cross-document) iframe,
 	// since the app's CSS custom properties don't reach it. Values track DESIGN.md tokens.
@@ -60,20 +64,21 @@
 			html { color-scheme: ${theme}; font-size: ${Math.round(scale * 100)}%; }
 			p, li, blockquote, dd { line-height: 1.6; }
 		`;
-		// The save-to-favourites control we inject next to matched recipe titles: a circular star
-		// button mirroring the app's FavouriteToggle — clay star, hairline border that turns clay
-		// when hovered or saved, transparent fill. Star-only so it stays small against the title.
+		// The controls we inject next to matched recipe titles: a circular star button mirroring
+		// the app's FavouriteToggle (clay star, hairline border that turns clay when hovered or
+		// saved, transparent fill), and a matching `+` circle that opens the save-to-list popover.
 		const fav = `
-			.cm-fav { box-sizing: border-box; display: inline-flex; align-items: center;
+			.cm-fav, .cm-plus { box-sizing: border-box; display: inline-flex; align-items: center;
 				justify-content: center; width: 1.7em; height: 1.7em; padding: 0;
 				margin-inline-start: 0.75em; vertical-align: middle; font-size: 0.8rem;
 				font-style: normal; text-transform: none; line-height: 1; cursor: pointer;
 				border-radius: 50%; border: 1.5px solid ${c.line}; background: transparent;
 				color: ${c.clay} !important; -webkit-text-fill-color: ${c.clay};
 				transition: border-color 0.18s ease, transform 0.12s ease; }
-			.cm-fav:hover { border-color: ${c.clay}; transform: scale(1.08); }
+			.cm-fav:hover, .cm-plus:hover { border-color: ${c.clay}; transform: scale(1.08); }
 			.cm-fav.is-fav { border-color: ${c.clay}; }
 			.cm-fav[disabled] { opacity: 0.5; cursor: default; }
+			.cm-plus { margin-inline-start: 0.4em; }
 		`;
 		if (theme === 'light') {
 			return `
@@ -107,12 +112,23 @@
 		view?.renderer.setStyles?.(contentCss(fontScale, $resolvedTheme));
 	}
 
-	// As each section renders, find the lines that name one of the book's recipes and inject a
-	// save-to-favourites pill right after the title. Runs in the (same-origin) content document.
+	/** An in-content element's rect translated to app-viewport coords (content iframe offset added). */
+	function appAnchor(el: HTMLElement, doc: Document): PanelAnchor {
+		const r = el.getBoundingClientRect();
+		const frame = doc.defaultView?.frameElement?.getBoundingClientRect();
+		return { x: r.left + (frame?.left ?? 0), y: r.top + (frame?.top ?? 0), w: r.width, h: r.height };
+	}
+
+	// The latest injected star's re-render per recipe, so a favourite change made in the
+	// popover updates the in-book star too.
+	const starSync = new Map<string, () => void>();
+
+	// As each section renders, find the lines that name one of the book's recipes and inject the
+	// controls right after the title. Runs in the (same-origin) content document.
 	// Cookbook EPUBs rarely use semantic headings — titles are often bold lines (e.g. Calibre's
 	// `<p><b>…</b></p>`) — so we consider headings *and* bold elements, exclude cross-reference
 	// links, and require an exact name match on the (looser) bold candidates to avoid false hits.
-	function injectFavourites(doc: Document) {
+	function injectControls(doc: Document) {
 		const index = recipeIndex;
 		if (!index) return;
 		doc.querySelectorAll('h1, h2, h3, h4, h5, h6, b, strong').forEach((node) => {
@@ -130,8 +146,8 @@
 			const btn = doc.createElement('button');
 			btn.className = 'cm-fav';
 			btn.type = 'button';
-			let fav = match.isFavourite;
 			const render = () => {
+				const fav = match.isFavourite;
 				btn.textContent = fav ? '★' : '☆';
 				btn.setAttribute('aria-pressed', String(fav));
 				btn.setAttribute(
@@ -141,13 +157,13 @@
 				btn.classList.toggle('is-fav', fav);
 			};
 			render();
+			starSync.set(match.id, render);
 			btn.addEventListener('click', (ev) => {
 				ev.preventDefault();
 				ev.stopPropagation();
 				btn.disabled = true;
 				toggleFavourite(match.id)
 					.then((next) => {
-						fav = next;
 						match.isFavourite = next; // keep the index in sync if the section re-renders
 						render();
 					})
@@ -156,7 +172,19 @@
 						btn.disabled = false;
 					});
 			});
-			el.append(btn);
+
+			const plus = doc.createElement('button');
+			plus.className = 'cm-plus';
+			plus.type = 'button';
+			plus.textContent = '+';
+			plus.setAttribute('aria-label', `Save ${match.name} to a list`);
+			plus.addEventListener('click', (ev) => {
+				ev.preventDefault();
+				ev.stopPropagation();
+				panel = { recipe: match, anchor: appAnchor(plus, doc) };
+			});
+
+			el.append(btn, plus);
 		});
 	}
 
@@ -260,12 +288,13 @@
 					if (typeof detail.fraction === 'number') progress = detail.fraction;
 					currentHref = detail.tocItem?.href ?? currentHref;
 					recordPosition(detail.cfi ?? null);
+					panel = null; // a page turn leaves the popover's anchor stale
 				});
 				el.addEventListener('load', (e: Event) => {
 					const detail = (e as CustomEvent<{ doc: Document }>).detail;
 					if (!detail?.doc) return;
 					currentDoc = detail.doc;
-					injectFavourites(detail.doc);
+					injectControls(detail.doc);
 				});
 
 				// Ready before open() renders the first section, so its headings get matched too.
@@ -340,6 +369,20 @@
 		</div>
 	{/if}
 </ReaderChrome>
+
+{#if panel}
+	<ReaderRecipePanel
+		recipeId={panel.recipe.id}
+		recipeName={panel.recipe.name}
+		anchor={panel.anchor}
+		onClose={() => (panel = null)}
+		onFavouriteChange={(fav) => {
+			if (!panel) return;
+			panel.recipe.isFavourite = fav;
+			starSync.get(panel.recipe.id)?.();
+		}}
+	/>
+{/if}
 
 <style>
 	.host {
