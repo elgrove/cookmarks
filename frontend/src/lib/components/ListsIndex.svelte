@@ -116,7 +116,7 @@
 				<!-- The queue holds books, not recipes: a distinct clay-accented card, pinned
 				     ahead of every list (search filters lists by name, so it steps aside). -->
 				<li class="cell">
-					<a class="queue-card" href="/lists/reading-queue" aria-label="Open the reading queue">
+					<a class="queue-card" href="/lists/reading-queue">
 						<span class="queue-label mono">Up next</span>
 						<span class="queue-name">Reading queue</span>
 						<span class="queue-count mono">{queueCount} {queueCount === 1 ? 'book' : 'books'}</span>
@@ -397,22 +397,25 @@
 	.queue-card:hover {
 		background: var(--clay-deep);
 	}
+	/* Near-black ink on the clay ground: legible on the light palette's terracotta
+	   and the dark palette's lighter clay alike, where ivory-on-clay would fall
+	   below AA in dark mode. */
 	.queue-label {
 		font-size: 0.68rem;
 		letter-spacing: 0.14em;
 		text-transform: uppercase;
-		color: rgba(255, 252, 245, 0.75);
+		color: rgba(28, 25, 23, 0.72);
 	}
 	.queue-name {
 		font-family: var(--f-serif);
 		font-size: 1.3rem;
 		line-height: 1.2;
-		color: #fffcf5;
+		color: #1c1917;
 	}
 	.queue-count {
 		font-size: 0.72rem;
 		letter-spacing: 0.04em;
-		color: rgba(255, 252, 245, 0.75);
+		color: rgba(28, 25, 23, 0.72);
 	}
 
 	/* Mobile: the queue card joins the hairline-row treatment of the list cards. */

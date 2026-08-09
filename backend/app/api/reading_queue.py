@@ -1,8 +1,9 @@
 import uuid
-from collections.abc import Iterable
+from collections.abc import Sequence
 
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import delete, exists, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps import CurrentUser
@@ -20,7 +21,7 @@ router = APIRouter(tags=["reading-queue"])
 def queued_books(
     session: Session,
     user_id: uuid.UUID,
-    exclude: Iterable[uuid.UUID] = (),
+    exclude: Sequence[uuid.UUID] = (),
     limit: int | None = None,
 ) -> list[QueuedBook]:
     """The caller's queue, newest-queued first. A book whose reading is finished has
@@ -77,7 +78,11 @@ def queue_book(book_id: uuid.UUID, session: SessionDep, user: CurrentUser) -> Qu
         raise HTTPException(status_code=404, detail="book not found")
     if not is_queued(session, user.id, book_id):
         session.add(ReadingQueueItem(user_id=user.id, book_id=book_id))
-        session.commit()
+        try:
+            session.commit()
+        except IntegrityError:
+            # A concurrent PUT won the unique constraint; the desired state holds.
+            session.rollback()
     return QueueState(queued=True)
 
 
