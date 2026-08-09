@@ -133,23 +133,31 @@
 	// popover updates the in-book star too.
 	const starSync = new Map<string, () => void>();
 
+	// Cookbook EPUBs rarely use semantic headings — titles are often bold lines (e.g. Calibre's
+	// `<p><b>…</b></p>`) or class-styled paragraphs — so candidates are headings, bold elements
+	// and short paragraphs, with the looser (non-heading) ones held to an exact name match.
+	const TITLE_CANDIDATES = 'h1, h2, h3, h4, h5, h6, b, strong, p';
+
+	/** Match one candidate element against the recipe index, or null. Link-wrapped text is a
+	 *  cross-reference (contents lines, "see also"), never the recipe's own title. */
+	function matchTitleElement(el: HTMLElement, index: RecipeNameIndex): RecipeMatch | null {
+		if (el.closest('a') || el.querySelector('a[href]')) return null;
+		const text = (el.textContent ?? '').trim();
+		if (text.length < 3 || text.length > 90) return null;
+		const isHeading = el.matches('h1, h2, h3, h4, h5, h6');
+		return isHeading ? matchHeading(text, index) : (index.get(normaliseTitle(text)) ?? null);
+	}
+
 	// As each section renders, find the lines that name one of the book's recipes and inject the
 	// controls right after the title. Runs in the (same-origin) content document.
-	// Cookbook EPUBs rarely use semantic headings — titles are often bold lines (e.g. Calibre's
-	// `<p><b>…</b></p>`) — so we consider headings *and* bold elements, exclude cross-reference
-	// links, and require an exact name match on the (looser) bold candidates to avoid false hits.
 	function injectControls(doc: Document) {
 		const index = recipeIndex;
 		if (!index) return;
-		doc.querySelectorAll('h1, h2, h3, h4, h5, h6, b, strong').forEach((node) => {
+		doc.querySelectorAll(TITLE_CANDIDATES).forEach((node) => {
 			const el = node as HTMLElement;
 			if (el.dataset.cmFav) return; // already processed
-			if (el.closest('a')) return; // a linked title is a cross-reference, not the recipe
 			if (el.querySelector('[data-cm-fav]') || el.closest('[data-cm-fav]')) return; // nested dup
-			const text = (el.textContent ?? '').trim();
-			if (text.length < 3 || text.length > 90) return;
-			const isHeading = el.matches('h1, h2, h3, h4, h5, h6');
-			const match = isHeading ? matchHeading(text, index) : (index.get(normaliseTitle(text)) ?? null);
+			const match = matchTitleElement(el, index);
 			if (!match) return;
 			el.dataset.cmFav = match.id;
 
@@ -233,8 +241,8 @@
 		for (const [index, section] of sections.entries()) {
 			if (!section.createDocument) continue;
 			const doc = await section.createDocument();
-			const heading = [...doc.querySelectorAll('h1, h2, h3, h4, h5, h6, b, strong')].find((node) =>
-				matchHeading(node.textContent ?? '', wanted)
+			const heading = [...doc.querySelectorAll(TITLE_CANDIDATES)].find((node) =>
+				matchTitleElement(node as HTMLElement, wanted)
 			);
 			if (!heading) continue;
 			const range = doc.createRange();
