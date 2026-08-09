@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import BooksLibrary, { type LibraryBook } from '$lib/components/BooksLibrary.svelte';
 	import { fetchBooks } from '$lib/api/books';
+	import { fetchReadingQueue } from '$lib/api/reading-queue';
 	import { pageTitle } from '$lib/title';
 
 	let status = $state<'loading' | 'error' | 'ready'>('loading');
@@ -11,6 +12,14 @@
 		status = 'loading';
 		try {
 			const data = await fetchBooks();
+			// Queue positions feed the "Queue order" sort; a failed fetch just means
+			// no queued books lead, not a broken library.
+			const positions = new Map<string, number>();
+			try {
+				(await fetchReadingQueue()).forEach((b, i) => positions.set(b.id, i + 1));
+			} catch (err) {
+				console.error('failed to load reading queue for sort', err);
+			}
 			books = data.map((b) => ({
 				id: b.id,
 				title: b.title,
@@ -18,7 +27,8 @@
 				recipeCount: b.recipe_count,
 				progress: b.progress,
 				hasCover: b.has_cover,
-				keywords: b.keywords
+				keywords: b.keywords,
+				queuePosition: positions.get(b.id) ?? null
 			}));
 			status = 'ready';
 		} catch (err) {

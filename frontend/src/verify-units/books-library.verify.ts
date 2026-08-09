@@ -11,7 +11,8 @@ const bookSchema = z.object({
 	recipeCount: z.number().int().nonnegative(),
 	progress: z.number().min(0).max(1).nullable().optional(),
 	hasCover: z.boolean(),
-	keywords: z.array(z.string()).optional()
+	keywords: z.array(z.string()).optional(),
+	queuePosition: z.number().int().positive().nullable().optional()
 });
 
 // Incoming (recently-added) order is deliberately NOT alphabetical, so a title
@@ -72,6 +73,21 @@ const unit: VerifiableUnit<Props> = {
 			description: 'sorting Title A–Z reorders the visible list',
 			props: { books: populated },
 			act: ({ type }) => type(SORT, 'title')
+		},
+		{
+			id: 'sort-queue',
+			description: 'Queue order leads with the queued books; the rest keep recent order',
+			props: {
+				// Persiana is 2nd on the queue, Nordic Baking 1st; the other three unqueued.
+				books: populated.map((b) =>
+					b.id === 'a3'
+						? { ...b, queuePosition: 1 }
+						: b.id === 'a5'
+							? { ...b, queuePosition: 2 }
+							: b
+				)
+			},
+			act: ({ type }) => type(SORT, 'queue')
 		},
 		{
 			id: 'no-results',
@@ -270,6 +286,25 @@ const unit: VerifiableUnit<Props> = {
 				if (Number(contract.count) !== 2) return `expected 2 matches, saw ${contract.count}`;
 				const titles = [...root.querySelectorAll('.title')].map((t) => (t.textContent ?? '').toLowerCase());
 				return titles.every((t) => t.includes('modern')) || `non-matching title rendered: ${titles}`;
+			}
+		},
+		{
+			id: 'queue-sort-applied',
+			description: 'Queue order puts queue position 1 first, then 2, then the unqueued in recent order',
+			onlyFixtures: ['sort-queue'],
+			check: ({ contract, root, props }) => {
+				if (contract.sort !== 'queue') return `sort=${contract.sort}`;
+				if (contract.first !== 'The Nordic Baking Book') return `first=${contract.first}`;
+				const titles = [...root.querySelectorAll('.meta .title')].map((el) =>
+					(el.textContent ?? '').trim()
+				);
+				const want = ['The Nordic Baking Book', 'Persiana'].concat(
+					props.books.filter((b) => !b.queuePosition).map((b) => b.title)
+				);
+				return (
+					titles.slice(0, want.length).join('|') === want.join('|') ||
+					`order=${titles.join('|')}`
+				);
 			}
 		},
 		{
