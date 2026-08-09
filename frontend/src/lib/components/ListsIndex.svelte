@@ -113,12 +113,15 @@
 	{:else}
 		<ul class="grid">
 			{#if !query}
-				<!-- The queue holds books, not recipes: a distinct clay-accented card, pinned
-				     ahead of every list (search filters lists by name, so it steps aside). -->
+				<!-- The queue holds books, not recipes: the Favourites card shape, but with a
+				     trio of book spines where the star sits — pinned ahead of every list
+				     (search filters lists by name, so it steps aside). -->
 				<li class="cell">
 					<a class="queue-card" href="/lists/reading-queue">
-						<span class="queue-label mono">Up next</span>
-						<span class="queue-name">Reading queue</span>
+						<span class="queue-title">
+							<span class="spines" aria-hidden="true"><i></i><i></i><i></i></span>
+							<span class="queue-name">Reading queue</span>
+						</span>
 						<span class="queue-count mono">{queueCount} {queueCount === 1 ? 'book' : 'books'}</span>
 					</a>
 				</li>
@@ -378,8 +381,8 @@
 		animation: fadeUp 0.6s var(--ease-out) both;
 	}
 
-	/* The queue card: books, not recipes — clay ground and ivory type so it reads as
-	   its own thing, pinned ahead of the lists. */
+	/* The queue card: the Favourites card shape, distinguished by a trio of book
+	   spines in the star's spot — the one card on the grid that holds books. */
 	.queue-card {
 		display: flex;
 		flex-direction: column;
@@ -388,34 +391,59 @@
 		height: 100%;
 		min-height: 8rem;
 		padding: 1.25rem;
-		background: var(--clay);
-		border: 1px solid var(--clay);
+		background: var(--bg-warm);
+		border: var(--border);
 		border-radius: 4px;
 		text-decoration: none;
-		transition: background 0.18s var(--ease-out);
+		transition: border-color 0.18s var(--ease-out);
 	}
 	.queue-card:hover {
-		background: var(--clay-deep);
+		border-color: var(--clay);
 	}
-	/* Near-black ink on the clay ground: legible on the light palette's terracotta
-	   and the dark palette's lighter clay alike, where ivory-on-clay would fall
-	   below AA in dark mode. */
-	.queue-label {
-		font-size: 0.68rem;
-		letter-spacing: 0.14em;
-		text-transform: uppercase;
-		color: rgba(28, 25, 23, 0.72);
+	.queue-title {
+		display: flex;
+		align-items: baseline;
+		gap: 0.45rem;
+		min-width: 0;
+	}
+	.spines {
+		flex: none;
+		display: flex;
+		align-items: flex-end;
+		gap: 3px;
+		align-self: center;
+	}
+	.spines i {
+		display: block;
+		width: 5px;
+		border-radius: 1px;
+	}
+	.spines i:nth-child(1) {
+		height: 18px;
+		background: var(--clay);
+	}
+	.spines i:nth-child(2) {
+		height: 14px;
+		background: color-mix(in srgb, var(--clay) 55%, var(--bg-warm));
+	}
+	.spines i:nth-child(3) {
+		height: 16px;
+		background: color-mix(in srgb, var(--clay) 30%, var(--bg-warm));
 	}
 	.queue-name {
 		font-family: var(--f-serif);
 		font-size: 1.3rem;
 		line-height: 1.2;
-		color: #1c1917;
+		color: var(--ink);
+		transition: color 0.18s var(--ease-out);
+	}
+	.queue-card:hover .queue-name {
+		color: var(--clay-deep);
 	}
 	.queue-count {
 		font-size: 0.72rem;
 		letter-spacing: 0.04em;
-		color: rgba(28, 25, 23, 0.72);
+		color: var(--muted);
 	}
 
 	/* Mobile: the queue card joins the hairline-row treatment of the list cards. */
@@ -425,18 +453,32 @@
 			min-height: 0;
 			flex-direction: row;
 			align-items: baseline;
+			justify-content: space-between;
 			gap: 0.75rem;
-			padding: 0.85rem 0.6rem;
-			border-radius: 3px;
+			padding: 0.85rem 0.1rem;
+			background: none;
+			border: none;
+			border-bottom: var(--border);
+			border-radius: 0;
 		}
-		.queue-label {
-			display: none;
+		.spines {
+			align-self: auto;
+			transform: translateY(2px);
+		}
+		.spines i:nth-child(1) {
+			height: 14px;
+		}
+		.spines i:nth-child(2) {
+			height: 10px;
+		}
+		.spines i:nth-child(3) {
+			height: 12px;
 		}
 		.queue-name {
 			font-size: 1.1rem;
-			flex: 1;
 		}
 		.queue-count {
+			flex: none;
 			white-space: nowrap;
 		}
 	}
