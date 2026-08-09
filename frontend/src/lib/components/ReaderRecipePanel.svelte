@@ -5,19 +5,14 @@
 		fetchRecipeLists,
 		removeRecipeFromList,
 		type ListMembership,
-		type ListSummary
+		type ListPanelApi
 	} from '$lib/api/lists';
 
 	/** A rectangle in app-viewport coordinates (the trigger's, iframe offset already applied). */
 	export type PanelAnchor = { x: number; y: number; w: number; h: number };
 
 	/** The list endpoints the panel talks to — injectable so the harness can stub them. */
-	export type PanelApi = {
-		fetchRecipeLists: (recipeId: string) => Promise<ListMembership[]>;
-		addRecipeToList: (listId: string, recipeId: string) => Promise<void>;
-		removeRecipeFromList: (listId: string, recipeId: string) => Promise<void>;
-		createList: (name: string) => Promise<Pick<ListSummary, 'id' | 'name' | 'is_default'>>;
-	};
+	export type PanelApi = ListPanelApi;
 
 	export type ReaderRecipePanelProps = {
 		recipeId: string;
@@ -32,6 +27,7 @@
 
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import ListPanelBody from './ListPanelBody.svelte';
 
 	let {
 		recipeId,
@@ -44,7 +40,6 @@
 
 	let lists = $state<ListMembership[]>([]);
 	let phase = $state<'loading' | 'ready' | 'error'>('loading');
-	let newName = $state('');
 	let busy = $state<string | null>(null);
 	// Echo the last interactions so the harness can verify wiring (cf. ListPicker).
 	let lastToggled = $state('');
@@ -87,13 +82,11 @@
 		}
 	}
 
-	async function create() {
-		const name = newName.trim();
-		if (!name || busy) return;
+	async function create(name: string) {
+		if (busy) return;
 		busy = 'create';
 		try {
 			const created = await api.createList(name);
-			newName = '';
 			lastCreated = created.name;
 			// The list now exists server-side either way — show it, unticked if the add failed,
 			// so a retry is a toggle rather than a duplicate create.
@@ -154,49 +147,7 @@
 		<button class="close" type="button" aria-label="Close" onclick={onClose}>×</button>
 	</header>
 
-	{#if phase === 'loading'}
-		<p class="note">Loading lists…</p>
-	{:else if phase === 'error'}
-		<p class="note">Couldn’t load your lists.</p>
-	{:else}
-		<ul class="lists">
-			{#each lists as list (list.id)}
-				<li>
-					<button
-						class="row"
-						class:on={list.contains}
-						type="button"
-						aria-pressed={list.contains}
-						disabled={busy === list.id}
-						onclick={() => toggle(list)}
-					>
-						<span class="tick" aria-hidden="true">{list.contains ? '✓' : ''}</span>
-						<span class="rname">{list.name}</span>
-						{#if list.is_default}<span class="star" aria-hidden="true">★</span>{/if}
-					</button>
-				</li>
-			{/each}
-		</ul>
-
-		<div class="create">
-			<input
-				class="create-input"
-				type="text"
-				placeholder="New list…"
-				aria-label="New list name"
-				bind:value={newName}
-				onkeydown={(e) => {
-					if (e.key === 'Enter') {
-						e.preventDefault();
-						create();
-					}
-				}}
-			/>
-			<button class="create-btn" type="button" disabled={busy === 'create'} onclick={create}
-				>Create</button
-			>
-		</div>
-	{/if}
+	<ListPanelBody {lists} {phase} {busy} onToggle={toggle} onCreate={create} />
 
 	<a class="view" href={`/recipes/${recipeId}`}>View recipe <span aria-hidden="true">→</span></a>
 </div>
@@ -254,98 +205,6 @@
 	}
 	.close:hover {
 		color: var(--ink);
-	}
-
-	.note {
-		font-family: var(--f-grotesk);
-		font-size: 0.85rem;
-		color: var(--muted);
-		margin: 0.4rem 0;
-	}
-
-	.lists {
-		list-style: none;
-		margin: 0;
-		padding: 0;
-	}
-	.row {
-		display: flex;
-		align-items: center;
-		gap: 0.55rem;
-		width: 100%;
-		text-align: left;
-		font-family: var(--f-grotesk);
-		font-size: 0.9rem;
-		color: var(--ink);
-		background: none;
-		border: none;
-		border-radius: 3px;
-		padding: 0.5rem 0.6rem;
-		cursor: pointer;
-		transition: background 0.15s var(--ease-out);
-	}
-	.row:hover {
-		background: var(--bg-warm);
-	}
-	.row[disabled] {
-		opacity: 0.6;
-	}
-	.row .tick {
-		width: 1rem;
-		color: var(--clay);
-		font-size: 0.85rem;
-	}
-	.row.on .rname {
-		color: var(--clay-deep);
-	}
-	.row .rname {
-		flex: 1;
-	}
-	.row .star {
-		color: var(--clay);
-		font-size: 0.8rem;
-	}
-
-	.create {
-		display: flex;
-		gap: 0.4rem;
-		margin-top: 0.5rem;
-		padding-top: 0.5rem;
-		border-top: var(--border);
-	}
-	.create-input {
-		flex: 1;
-		min-width: 0;
-		font-family: var(--f-grotesk);
-		font-size: 0.85rem;
-		color: var(--ink);
-		background: transparent;
-		border: none;
-		border-bottom: 1px solid var(--line-strong);
-		padding: 0.35rem 0.2rem;
-	}
-	.create-input:focus {
-		outline: none;
-		border-bottom-color: var(--clay);
-	}
-	.create-input::placeholder {
-		color: var(--faint);
-	}
-	.create-btn {
-		font-family: var(--f-grotesk);
-		font-weight: 600;
-		font-size: 0.8rem;
-		color: var(--ink);
-		background: none;
-		border: 1px solid var(--line-strong);
-		border-radius: 3px;
-		padding: 0.35rem 0.7rem;
-		cursor: pointer;
-		transition: border-color 0.18s var(--ease-out);
-	}
-	.create-btn:hover {
-		border-color: var(--clay);
-		color: var(--clay-deep);
 	}
 
 	.view {

@@ -6,7 +6,7 @@ import type { ListMembership } from '$lib/api/lists';
 import type { VerifiableUnit } from '$lib/verify/types';
 import { z } from 'zod';
 
-const ROW = '.lists .row';
+const ROW = '.lists .list-toggle';
 const CREATE_INPUT = '.create-input';
 const CREATE_BTN = '.create-btn';
 
@@ -94,7 +94,7 @@ const unit: VerifiableUnit<ReaderRecipePanelProps> = {
 			props: props(FOUR_LISTS),
 			act: async ({ wait, click }) => {
 				await wait(0);
-				click(`.lists li:nth-child(2) .row`);
+				click(`.lists li:nth-child(2) .list-toggle`);
 				await wait(0);
 			}
 		},
@@ -104,7 +104,7 @@ const unit: VerifiableUnit<ReaderRecipePanelProps> = {
 			props: props(FOUR_LISTS),
 			act: async ({ wait, click }) => {
 				await wait(0);
-				click(`.lists li:first-child .row`);
+				click(`.lists li:first-child .list-toggle`);
 				await wait(0);
 			}
 		},
@@ -175,7 +175,7 @@ const unit: VerifiableUnit<ReaderRecipePanelProps> = {
 			check: ({ contract, root }) => {
 				const ticked = [...root.querySelectorAll(ROW)]
 					.filter((r) => r.getAttribute('aria-pressed') === 'true')
-					.map((r) => r.querySelector('.rname')?.textContent?.trim() ?? '')
+					.map((r) => r.querySelector('.name')?.textContent?.trim() ?? '')
 					.join('|');
 				return contract.members === ticked || `members=${contract.members} rows say ${ticked}`;
 			}
@@ -184,7 +184,7 @@ const unit: VerifiableUnit<ReaderRecipePanelProps> = {
 			id: 'default-first',
 			description: 'the default-first contract agrees with the starred first row',
 			check: ({ contract, root }) => {
-				const starred = root.querySelector(`.lists li:first-child .row .star`) !== null;
+				const starred = root.querySelector(`.lists li:first-child .list-toggle .star`) !== null;
 				return (
 					contract['default-first'] === String(starred) ||
 					`default-first=${contract['default-first']} but first-row star=${starred}`
@@ -209,7 +209,7 @@ const unit: VerifiableUnit<ReaderRecipePanelProps> = {
 			onlyFixtures: ['toggle-on'],
 			check: ({ contract, root }) => {
 				if (contract.toggled !== 'Weeknight') return `toggled=${contract.toggled}`;
-				const row = root.querySelector(`.lists li:nth-child(2) .row`);
+				const row = root.querySelector(`.lists li:nth-child(2) .list-toggle`);
 				if (row?.getAttribute('aria-pressed') !== 'true') return 'row not ticked after toggle';
 				return contract.members.includes('Weeknight') || `members=${contract.members}`;
 			}

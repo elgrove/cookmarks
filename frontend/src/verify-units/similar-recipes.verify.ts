@@ -1,8 +1,8 @@
-import SimilarRecipes, { type SimilarRecipesData } from '$lib/components/SimilarRecipes.svelte';
+import SimilarRecipes, { type SimilarRecipesProps } from '$lib/components/SimilarRecipes.svelte';
 import type { VerifiableUnit } from '$lib/verify/types';
 import { z } from 'zod';
 
-type Props = SimilarRecipesData;
+type Props = SimilarRecipesProps;
 
 const rowSchema = z.object({
 	id: z.string(),
@@ -98,6 +98,11 @@ const unit: VerifiableUnit<Props> = {
 			id: 'empty',
 			description: 'no neighbours found: the designed empty state, not a bare heading',
 			props: { recipes: [], basis: 'keyword' }
+		},
+		{
+			id: 'with-picker',
+			description: 'the row picker switched on: every row carries the labelled [+] trigger',
+			props: { recipes: neighbours, basis: 'vector', listPicker: {} }
 		}
 	],
 	invariants: [
@@ -149,6 +154,18 @@ const unit: VerifiableUnit<Props> = {
 			check: ({ root }) => {
 				if (root.querySelector('.rows')) return 'list rendered for an empty result';
 				return root.querySelector('.empty') !== null || 'no empty-state message';
+			}
+		},
+		{
+			id: 'picker-on-rows',
+			description: 'with listPicker set, every row renders the per-row [+] trigger',
+			onlyFixtures: ['with-picker'],
+			check: ({ root, props }) => {
+				const triggers = root.querySelectorAll('.rows .row .add-trigger').length;
+				return (
+					triggers === props.recipes.length ||
+					`${triggers} pickers for ${props.recipes.length} rows`
+				);
 			}
 		},
 		{

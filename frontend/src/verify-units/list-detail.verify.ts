@@ -1,4 +1,7 @@
-import ListDetail, { type ListDetailData } from '$lib/components/ListDetail.svelte';
+import ListDetail, {
+	type ListDetailData,
+	type ListSelectionTools
+} from '$lib/components/ListDetail.svelte';
 import type { RecipeRowData } from '$lib/components/RecipeRow.svelte';
 import type { VerifiableUnit } from '$lib/verify/types';
 
@@ -7,7 +10,12 @@ type Props = {
 	onRename?: (name: string) => void;
 	onDelete?: () => void;
 	onRemoveRecipe?: (recipeId: string) => void;
+	selection?: ListSelectionTools;
 };
+
+function selectionStub(): ListSelectionTools {
+	return { lists: [], onAdd: () => {}, onCreate: () => {}, onRemove: () => {} };
+}
 
 function recipe(over: Partial<RecipeRowData> = {}): RecipeRowData {
 	return {
@@ -89,6 +97,23 @@ const unit: VerifiableUnit<Props> = {
 			act: ({ click }) => {
 				click(DELETE_BTN);
 				click(CONFIRM_DELETE);
+			}
+		},
+		{
+			id: 'select-mode',
+			description: 'toggling Select shows a checkbox per row and the bar with its bulk remove',
+			props: { list: customList(), selection: selectionStub() },
+			act: ({ click }) => click('.select-toggle')
+		},
+		{
+			id: 'bulk-remove',
+			description: 'selecting two rows and bulk-removing them echoes the count',
+			props: { list: customList(), selection: selectionStub() },
+			act: ({ click }) => {
+				click('.select-toggle');
+				click('.rows li:nth-child(1) input.select');
+				click('.rows li:nth-child(2) input.select');
+				click('.bulk-remove');
 			}
 		},
 		{
@@ -175,6 +200,27 @@ const unit: VerifiableUnit<Props> = {
 			check: ({ root, props }) => {
 				const rows = root.querySelectorAll(ROW);
 				return rows.length === props.list.recipes.length || `saw ${rows.length} rows`;
+			}
+		},
+		{
+			id: 'select-mode-rows',
+			description: 'select mode reports itself, checkboxes every row, and offers the bulk remove',
+			onlyFixtures: ['select-mode'],
+			check: ({ contract, root, props }) => {
+				if (contract['select-mode'] !== 'true') return `select-mode=${contract['select-mode']}`;
+				const boxes = root.querySelectorAll('.rows .row input.select').length;
+				if (boxes !== props.list.recipes.length)
+					return `${boxes} checkboxes for ${props.list.recipes.length} rows`;
+				return root.querySelector('.bulk-remove') !== null || 'bulk remove missing from the bar';
+			}
+		},
+		{
+			id: 'bulk-remove-wires',
+			description: 'bulk-removing the selection echoes how many rows went',
+			onlyFixtures: ['bulk-remove'],
+			check: ({ contract }) => {
+				if (contract.selected !== '2') return `selected=${contract.selected}`;
+				return contract['bulk-removed'] === '2' || `bulk-removed=${contract['bulk-removed']}`;
 			}
 		},
 		{

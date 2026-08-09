@@ -1,7 +1,7 @@
 import uuid
 
 from fastapi import APIRouter, HTTPException, Response, status
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
@@ -12,11 +12,13 @@ from app.models.recipe import Recipe
 from app.models.recipe_list import RecipeList, RecipeListItem
 from app.schemas.recipe import RecipeSummary
 from app.schemas.recipe_list import (
+    BulkListResult,
     FavouriteState,
     ListCreate,
     ListDetail,
     ListMembership,
     ListRecipeRef,
+    ListRecipeRefs,
     ListRename,
     ListSummary,
 )
@@ -192,6 +194,68 @@ def add_to_list(
         session.add(RecipeListItem(recipe_list_id=list_id, recipe_id=body.recipe_id))
         session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+def _ensure_recipes_exist(session: Session, recipe_ids: set[uuid.UUID]) -> None:
+    """404 unless every id names a real recipe — a bulk request is all-or-nothing,
+    matching the single-recipe add."""
+    if not recipe_ids:
+        return
+    found = set(session.scalars(select(Recipe.id).where(Recipe.id.in_(recipe_ids))).all())
+    if found != recipe_ids:
+        raise HTTPException(status_code=404, detail="recipe not found")
+
+
+def _list_size(session: Session, list_id: uuid.UUID) -> int:
+    return (
+        session.scalar(select(func.count()).where(RecipeListItem.recipe_list_id == list_id)) or 0
+    )
+
+
+@router.post("/lists/{list_id}/recipes/bulk", response_model=BulkListResult)
+def bulk_add_to_list(
+    list_id: uuid.UUID, body: ListRecipeRefs, session: SessionDep, user: CurrentUser
+) -> BulkListResult:
+    _owned(session, list_id, user.id)
+    ids = set(body.recipe_ids)
+    _ensure_recipes_exist(session, ids)
+    existing = set(
+        session.scalars(
+            select(RecipeListItem.recipe_id).where(
+                RecipeListItem.recipe_list_id == list_id,
+                RecipeListItem.recipe_id.in_(ids),
+            )
+        ).all()
+    )
+    to_add = ids - existing
+    session.add_all(
+        RecipeListItem(recipe_list_id=list_id, recipe_id=rid) for rid in to_add
+    )
+    session.commit()
+    return BulkListResult(changed=len(to_add), recipe_count=_list_size(session, list_id))
+
+
+@router.post("/lists/{list_id}/recipes/bulk-remove", response_model=BulkListResult)
+def bulk_remove_from_list(
+    list_id: uuid.UUID, body: ListRecipeRefs, session: SessionDep, user: CurrentUser
+) -> BulkListResult:
+    _owned(session, list_id, user.id)
+    ids = set(body.recipe_ids)
+    _ensure_recipes_exist(session, ids)
+    members = session.scalars(
+        select(RecipeListItem.recipe_id).where(
+            RecipeListItem.recipe_list_id == list_id,
+            RecipeListItem.recipe_id.in_(ids),
+        )
+    ).all()
+    session.execute(
+        delete(RecipeListItem).where(
+            RecipeListItem.recipe_list_id == list_id,
+            RecipeListItem.recipe_id.in_(members),
+        )
+    )
+    session.commit()
+    return BulkListResult(changed=len(members), recipe_count=_list_size(session, list_id))
 
 
 @router.delete(

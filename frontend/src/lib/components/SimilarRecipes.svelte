@@ -1,5 +1,5 @@
 <script module lang="ts">
-	import type { RecipeRowData } from './RecipeRow.svelte';
+	import type { RecipeRowData, RowPickerHook } from './RecipeRow.svelte';
 
 	export type SimilarRecipesData = {
 		recipes: RecipeRowData[];
@@ -9,12 +9,17 @@
 		/** When set, render a "More like this" link to the fuller similar list. */
 		moreHref?: string;
 	};
+
+	export type SimilarRecipesProps = SimilarRecipesData & {
+		/** Switches on the per-row add-to-list picker (no selection mode here). */
+		listPicker?: RowPickerHook;
+	};
 </script>
 
 <script lang="ts">
 	import RecipeRow from './RecipeRow.svelte';
 
-	let { recipes, basis, moreHref }: SimilarRecipesData = $props();
+	let { recipes, basis, moreHref, listPicker }: SimilarRecipesProps = $props();
 </script>
 
 <section
@@ -28,7 +33,7 @@
 	{#if recipes.length}
 		<ul class="rows">
 			{#each recipes as r (r.id)}
-				<RecipeRow {...r} />
+				<RecipeRow {...r} {listPicker} />
 			{/each}
 		</ul>
 		{#if moreHref}

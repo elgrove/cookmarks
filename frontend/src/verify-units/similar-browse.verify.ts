@@ -1,8 +1,8 @@
-import SimilarBrowse, { type SimilarBrowseData } from '$lib/components/SimilarBrowse.svelte';
+import SimilarBrowse, { type SimilarBrowseProps } from '$lib/components/SimilarBrowse.svelte';
 import type { VerifiableUnit } from '$lib/verify/types';
 import { z } from 'zod';
 
-type Props = SimilarBrowseData;
+type Props = SimilarBrowseProps;
 
 const rowSchema = z.object({
 	id: z.string(),
@@ -90,6 +90,18 @@ const unit: VerifiableUnit<Props> = {
 			id: 'empty',
 			description: 'no neighbours: the designed empty state under the heading',
 			props: { ...base, recipes: [] }
+		},
+		{
+			id: 'select-mode',
+			description: 'toggling Select checkboxes every row and shows the selection bar',
+			props: {
+				...base,
+				selection: { lists: [], onAdd: () => {}, onCreate: () => {} }
+			},
+			act: ({ click }) => {
+				click('.select-toggle');
+				click('.rows .row input.select');
+			}
 		}
 	],
 	invariants: [
@@ -140,6 +152,22 @@ const unit: VerifiableUnit<Props> = {
 			check: ({ root }) => {
 				if (root.querySelector('.rows')) return 'list rendered for an empty result';
 				return root.querySelector('.empty') !== null || 'no empty-state message';
+			}
+		},
+		{
+			id: 'select-mode-rows',
+			description: 'select mode reports itself, checkboxes every row, and counts the selection',
+			onlyFixtures: ['select-mode'],
+			check: ({ contract, root, props }) => {
+				if (contract['select-mode'] !== 'true') return `select-mode=${contract['select-mode']}`;
+				const boxes = root.querySelectorAll('.rows .row input.select').length;
+				if (boxes !== props.recipes.length)
+					return `${boxes} checkboxes for ${props.recipes.length} rows`;
+				if (contract.selected !== '1') return `selected=${contract.selected}`;
+				return (
+					root.querySelector('[data-verify-unit="selection-bar"]') !== null ||
+					'selection bar missing in select mode'
+				);
 			}
 		}
 	]

@@ -247,6 +247,7 @@
 					recipes={similar.recipes}
 					basis={similar.basis}
 					moreHref={similar.moreHref}
+					listPicker={{}}
 				/>
 		{/if}
 	{/key}

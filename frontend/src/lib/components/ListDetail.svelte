@@ -1,5 +1,6 @@
 <script module lang="ts">
-	import type { RecipeRowData } from './RecipeRow.svelte';
+	import type { RecipeRowData, RowPickerHook } from './RecipeRow.svelte';
+	import type { ListMembership } from '$lib/api/lists';
 
 	export type ListDetailData = {
 		id: string;
@@ -8,25 +9,64 @@
 		recipeCount: number;
 		recipes: RecipeRowData[];
 	};
+
+	/** The selection bar's lists + bulk callbacks — the route owns the IO. */
+	export type ListSelectionTools = {
+		lists: ListMembership[];
+		onAdd: (listId: string, recipeIds: string[]) => void;
+		onCreate: (name: string, recipeIds: string[]) => void;
+		onRemove: (recipeIds: string[]) => void;
+	};
 </script>
 
 <script lang="ts">
 	import RecipeRow from './RecipeRow.svelte';
+	import SelectionBar from './SelectionBar.svelte';
 
 	type Props = {
 		list: ListDetailData;
 		onRename?: (name: string) => void;
 		onDelete?: () => void;
 		onRemoveRecipe?: (recipeId: string) => void;
+		selection?: ListSelectionTools;
+		listPicker?: RowPickerHook;
 	};
 
-	let { list, onRename, onDelete, onRemoveRecipe }: Props = $props();
+	let { list, onRename, onDelete, onRemoveRecipe, selection, listPicker }: Props = $props();
 
 	let mode = $state<'view' | 'rename' | 'confirm'>('view');
 	let editName = $state('');
 	let lastRemoved = $state('');
 	let lastRenamed = $state('');
 	let deleted = $state(false);
+
+	// Selection mode: local to this surface. The row set changing (the route reloads
+	// the list after a mutation) empties the selection.
+	let selectMode = $state(false);
+	let selectedRows = $state<string[]>([]);
+	let bulkRemoved = $state('');
+
+	// Key the clear on the row ids' *value* — an effect on the array itself refires
+	// on unrelated interactions (deep-proxy invalidation) and wipes a live selection.
+	let rowsKey = $derived(list.recipes.map((r) => r.id).join('|'));
+	$effect(() => {
+		void rowsKey;
+		selectedRows = [];
+	});
+
+	function toggleSelectMode() {
+		selectMode = !selectMode;
+		if (!selectMode) selectedRows = [];
+	}
+
+	function toggleRow(id: string, on: boolean) {
+		selectedRows = on ? [...selectedRows, id] : selectedRows.filter((r) => r !== id);
+	}
+
+	function bulkRemove() {
+		bulkRemoved = String(selectedRows.length);
+		selection?.onRemove(selectedRows);
+	}
 
 	function startRename() {
 		editName = list.name;
@@ -65,6 +105,9 @@
 	data-verify-removed={lastRemoved}
 	data-verify-renamed={lastRenamed}
 	data-verify-deleted={deleted ? 'true' : 'false'}
+	data-verify-select-mode={selectMode ? 'true' : 'false'}
+	data-verify-selected={selectedRows.length}
+	data-verify-bulk-removed={bulkRemoved}
 >
 	<nav class="crumb" aria-label="Breadcrumb">
 		<a href="/lists">Lists</a><span class="sep">›</span><span class="here">{list.name}</span>
@@ -111,19 +154,46 @@
 						{list.recipes.length === 1 ? 'recipe' : 'recipes'}
 					</p>
 				</div>
-				{#if !list.isDefault}
+				{#if selection || !list.isDefault}
 					<div class="actions">
-						<button class="btn ghost rename-btn" type="button" onclick={startRename}>
-							Rename
-						</button>
-						<button class="btn ghost delete-btn" type="button" onclick={() => (mode = 'confirm')}>
-							Delete
-						</button>
+						{#if selection}
+							<button
+								class="btn ghost select-toggle"
+								type="button"
+								aria-pressed={selectMode}
+								onclick={toggleSelectMode}
+							>
+								Select
+							</button>
+						{/if}
+						{#if !list.isDefault}
+							<button class="btn ghost rename-btn" type="button" onclick={startRename}>
+								Rename
+							</button>
+							<button class="btn ghost delete-btn" type="button" onclick={() => (mode = 'confirm')}>
+								Delete
+							</button>
+						{/if}
 					</div>
 				{/if}
 			</div>
 		{/if}
 	</header>
+
+	{#if selection && selectMode}
+		<SelectionBar
+			count={selectedRows.length}
+			total={list.recipes.length}
+			allSelected={list.recipes.length > 0 && selectedRows.length === list.recipes.length}
+			lists={selection.lists}
+			onSelectAll={() => (selectedRows = list.recipes.map((r) => r.id))}
+			onClear={() => (selectedRows = [])}
+			onAdd={(listId) => selection?.onAdd(listId, selectedRows)}
+			onCreate={(name) => selection?.onCreate(name, selectedRows)}
+			onRemove={bulkRemove}
+			removeLabel="Remove from this list"
+		/>
+	{/if}
 
 	{#if list.recipes.length === 0}
 		<p class="empty">No recipes in this list yet.</p>
@@ -138,6 +208,10 @@
 					bookAuthor={recipe.bookAuthor}
 					keywords={recipe.keywords}
 					onRemove={() => removeRecipe(recipe.id)}
+					{listPicker}
+					selectable={selectMode}
+					selected={selectedRows.includes(recipe.id)}
+					onSelect={(on) => toggleRow(recipe.id, on)}
 				/>
 			{/each}
 		</ul>

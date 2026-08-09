@@ -1,4 +1,13 @@
 <script module lang="ts">
+	import type { ListPanelApi } from '$lib/api/lists';
+
+	/** Switches on the per-row add-to-list picker; passed through by every surface. */
+	export type RowPickerHook = {
+		api?: ListPanelApi;
+		/** Fired after a successful membership toggle, with the row's recipe id. */
+		onMembershipChange?: (recipeId: string, listId: string, contains: boolean) => void;
+	};
+
 	export type RecipeRowData = {
 		id: string;
 		name: string;
@@ -13,11 +22,16 @@
 <script lang="ts">
 	import { cleanTitle } from '$lib/title';
 	import { keywordHref } from '$lib/api/recipes';
+	import RowListPicker from './RowListPicker.svelte';
 
 	// `contextQuery` carries the originating search (criteria + ordering) into the
 	// recipe link, so the detail page's prev/next follow the search order.
 	// `onKeyword`, when set, intercepts a plain click on a keyword chip to filter
 	// in place (the search page); without it the chip just navigates to its href.
+	// `listPicker` switches on the per-row add-to-list control (self-fetching).
+	// `selectable` puts the row in selection mode: a leading checkbox, reported
+	// through `onSelect` — a deliberate, mode-scoped exception to DESIGN §5's
+	// "no leading number" (the resting row is unchanged).
 	let {
 		id,
 		name,
@@ -27,11 +41,19 @@
 		keywords,
 		contextQuery = '',
 		onRemove,
-		onKeyword
+		onKeyword,
+		listPicker,
+		selectable = false,
+		selected = false,
+		onSelect
 	}: RecipeRowData & {
 		contextQuery?: string;
 		onRemove?: () => void;
 		onKeyword?: (name: string) => void;
+		listPicker?: RowPickerHook;
+		selectable?: boolean;
+		selected?: boolean;
+		onSelect?: (selected: boolean) => void;
 	} = $props();
 
 	// Calibre titles carry a subtitle after a colon; show the clean pre-colon title.
@@ -49,12 +71,30 @@
 	}
 </script>
 
-<li class="row">
+<li class="row" class:selected>
 	<div class="line">
+		{#if selectable}
+			<input
+				class="select"
+				type="checkbox"
+				checked={selected}
+				aria-label={`Select ${name}`}
+				onchange={(e) => onSelect?.(e.currentTarget.checked)}
+			/>
+		{/if}
 		<a class="name" href={`/recipes/${id}${contextQuery ? `?${contextQuery}` : ''}`}>{name}</a>
 		<a class="source" href={`/books/${bookId}`}>
 			{displayTitle}<span class="sep" aria-hidden="true">·</span><span class="author">{bookAuthor}</span>
 		</a>
+		{#if listPicker}
+			<RowListPicker
+				recipeId={id}
+				recipeName={name}
+				api={listPicker.api}
+				onMembershipChange={(listId, contains) =>
+					listPicker?.onMembershipChange?.(id, listId, contains)}
+			/>
+		{/if}
 		{#if onRemove}
 			<button
 				class="remove"
@@ -85,6 +125,18 @@
 	.row {
 		padding: 1rem 0;
 		border-bottom: var(--border);
+	}
+	.row.selected {
+		background: var(--bg-warm);
+	}
+
+	.select {
+		align-self: center;
+		width: 1rem;
+		height: 1rem;
+		margin: 0;
+		accent-color: var(--clay);
+		cursor: pointer;
 	}
 
 	.line {
