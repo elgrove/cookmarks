@@ -241,9 +241,12 @@
 	@media (max-width: 760px) {
 		/* The bar pins to the bottom edge on mobile, so the panel opens upward. */
 		.bar {
-			position: sticky;
+			position: fixed;
 			top: auto;
 			bottom: 0.75rem;
+			left: 0.75rem;
+			right: 0.75rem;
+			margin-bottom: 0;
 		}
 		.panel {
 			top: auto;
