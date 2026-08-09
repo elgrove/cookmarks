@@ -19,7 +19,12 @@ import {
 	semanticSearchResultsSchema,
 	similarRecipesSchema
 } from './recipes';
-import { listDetailSchema, listMembershipSchema, listSummarySchema } from './lists';
+import {
+	bulkListResultSchema,
+	listDetailSchema,
+	listMembershipSchema,
+	listSummarySchema
+} from './lists';
 import { taskRunSchema, reviewQuestionSchema } from './task-runs';
 import { configSchema } from './config';
 import { taskRunAckSchema } from './tasks';
@@ -174,6 +179,17 @@ describe('api wire contract', () => {
 		const { contains, ...rest } = example;
 		const drifted = { ...rest, inList: contains };
 		expect(() => listMembershipSchema.parse(drifted)).toThrow();
+	});
+
+	it('accepts the bulk list result example', () => {
+		expect(() => bulkListResultSchema.parse(load('bulklistresult.example.json'))).not.toThrow();
+	});
+
+	it('rejects a bulk list result example with a drifted field name', () => {
+		const example = load('bulklistresult.example.json');
+		const { recipe_count, ...rest } = example;
+		const drifted = { ...rest, recipeCount: recipe_count };
+		expect(() => bulkListResultSchema.parse(drifted)).toThrow();
 	});
 
 	it('accepts the task-run example', () => {

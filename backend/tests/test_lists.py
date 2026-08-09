@@ -120,6 +120,71 @@ def test_remove_non_member_is_noop(client: TestClient) -> None:
     assert client.delete(f"/api/lists/{list_id}/recipes/{recipe_id}").status_code == 204
 
 
+def test_bulk_add_mixed_memberships(client: TestClient) -> None:
+    """Bulk add over a mix of new and existing memberships counts only the new rows."""
+    ids = _recipe_ids(client)
+    list_id = client.post("/api/lists", json={"name": "Bulk"}).json()["id"]
+    client.post(f"/api/lists/{list_id}/recipes", json={"recipe_id": ids[0]})
+
+    resp = client.post(f"/api/lists/{list_id}/recipes/bulk", json={"recipe_ids": ids})
+    assert resp.status_code == 200
+    assert resp.json() == {"changed": len(ids) - 1, "recipe_count": len(ids)}
+
+
+def test_bulk_remove(client: TestClient) -> None:
+    ids = _recipe_ids(client)
+    list_id = client.post("/api/lists", json={"name": "Bulk"}).json()["id"]
+    client.post(f"/api/lists/{list_id}/recipes/bulk", json={"recipe_ids": ids})
+
+    resp = client.post(
+        f"/api/lists/{list_id}/recipes/bulk-remove", json={"recipe_ids": ids[:2]}
+    )
+    assert resp.status_code == 200
+    assert resp.json() == {"changed": 2, "recipe_count": len(ids) - 2}
+
+
+def test_bulk_remove_absent_is_noop(client: TestClient) -> None:
+    """Removing recipes that aren't in the list changes nothing and still succeeds."""
+    ids = _recipe_ids(client)
+    list_id = client.post("/api/lists", json={"name": "Bulk"}).json()["id"]
+    resp = client.post(
+        f"/api/lists/{list_id}/recipes/bulk-remove", json={"recipe_ids": ids}
+    )
+    assert resp.status_code == 200
+    assert resp.json() == {"changed": 0, "recipe_count": 0}
+
+
+def test_bulk_unknown_recipe_rejects_whole_request(client: TestClient) -> None:
+    ids = _recipe_ids(client)
+    list_id = client.post("/api/lists", json={"name": "Bulk"}).json()["id"]
+    missing = "00000000-0000-4000-8000-000000000000"
+    resp = client.post(
+        f"/api/lists/{list_id}/recipes/bulk", json={"recipe_ids": [ids[0], missing]}
+    )
+    assert resp.status_code == 404
+    # All-or-nothing: the real recipe wasn't added either.
+    assert client.get(f"/api/lists/{list_id}").json()["recipe_count"] == 0
+
+
+def test_bulk_other_users_list_404(
+    client: TestClient, session: Session, act_as: Callable[[str], User]
+) -> None:
+    ids = _recipe_ids(client)
+    mine = client.post("/api/lists", json={"name": "Bulk"}).json()["id"]
+
+    create_user(session, "plain", "plain-password")
+    act_as("plain")
+    resp = client.post(f"/api/lists/{mine}/recipes/bulk", json={"recipe_ids": ids})
+    assert resp.status_code == 404
+
+
+def test_bulk_payload_capped_at_500(client: TestClient) -> None:
+    list_id = client.post("/api/lists", json={"name": "Bulk"}).json()["id"]
+    too_many = ["00000000-0000-4000-8000-000000000000"] * 501
+    resp = client.post(f"/api/lists/{list_id}/recipes/bulk", json={"recipe_ids": too_many})
+    assert resp.status_code == 422
+
+
 def test_list_detail_missing(client: TestClient) -> None:
     missing = "00000000-0000-4000-8000-000000000000"
     assert client.get(f"/api/lists/{missing}").status_code == 404

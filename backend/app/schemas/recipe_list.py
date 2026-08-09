@@ -1,6 +1,6 @@
 import uuid
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.recipe import RecipeSummary
 
@@ -54,6 +54,20 @@ class ListRecipeRef(BaseModel):
     """Request body to add a recipe to a list."""
 
     recipe_id: uuid.UUID
+
+
+class ListRecipeRefs(BaseModel):
+    """Request body naming the recipes for a bulk membership operation."""
+
+    recipe_ids: list[uuid.UUID] = Field(max_length=500)
+
+
+class BulkListResult(BaseModel):
+    """The outcome of a bulk add/remove: rows actually changed (idempotent no-ops
+    excluded) and the list's size afterwards."""
+
+    changed: int
+    recipe_count: int
 
 
 class FavouriteState(BaseModel):

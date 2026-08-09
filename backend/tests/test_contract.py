@@ -24,7 +24,7 @@ from app.schemas.recipe import (
     SemanticSearchResults,
     SimilarRecipes,
 )
-from app.schemas.recipe_list import ListDetail, ListMembership, ListSummary
+from app.schemas.recipe_list import BulkListResult, ListDetail, ListMembership, ListSummary
 from app.schemas.task_run import TaskRunRead
 from app.schemas.tasks import TaskRunAck
 
@@ -195,6 +195,22 @@ def test_recipe_lists_endpoint_keys_match_contract(client: TestClient) -> None:
     recipe_id = _a_recipe_id(client)
     item = client.get(f"/api/recipes/{recipe_id}/lists").json()[0]
     assert set(item.keys()) == set(example.keys())
+
+
+def test_bulk_list_result_model_matches_contract() -> None:
+    example = _example("bulklistresult.example.json")
+    dumped = BulkListResult.model_validate(example).model_dump(mode="json")
+    assert dumped == example
+
+
+def test_bulk_add_endpoint_keys_match_contract(client: TestClient) -> None:
+    example = _example("bulklistresult.example.json")
+    recipe_id = _a_recipe_id(client)
+    list_id = client.post("/api/lists", json={"name": "Bulk"}).json()["id"]
+    body = client.post(
+        f"/api/lists/{list_id}/recipes/bulk", json={"recipe_ids": [recipe_id]}
+    ).json()
+    assert set(body.keys()) == set(example.keys())
 
 
 def test_task_run_model_matches_contract() -> None:
