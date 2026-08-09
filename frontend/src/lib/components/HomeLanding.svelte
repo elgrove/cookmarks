@@ -27,6 +27,15 @@
 			: `/books/${book.id}/read`;
 	}
 
+	/** A book queued to read next — not yet being read, so no resume semantics. */
+	export type UpNextBook = {
+		id: string;
+		title: string;
+		author: string;
+		hasCover: boolean;
+		recipeCount: number;
+	};
+
 	/** A recipe opened recently — the trail back to where reading left off. */
 	export type RecentRecipe = {
 		id: string;
@@ -49,11 +58,13 @@
 		bookOfTheDay,
 		progress = { books: 0, booksRead: 0 },
 		continueReading = [],
+		upNext = [],
 		recentlyRead = []
 	}: {
 		bookOfTheDay: BookOfTheDay | null;
 		progress?: ReadProgress;
 		continueReading?: ContinueBook[];
+		upNext?: UpNextBook[];
 		recentlyRead?: RecentRecipe[];
 	} = $props();
 
@@ -80,6 +91,7 @@
 	data-verify-has-feature={bookOfTheDay ? 'true' : 'false'}
 	data-verify-read-pct={readPct === null ? '' : readPct}
 	data-verify-continue-count={continueReading.length}
+	data-verify-upnext-count={upNext.length}
 	data-verify-recent-count={recentlyRead.length}
 	data-verify-lead={lead}
 >
@@ -141,6 +153,27 @@
 		</section>
 	{:else if lead === 'empty'}
 		<p class="empty">No books yet.</p>
+	{/if}
+
+	{#if upNext.length}
+		<!-- Never the lead: a queued book is a plan, not progress — whatever leads the
+		     page keeps the masthead, and Up next reads as a quieter shelf below it. -->
+		<section class="upnext">
+			<h2 class="label">Up next</h2>
+			<ul class="strip">
+				{#each upNext as book, i (book.id)}
+					<li class="cell" style={`animation-delay: ${Math.min(i * 60, 240)}ms`}>
+						<BookCard
+							id={book.id}
+							title={book.title}
+							author={book.author}
+							hasCover={book.hasCover}
+							recipeCount={book.recipeCount}
+						/>
+					</li>
+				{/each}
+			</ul>
+		</section>
 	{/if}
 
 	{#if recentlyRead.length}
@@ -334,6 +367,18 @@
 		font-style: italic;
 		font-size: 1.4rem;
 		color: var(--muted);
+	}
+
+	/* The queue's shelf: same card language as the continue strip, under a quiet
+	   mono label — a plan for later, not the page's headline. */
+	.upnext {
+		margin-top: 3.5rem;
+		padding-top: 1.5rem;
+		border-top: var(--border);
+	}
+	.upnext h2 {
+		margin: 0 0 1.1rem;
+		font-weight: 400;
 	}
 
 	/* Where reading left off, as a numbered index (DESIGN §4): recipe name leading,

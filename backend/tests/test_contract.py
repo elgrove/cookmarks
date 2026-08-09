@@ -16,6 +16,7 @@ from app.schemas.book import BookFilter, BookReadState, BookSummary, RecipeIndex
 from app.schemas.config import ConfigRead
 from app.schemas.extraction import ReviewQuestion
 from app.schemas.home import HomeData
+from app.schemas.reading_queue import QueuedBook, QueueState
 from app.schemas.recipe import (
     KeywordSummary,
     RecipeDetail,
@@ -24,7 +25,6 @@ from app.schemas.recipe import (
     SemanticSearchResults,
     SimilarRecipes,
 )
-from app.schemas.reading_queue import QueuedBook, QueueState
 from app.schemas.recipe_list import BulkListResult, ListDetail, ListMembership, ListSummary
 from app.schemas.task_run import TaskRunRead
 from app.schemas.tasks import TaskRunAck
