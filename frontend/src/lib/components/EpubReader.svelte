@@ -11,7 +11,8 @@
 		epubUrl,
 		fetchRecipeIndex,
 		reportReading,
-		type ReadingState
+		type ReadingState,
+		type RecipeIndexEntry
 	} from '$lib/api/books';
 	import { toggleFavourite } from '$lib/api/lists';
 	import {
@@ -23,6 +24,7 @@
 	} from '$lib/reader/match';
 	import { resolvedTheme, toggleTheme } from '$lib/theme';
 	import ReaderChrome, { type TocEntry } from './ReaderChrome.svelte';
+	import ReaderNotFound from './ReaderNotFound.svelte';
 	import ReaderRecipePanel, { type PanelAnchor } from './ReaderRecipePanel.svelte';
 
 	type Props = {
@@ -31,15 +33,22 @@
 		author: string;
 		/** How far the book has been read, either way, if it has been opened before. */
 		resume?: ReadingState | null;
+		/** Open at this recipe instead of the resume position — a targeted jump from its page. */
+		startRecipeId?: string | null;
 	};
-	let { bookId, title, author, resume = null }: Props = $props();
+	let { bookId, title, author, resume = null, startRecipeId = null }: Props = $props();
 
 	let host = $state<HTMLDivElement>();
 	let view: FoliateView | null = null;
 	// The book's recipes keyed by normalised name, for matching headings as sections render.
 	let recipeIndex: RecipeNameIndex | null = null;
+	// The same recipes unkeyed — the name index drops duplicate-named recipes, so a
+	// targeted id is resolved against the raw list.
+	let rawIndex: RecipeIndexEntry[] | null = null;
 
-	let status = $state<'loading' | 'error' | 'ready'>('loading');
+	let status = $state<'loading' | 'error' | 'ready' | 'not-found'>('loading');
+	// The name behind a failed targeted jump (null when the id wasn't in the index at all).
+	let missedName = $state<string | null>(null);
 	let toc = $state<TocEntry[]>([]);
 	let currentHref = $state<string | null>(null);
 	let progress = $state(0);
@@ -124,23 +133,31 @@
 	// popover updates the in-book star too.
 	const starSync = new Map<string, () => void>();
 
+	// Cookbook EPUBs rarely use semantic headings — titles are often bold lines (e.g. Calibre's
+	// `<p><b>…</b></p>`) or class-styled paragraphs — so candidates are headings, bold elements
+	// and short paragraphs, with the looser (non-heading) ones held to an exact name match.
+	const TITLE_CANDIDATES = 'h1, h2, h3, h4, h5, h6, b, strong, p';
+
+	/** Match one candidate element against the recipe index, or null. Link-wrapped text is a
+	 *  cross-reference (contents lines, "see also"), never the recipe's own title. */
+	function matchTitleElement(el: HTMLElement, index: RecipeNameIndex): RecipeMatch | null {
+		if (el.closest('a') || el.querySelector('a[href]')) return null;
+		const text = (el.textContent ?? '').trim();
+		if (text.length < 3 || text.length > 90) return null;
+		const isHeading = el.matches('h1, h2, h3, h4, h5, h6');
+		return isHeading ? matchHeading(text, index) : (index.get(normaliseTitle(text)) ?? null);
+	}
+
 	// As each section renders, find the lines that name one of the book's recipes and inject the
 	// controls right after the title. Runs in the (same-origin) content document.
-	// Cookbook EPUBs rarely use semantic headings — titles are often bold lines (e.g. Calibre's
-	// `<p><b>…</b></p>`) — so we consider headings *and* bold elements, exclude cross-reference
-	// links, and require an exact name match on the (looser) bold candidates to avoid false hits.
 	function injectControls(doc: Document) {
 		const index = recipeIndex;
 		if (!index) return;
-		doc.querySelectorAll('h1, h2, h3, h4, h5, h6, b, strong').forEach((node) => {
+		doc.querySelectorAll(TITLE_CANDIDATES).forEach((node) => {
 			const el = node as HTMLElement;
 			if (el.dataset.cmFav) return; // already processed
-			if (el.closest('a')) return; // a linked title is a cross-reference, not the recipe
 			if (el.querySelector('[data-cm-fav]') || el.closest('[data-cm-fav]')) return; // nested dup
-			const text = (el.textContent ?? '').trim();
-			if (text.length < 3 || text.length > 90) return;
-			const isHeading = el.matches('h1, h2, h3, h4, h5, h6');
-			const match = isHeading ? matchHeading(text, index) : (index.get(normaliseTitle(text)) ?? null);
+			const match = matchTitleElement(el, index);
 			if (!match) return;
 			el.dataset.cmFav = match.id;
 
@@ -224,8 +241,8 @@
 		for (const [index, section] of sections.entries()) {
 			if (!section.createDocument) continue;
 			const doc = await section.createDocument();
-			const heading = [...doc.querySelectorAll('h1, h2, h3, h4, h5, h6, b, strong')].find((node) =>
-				matchHeading(node.textContent ?? '', wanted)
+			const heading = [...doc.querySelectorAll(TITLE_CANDIDATES)].find((node) =>
+				matchTitleElement(node as HTMLElement, wanted)
 			);
 			if (!heading) continue;
 			const range = doc.createRange();
@@ -257,6 +274,7 @@
 	}
 
 	function onKeydown(e: KeyboardEvent) {
+		if (status !== 'ready') return;
 		if (e.key === 'ArrowLeft') view?.prev();
 		else if (e.key === 'ArrowRight') view?.next();
 	}
@@ -269,7 +287,10 @@
 				await ensureFoliateView(); // registers the <foliate-view> custom element
 				// Fetch the book's recipe index alongside the EPUB; failure just disables matching.
 				const indexPromise = fetchRecipeIndex(bookId)
-					.then(buildRecipeIndex)
+					.then((entries) => {
+						rawIndex = entries;
+						return buildRecipeIndex(entries);
+					})
 					.catch((e) => {
 						console.warn('recipe index unavailable; matching disabled', e);
 						return null;
@@ -290,7 +311,6 @@
 					const detail = (e as CustomEvent<FoliateRelocateDetail>).detail ?? ({} as FoliateRelocateDetail);
 					if (typeof detail.fraction === 'number') progress = detail.fraction;
 					currentHref = detail.tocItem?.href ?? currentHref;
-					recordPosition(detail.cfi ?? null);
 					panel = null; // a page turn leaves the popover's anchor stale
 				});
 				el.addEventListener('load', (e: Event) => {
@@ -305,20 +325,48 @@
 				await el.open(file);
 				if (cancelled) return;
 
+				// Only genuine reading movement records the position — the same reasons foliate
+				// itself treats as history-worthy. Jumps and layout re-anchoring ('anchor',
+				// 'navigation', 'selection') are not reading, so a targeted arrival, the resume
+				// landing and setStyles re-layouts all leave the stored position alone. The
+				// reason only exists on the renderer's own relocate; the view-level event
+				// strips it.
+				el.renderer.addEventListener('relocate', (e: Event) => {
+					const reason = (e as CustomEvent<{ reason?: string }>).detail?.reason;
+					// The not-found overlay hides the pages, so nothing turned behind it counts.
+					if (status !== 'ready') return;
+					if (reason === 'page' || reason === 'snap' || reason === 'scroll')
+						recordPosition(el.lastLocation?.cfi ?? null);
+				});
+
 				el.renderer.setAttribute('flow', 'paginated');
 				el.renderer.setAttribute('gap', '6%');
 				el.renderer.setAttribute('max-inline-size', '38rem');
 				el.renderer.setAttribute('max-column-count', '2');
 				applyStyles();
 				toc = flattenToc(el.book?.toc);
-				// One position, either way in: the pages resume at whichever is further through
-				// the book — the page they were left on, or the recipe the walk reached.
-				const target = await furthestCfi(
-					resume?.location ?? null,
-					resume?.anchor ? await locateRecipe(el, resume.anchor.name) : null
-				);
-				if (target) await el.goTo(target).catch(() => el.renderer.next());
-				else el.renderer.next(); // render the first page
+				if (startRecipeId) {
+					// A targeted jump from the recipe's own page: it wins over the resume
+					// position, and a miss lands on the not-found state, never a random page.
+					const entry = rawIndex?.find((r) => r.id === startRecipeId) ?? null;
+					const cfi = entry ? await locateRecipe(el, entry.name) : null;
+					if (cancelled) return;
+					if (!cfi) {
+						missedName = entry?.name ?? null;
+						status = 'not-found';
+						return;
+					}
+					await el.goTo(cfi).catch(() => el.renderer.next());
+				} else {
+					// One position, either way in: the pages resume at whichever is further through
+					// the book — the page they were left on, or the recipe the walk reached.
+					const target = await furthestCfi(
+						resume?.location ?? null,
+						resume?.anchor ? await locateRecipe(el, resume.anchor.name) : null
+					);
+					if (target) await el.goTo(target).catch(() => el.renderer.next());
+					else el.renderer.next(); // render the first page
+				}
 				status = 'ready';
 			} catch (err) {
 				if (!cancelled) {
@@ -363,6 +411,15 @@
 		<div class="overlay" class:error={status === 'error'}>
 			{#if status === 'loading'}
 				<p class="msg">Opening the book…</p>
+			{:else if status === 'not-found'}
+				<ReaderNotFound
+					recipeName={missedName}
+					recipeHref={`/recipes/${startRecipeId}`}
+					onOpenAtStart={() => {
+						status = 'ready';
+						view?.renderer.next();
+					}}
+				/>
 			{:else}
 				<p class="msg">This book couldn’t be opened.</p>
 				<a class="back" href={`/books/${bookId}`}>← Back to book</a>

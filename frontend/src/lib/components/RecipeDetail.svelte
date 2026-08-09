@@ -81,6 +81,14 @@
 	{#if lists}
 		<ListPicker {lists} onToggle={onToggleList} onCreate={onCreateList} />
 	{/if}
+	<a
+		class="open-in-book"
+		href={`/books/${recipe.bookId}/read?at=${recipe.id}`}
+		aria-label={`Read “${recipe.name}” in the book`}
+	>
+		<span class="glyph" aria-hidden="true">→</span>
+		<span class="text">Read in book</span>
+	</a>
 {/snippet}
 
 <article
@@ -95,6 +103,7 @@
 	data-verify-context={recipe.context}
 	data-verify-prev={recipe.previous?.id ?? ''}
 	data-verify-next={recipe.next?.id ?? ''}
+	data-verify-open-in-book={`/books/${recipe.bookId}/read?at=${recipe.id}`}
 >
 	<div class="topbar">
 		<nav class="crumb" aria-label="Breadcrumb">
@@ -422,6 +431,32 @@
 		gap: 0.6rem;
 		margin-top: 1.3rem;
 	}
+	.open-in-book {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.45rem;
+		font-family: var(--f-grotesk);
+		font-weight: 600;
+		font-size: 0.9rem;
+		padding: 0.7rem 1rem;
+		border-radius: 3px;
+		color: var(--ink);
+		border: 1px solid var(--line-strong);
+		text-decoration: none;
+		transition:
+			border-color 0.18s var(--ease-out),
+			color 0.18s var(--ease-out);
+	}
+	.open-in-book:hover {
+		border-color: var(--clay);
+		color: var(--clay-deep);
+	}
+	.open-in-book .glyph {
+		color: var(--clay);
+		font-size: 1rem;
+		line-height: 1;
+	}
+
 	/* Yield heads the ingredients column in the image layout. */
 	.yield-lead {
 		margin: 0 0 0.85rem;

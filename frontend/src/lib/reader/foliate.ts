@@ -19,6 +19,10 @@ export interface FoliateRenderer {
 	setStyles?(css: string): void;
 	setAttribute(name: string, value: string): void;
 	next(): void;
+	/** The renderer's own relocate events carry a `reason` the view-level event strips
+	 *  ('page' | 'snap' | 'scroll' for reading movement; 'anchor' | 'navigation' |
+	 *  'selection' for jumps and layout re-anchoring). */
+	addEventListener(type: 'relocate', listener: (e: Event) => void): void;
 }
 
 /** One spine document. `createDocument` parses it without rendering, which is how a
@@ -43,6 +47,8 @@ export interface FoliateView extends HTMLElement {
 	goRight(): Promise<void>;
 	book: FoliateBook;
 	renderer: FoliateRenderer;
+	/** The location the view last computed for a relocate (see view.js #onRelocate). */
+	lastLocation?: { cfi?: string } | null;
 	/** The canonical location of a range within the section at `index`. */
 	getCFI(index: number, range: Range): string;
 }

@@ -348,6 +348,21 @@ const unit: VerifiableUnit<Props> = {
 			}
 		},
 		{
+			id: 'open-in-book-link',
+			description: 'the actions row links into the reader at this recipe, contract-matched and named',
+			check: ({ root, contract, props }) => {
+				const want = `/books/${props.recipe.bookId}/read?at=${props.recipe.id}`;
+				if (contract['open-in-book'] !== want)
+					return `contract open-in-book=${contract['open-in-book']} expected ${want}`;
+				const a = root.querySelector('a.open-in-book');
+				if (!a) return 'no open-in-book link in the actions row';
+				if (a.getAttribute('href') !== want)
+					return `href=${a.getAttribute('href')} expected ${want}`;
+				const name = a.getAttribute('aria-label')?.trim() ?? a.textContent?.trim() ?? '';
+				return name.length > 0 || 'open-in-book link has no accessible name';
+			}
+		},
+		{
 			id: 'no-recipe-read-state',
 			description:
 				'a recipe carries no read state of its own — reading is a property of books now',
