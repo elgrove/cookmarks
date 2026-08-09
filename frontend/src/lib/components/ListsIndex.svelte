@@ -3,6 +3,8 @@
 
 	export type ListsIndexProps = {
 		lists: ListSummary[];
+		/** Books on the reading queue — drives the pinned queue card. */
+		queueCount?: number;
 		onCreate?: (name: string) => void;
 		onRename?: (id: string, name: string) => void;
 		onDelete?: (id: string) => void;
@@ -12,7 +14,7 @@
 <script lang="ts">
 	import ListCard from './ListCard.svelte';
 
-	let { lists, onCreate, onRename, onDelete }: ListsIndexProps = $props();
+	let { lists, queueCount = 0, onCreate, onRename, onDelete }: ListsIndexProps = $props();
 
 	let search = $state('');
 	let newName = $state('');
@@ -78,6 +80,7 @@
 	data-verify-created={lastCreated}
 	data-verify-renamed={lastRenamed}
 	data-verify-deleted={lastDeleted}
+	data-verify-queue-count={queueCount}
 >
 	<header class="head">
 		<h1 class="display">Lists</h1>
@@ -109,6 +112,17 @@
 		</p>
 	{:else}
 		<ul class="grid">
+			{#if !query}
+				<!-- The queue holds books, not recipes: a distinct clay-accented card, pinned
+				     ahead of every list (search filters lists by name, so it steps aside). -->
+				<li class="cell">
+					<a class="queue-card" href="/lists/reading-queue" aria-label="Open the reading queue">
+						<span class="queue-label mono">Up next</span>
+						<span class="queue-name">Reading queue</span>
+						<span class="queue-count mono">{queueCount} {queueCount === 1 ? 'book' : 'books'}</span>
+					</a>
+				</li>
+			{/if}
 			{#each visible as list, i (list.id)}
 				<li class="cell" style={`animation-delay: ${Math.min(i * 30, 600)}ms`}>
 					<ListCard
@@ -362,6 +376,66 @@
 	}
 	.cell {
 		animation: fadeUp 0.6s var(--ease-out) both;
+	}
+
+	/* The queue card: books, not recipes — clay ground and ivory type so it reads as
+	   its own thing, pinned ahead of the lists. */
+	.queue-card {
+		display: flex;
+		flex-direction: column;
+		justify-content: space-between;
+		gap: 1rem;
+		height: 100%;
+		min-height: 8rem;
+		padding: 1.25rem;
+		background: var(--clay);
+		border: 1px solid var(--clay);
+		border-radius: 4px;
+		text-decoration: none;
+		transition: background 0.18s var(--ease-out);
+	}
+	.queue-card:hover {
+		background: var(--clay-deep);
+	}
+	.queue-label {
+		font-size: 0.68rem;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+		color: rgba(255, 252, 245, 0.75);
+	}
+	.queue-name {
+		font-family: var(--f-serif);
+		font-size: 1.3rem;
+		line-height: 1.2;
+		color: #fffcf5;
+	}
+	.queue-count {
+		font-size: 0.72rem;
+		letter-spacing: 0.04em;
+		color: rgba(255, 252, 245, 0.75);
+	}
+
+	/* Mobile: the queue card joins the hairline-row treatment of the list cards. */
+	@media (max-width: 560px) {
+		.queue-card {
+			height: auto;
+			min-height: 0;
+			flex-direction: row;
+			align-items: baseline;
+			gap: 0.75rem;
+			padding: 0.85rem 0.6rem;
+			border-radius: 3px;
+		}
+		.queue-label {
+			display: none;
+		}
+		.queue-name {
+			font-size: 1.1rem;
+			flex: 1;
+		}
+		.queue-count {
+			white-space: nowrap;
+		}
 	}
 
 	.empty {

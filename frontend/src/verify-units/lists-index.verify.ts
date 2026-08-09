@@ -39,8 +39,8 @@ const unit: VerifiableUnit<Props> = {
 	fixtures: [
 		{
 			id: 'populated',
-			description: 'a grid of lists, Favourites first',
-			props: { lists }
+			description: 'a grid of lists, the queue card pinned first, Favourites next',
+			props: { lists, queueCount: 3 }
 		},
 		{
 			id: 'empty',
@@ -122,6 +122,18 @@ const unit: VerifiableUnit<Props> = {
 				if (contract.count !== String(props.lists.length)) return `count=${contract.count}`;
 				if (contract['default-first'] !== 'true') return 'Favourites not pinned first';
 				return contract.first === 'Favourites' || `first=${contract.first}`;
+			}
+		},
+		{
+			id: 'queue-card-pinned-first',
+			description: 'the reading-queue card leads the grid, ahead of the default list',
+			onlyFixtures: ['populated'],
+			check: ({ contract, root }) => {
+				if (contract['queue-count'] !== '3') return `queue-count=${contract['queue-count']}`;
+				const first = root.querySelector('.grid > li');
+				if (!first?.querySelector('.queue-card')) return 'first grid cell is not the queue card';
+				const href = first.querySelector('a')?.getAttribute('href') ?? '';
+				return href === '/lists/reading-queue' || `queue card href=${href}`;
 			}
 		},
 		{
