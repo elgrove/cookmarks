@@ -8,12 +8,14 @@ type Props = {
 	onDelete?: (opts: { exclude: boolean }) => void;
 	onMarkBookRead?: () => void;
 	onResetProgress?: () => void;
+	onToggleQueue?: () => void;
 };
 
 const DELETE_BTN = '.delete-btn';
 const CONFIRM_DELETE = '.confirm-delete';
 const EXCLUDE = '.exclude input';
 const MARK_READ = '.mark-read';
+const QUEUE_TOGGLE = '.queue-toggle';
 const RESET_BTN = '.reset-btn';
 const CONFIRM_RESET = '.confirm-reset';
 
@@ -36,6 +38,7 @@ const bookSchema = z.object({
 	added: z.string().nullable(),
 	keywords: z.array(z.string()),
 	recipes: z.array(recipeSchema),
+	queued: z.boolean(),
 	reading: z
 		.object({
 			mode: z.enum(['book', 'recipes']),
@@ -81,6 +84,7 @@ const pastaGrannies: BookDetailData = {
 	added: '2025-05-22T20:56:10Z',
 	keywords: ['Italian', 'Pasta', 'Regional', 'Traditional'],
 	recipes: recipes(10),
+	queued: false,
 	reading: null,
 	resumeRecipe: { id: 'r4', name: "Margherita's Cavati with Spring Vegetables" }
 };
@@ -281,6 +285,18 @@ const unit: VerifiableUnit<Props> = {
 			}
 		},
 		{
+			id: 'queue-add',
+			description: 'an unqueued book offers "Queue to read"; clicking fires the toggle',
+			props: { book: pastaGrannies, onToggleQueue: () => {} },
+			act: ({ click }) => click(QUEUE_TOGGLE)
+		},
+		{
+			id: 'queue-remove',
+			description: 'a queued book offers "Remove from queue"; clicking fires the toggle',
+			props: { book: { ...pastaGrannies, queued: true }, onToggleQueue: () => {} },
+			act: ({ click }) => click(QUEUE_TOGGLE)
+		},
+		{
 			id: 'delete-confirm',
 			description: 'the delete action opens a confirm step with the exclusion box unticked',
 			props: { book: pastaGrannies, onDelete: () => {} },
@@ -329,6 +345,34 @@ const unit: VerifiableUnit<Props> = {
 		}
 	],
 	invariants: [
+		{
+			id: 'queue-add-wires',
+			description: 'the unqueued button is labelled to queue and echoes the queue intent',
+			onlyFixtures: ['queue-add'],
+			check: ({ contract, root }) => {
+				if (contract.queued !== 'false') return `queued=${contract.queued}`;
+				const btn = root.querySelector(QUEUE_TOGGLE);
+				if (!btn) return 'no queue toggle rendered';
+				if (!(btn.textContent ?? '').includes('Queue to read'))
+					return `label="${(btn.textContent ?? '').trim()}"`;
+				return contract['queue-action'] === 'queue' || `queue-action=${contract['queue-action']}`;
+			}
+		},
+		{
+			id: 'queue-remove-wires',
+			description: 'the queued button is labelled to remove and echoes the unqueue intent',
+			onlyFixtures: ['queue-remove'],
+			check: ({ contract, root }) => {
+				if (contract.queued !== 'true') return `queued=${contract.queued}`;
+				const btn = root.querySelector(QUEUE_TOGGLE);
+				if (!btn) return 'no queue toggle rendered';
+				if (!(btn.textContent ?? '').includes('Remove from queue'))
+					return `label="${(btn.textContent ?? '').trim()}"`;
+				return (
+					contract['queue-action'] === 'unqueue' || `queue-action=${contract['queue-action']}`
+				);
+			}
+		},
 		{
 			id: 'contract-id',
 			description: 'the data-verify-id contract reports the book id',

@@ -4,6 +4,7 @@
 	import { page } from '$app/stores';
 	import BookDetail, { type BookDetailData } from '$lib/components/BookDetail.svelte';
 	import { deleteBook, fetchBookDetail, markBookRead, resetBookProgress } from '$lib/api/books';
+	import { queueBook, unqueueBook } from '$lib/api/reading-queue';
 	import { cleanTitle, pageTitle } from '$lib/title';
 	import { currentUser } from '$lib/auth';
 	import {
@@ -60,6 +61,7 @@
 					name: r.name,
 					keywords: r.keywords
 				})),
+				queued: b.queued,
 				reading: b.reading
 					? {
 							mode: b.reading.mode,
@@ -94,6 +96,17 @@
 		await load();
 	}
 
+	// The server's returned state is authoritative — the button label follows it.
+	async function toggleQueue() {
+		if (!book) return;
+		try {
+			const state = book.queued ? await unqueueBook(book.id) : await queueBook(book.id);
+			book.queued = state.queued;
+		} catch (err) {
+			console.error('failed to toggle reading queue', err);
+		}
+	}
+
 	async function answerReview(value: string) {
 		if (!book || !latestRun) return;
 		const run = latestRun;
@@ -119,6 +132,7 @@
 		onAnswer={answerReview}
 		onMarkBookRead={() => setBookRead(true)}
 		onResetProgress={() => setBookRead(false)}
+		onToggleQueue={toggleQueue}
 		onExtract={$currentUser?.is_admin
 			? async () => {
 					await triggerExtraction(book!.id);
