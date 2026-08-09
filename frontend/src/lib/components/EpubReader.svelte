@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import {
 		ensureFoliateView,
+		furthestCfi,
 		type FoliateRelocateDetail,
 		type FoliateTOCItem,
 		type FoliateView
@@ -216,13 +217,15 @@
 	 *  left off. Sections are parsed, not rendered, and the scan stops at the first hit;
 	 *  a recipe whose title the book doesn't spell the same way simply isn't found. */
 	async function locateRecipe(el: FoliateView, name: string): Promise<string | null> {
-		const wanted = normaliseTitle(name);
+		// Matched the same way as headings are as they render, so a recipe the book titles
+		// slightly differently ("Plantain" for "Plantain (fry)") still resolves.
+		const wanted = buildRecipeIndex([{ id: '', name, is_favourite: false }]);
 		const sections = el.book?.sections ?? [];
 		for (const [index, section] of sections.entries()) {
 			if (!section.createDocument) continue;
 			const doc = await section.createDocument();
-			const heading = [...doc.querySelectorAll('h1, h2, h3, h4, h5, h6, b, strong')].find(
-				(node) => normaliseTitle(node.textContent ?? '') === wanted
+			const heading = [...doc.querySelectorAll('h1, h2, h3, h4, h5, h6, b, strong')].find((node) =>
+				matchHeading(node.textContent ?? '', wanted)
 			);
 			if (!heading) continue;
 			const range = doc.createRange();
@@ -308,14 +311,12 @@
 				el.renderer.setAttribute('max-column-count', '2');
 				applyStyles();
 				toc = flattenToc(el.book?.toc);
-				// The pages resume where they were left; arriving from the recipe walk, they
-				// open at the recipe it reached instead — one position, either way in.
-				const target =
-					resume?.mode === 'book' && resume.location
-						? resume.location
-						: resume?.anchor
-							? await locateRecipe(el, resume.anchor.name)
-							: null;
+				// One position, either way in: the pages resume at whichever is further through
+				// the book — the page they were left on, or the recipe the walk reached.
+				const target = await furthestCfi(
+					resume?.location ?? null,
+					resume?.anchor ? await locateRecipe(el, resume.anchor.name) : null
+				);
 				if (target) await el.goTo(target).catch(() => el.renderer.next());
 				else el.renderer.next(); // render the first page
 				status = 'ready';

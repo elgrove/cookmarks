@@ -52,3 +52,16 @@ export interface FoliateView extends HTMLElement {
 export async function ensureFoliateView(): Promise<void> {
 	await import('$lib/vendor/foliate-js/view.js');
 }
+
+/** Whichever of two locations sits later in the book. Null-tolerant, and on an unparseable
+ *  CFI falls back to `a` — a resume that lands somewhere beats one that throws. */
+export async function furthestCfi(a: string | null, b: string | null): Promise<string | null> {
+	if (!a || !b) return a ?? b;
+	try {
+		const { compare } = await import('$lib/vendor/foliate-js/epubcfi.js');
+		return compare(a, b) >= 0 ? a : b;
+	} catch (e) {
+		console.warn('could not compare reading locations', e);
+		return a;
+	}
+}
