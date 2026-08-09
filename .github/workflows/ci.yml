@@ -19,6 +19,14 @@ jobs:
       - run: uv sync
       - run: uv run ruff check .
       - run: uv run ty check
+      # Two branches autogenerating off the same base merge cleanly in git but leave
+      # multiple Alembic heads, which kills the prod container's `upgrade head` at
+      # start — fail here instead.
+      - name: Single Alembic head
+        run: |
+          heads="$(uv run python -m alembic heads)"
+          echo "$heads"
+          test "$(echo "$heads" | wc -l)" -eq 1
       - run: uv run python -m pytest
 
   frontend:
