@@ -256,16 +256,7 @@
 		);
 	}
 
-	// Arriving at a targeted recipe is not reading: the first relocate after the jump is
-	// swallowed so it moves neither the anchor nor the location. Page turns after it report
-	// as normal.
-	let suppressNextReport = false;
-
 	function recordPosition(location: string | null) {
-		if (suppressNextReport) {
-			suppressNextReport = false;
-			return;
-		}
 		pending = { recipe_id: reachedRecipeId(), location };
 		if (Date.now() - lastSaved >= SAVE_INTERVAL_MS) flushPosition();
 	}
@@ -304,7 +295,6 @@
 					const detail = (e as CustomEvent<FoliateRelocateDetail>).detail ?? ({} as FoliateRelocateDetail);
 					if (typeof detail.fraction === 'number') progress = detail.fraction;
 					currentHref = detail.tocItem?.href ?? currentHref;
-					recordPosition(detail.cfi ?? null);
 					panel = null; // a page turn leaves the popover's anchor stale
 				});
 				el.addEventListener('load', (e: Event) => {
@@ -318,6 +308,18 @@
 				recipeIndex = await indexPromise;
 				await el.open(file);
 				if (cancelled) return;
+
+				// Only genuine reading movement records the position — the same reasons foliate
+				// itself treats as history-worthy. Jumps and layout re-anchoring ('anchor',
+				// 'navigation', 'selection') are not reading, so a targeted arrival, the resume
+				// landing and setStyles re-layouts all leave the stored position alone. The
+				// reason only exists on the renderer's own relocate; the view-level event
+				// strips it.
+				el.renderer.addEventListener('relocate', (e: Event) => {
+					const reason = (e as CustomEvent<{ reason?: string }>).detail?.reason;
+					if (reason === 'page' || reason === 'snap' || reason === 'scroll')
+						recordPosition(el.lastLocation?.cfi ?? null);
+				});
 
 				el.renderer.setAttribute('flow', 'paginated');
 				el.renderer.setAttribute('gap', '6%');
@@ -338,7 +340,6 @@
 						status = 'not-found';
 						return;
 					}
-					suppressNextReport = true;
 					await el.goTo(cfi).catch(() => el.renderer.next());
 				} else {
 					// One position, either way in: the pages resume at whichever is further through
