@@ -1,7 +1,7 @@
 """reading queue items
 
 Revision ID: 219faab92061
-Revises: c7d8e9f0a1b2
+Revises: 043eb01521db
 Create Date: 2026-08-09 21:08:47.862829
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = '219faab92061'
-down_revision: Union[str, Sequence[str], None] = 'c7d8e9f0a1b2'
+down_revision: Union[str, Sequence[str], None] = '043eb01521db'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
