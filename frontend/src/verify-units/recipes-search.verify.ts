@@ -159,6 +159,34 @@ const unit: VerifiableUnit<Props> = {
 			}
 		},
 		{
+			id: 'select-mode',
+			description: 'toggling Select puts every result row behind a checkbox and shows the bar',
+			props: {
+				status: 'results',
+				criteria: { q: 'dal', limit: 2, offset: 0 },
+				results: { total: 5, items: twoResults, facets: chips },
+				keywords: chips,
+				selection: { lists: [], onAdd: () => {}, onCreate: () => {} }
+			},
+			act: ({ click }) => click('.select-toggle')
+		},
+		{
+			id: 'select-clears-on-search',
+			description: 'a fresh search (here: narrowing by a chip) empties the selection',
+			props: {
+				status: 'results',
+				criteria: { q: 'dal', limit: 2, offset: 0 },
+				results: { total: 5, items: twoResults, facets: chips },
+				keywords: chips,
+				selection: { lists: [], onAdd: () => {}, onCreate: () => {} }
+			},
+			act: ({ click }) => {
+				click('.select-toggle');
+				click('.rows .row input.select');
+				click(CHIP);
+			}
+		},
+		{
 			id: 'long-name',
 			description: 'probe: an overlong unicode name with many keywords renders in full',
 			probe: true,
@@ -351,6 +379,38 @@ const unit: VerifiableUnit<Props> = {
 			check: ({ contract }) =>
 				(contract.mode === 'semantic' && contract.query === 'something warming') ||
 				`mode=${contract.mode} query=${contract.query}`
+		},
+		{
+			id: 'select-mode-rows',
+			description: 'select mode reports itself and puts a checkbox on every result row',
+			onlyFixtures: ['select-mode'],
+			check: ({ contract, root }) => {
+				if (contract['select-mode'] !== 'true') return `select-mode=${contract['select-mode']}`;
+				const rows = root.querySelectorAll('.rows .row').length;
+				const boxes = root.querySelectorAll('.rows .row input.select').length;
+				if (boxes !== rows) return `${boxes} checkboxes for ${rows} rows`;
+				return (
+					root.querySelector('[data-verify-unit="selection-bar"]') !== null ||
+					'selection bar missing in select mode'
+				);
+			}
+		},
+		{
+			id: 'no-checkboxes-out-of-mode',
+			description: 'outside select mode no result row exposes a checkbox',
+			onlyFixtures: ['results'],
+			check: ({ root }) =>
+				root.querySelectorAll('.rows .row input.select').length === 0 ||
+				'checkboxes rendered outside select mode'
+		},
+		{
+			id: 'fresh-search-clears-selection',
+			description: 'a fresh search empties the selection while staying in select mode',
+			onlyFixtures: ['select-clears-on-search'],
+			check: ({ contract }) => {
+				if (contract['select-mode'] !== 'true') return `select-mode=${contract['select-mode']}`;
+				return contract.selected === '0' || `selected=${contract.selected}`;
+			}
 		},
 		{
 			id: 'intentional-fail',

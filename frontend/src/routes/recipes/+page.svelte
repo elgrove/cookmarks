@@ -9,6 +9,12 @@
 	import SimilarBrowse, { type SimilarBrowseData } from '$lib/components/SimilarBrowse.svelte';
 	import { fetchBookFilters } from '$lib/api/books';
 	import {
+		bulkAddToList,
+		createList,
+		fetchLists,
+		type ListMembership
+	} from '$lib/api/lists';
+	import {
 		criteriaFromParams,
 		criteriaToParams,
 		fetchKeywords,
@@ -46,6 +52,44 @@
 	// The global most-used keywords, shown on the resting state. Cached on mount
 	// so we can restore them when the search is cleared back to resting.
 	let globalKeywords: KeywordSummary[] = [];
+
+	// The selection bar's lists (membership ticks are suppressed there, so a flat
+	// contains:false mapping of the user's lists is all it needs).
+	let barLists = $state<ListMembership[]>([]);
+
+	async function loadBarLists(): Promise<void> {
+		try {
+			const ls = await fetchLists();
+			barLists = ls.map((l) => ({
+				id: l.id,
+				name: l.name,
+				is_default: l.is_default,
+				contains: false
+			}));
+		} catch (err) {
+			console.error('failed to load lists for selection', err);
+		}
+	}
+
+	async function bulkAdd(listId: string, recipeIds: string[]): Promise<void> {
+		try {
+			await bulkAddToList(listId, recipeIds);
+		} catch (err) {
+			console.error('bulk add failed', err);
+		}
+	}
+
+	async function bulkCreate(name: string, recipeIds: string[]): Promise<void> {
+		try {
+			const created = await createList(name);
+			await bulkAddToList(created.id, recipeIds);
+			await loadBarLists();
+		} catch (err) {
+			console.error('bulk create failed', err);
+		}
+	}
+
+	const selectionTools = $derived({ lists: barLists, onAdd: bulkAdd, onCreate: bulkCreate });
 
 	// Monotonic guard: drop stale responses so a slow earlier search (of either
 	// mode) can't overwrite the results of a newer one.
@@ -189,6 +233,8 @@
 	onMount(() => {
 		// These requests are independent — fire them concurrently. The search in
 		// particular depends on neither the books nor the keywords.
+		void loadBarLists();
+
 		fetchBookFilters()
 			.then((bs) => {
 				books = bs
@@ -223,7 +269,7 @@
 
 {#if inSimilarMode}
 	{#if similarBrowse}
-		<SimilarBrowse {...similarBrowse} />
+		<SimilarBrowse {...similarBrowse} selection={selectionTools} listPicker={{}} />
 	{:else if similarStatus === 'error'}
 		<div class="status"><p class="msg">Couldn’t load similar recipes.</p></div>
 	{:else}
@@ -241,6 +287,8 @@
 		criteria={initialCriteria}
 		onSearch={run}
 		onSemanticSearch={runSemantic}
+		selection={selectionTools}
+		listPicker={{}}
 	/>
 {/if}
 

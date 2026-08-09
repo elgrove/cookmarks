@@ -3,16 +3,74 @@
 	import { goto } from '$app/navigation';
 	import ListDetail, { type ListDetailData } from '$lib/components/ListDetail.svelte';
 	import {
+		bulkAddToList,
+		bulkRemoveFromList,
+		createList,
 		deleteList,
 		fetchListDetail,
+		fetchLists,
 		removeRecipeFromList,
-		renameList
+		renameList,
+		type ListMembership
 	} from '$lib/api/lists';
 	import { pageTitle } from '$lib/title';
 
 	let status = $state<'loading' | 'error' | 'ready'>('loading');
 	let list = $state<ListDetailData | null>(null);
 	let seq = 0;
+
+	// The selection bar's lists (ticks suppressed there — a flat mapping suffices).
+	let barLists = $state<ListMembership[]>([]);
+
+	async function loadBarLists(): Promise<void> {
+		try {
+			const ls = await fetchLists();
+			barLists = ls.map((l) => ({
+				id: l.id,
+				name: l.name,
+				is_default: l.is_default,
+				contains: false
+			}));
+		} catch (err) {
+			console.error('failed to load lists for selection', err);
+		}
+	}
+
+	async function bulkAdd(listId: string, recipeIds: string[]): Promise<void> {
+		try {
+			await bulkAddToList(listId, recipeIds);
+		} catch (err) {
+			console.error('bulk add failed', err);
+		}
+	}
+
+	async function bulkCreate(name: string, recipeIds: string[]): Promise<void> {
+		try {
+			const created = await createList(name);
+			await bulkAddToList(created.id, recipeIds);
+			await loadBarLists();
+		} catch (err) {
+			console.error('bulk create failed', err);
+		}
+	}
+
+	async function bulkRemove(recipeIds: string[]): Promise<void> {
+		const id = $page.params.id;
+		if (!id) return;
+		try {
+			await bulkRemoveFromList(id, recipeIds);
+			await load(id);
+		} catch (err) {
+			console.error('bulk remove failed', err);
+		}
+	}
+
+	const selectionTools = $derived({
+		lists: barLists,
+		onAdd: bulkAdd,
+		onCreate: bulkCreate,
+		onRemove: bulkRemove
+	});
 
 	async function load(id: string) {
 		const mine = ++seq;
@@ -81,6 +139,10 @@
 		else status = 'error';
 	});
 
+	$effect(() => {
+		void loadBarLists();
+	});
+
 	const docTitle = $derived(pageTitle(list?.name));
 </script>
 
@@ -89,7 +151,14 @@
 </svelte:head>
 
 {#if list}
-	<ListDetail {list} onRename={rename} onDelete={remove} onRemoveRecipe={removeRecipe} />
+	<ListDetail
+		{list}
+		onRename={rename}
+		onDelete={remove}
+		onRemoveRecipe={removeRecipe}
+		selection={selectionTools}
+		listPicker={{}}
+	/>
 {:else if status === 'loading'}
 	<div class="status"><p class="msg">Loading list…</p></div>
 {:else}

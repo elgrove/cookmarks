@@ -1,10 +1,18 @@
 <script module lang="ts">
 	import type { KeywordSummary, RecipeSearchResults, SearchCriteria, SortKey } from '$lib/api/recipes';
+	import type { ListMembership, ListPanelApi } from '$lib/api/lists';
 
 	export type SearchStatus = 'resting' | 'loading' | 'results' | 'empty' | 'error';
 	// Which search the box last ran. Keyword = literal match shaped by the filters;
 	// semantic = ranked by meaning, with the filters set aside.
 	export type SearchMode = 'keyword' | 'semantic';
+
+	/** The selection bar's lists + bulk callbacks — the route owns the IO. */
+	export type SelectionTools = {
+		lists: ListMembership[];
+		onAdd: (listId: string, recipeIds: string[]) => void;
+		onCreate: (name: string, recipeIds: string[]) => void;
+	};
 
 	export type RecipesSearchProps = {
 		status?: SearchStatus;
@@ -19,11 +27,16 @@
 		criteria?: SearchCriteria;
 		onSearch?: (criteria: SearchCriteria) => void;
 		onSemanticSearch?: (query: string) => void;
+		/** Enables select mode over the results. */
+		selection?: SelectionTools;
+		/** Switches on the per-row add-to-list picker. */
+		listPicker?: { api?: ListPanelApi };
 	};
 </script>
 
 <script lang="ts">
 	import RecipeRow from './RecipeRow.svelte';
+	import SelectionBar from './SelectionBar.svelte';
 	import { searchContextQuery } from '$lib/api/recipes';
 	import { cleanTitle } from '$lib/title';
 
@@ -37,7 +50,9 @@
 		authors = [],
 		criteria = {},
 		onSearch,
-		onSemanticSearch
+		onSemanticSearch,
+		selection,
+		listPicker
 	}: RecipesSearchProps = $props();
 
 	const sortOptions: { key: SortKey; label: string }[] = [
@@ -70,6 +85,21 @@
 
 	let active = $derived(Boolean(query.trim() || selected.length || bookId || author));
 	let isSemantic = $derived(searchMode === 'semantic');
+
+	// Selection mode: local to this surface, cleared whenever the row set changes
+	// (a new search, a chip, a filter, prev/next — they all route through
+	// emitKeyword / runSemantic).
+	let selectMode = $state(false);
+	let selectedRows = $state<string[]>([]);
+
+	function toggleSelectMode(): void {
+		selectMode = !selectMode;
+		if (!selectMode) selectedRows = [];
+	}
+
+	function toggleRow(id: string, on: boolean): void {
+		selectedRows = on ? [...selectedRows, id] : selectedRows.filter((r) => r !== id);
+	}
 
 	// Mobile collapses the book/author/sort/keyword controls behind a "Filters"
 	// disclosure to save vertical space; the count keeps applied filters visible
@@ -201,6 +231,7 @@
 	// filter, the magnifier) routes through here and switches the box to keyword
 	// mode, so the filters always describe what's on screen.
 	function emitKeyword(resetOffset = true): void {
+		selectedRows = [];
 		searchMode = 'keyword';
 		if (resetOffset) {
 			offset = 0;
@@ -224,6 +255,7 @@
 	// mode (the lightbulb / Enter-on-the-idea side). Disabled while the box is empty.
 	function runSemantic(): void {
 		if (!query.trim()) return;
+		selectedRows = [];
 		// Cancel any pending debounced keyword search from earlier typing.
 		clearTimeout(debounce);
 		searchMode = 'semantic';
@@ -300,6 +332,8 @@
 	data-verify-book={bookId}
 	data-verify-author={author}
 	data-verify-sort={sort}
+	data-verify-select-mode={selectMode ? 'true' : 'false'}
+	data-verify-selected={selectedRows.length}
 >
 	<header class="head">
 		<h1 class="display">Recipes</h1>
@@ -468,13 +502,37 @@
 				{isSemantic ? 'No recipes match your description.' : 'No recipes match your search.'}
 			</p>
 		{:else}
-			<p class="count mono">
-				{#if isSemantic}
-					{results.total} {results.total === 1 ? 'result' : 'results'} · most relevant first
-				{:else}
-					{rangeStart}–{rangeEnd} of {results.total}
+			<div class="results-head">
+				<p class="count mono">
+					{#if isSemantic}
+						{results.total} {results.total === 1 ? 'result' : 'results'} · most relevant first
+					{:else}
+						{rangeStart}–{rangeEnd} of {results.total}
+					{/if}
+				</p>
+				{#if selection}
+					<button
+						class="select-toggle"
+						type="button"
+						aria-pressed={selectMode}
+						onclick={toggleSelectMode}
+					>
+						Select
+					</button>
 				{/if}
-			</p>
+			</div>
+			{#if selection && selectMode}
+				<SelectionBar
+					count={selectedRows.length}
+					total={results.items.length}
+					allSelected={results.items.length > 0 && selectedRows.length === results.items.length}
+					lists={selection.lists}
+					onSelectAll={() => (selectedRows = results.items.map((r) => r.id))}
+					onClear={() => (selectedRows = [])}
+					onAdd={(listId) => selection?.onAdd(listId, selectedRows)}
+					onCreate={(name) => selection?.onCreate(name, selectedRows)}
+				/>
+			{/if}
 			<ul class="rows">
 				{#each results.items as r (r.id)}
 					<RecipeRow
@@ -486,6 +544,10 @@
 						keywords={r.keywords}
 						contextQuery={isSemantic ? '' : contextQuery}
 						onKeyword={narrowByKeyword}
+						{listPicker}
+						selectable={selectMode}
+						selected={selectedRows.includes(r.id)}
+						onSelect={(on) => toggleRow(r.id, on)}
 					/>
 				{/each}
 			</ul>
@@ -759,6 +821,37 @@
 	.count {
 		color: var(--muted);
 		margin: 0 0 0.5rem;
+	}
+
+	.results-head {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 1rem;
+	}
+
+	.select-toggle {
+		font-family: var(--f-grotesk);
+		font-weight: 600;
+		font-size: 0.8rem;
+		color: var(--ink);
+		background: none;
+		border: var(--border);
+		border-radius: 3px;
+		padding: 0.35rem 0.75rem;
+		cursor: pointer;
+		transition:
+			border-color 0.16s var(--ease-out),
+			background 0.16s var(--ease-out),
+			color 0.16s var(--ease-out);
+	}
+	.select-toggle:hover {
+		border-color: var(--clay);
+	}
+	.select-toggle[aria-pressed='true'] {
+		background: var(--clay);
+		border-color: var(--clay);
+		color: var(--bg);
 	}
 
 	.rows {
