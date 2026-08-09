@@ -48,6 +48,12 @@ describe('matchHeading', () => {
 	it('matches a heading carrying a trailing qualifier (prefix fallback)', () => {
 		expect(matchHeading('Chana Masala (Serves 4)', idx)?.id).toBe('r2');
 	});
+	it('matches a heading the book states more plainly than the recipe (prefix fallback)', () => {
+		expect(matchHeading('Chana', buildRecipeIndex([entry('r2', 'Chana Masala')]))).toBeNull();
+		expect(matchHeading('Plantain', buildRecipeIndex([entry('r4', 'Plantain (fry)')]))?.id).toBe(
+			'r4'
+		);
+	});
 	it('carries the favourite state through', () => {
 		expect(matchHeading('Chana Masala', idx)?.isFavourite).toBe(true);
 	});
