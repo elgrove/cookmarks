@@ -95,7 +95,7 @@ const unit: VerifiableUnit<Props> = {
 			act: async ({ click, wait }) => {
 				click(TRIGGER);
 				await wait(0);
-				click(`.lists li:nth-child(2) ${'.list-toggle'}`);
+				click(`.lists li:nth-child(2) .list-toggle`);
 				await wait(0);
 			}
 		},

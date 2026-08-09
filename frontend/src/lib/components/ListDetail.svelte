@@ -1,6 +1,6 @@
 <script module lang="ts">
-	import type { RecipeRowData } from './RecipeRow.svelte';
-	import type { ListMembership, ListPanelApi } from '$lib/api/lists';
+	import type { RecipeRowData, RowPickerHook } from './RecipeRow.svelte';
+	import type { ListMembership } from '$lib/api/lists';
 
 	export type ListDetailData = {
 		id: string;
@@ -29,7 +29,7 @@
 		onDelete?: () => void;
 		onRemoveRecipe?: (recipeId: string) => void;
 		selection?: ListSelectionTools;
-		listPicker?: { api?: ListPanelApi };
+		listPicker?: RowPickerHook;
 	};
 
 	let { list, onRename, onDelete, onRemoveRecipe, selection, listPicker }: Props = $props();

@@ -1,6 +1,6 @@
 <script module lang="ts">
-	import type { RecipeRowData } from './RecipeRow.svelte';
-	import type { ListMembership, ListPanelApi } from '$lib/api/lists';
+	import type { RecipeRowData, RowPickerHook } from './RecipeRow.svelte';
+	import type { ListMembership } from '$lib/api/lists';
 
 	export type SimilarBrowseData = {
 		/** The recipe the list is "similar to" — for the heading and the link back. */
@@ -20,7 +20,7 @@
 
 	export type SimilarBrowseProps = SimilarBrowseData & {
 		selection?: BrowseSelectionTools;
-		listPicker?: { api?: ListPanelApi };
+		listPicker?: RowPickerHook;
 	};
 </script>
 

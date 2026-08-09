@@ -1,6 +1,5 @@
 <script module lang="ts">
-	import type { RecipeRowData } from './RecipeRow.svelte';
-	import type { ListPanelApi } from '$lib/api/lists';
+	import type { RecipeRowData, RowPickerHook } from './RecipeRow.svelte';
 
 	export type SimilarRecipesData = {
 		recipes: RecipeRowData[];
@@ -13,7 +12,7 @@
 
 	export type SimilarRecipesProps = SimilarRecipesData & {
 		/** Switches on the per-row add-to-list picker (no selection mode here). */
-		listPicker?: { api?: ListPanelApi };
+		listPicker?: RowPickerHook;
 	};
 </script>
 

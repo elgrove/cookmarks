@@ -125,34 +125,46 @@ export async function removeRecipeFromList(
 	if (!res.ok) throw new Error(`DELETE /api/lists/${listId}/recipes/${recipeId} → ${res.status}`);
 }
 
+// The server caps a bulk payload at 500 ids; larger selections go in chunks.
+const BULK_CHUNK = 500;
+
+async function bulkOp(
+	path: string,
+	recipeIds: string[],
+	fetchFn: typeof fetch
+): Promise<BulkListResult> {
+	let changed = 0;
+	let recipe_count = 0;
+	for (let i = 0; i < recipeIds.length; i += BULK_CHUNK) {
+		const res = await fetchFn(path, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ recipe_ids: recipeIds.slice(i, i + BULK_CHUNK) })
+		});
+		if (!res.ok) throw new Error(`POST ${path} → ${res.status}`);
+		const result = bulkListResultSchema.parse(await res.json());
+		changed += result.changed;
+		recipe_count = result.recipe_count;
+	}
+	return { changed, recipe_count };
+}
+
 /** Add many recipes to a list at once (idempotent server-side). */
-export async function bulkAddToList(
+export function bulkAddToList(
 	listId: string,
 	recipeIds: string[],
 	fetchFn: typeof fetch = fetch
 ): Promise<BulkListResult> {
-	const res = await fetchFn(`/api/lists/${listId}/recipes/bulk`, {
-		method: 'POST',
-		headers: { 'content-type': 'application/json' },
-		body: JSON.stringify({ recipe_ids: recipeIds })
-	});
-	if (!res.ok) throw new Error(`POST /api/lists/${listId}/recipes/bulk → ${res.status}`);
-	return bulkListResultSchema.parse(await res.json());
+	return bulkOp(`/api/lists/${listId}/recipes/bulk`, recipeIds, fetchFn);
 }
 
 /** Remove many recipes from a list at once (idempotent server-side). */
-export async function bulkRemoveFromList(
+export function bulkRemoveFromList(
 	listId: string,
 	recipeIds: string[],
 	fetchFn: typeof fetch = fetch
 ): Promise<BulkListResult> {
-	const res = await fetchFn(`/api/lists/${listId}/recipes/bulk-remove`, {
-		method: 'POST',
-		headers: { 'content-type': 'application/json' },
-		body: JSON.stringify({ recipe_ids: recipeIds })
-	});
-	if (!res.ok) throw new Error(`POST /api/lists/${listId}/recipes/bulk-remove → ${res.status}`);
-	return bulkListResultSchema.parse(await res.json());
+	return bulkOp(`/api/lists/${listId}/recipes/bulk-remove`, recipeIds, fetchFn);
 }
 
 /** Which lists a recipe belongs to (Favourites first), for the add-to-list control. */

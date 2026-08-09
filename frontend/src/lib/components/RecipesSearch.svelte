@@ -1,6 +1,7 @@
 <script module lang="ts">
 	import type { KeywordSummary, RecipeSearchResults, SearchCriteria, SortKey } from '$lib/api/recipes';
-	import type { ListMembership, ListPanelApi } from '$lib/api/lists';
+	import type { ListMembership } from '$lib/api/lists';
+	import type { RowPickerHook } from './RecipeRow.svelte';
 
 	export type SearchStatus = 'resting' | 'loading' | 'results' | 'empty' | 'error';
 	// Which search the box last ran. Keyword = literal match shaped by the filters;
@@ -30,7 +31,7 @@
 		/** Enables select mode over the results. */
 		selection?: SelectionTools;
 		/** Switches on the per-row add-to-list picker. */
-		listPicker?: { api?: ListPanelApi };
+		listPicker?: RowPickerHook;
 	};
 </script>
 

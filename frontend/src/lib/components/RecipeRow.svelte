@@ -1,6 +1,13 @@
 <script module lang="ts">
 	import type { ListPanelApi } from '$lib/api/lists';
 
+	/** Switches on the per-row add-to-list picker; passed through by every surface. */
+	export type RowPickerHook = {
+		api?: ListPanelApi;
+		/** Fired after a successful membership toggle, with the row's recipe id. */
+		onMembershipChange?: (recipeId: string, listId: string, contains: boolean) => void;
+	};
+
 	export type RecipeRowData = {
 		id: string;
 		name: string;
@@ -43,7 +50,7 @@
 		contextQuery?: string;
 		onRemove?: () => void;
 		onKeyword?: (name: string) => void;
-		listPicker?: { api?: ListPanelApi };
+		listPicker?: RowPickerHook;
 		selectable?: boolean;
 		selected?: boolean;
 		onSelect?: (selected: boolean) => void;
@@ -80,7 +87,13 @@
 			{displayTitle}<span class="sep" aria-hidden="true">·</span><span class="author">{bookAuthor}</span>
 		</a>
 		{#if listPicker}
-			<RowListPicker recipeId={id} recipeName={name} api={listPicker.api} />
+			<RowListPicker
+				recipeId={id}
+				recipeName={name}
+				api={listPicker.api}
+				onMembershipChange={(listId, contains) =>
+					listPicker?.onMembershipChange?.(id, listId, contains)}
+			/>
 		{/if}
 		{#if onRemove}
 			<button

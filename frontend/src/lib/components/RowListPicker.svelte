@@ -75,6 +75,8 @@
 		} catch (e) {
 			console.error('could not load lists', e);
 			phase = 'error';
+			// Let the next open retry rather than pinning the error for the mount.
+			fetched = false;
 		}
 	}
 

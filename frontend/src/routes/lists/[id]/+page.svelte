@@ -47,8 +47,12 @@
 	async function bulkCreate(name: string, recipeIds: string[]): Promise<void> {
 		try {
 			const created = await createList(name);
-			await bulkAddToList(created.id, recipeIds);
-			await loadBarLists();
+			try {
+				await bulkAddToList(created.id, recipeIds);
+			} finally {
+				// The list exists server-side even if the add failed — show it.
+				await loadBarLists();
+			}
 		} catch (err) {
 			console.error('bulk create failed', err);
 		}
@@ -157,7 +161,12 @@
 		onDelete={remove}
 		onRemoveRecipe={removeRecipe}
 		selection={selectionTools}
-		listPicker={{}}
+		listPicker={{
+			onMembershipChange: (_recipeId, listId) => {
+				// Toggling *this* list from a row picker changes the rows on screen.
+				if (listId === $page.params.id) void load(listId);
+			}
+		}}
 	/>
 {:else if status === 'loading'}
 	<div class="status"><p class="msg">Loading list…</p></div>
