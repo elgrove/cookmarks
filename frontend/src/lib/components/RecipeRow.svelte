@@ -1,4 +1,6 @@
 <script module lang="ts">
+	import type { ListPanelApi } from '$lib/api/lists';
+
 	export type RecipeRowData = {
 		id: string;
 		name: string;
@@ -13,11 +15,13 @@
 <script lang="ts">
 	import { cleanTitle } from '$lib/title';
 	import { keywordHref } from '$lib/api/recipes';
+	import RowListPicker from './RowListPicker.svelte';
 
 	// `contextQuery` carries the originating search (criteria + ordering) into the
 	// recipe link, so the detail page's prev/next follow the search order.
 	// `onKeyword`, when set, intercepts a plain click on a keyword chip to filter
 	// in place (the search page); without it the chip just navigates to its href.
+	// `listPicker` switches on the per-row add-to-list control (self-fetching).
 	let {
 		id,
 		name,
@@ -27,11 +31,13 @@
 		keywords,
 		contextQuery = '',
 		onRemove,
-		onKeyword
+		onKeyword,
+		listPicker
 	}: RecipeRowData & {
 		contextQuery?: string;
 		onRemove?: () => void;
 		onKeyword?: (name: string) => void;
+		listPicker?: { api?: ListPanelApi };
 	} = $props();
 
 	// Calibre titles carry a subtitle after a colon; show the clean pre-colon title.
@@ -55,6 +61,9 @@
 		<a class="source" href={`/books/${bookId}`}>
 			{displayTitle}<span class="sep" aria-hidden="true">·</span><span class="author">{bookAuthor}</span>
 		</a>
+		{#if listPicker}
+			<RowListPicker recipeId={id} recipeName={name} api={listPicker.api} />
+		{/if}
 		{#if onRemove}
 			<button
 				class="remove"
