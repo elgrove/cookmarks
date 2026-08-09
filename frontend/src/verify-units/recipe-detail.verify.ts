@@ -364,13 +364,20 @@ const unit: VerifiableUnit<Props> = {
 			id: 'open-in-book-link',
 			description: 'the actions row links into the reader at this recipe, contract-matched and named',
 			check: ({ root, contract, props }) => {
-				// A recipe the book is known not to name offers no jump at all — the contract
-				// says so, and the actions row carries the note in its place.
+				const state = props.recipe.inBook === null ? 'unknown' : String(props.recipe.inBook);
+				if (contract['in-book'] !== state)
+					return `contract in-book=${contract['in-book']} expected ${state}`;
+				// A recipe the book is known not to name says so instead of promising a jump —
+				// while staying a link, since following it is what looks again.
 				if (props.recipe.inBook === false) {
-					if (contract['open-in-book']) return `a jump survives: ${contract['open-in-book']}`;
-					if (root.querySelector('a.open-in-book')) return 'a link into the reader survives';
-					const note = root.querySelector('.open-in-book.absent')?.textContent ?? '';
-					return note.includes('Not in the book') || `unexpected note text: ${note}`;
+					const note = root.querySelector('a.open-in-book.absent');
+					if (!note) return 'no not-in-book note in the actions row';
+					if (!(note.textContent ?? '').includes('Not in the book'))
+						return `unexpected note text: ${note.textContent}`;
+					return (
+						(note.getAttribute('aria-label') ?? '').includes('Look again') ||
+						'the note gives no accessible name for looking again'
+					);
 				}
 				const want = `/books/${props.recipe.bookId}/read?at=${props.recipe.id}`;
 				if (contract['open-in-book'] !== want)

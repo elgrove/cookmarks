@@ -266,13 +266,7 @@
 		return cfi;
 	}
 
-	/** Where a recipe sits in the pages: the position cached from an earlier open, or a
-	 *  fresh scan. */
-	const resolveRecipeCfi = (el: FoliateView, entry: RecipeIndexEntry): Promise<string | null> =>
-		entry.epub_cfi ? Promise.resolve(entry.epub_cfi) : scanAndCache(el, entry);
-
-	/** Whether the pages now on screen name this recipe — how a cached position is checked
-	 *  before it's trusted. */
+	/** Whether the section now on screen names this recipe. */
 	function pagesName(name: string): boolean {
 		const doc = currentDoc;
 		if (!doc) return false;
@@ -283,9 +277,11 @@
 	}
 
 	/** Open the pages at a recipe, returning where it landed (null if the book doesn't
-	 *  name it). The cached position is only trusted if the pages it opens still name the
-	 *  recipe: a re-synced EPUB can leave one that resolves but points at other text, and
-	 *  re-scanning on that rare miss is cheaper than invalidating the cache wholesale. */
+	 *  name it). The cached position is only trusted if the section it opens still names
+	 *  the recipe: a re-synced EPUB can leave one that resolves but points at other text,
+	 *  and re-scanning on that rare miss is cheaper than invalidating the cache wholesale.
+	 *  A rejected jump leaves the pages where it landed, so callers that don't go on to
+	 *  open somewhere else must move off it before reading resumes. */
 	async function openAtRecipe(el: FoliateView, entry: RecipeIndexEntry): Promise<string | null> {
 		if (entry.epub_cfi) {
 			const landed = await el
@@ -406,18 +402,20 @@
 				} else {
 					// One position, either way in: the pages resume at whichever is further through
 					// the book — the page they were left on, or the recipe the walk reached.
+					// The anchor is scanned for rather than taken from the cache: it is weighed
+					// against the stored page and the further of the two wins, so an unverified
+					// cached position that a re-synced EPUB has left pointing deeper into the
+					// book would take the reader past where they actually got to.
 					const anchor = resume?.anchor ?? null;
 					const anchorEntry = anchor
 						? (rawIndex?.find((r) => r.id === anchor.id) ?? null)
 						: null;
-					const target = await furthestCfi(
-						resume?.location ?? null,
-						anchorEntry
-							? await resolveRecipeCfi(el, anchorEntry)
-							: anchor
-								? await locateRecipe(el, anchor.name)
-								: null
-					);
+					const anchorCfi = anchorEntry
+						? await scanAndCache(el, anchorEntry)
+						: anchor
+							? await locateRecipe(el, anchor.name)
+							: null;
+					const target = await furthestCfi(resume?.location ?? null, anchorCfi);
 					if (target) await el.goTo(target).catch(() => el.renderer.next());
 					else el.renderer.next(); // render the first page
 				}
@@ -470,8 +468,11 @@
 					recipeName={missedName}
 					recipeHref={`/recipes/${startRecipeId}`}
 					onOpenAtStart={() => {
+						// Explicitly the book's first section: a rejected cached position may have
+						// left the pages parked somewhere arbitrary, and paging on from there would
+						// record that as the reading position.
 						status = 'ready';
-						view?.renderer.next();
+						view?.goTo(0).catch(() => view?.renderer.next());
 					}}
 				/>
 			{:else}

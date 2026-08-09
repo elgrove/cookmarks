@@ -41,8 +41,7 @@ export async function reportEpubLocation(
 	const res = await fetchFn(`/api/recipes/${id}/epub-location`, {
 		method: 'PUT',
 		headers: { 'content-type': 'application/json' },
-		body: JSON.stringify({ cfi }),
-		keepalive: true
+		body: JSON.stringify({ cfi })
 	});
 	if (!res.ok) throw new Error(`PUT /api/recipes/${id}/epub-location → ${res.status}`);
 }

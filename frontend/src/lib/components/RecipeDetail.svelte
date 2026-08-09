@@ -85,23 +85,25 @@
 	{#if lists}
 		<ListPicker {lists} onToggle={onToggleList} onCreate={onCreateList} />
 	{/if}
-	{#if recipe.inBook === false}
-		<!-- The reader looked and the book doesn't name this recipe anywhere: say so here
-		     rather than send the reader to a jump that can only land on not-found. -->
-		<p class="open-in-book absent">
-			<span class="glyph" aria-hidden="true">→</span>
+	<!-- When the reader has looked and found nothing, the control says so up front rather
+	     than promising a jump that can only land on not-found. It stays a link all the
+	     same: following it is what looks again, so a book re-synced to an edition that
+	     does name the recipe isn't shut out by the old answer. -->
+	<a
+		class="open-in-book"
+		class:absent={recipe.inBook === false}
+		href={`/books/${recipe.bookId}/read?at=${recipe.id}`}
+		aria-label={recipe.inBook === false
+			? `Look again for “${recipe.name}” in the book`
+			: `Read “${recipe.name}” in the book`}
+	>
+		{#if recipe.inBook === false}
 			<span class="text">Not in the book’s pages</span>
-		</p>
-	{:else}
-		<a
-			class="open-in-book"
-			href={`/books/${recipe.bookId}/read?at=${recipe.id}`}
-			aria-label={`Read “${recipe.name}” in the book`}
-		>
+		{:else}
 			<span class="glyph" aria-hidden="true">→</span>
 			<span class="text">Read in book</span>
-		</a>
-	{/if}
+		{/if}
+	</a>
 {/snippet}
 
 <article
@@ -116,9 +118,7 @@
 	data-verify-context={recipe.context}
 	data-verify-prev={recipe.previous?.id ?? ''}
 	data-verify-next={recipe.next?.id ?? ''}
-	data-verify-open-in-book={recipe.inBook === false
-		? ''
-		: `/books/${recipe.bookId}/read?at=${recipe.id}`}
+	data-verify-open-in-book={`/books/${recipe.bookId}/read?at=${recipe.id}`}
 	data-verify-in-book={recipe.inBook === null ? 'unknown' : String(recipe.inBook)}
 >
 	<div class="topbar">
@@ -472,14 +472,11 @@
 		font-size: 1rem;
 		line-height: 1;
 	}
-	/* Same slot, no destination: the recipe isn't in the book's text. */
+	/* Same slot, stated as fact rather than offered as a destination. */
 	.open-in-book.absent {
-		margin: 0;
-		color: var(--muted);
+		font-weight: 500;
+		color: var(--faint);
 		border-style: dashed;
-	}
-	.open-in-book.absent .glyph {
-		color: var(--muted);
 	}
 
 	/* Yield heads the ingredients column in the image layout. */

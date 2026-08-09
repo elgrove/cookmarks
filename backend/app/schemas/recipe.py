@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class RecipeRow(BaseModel):
@@ -145,6 +145,7 @@ class RecipeDetail(BaseModel):
 
 class EpubLocation(BaseModel):
     """What the reader resolved for a recipe in its book's EPUB — a foliate CFI, or
-    null when the scan found nothing. Either way the recipe is recorded as checked."""
+    null when the scan found nothing. Either way the recipe is recorded as checked.
+    Required rather than defaulted: an empty body must not read as "found nothing"."""
 
-    cfi: str | None = None
+    cfi: str | None = Field(max_length=500)

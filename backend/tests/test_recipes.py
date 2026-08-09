@@ -253,14 +253,16 @@ def test_epub_location_is_a_tri_state(client: TestClient) -> None:
     index = {r["id"]: r for r in client.get(f"/api/books/{book_id}/recipe-index").json()}
     assert index[recipe_id]["epub_cfi"] is None
 
-    assert client.put(f"/api/recipes/{recipe_id}/epub-location", json={"cfi": cfi}).status_code == 204
+    resp = client.put(f"/api/recipes/{recipe_id}/epub-location", json={"cfi": cfi})
+    assert resp.status_code == 204
     assert client.get(f"/api/recipes/{recipe_id}").json()["in_book"] is True
     index = {r["id"]: r for r in client.get(f"/api/books/{book_id}/recipe-index").json()}
     assert index[recipe_id]["epub_cfi"] == cfi
 
     # A re-check that finds nothing (the book no longer spells it that way) clears the
     # cached position and records the recipe as absent, not as never checked.
-    assert client.put(f"/api/recipes/{recipe_id}/epub-location", json={"cfi": None}).status_code == 204
+    resp = client.put(f"/api/recipes/{recipe_id}/epub-location", json={"cfi": None})
+    assert resp.status_code == 204
     assert client.get(f"/api/recipes/{recipe_id}").json()["in_book"] is False
     index = {r["id"]: r for r in client.get(f"/api/books/{book_id}/recipe-index").json()}
     assert index[recipe_id]["epub_cfi"] is None
@@ -269,6 +271,16 @@ def test_epub_location_is_a_tri_state(client: TestClient) -> None:
 def test_epub_location_unknown_recipe_is_404(client: TestClient) -> None:
     resp = client.put(f"/api/recipes/{uuid.uuid4()}/epub-location", json={"cfi": None})
     assert resp.status_code == 404
+
+
+def test_epub_location_rejects_an_empty_body_and_an_overlong_cfi(client: TestClient) -> None:
+    """A miss has to be stated: an empty body must not record one by default, and the
+    cached position is bounded — it comes back to every reader on the book's index."""
+    recipe_id = _recipe_id(client, "Recipe 0")
+    assert client.put(f"/api/recipes/{recipe_id}/epub-location", json={}).status_code == 422
+    overlong = client.put(f"/api/recipes/{recipe_id}/epub-location", json={"cfi": "x" * 501})
+    assert overlong.status_code == 422
+    assert client.get(f"/api/recipes/{recipe_id}").json()["in_book"] is None
 
 
 def test_recipe_nav_default_is_book_order(client: TestClient) -> None:
