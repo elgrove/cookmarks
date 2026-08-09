@@ -30,6 +30,7 @@ RECIPE_KEYS = {
     "has_image",
     "is_favourite",
     "context",
+    "in_book",
     "previous",
     "next",
 }
@@ -236,6 +237,38 @@ def test_recipe_optional_fields_when_absent(client: TestClient) -> None:
     assert body["ingredients"] == []
     assert body["instructions"] == []
     assert body["keywords"] == []
+
+
+# --- The cached position in the book's pages -----------------------------------
+
+
+def test_epub_location_is_a_tri_state(client: TestClient) -> None:
+    """Never checked reads null; a hit reads true and comes back on the book's recipe
+    index for the reader; a miss reads false without a cached position."""
+    recipe_id = _recipe_id(client, "Recipe 0")
+    book_id = _book_id(client, "With Recipes")
+    cfi = "epubcfi(/6/14!/4/2/6,/1:0,/1:34)"
+
+    assert client.get(f"/api/recipes/{recipe_id}").json()["in_book"] is None
+    index = {r["id"]: r for r in client.get(f"/api/books/{book_id}/recipe-index").json()}
+    assert index[recipe_id]["epub_cfi"] is None
+
+    assert client.put(f"/api/recipes/{recipe_id}/epub-location", json={"cfi": cfi}).status_code == 204
+    assert client.get(f"/api/recipes/{recipe_id}").json()["in_book"] is True
+    index = {r["id"]: r for r in client.get(f"/api/books/{book_id}/recipe-index").json()}
+    assert index[recipe_id]["epub_cfi"] == cfi
+
+    # A re-check that finds nothing (the book no longer spells it that way) clears the
+    # cached position and records the recipe as absent, not as never checked.
+    assert client.put(f"/api/recipes/{recipe_id}/epub-location", json={"cfi": None}).status_code == 204
+    assert client.get(f"/api/recipes/{recipe_id}").json()["in_book"] is False
+    index = {r["id"]: r for r in client.get(f"/api/books/{book_id}/recipe-index").json()}
+    assert index[recipe_id]["epub_cfi"] is None
+
+
+def test_epub_location_unknown_recipe_is_404(client: TestClient) -> None:
+    resp = client.put(f"/api/recipes/{uuid.uuid4()}/epub-location", json={"cfi": None})
+    assert resp.status_code == 404
 
 
 def test_recipe_nav_default_is_book_order(client: TestClient) -> None:

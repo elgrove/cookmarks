@@ -15,6 +15,7 @@
 		type RecipeIndexEntry
 	} from '$lib/api/books';
 	import { toggleFavourite } from '$lib/api/lists';
+	import { reportEpubLocation } from '$lib/api/recipes';
 	import {
 		buildRecipeIndex,
 		matchHeading,
@@ -230,13 +231,16 @@
 		return reached;
 	}
 
+	/** A one-recipe index, matched the same way headings are as they render, so a recipe
+	 *  the book titles slightly differently ("Plantain" for "Plantain (fry)") resolves. */
+	const wantedIndex = (name: string): RecipeNameIndex =>
+		buildRecipeIndex([{ id: '', name, is_favourite: false, epub_cfi: null }]);
+
 	/** Find a recipe in the book's own text, for opening the pages where the recipe walk
 	 *  left off. Sections are parsed, not rendered, and the scan stops at the first hit;
 	 *  a recipe whose title the book doesn't spell the same way simply isn't found. */
 	async function locateRecipe(el: FoliateView, name: string): Promise<string | null> {
-		// Matched the same way as headings are as they render, so a recipe the book titles
-		// slightly differently ("Plantain" for "Plantain (fry)") still resolves.
-		const wanted = buildRecipeIndex([{ id: '', name, is_favourite: false }]);
+		const wanted = wantedIndex(name);
 		const sections = el.book?.sections ?? [];
 		for (const [index, section] of sections.entries()) {
 			if (!section.createDocument) continue;
@@ -250,6 +254,49 @@
 			return el.getCFI(index, range);
 		}
 		return null;
+	}
+
+	/** Scan the sections for a recipe and cache what came back — a miss included, so it is
+	 *  recorded as checked-and-absent and its own page can say so before the click. */
+	async function scanAndCache(el: FoliateView, entry: RecipeIndexEntry): Promise<string | null> {
+		const cfi = await locateRecipe(el, entry.name);
+		reportEpubLocation(entry.id, cfi).catch((e) =>
+			console.warn('could not cache the reader position', e)
+		);
+		return cfi;
+	}
+
+	/** Where a recipe sits in the pages: the position cached from an earlier open, or a
+	 *  fresh scan. */
+	const resolveRecipeCfi = (el: FoliateView, entry: RecipeIndexEntry): Promise<string | null> =>
+		entry.epub_cfi ? Promise.resolve(entry.epub_cfi) : scanAndCache(el, entry);
+
+	/** Whether the pages now on screen name this recipe — how a cached position is checked
+	 *  before it's trusted. */
+	function pagesName(name: string): boolean {
+		const doc = currentDoc;
+		if (!doc) return false;
+		const wanted = wantedIndex(name);
+		return [...doc.querySelectorAll(TITLE_CANDIDATES)].some((node) =>
+			matchTitleElement(node as HTMLElement, wanted)
+		);
+	}
+
+	/** Open the pages at a recipe, returning where it landed (null if the book doesn't
+	 *  name it). The cached position is only trusted if the pages it opens still name the
+	 *  recipe: a re-synced EPUB can leave one that resolves but points at other text, and
+	 *  re-scanning on that rare miss is cheaper than invalidating the cache wholesale. */
+	async function openAtRecipe(el: FoliateView, entry: RecipeIndexEntry): Promise<string | null> {
+		if (entry.epub_cfi) {
+			const landed = await el
+				.goTo(entry.epub_cfi)
+				.then(() => pagesName(entry.name))
+				.catch(() => false);
+			if (landed) return entry.epub_cfi;
+		}
+		const cfi = await scanAndCache(el, entry);
+		if (cfi) await el.goTo(cfi).catch(() => el.renderer.next());
+		return cfi;
 	}
 
 	// Reading is reported back as the reader moves, at most once every few seconds, with
@@ -349,20 +396,27 @@
 					// A targeted jump from the recipe's own page: it wins over the resume
 					// position, and a miss lands on the not-found state, never a random page.
 					const entry = rawIndex?.find((r) => r.id === startRecipeId) ?? null;
-					const cfi = entry ? await locateRecipe(el, entry.name) : null;
+					const cfi = entry ? await openAtRecipe(el, entry) : null;
 					if (cancelled) return;
 					if (!cfi) {
 						missedName = entry?.name ?? null;
 						status = 'not-found';
 						return;
 					}
-					await el.goTo(cfi).catch(() => el.renderer.next());
 				} else {
 					// One position, either way in: the pages resume at whichever is further through
 					// the book — the page they were left on, or the recipe the walk reached.
+					const anchor = resume?.anchor ?? null;
+					const anchorEntry = anchor
+						? (rawIndex?.find((r) => r.id === anchor.id) ?? null)
+						: null;
 					const target = await furthestCfi(
 						resume?.location ?? null,
-						resume?.anchor ? await locateRecipe(el, resume.anchor.name) : null
+						anchorEntry
+							? await resolveRecipeCfi(el, anchorEntry)
+							: anchor
+								? await locateRecipe(el, anchor.name)
+								: null
 					);
 					if (target) await el.goTo(target).catch(() => el.renderer.next());
 					else el.renderer.next(); // render the first page

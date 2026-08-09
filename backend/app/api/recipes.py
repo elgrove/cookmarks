@@ -11,12 +11,13 @@ from app.api.lists import favourite_list_id
 from app.covers import has_cover
 from app.db import SessionDep
 from app.epub import read_epub_image
-from app.models.base import as_utc
+from app.models.base import as_utc, utcnow
 from app.models.book import Book
 from app.models.enums import ReadingMode
 from app.models.recipe import Keyword, Recipe, recipe_keywords
 from app.models.recipe_list import RecipeListItem
 from app.schemas.recipe import (
+    EpubLocation,
     KeywordSummary,
     RecipeDetail,
     RecipeNeighbour,
@@ -426,9 +427,26 @@ def get_recipe(
         has_image=recipe.image is not None,
         is_favourite=_is_favourite(session, recipe.id, user.id),
         context=resolved_context,
+        in_book=None if recipe.epub_checked_at is None else recipe.epub_cfi is not None,
         previous=previous,
         next=next_,
     )
+
+
+@router.put("/recipes/{recipe_id}/epub-location", status_code=status.HTTP_204_NO_CONTENT)
+def set_recipe_epub_location(
+    recipe_id: uuid.UUID, body: EpubLocation, session: SessionDep, user: CurrentUser
+) -> Response:
+    """Cache where the reader found this recipe in its book's pages, so the next open
+    skips the section-by-section scan and the recipe page knows up front whether the
+    jump can land. A miss is recorded too — the checked-and-absent state."""
+    recipe = session.get(Recipe, recipe_id)
+    if recipe is None:
+        raise HTTPException(status_code=404, detail="recipe not found")
+    recipe.epub_cfi = body.cfi
+    recipe.epub_checked_at = utcnow()
+    session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/recipes/{recipe_id}/seen", response_model=RecipeViewState)

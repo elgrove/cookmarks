@@ -116,7 +116,11 @@ class RecipeDetail(BaseModel):
 
     `context` is the navigation ordering the page was reached through; `previous`/
     `next` are the adjacent recipes in that ordering (null at the ends). Only the
-    `book` context is wired today — search/list orderings arrive with those pages."""
+    `book` context is wired today — search/list orderings arrive with those pages.
+
+    `in_book` is what the reader last found when it looked for this recipe in the
+    book's own text: null = never looked, true = found, false = the book doesn't
+    spell it that way anywhere, so opening the book at it can't land."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -134,5 +138,13 @@ class RecipeDetail(BaseModel):
     has_image: bool
     is_favourite: bool
     context: str
+    in_book: bool | None
     previous: RecipeNeighbour | None
     next: RecipeNeighbour | None
+
+
+class EpubLocation(BaseModel):
+    """What the reader resolved for a recipe in its book's EPUB — a foliate CFI, or
+    null when the scan found nothing. Either way the recipe is recorded as checked."""
+
+    cfi: str | None = None

@@ -17,6 +17,10 @@
 		 *  page records it; the toggle is the way back out of an accidental open. */
 		/** The navigation ordering this page was reached through ('book' | 'search'). */
 		context: string;
+		/** What the reader last found looking for this recipe in the book's own text:
+		 *  null = never looked, true = found, false = the book doesn't name it, so the
+		 *  jump into the pages can't land and isn't offered. */
+		inBook: boolean | null;
 		/** The query string carried into prev/next links so they keep this ordering. */
 		contextQuery: string;
 		/** For a search context, the URL back to the originating search (else null). */
@@ -81,14 +85,23 @@
 	{#if lists}
 		<ListPicker {lists} onToggle={onToggleList} onCreate={onCreateList} />
 	{/if}
-	<a
-		class="open-in-book"
-		href={`/books/${recipe.bookId}/read?at=${recipe.id}`}
-		aria-label={`Read “${recipe.name}” in the book`}
-	>
-		<span class="glyph" aria-hidden="true">→</span>
-		<span class="text">Read in book</span>
-	</a>
+	{#if recipe.inBook === false}
+		<!-- The reader looked and the book doesn't name this recipe anywhere: say so here
+		     rather than send the reader to a jump that can only land on not-found. -->
+		<p class="open-in-book absent">
+			<span class="glyph" aria-hidden="true">→</span>
+			<span class="text">Not in the book’s pages</span>
+		</p>
+	{:else}
+		<a
+			class="open-in-book"
+			href={`/books/${recipe.bookId}/read?at=${recipe.id}`}
+			aria-label={`Read “${recipe.name}” in the book`}
+		>
+			<span class="glyph" aria-hidden="true">→</span>
+			<span class="text">Read in book</span>
+		</a>
+	{/if}
 {/snippet}
 
 <article
@@ -103,7 +116,10 @@
 	data-verify-context={recipe.context}
 	data-verify-prev={recipe.previous?.id ?? ''}
 	data-verify-next={recipe.next?.id ?? ''}
-	data-verify-open-in-book={`/books/${recipe.bookId}/read?at=${recipe.id}`}
+	data-verify-open-in-book={recipe.inBook === false
+		? ''
+		: `/books/${recipe.bookId}/read?at=${recipe.id}`}
+	data-verify-in-book={recipe.inBook === null ? 'unknown' : String(recipe.inBook)}
 >
 	<div class="topbar">
 		<nav class="crumb" aria-label="Breadcrumb">
@@ -455,6 +471,15 @@
 		color: var(--clay);
 		font-size: 1rem;
 		line-height: 1;
+	}
+	/* Same slot, no destination: the recipe isn't in the book's text. */
+	.open-in-book.absent {
+		margin: 0;
+		color: var(--muted);
+		border-style: dashed;
+	}
+	.open-in-book.absent .glyph {
+		color: var(--muted);
 	}
 
 	/* Yield heads the ingredients column in the image layout. */

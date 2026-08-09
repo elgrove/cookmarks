@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { buildRecipeIndex, matchHeading, normaliseTitle } from './match';
 
-const entry = (id: string, name: string, is_favourite = false) => ({ id, name, is_favourite });
+const entry = (id: string, name: string, is_favourite = false) => ({
+	id,
+	name,
+	is_favourite,
+	epub_cfi: null
+});
 
 describe('normaliseTitle', () => {
 	it('lowercases and collapses punctuation + whitespace', () => {

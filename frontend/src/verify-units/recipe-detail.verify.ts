@@ -22,6 +22,7 @@ const recipeSchema = z.object({
 	hasImage: z.boolean(),
 	isFavourite: z.boolean(),
 	context: z.string(),
+	inBook: z.boolean().nullable(),
 	contextQuery: z.string(),
 	searchHref: z.string().nullable(),
 	previous: z.object({ id: z.string(), name: z.string() }).nullable(),
@@ -56,6 +57,7 @@ const trofie: RecipeDetailData = {
 	hasImage: false,
 	isFavourite: false,
 	context: 'book',
+	inBook: null,
 	contextQuery: 'context=book',
 	searchHref: null,
 	previous: { id: '11111111-1111-4111-8111-111111111111', name: "Cornelia's Pansotti with Walnut Pesto" },
@@ -147,6 +149,17 @@ const unit: VerifiableUnit<Props> = {
 					searchHref: '/recipes?q=pesto&sort=name'
 				}
 			}
+		},
+		{
+			id: 'not-in-book',
+			description:
+				'the reader looked and the book never names this recipe: the jump is replaced by a plain note',
+			props: { recipe: { ...trofie, inBook: false } }
+		},
+		{
+			id: 'found-in-book',
+			description: 'a recipe whose position in the pages is known still offers the jump',
+			props: { recipe: { ...trofie, inBook: true } }
 		},
 		{
 			id: 'long-content',
@@ -351,6 +364,14 @@ const unit: VerifiableUnit<Props> = {
 			id: 'open-in-book-link',
 			description: 'the actions row links into the reader at this recipe, contract-matched and named',
 			check: ({ root, contract, props }) => {
+				// A recipe the book is known not to name offers no jump at all — the contract
+				// says so, and the actions row carries the note in its place.
+				if (props.recipe.inBook === false) {
+					if (contract['open-in-book']) return `a jump survives: ${contract['open-in-book']}`;
+					if (root.querySelector('a.open-in-book')) return 'a link into the reader survives';
+					const note = root.querySelector('.open-in-book.absent')?.textContent ?? '';
+					return note.includes('Not in the book') || `unexpected note text: ${note}`;
+				}
 				const want = `/books/${props.recipe.bookId}/read?at=${props.recipe.id}`;
 				if (contract['open-in-book'] !== want)
 					return `contract open-in-book=${contract['open-in-book']} expected ${want}`;

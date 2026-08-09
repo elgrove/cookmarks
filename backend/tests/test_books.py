@@ -352,7 +352,7 @@ def test_recipe_index_lists_all_in_order(client: TestClient) -> None:
     idx = client.get(f"/api/books/{book_id}/recipe-index").json()
     assert [e["name"] for e in idx] == ["Recipe 0", "Recipe 1", "Recipe 2"]
     assert all(e["is_favourite"] is False for e in idx)
-    assert set(idx[0].keys()) == {"id", "name", "is_favourite"}
+    assert set(idx[0].keys()) == {"id", "name", "is_favourite", "epub_cfi"}
 
 
 def test_recipe_index_reflects_favourite(client: TestClient) -> None:
