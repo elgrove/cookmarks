@@ -24,6 +24,7 @@ from app.schemas.recipe import (
     SemanticSearchResults,
     SimilarRecipes,
 )
+from app.schemas.reading_queue import QueuedBook, QueueState
 from app.schemas.recipe_list import BulkListResult, ListDetail, ListMembership, ListSummary
 from app.schemas.task_run import TaskRunRead
 from app.schemas.tasks import TaskRunAck
@@ -210,6 +211,33 @@ def test_bulk_add_endpoint_keys_match_contract(client: TestClient) -> None:
     body = client.post(
         f"/api/lists/{list_id}/recipes/bulk", json={"recipe_ids": [recipe_id]}
     ).json()
+    assert set(body.keys()) == set(example.keys())
+
+
+def test_queued_book_model_matches_contract() -> None:
+    example = _example("readingqueue.example.json")
+    dumped = QueuedBook.model_validate(example).model_dump(mode="json")
+    assert dumped == example
+
+
+def test_queue_state_model_matches_contract() -> None:
+    example = _example("queuestate.example.json")
+    dumped = QueueState.model_validate(example).model_dump(mode="json")
+    assert dumped == example
+
+
+def test_reading_queue_endpoint_keys_match_contract(client: TestClient) -> None:
+    example = _example("readingqueue.example.json")
+    book = client.get("/api/books").json()[0]
+    client.put(f"/api/books/{book['id']}/queue")
+    item = client.get("/api/reading-queue").json()[0]
+    assert set(item.keys()) == set(example.keys())
+
+
+def test_queue_endpoint_keys_match_contract(client: TestClient) -> None:
+    example = _example("queuestate.example.json")
+    book = client.get("/api/books").json()[0]
+    body = client.put(f"/api/books/{book['id']}/queue").json()
     assert set(body.keys()) == set(example.keys())
 
 

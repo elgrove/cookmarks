@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { queuedBookSchema } from './reading-queue';
 
 export const statsSchema = z.object({
 	books: z.number().int().nonnegative(),
@@ -41,6 +42,8 @@ export const homeSchema = z.object({
 	stats: statsSchema,
 	book_of_the_day: bookFeatureSchema.nullable(),
 	continue_reading: z.array(continueBookSchema),
+	// Queued books not already on the Continue strip — the "Up next" shelf.
+	up_next: z.array(queuedBookSchema),
 	recently_read: z.array(recentRecipeSchema)
 });
 

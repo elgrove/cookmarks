@@ -24,6 +24,15 @@
       "resume_recipe_id": "9f8e7d6c-5b4a-4039-8281-7060504a3b2c"
     }
   ],
+  "up_next": [
+    {
+      "id": "2c3d4e5f-6a7b-4c8d-9e0f-1a2b3c4d5e6f",
+      "title": "An Everlasting Meal",
+      "author": "Tamar Adler",
+      "has_cover": true,
+      "recipe_count": 87
+    }
+  ],
   "recently_read": [
     {
       "id": "9f8e7d6c-5b4a-4039-8281-7060504a3b2c",

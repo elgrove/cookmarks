@@ -11,6 +11,7 @@ import {
 	recipeIndexResponseSchema
 } from './books';
 import { homeSchema } from './home';
+import { queuedBookSchema, queueStateSchema } from './reading-queue';
 import {
 	keywordSummarySchema,
 	recipeDetailSchema,
@@ -91,6 +92,21 @@ describe('api wire contract', () => {
 
 	it('accepts the home example', () => {
 		expect(() => homeSchema.parse(load('home.example.json'))).not.toThrow();
+	});
+
+	it('accepts the reading-queue example', () => {
+		expect(() => queuedBookSchema.parse(load('readingqueue.example.json'))).not.toThrow();
+	});
+
+	it('rejects a reading-queue example with a drifted field name', () => {
+		const example = load('readingqueue.example.json');
+		const { recipe_count, ...rest } = example;
+		const drifted = { ...rest, recipeCount: recipe_count };
+		expect(() => queuedBookSchema.parse(drifted)).toThrow();
+	});
+
+	it('accepts the queue-state example', () => {
+		expect(() => queueStateSchema.parse(load('queuestate.example.json'))).not.toThrow();
 	});
 
 	it('accepts the recipe example', () => {
