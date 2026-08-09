@@ -65,6 +65,7 @@ class BookDetail(BaseModel):
     added: datetime | None
     keywords: list[str]
     recipes: list[RecipeRow]
+    queued: bool
     reading: ReadingState | None
     # Where reading the recipes picks up: the furthest one reached, or the first in book
     # order for a book not yet read. None for a book with nothing extracted.

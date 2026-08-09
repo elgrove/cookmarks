@@ -2,7 +2,8 @@ import HomeLanding, {
 	type BookOfTheDay,
 	type ContinueBook,
 	type ReadProgress,
-	type RecentRecipe
+	type RecentRecipe,
+	type UpNextBook
 } from '$lib/components/HomeLanding.svelte';
 import type { VerifiableUnit } from '$lib/verify/types';
 import { z } from 'zod';
@@ -11,6 +12,7 @@ type Props = {
 	bookOfTheDay: BookOfTheDay | null;
 	progress?: ReadProgress;
 	continueReading?: ContinueBook[];
+	upNext?: UpNextBook[];
 	recentlyRead?: RecentRecipe[];
 };
 
@@ -38,6 +40,14 @@ const recentSchema = z.object({
 	name: z.string(),
 	bookId: z.string(),
 	bookTitle: z.string()
+});
+
+const upNextSchema = z.object({
+	id: z.string(),
+	title: z.string(),
+	author: z.string(),
+	hasCover: z.boolean(),
+	recipeCount: z.number().int().nonnegative()
 });
 
 const progressSchema = z.object({
@@ -76,6 +86,23 @@ const started: ContinueBook[] = [
 	}
 ];
 
+const queued: UpNextBook[] = [
+	{
+		id: 'q1',
+		title: 'An Everlasting Meal',
+		author: 'Tamar Adler',
+		hasCover: true,
+		recipeCount: 87
+	},
+	{
+		id: 'q2',
+		title: 'The Nordic Baking Book',
+		author: 'Magnus Nilsson',
+		hasCover: false,
+		recipeCount: 450
+	}
+];
+
 const recent: RecentRecipe[] = [
 	{
 		id: 'r1',
@@ -98,6 +125,7 @@ const unit: VerifiableUnit<Props> = {
 		bookOfTheDay: bookSchema.nullable(),
 		progress: progressSchema.optional(),
 		continueReading: z.array(continueSchema).optional(),
+		upNext: z.array(upNextSchema).optional(),
 		recentlyRead: z.array(recentSchema).optional()
 	}),
 	fixtures: [
@@ -140,6 +168,29 @@ const unit: VerifiableUnit<Props> = {
 							'An Unreasonably Long Cookbook Title: With A Subtitle That Also Refuses To Stop'
 					}
 				]
+			}
+		},
+		{
+			id: 'up-next',
+			description: 'queued books shelve below whatever leads, in the same card language',
+			props: {
+				bookOfTheDay: feature,
+				progress: { books: 192, booksRead: 24 },
+				continueReading: started,
+				upNext: queued,
+				recentlyRead: recent
+			}
+		},
+		{
+			id: 'up-next-without-continue',
+			description:
+				'probe: a queue with nothing part-read — the feature keeps the lead slot, the shelf stays below it',
+			probe: true,
+			props: {
+				bookOfTheDay: feature,
+				progress: { books: 192, booksRead: 24 },
+				continueReading: [],
+				upNext: queued
 			}
 		},
 		{
@@ -283,6 +334,33 @@ const unit: VerifiableUnit<Props> = {
 			}
 		},
 		{
+			id: 'up-next-shelf',
+			description:
+				'the shelf renders one card per queued book, each leading to its book page, and never sits above the section that leads the page',
+			check: ({ contract, root, props }) => {
+				const books = props.upNext ?? [];
+				if (Number(contract['upnext-count']) !== books.length)
+					return `upnext-count=${contract['upnext-count']} expected ${books.length}`;
+				const shelf = root.querySelector('.upnext');
+				if (!books.length)
+					return shelf === null || 'an Up next section is rendered with nothing queued';
+				if (!shelf) return 'no Up next section rendered';
+				const cells = [...shelf.querySelectorAll('.cell')];
+				if (cells.length !== books.length)
+					return `rendered ${cells.length} shelf cards, expected ${books.length}`;
+				for (let i = 0; i < books.length; i++) {
+					const href = cells[i].querySelector('a[href]')?.getAttribute('href') ?? '';
+					// A queued book is not being read yet: its card goes to the book page.
+					if (href !== `/books/${books[i].id}`)
+						return `card ${i} href=${href} expected /books/${books[i].id}`;
+				}
+				const lead = root.querySelector('.continue') ?? root.querySelector('.feature');
+				if (lead && lead.compareDocumentPosition(shelf) & Node.DOCUMENT_POSITION_PRECEDING)
+					return 'the Up next shelf sits above the lead section';
+				return true;
+			}
+		},
+		{
 			id: 'title-rendered',
 			description: 'when present, the book title appears in the DOM',
 			onlyFixtures: ['populated'],
@@ -319,7 +397,8 @@ const unit: VerifiableUnit<Props> = {
 				const books = props.continueReading ?? [];
 				if (Number(contract['continue-count']) !== books.length)
 					return `continue-count=${contract['continue-count']} expected ${books.length}`;
-				const cells = [...root.querySelectorAll('.strip .cell')];
+				// Scoped to the continue section — the Up next shelf shares the strip classes.
+				const cells = [...root.querySelectorAll('.continue .cell')];
 				if (cells.length !== books.length)
 					return `rendered ${cells.length} strip cards, expected ${books.length}`;
 				for (let i = 0; i < books.length; i++) {

@@ -8,10 +8,12 @@
 		renameList,
 		type ListSummary
 	} from '$lib/api/lists';
+	import { fetchReadingQueue } from '$lib/api/reading-queue';
 	import { pageTitle } from '$lib/title';
 
 	let status = $state<'loading' | 'error' | 'ready'>('loading');
 	let lists = $state<ListSummary[]>([]);
+	let queueCount = $state(0);
 
 	async function load() {
 		status = 'loading';
@@ -21,6 +23,12 @@
 		} catch (err) {
 			console.error('failed to load lists', err);
 			status = 'error';
+		}
+		// The queue card degrades to a zero count rather than failing the page.
+		try {
+			queueCount = (await fetchReadingQueue()).length;
+		} catch (err) {
+			console.error('failed to load reading queue count', err);
 		}
 	}
 
@@ -60,7 +68,7 @@
 </svelte:head>
 
 {#if status === 'ready'}
-	<ListsIndex {lists} onCreate={create} onRename={rename} onDelete={remove} />
+	<ListsIndex {lists} {queueCount} onCreate={create} onRename={rename} onDelete={remove} />
 {:else}
 	<div class="status">
 		{#if status === 'loading'}

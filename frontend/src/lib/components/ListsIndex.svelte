@@ -3,6 +3,8 @@
 
 	export type ListsIndexProps = {
 		lists: ListSummary[];
+		/** Books on the reading queue — drives the pinned queue card. */
+		queueCount?: number;
 		onCreate?: (name: string) => void;
 		onRename?: (id: string, name: string) => void;
 		onDelete?: (id: string) => void;
@@ -12,7 +14,7 @@
 <script lang="ts">
 	import ListCard from './ListCard.svelte';
 
-	let { lists, onCreate, onRename, onDelete }: ListsIndexProps = $props();
+	let { lists, queueCount = 0, onCreate, onRename, onDelete }: ListsIndexProps = $props();
 
 	let search = $state('');
 	let newName = $state('');
@@ -78,6 +80,7 @@
 	data-verify-created={lastCreated}
 	data-verify-renamed={lastRenamed}
 	data-verify-deleted={lastDeleted}
+	data-verify-queue-count={queueCount}
 >
 	<header class="head">
 		<h1 class="display">Lists</h1>
@@ -109,6 +112,20 @@
 		</p>
 	{:else}
 		<ul class="grid">
+			{#if !query}
+				<!-- The queue holds books, not recipes: the Favourites card shape, but with a
+				     trio of book spines where the star sits — pinned ahead of every list
+				     (search filters lists by name, so it steps aside). -->
+				<li class="cell">
+					<a class="queue-card" href="/lists/reading-queue">
+						<span class="queue-title">
+							<span class="spines" aria-hidden="true"><i></i><i></i><i></i></span>
+							<span class="queue-name">Reading queue</span>
+						</span>
+						<span class="queue-count mono">{queueCount} {queueCount === 1 ? 'book' : 'books'}</span>
+					</a>
+				</li>
+			{/if}
 			{#each visible as list, i (list.id)}
 				<li class="cell" style={`animation-delay: ${Math.min(i * 30, 600)}ms`}>
 					<ListCard
@@ -362,6 +379,106 @@
 	}
 	.cell {
 		animation: fadeUp 0.6s var(--ease-out) both;
+	}
+
+	/* The queue card: the Favourites card shape, distinguished by a trio of book
+	   spines in the star's spot — the one card on the grid that holds books. */
+	.queue-card {
+		display: flex;
+		flex-direction: column;
+		justify-content: space-between;
+		gap: 1rem;
+		height: 100%;
+		min-height: 8rem;
+		padding: 1.25rem;
+		background: var(--bg-warm);
+		/* Clay outline at the same weight the default Favourites card carries. */
+		border: var(--border);
+		border-color: var(--clay);
+		border-radius: 4px;
+		text-decoration: none;
+	}
+	.queue-title {
+		display: flex;
+		align-items: baseline;
+		gap: 0.45rem;
+		min-width: 0;
+	}
+	.spines {
+		flex: none;
+		display: flex;
+		align-items: flex-end;
+		gap: 3px;
+		align-self: center;
+	}
+	.spines i {
+		display: block;
+		width: 5px;
+		border-radius: 1px;
+	}
+	.spines i:nth-child(1) {
+		height: 18px;
+		background: var(--clay);
+	}
+	.spines i:nth-child(2) {
+		height: 14px;
+		background: color-mix(in srgb, var(--clay) 55%, var(--bg-warm));
+	}
+	.spines i:nth-child(3) {
+		height: 16px;
+		background: color-mix(in srgb, var(--clay) 30%, var(--bg-warm));
+	}
+	.queue-name {
+		font-family: var(--f-serif);
+		font-size: 1.3rem;
+		line-height: 1.2;
+		color: var(--ink);
+		transition: color 0.18s var(--ease-out);
+	}
+	.queue-card:hover .queue-name {
+		color: var(--clay-deep);
+	}
+	.queue-count {
+		font-size: 0.72rem;
+		letter-spacing: 0.04em;
+		color: var(--muted);
+	}
+
+	/* Mobile: the queue card joins the hairline-row treatment of the list cards. */
+	@media (max-width: 560px) {
+		.queue-card {
+			height: auto;
+			min-height: 0;
+			flex-direction: row;
+			align-items: baseline;
+			justify-content: space-between;
+			gap: 0.75rem;
+			padding: 0.85rem 0.1rem;
+			background: none;
+			border: none;
+			border-bottom: var(--border);
+			border-radius: 0;
+		}
+		.spines {
+			align-self: auto;
+			transform: translateY(2px);
+		}
+		.spines i:nth-child(1) {
+			height: 14px;
+		}
+		.spines i:nth-child(2) {
+			height: 10px;
+		}
+		.spines i:nth-child(3) {
+			height: 12px;
+		}
+		.queue-name {
+			font-size: 1.1rem;
+		}
+		.queue-count {
+			flex: none;
+			white-space: nowrap;
+		}
 	}
 
 	.empty {

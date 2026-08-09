@@ -18,6 +18,8 @@
 		added: string | null;
 		keywords: string[];
 		recipes: BookDetailRecipe[];
+		/** Whether the book sits on the caller's reading queue. */
+		queued: boolean;
 		/** How the book is being read and how far through it — measured in recipes
 		 *  either way. Null until the book has been opened. */
 		reading: { mode: 'book' | 'recipes'; fraction: number; finished: boolean } | null;
@@ -61,7 +63,8 @@
 		onAnswer,
 		onDelete,
 		onMarkBookRead,
-		onResetProgress
+		onResetProgress,
+		onToggleQueue
 	}: {
 		book: BookDetailData;
 		onExtract?: () => Promise<void> | void;
@@ -70,6 +73,7 @@
 		onDelete?: (opts: { exclude: boolean }) => Promise<void> | void;
 		onMarkBookRead?: () => Promise<void> | void;
 		onResetProgress?: () => Promise<void> | void;
+		onToggleQueue?: () => Promise<void> | void;
 	} = $props();
 
 	let coverFailed = $state(false);
@@ -81,6 +85,8 @@
 	// The last read-state action asked for, so the harness can verify the intent
 	// this component emits (the owning route holds the state and re-renders).
 	let seenAction = $state('');
+	// Likewise for the queue toggle: 'queue' or 'unqueue', by the state it acted from.
+	let queueAction = $state('');
 
 	function confirmDelete() {
 		deleted = exclude ? 'exclude' : 'plain';
@@ -127,6 +133,8 @@
 	data-verify-delete-exclude={exclude ? 'true' : 'false'}
 	data-verify-deleted={deleted}
 	data-verify-seen-action={seenAction}
+	data-verify-queued={book.queued ? 'true' : 'false'}
+	data-verify-queue-action={queueAction}
 	data-verify-reset-mode={resetMode}
 	data-verify-resume-recipe={book.resumeRecipe?.id ?? ''}
 	data-verify-reading-mode={mode ?? ''}
@@ -248,6 +256,19 @@
 					<a class="btn ghost browse" href={`/recipes?book_id=${book.id}&sort=book`}>
 						Browse recipes <span class="ar" aria-hidden="true">›</span>
 					</a>
+				{/if}
+				{#if onToggleQueue}
+					<button
+						class="btn ghost queue-toggle"
+						type="button"
+						onclick={() => {
+							queueAction = book.queued ? 'unqueue' : 'queue';
+							onToggleQueue();
+						}}
+					>
+						{book.queued ? 'Remove from queue' : 'Queue to read'}
+						<span class="ar" aria-hidden="true">{book.queued ? '−' : '+'}</span>
+					</button>
 				{/if}
 				{#if onMarkBookRead && !book.reading?.finished}
 					<button

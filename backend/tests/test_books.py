@@ -35,6 +35,7 @@ DETAIL_KEYS = {
     "added",
     "keywords",
     "recipes",
+    "queued",
     "reading",
     "resume_recipe",
 }

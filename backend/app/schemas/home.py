@@ -3,6 +3,7 @@ import uuid
 from pydantic import BaseModel, ConfigDict
 
 from app.models.enums import ReadingMode
+from app.schemas.reading_queue import QueuedBook
 
 
 class Stats(BaseModel):
@@ -56,4 +57,5 @@ class HomeData(BaseModel):
     stats: Stats
     book_of_the_day: BookFeature | None
     continue_reading: list[ContinueBook]
+    up_next: list[QueuedBook]
     recently_read: list[RecentRecipe]

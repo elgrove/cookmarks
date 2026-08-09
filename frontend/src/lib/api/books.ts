@@ -83,6 +83,7 @@ export const bookDetailSchema = z.object({
 	added: z.string().nullable(),
 	keywords: z.array(z.string()),
 	recipes: z.array(recipeRowSchema),
+	queued: z.boolean(),
 	reading: readingStateSchema.nullable(),
 	// Where reading the recipes picks up: the furthest reached, or the book's first.
 	resume_recipe: recipeRefSchema.nullable()

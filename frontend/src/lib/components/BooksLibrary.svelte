@@ -7,9 +7,11 @@
 		progress?: number | null;
 		hasCover: boolean;
 		keywords?: string[];
+		/** 1-based position on the caller's reading queue; absent when not queued. */
+		queuePosition?: number | null;
 	};
 
-	type SortKey = 'recent' | 'title' | 'author' | 'recipes';
+	type SortKey = 'recent' | 'title' | 'author' | 'recipes' | 'queue';
 </script>
 
 <script lang="ts">
@@ -26,7 +28,8 @@
 		{ key: 'recent', label: 'Recently added' },
 		{ key: 'title', label: 'Title A–Z' },
 		{ key: 'author', label: 'Author' },
-		{ key: 'recipes', label: 'Most recipes' }
+		{ key: 'recipes', label: 'Most recipes' },
+		{ key: 'queue', label: 'Queue order' }
 	];
 
 	let query = $derived(search.trim().toLowerCase());
@@ -59,6 +62,13 @@
 				break;
 			case 'recipes':
 				sorted.sort((a, b) => b.recipeCount - a.recipeCount);
+				break;
+			case 'queue':
+				// Queued books lead in queue order; the rest follow in the incoming
+				// (recently-added) order — Array.sort is stable, so they keep it.
+				sorted.sort(
+					(a, b) => (a.queuePosition ?? Infinity) - (b.queuePosition ?? Infinity)
+				);
 				break;
 			// 'recent' keeps the incoming order (created_at desc)
 		}
