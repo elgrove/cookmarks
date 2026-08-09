@@ -84,7 +84,7 @@
 	<a
 		class="open-in-book"
 		href={`/books/${recipe.bookId}/read?at=${recipe.id}`}
-		aria-label={`Open “${recipe.name}” in the book`}
+		aria-label={`Read “${recipe.name}” in the book`}
 	>
 		<span class="glyph" aria-hidden="true">→</span>
 		<span class="text">Read in book</span>

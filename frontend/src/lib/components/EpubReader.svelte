@@ -11,7 +11,8 @@
 		epubUrl,
 		fetchRecipeIndex,
 		reportReading,
-		type ReadingState
+		type ReadingState,
+		type RecipeIndexEntry
 	} from '$lib/api/books';
 	import { toggleFavourite } from '$lib/api/lists';
 	import {
@@ -41,6 +42,9 @@
 	let view: FoliateView | null = null;
 	// The book's recipes keyed by normalised name, for matching headings as sections render.
 	let recipeIndex: RecipeNameIndex | null = null;
+	// The same recipes unkeyed — the name index drops duplicate-named recipes, so a
+	// targeted id is resolved against the raw list.
+	let rawIndex: RecipeIndexEntry[] | null = null;
 
 	let status = $state<'loading' | 'error' | 'ready' | 'not-found'>('loading');
 	// The name behind a failed targeted jump (null when the id wasn't in the index at all).
@@ -262,6 +266,7 @@
 	}
 
 	function onKeydown(e: KeyboardEvent) {
+		if (status !== 'ready') return;
 		if (e.key === 'ArrowLeft') view?.prev();
 		else if (e.key === 'ArrowRight') view?.next();
 	}
@@ -274,7 +279,10 @@
 				await ensureFoliateView(); // registers the <foliate-view> custom element
 				// Fetch the book's recipe index alongside the EPUB; failure just disables matching.
 				const indexPromise = fetchRecipeIndex(bookId)
-					.then(buildRecipeIndex)
+					.then((entries) => {
+						rawIndex = entries;
+						return buildRecipeIndex(entries);
+					})
 					.catch((e) => {
 						console.warn('recipe index unavailable; matching disabled', e);
 						return null;
@@ -317,6 +325,8 @@
 				// strips it.
 				el.renderer.addEventListener('relocate', (e: Event) => {
 					const reason = (e as CustomEvent<{ reason?: string }>).detail?.reason;
+					// The not-found overlay hides the pages, so nothing turned behind it counts.
+					if (status !== 'ready') return;
 					if (reason === 'page' || reason === 'snap' || reason === 'scroll')
 						recordPosition(el.lastLocation?.cfi ?? null);
 				});
@@ -330,9 +340,7 @@
 				if (startRecipeId) {
 					// A targeted jump from the recipe's own page: it wins over the resume
 					// position, and a miss lands on the not-found state, never a random page.
-					const entry = recipeIndex
-						? [...recipeIndex.values()].find((r) => r.id === startRecipeId)
-						: null;
+					const entry = rawIndex?.find((r) => r.id === startRecipeId) ?? null;
 					const cfi = entry ? await locateRecipe(el, entry.name) : null;
 					if (cancelled) return;
 					if (!cfi) {

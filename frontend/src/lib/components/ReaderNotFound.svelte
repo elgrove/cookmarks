@@ -35,7 +35,9 @@
 			Couldn’t find this recipe in this book’s pages.
 		{/if}
 	</p>
-	<p class="hint">The book may spell its title differently.</p>
+	{#if recipeName}
+		<p class="hint">The book may spell its title differently.</p>
+	{/if}
 	<div class="choices">
 		<button class="start" type="button" onclick={openAtStart}>Open at the start</button>
 		<a class="back" href={recipeHref}>← Back to the recipe</a>
