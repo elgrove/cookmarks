@@ -22,6 +22,9 @@
 	// `onKeyword`, when set, intercepts a plain click on a keyword chip to filter
 	// in place (the search page); without it the chip just navigates to its href.
 	// `listPicker` switches on the per-row add-to-list control (self-fetching).
+	// `selectable` puts the row in selection mode: a leading checkbox, reported
+	// through `onSelect` — a deliberate, mode-scoped exception to DESIGN §5's
+	// "no leading number" (the resting row is unchanged).
 	let {
 		id,
 		name,
@@ -32,12 +35,18 @@
 		contextQuery = '',
 		onRemove,
 		onKeyword,
-		listPicker
+		listPicker,
+		selectable = false,
+		selected = false,
+		onSelect
 	}: RecipeRowData & {
 		contextQuery?: string;
 		onRemove?: () => void;
 		onKeyword?: (name: string) => void;
 		listPicker?: { api?: ListPanelApi };
+		selectable?: boolean;
+		selected?: boolean;
+		onSelect?: (selected: boolean) => void;
 	} = $props();
 
 	// Calibre titles carry a subtitle after a colon; show the clean pre-colon title.
@@ -55,8 +64,17 @@
 	}
 </script>
 
-<li class="row">
+<li class="row" class:selected>
 	<div class="line">
+		{#if selectable}
+			<input
+				class="select"
+				type="checkbox"
+				checked={selected}
+				aria-label={`Select ${name}`}
+				onchange={(e) => onSelect?.(e.currentTarget.checked)}
+			/>
+		{/if}
 		<a class="name" href={`/recipes/${id}${contextQuery ? `?${contextQuery}` : ''}`}>{name}</a>
 		<a class="source" href={`/books/${bookId}`}>
 			{displayTitle}<span class="sep" aria-hidden="true">·</span><span class="author">{bookAuthor}</span>
@@ -94,6 +112,18 @@
 	.row {
 		padding: 1rem 0;
 		border-bottom: var(--border);
+	}
+	.row.selected {
+		background: var(--bg-warm);
+	}
+
+	.select {
+		align-self: center;
+		width: 1rem;
+		height: 1rem;
+		margin: 0;
+		accent-color: var(--clay);
+		cursor: pointer;
 	}
 
 	.line {
