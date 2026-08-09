@@ -35,16 +35,13 @@ def get_chapterlike_files_from_epub(epub_path: Path) -> list[str]:
 
             opf_xml = etree.fromstring(epub.read(opf_path))
 
-            default_ns = opf_xml.nsmap.get(None)
-            if default_ns:
-                ns = {"opf": default_ns}
-                manifest_items = opf_xml.xpath("//opf:manifest/opf:item", namespaces=ns)
-                spine_refs = opf_xml.xpath(
-                    "//opf:spine/opf:itemref[not(@linear) or @linear!='no']", namespaces=ns
-                )
-            else:
-                manifest_items = opf_xml.xpath("//manifest/item")
-                spine_refs = opf_xml.xpath("//spine/itemref[not(@linear) or @linear!='no']")
+            # Match on local name: OPFs declare the IDPF namespace as a default, as a
+            # prefix (opf:package), or not at all, and a prefixed one matches neither a
+            # default-namespaced nor an unprefixed XPath.
+            manifest_items = opf_xml.xpath("//*[local-name()='manifest']/*[local-name()='item']")
+            spine_refs = opf_xml.xpath(
+                "//*[local-name()='spine']/*[local-name()='itemref'][not(@linear) or @linear!='no']"
+            )
 
             manifest = {
                 i.get("id"): {
