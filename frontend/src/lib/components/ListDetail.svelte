@@ -46,8 +46,11 @@
 	let selectedRows = $state<string[]>([]);
 	let bulkRemoved = $state('');
 
+	// Key the clear on the row ids' *value* — an effect on the array itself refires
+	// on unrelated interactions (deep-proxy invalidation) and wipes a live selection.
+	let rowsKey = $derived(list.recipes.map((r) => r.id).join('|'));
 	$effect(() => {
-		void list.recipes;
+		void rowsKey;
 		selectedRows = [];
 	});
 
