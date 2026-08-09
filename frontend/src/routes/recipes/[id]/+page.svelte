@@ -110,6 +110,7 @@
 				hasImage: r.has_image,
 				isFavourite: r.is_favourite,
 				context: r.context,
+				inBook: r.in_book,
 				contextQuery,
 				searchHref,
 				previous: r.previous,

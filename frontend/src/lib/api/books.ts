@@ -172,7 +172,10 @@ export const epubUrl = (id: string): string => `/api/books/${id}/epub`;
 export const recipeIndexEntrySchema = z.object({
 	id: z.string().uuid(),
 	name: z.string(),
-	is_favourite: z.boolean()
+	is_favourite: z.boolean(),
+	// Where the recipe was last found in the book's pages, so a targeted open skips
+	// the scan; null when never resolved, or resolved to nothing.
+	epub_cfi: z.string().nullable()
 });
 
 export const recipeIndexResponseSchema = z.array(recipeIndexEntrySchema);

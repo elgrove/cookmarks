@@ -22,11 +22,29 @@ export const recipeDetailSchema = z.object({
 	has_image: z.boolean(),
 	is_favourite: z.boolean(),
 	context: z.string(),
+	// What the reader last found when it looked for this recipe in the book's text:
+	// null = never looked, true = found, false = the book doesn't name it anywhere.
+	in_book: z.boolean().nullable(),
 	previous: recipeNeighbourSchema.nullable(),
 	next: recipeNeighbourSchema.nullable()
 });
 
 export type RecipeDetailResponse = z.infer<typeof recipeDetailSchema>;
+
+/** Cache where the reader resolved a recipe in its book's EPUB — a CFI, or null when
+ *  the scan found nothing (recorded all the same, as checked-and-absent). */
+export async function reportEpubLocation(
+	id: string,
+	cfi: string | null,
+	fetchFn: typeof fetch = fetch
+): Promise<void> {
+	const res = await fetchFn(`/api/recipes/${id}/epub-location`, {
+		method: 'PUT',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify({ cfi })
+	});
+	if (!res.ok) throw new Error(`PUT /api/recipes/${id}/epub-location → ${res.status}`);
+}
 
 /** Fetch and validate a single recipe's detail. `contextParams` is the raw query
  *  string selecting the prev/next ordering (e.g. `context=book`, or

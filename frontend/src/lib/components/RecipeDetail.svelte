@@ -17,6 +17,10 @@
 		 *  page records it; the toggle is the way back out of an accidental open. */
 		/** The navigation ordering this page was reached through ('book' | 'search'). */
 		context: string;
+		/** What the reader last found looking for this recipe in the book's own text:
+		 *  null = never looked, true = found, false = the book doesn't name it, so the
+		 *  jump into the pages can't land and isn't offered. */
+		inBook: boolean | null;
 		/** The query string carried into prev/next links so they keep this ordering. */
 		contextQuery: string;
 		/** For a search context, the URL back to the originating search (else null). */
@@ -81,6 +85,25 @@
 	{#if lists}
 		<ListPicker {lists} onToggle={onToggleList} onCreate={onCreateList} />
 	{/if}
+	<!-- When the reader has looked and found nothing, the control says so up front rather
+	     than promising a jump that can only land on not-found. It stays a link all the
+	     same: following it is what looks again, so a book re-synced to an edition that
+	     does name the recipe isn't shut out by the old answer. -->
+	<a
+		class="open-in-book"
+		class:absent={recipe.inBook === false}
+		href={`/books/${recipe.bookId}/read?at=${recipe.id}`}
+		aria-label={recipe.inBook === false
+			? `Look again for “${recipe.name}” in the book`
+			: `Read “${recipe.name}” in the book`}
+	>
+		{#if recipe.inBook === false}
+			<span class="text">Not in the book’s pages</span>
+		{:else}
+			<span class="glyph" aria-hidden="true">→</span>
+			<span class="text">Read in book</span>
+		{/if}
+	</a>
 {/snippet}
 
 <article
@@ -95,6 +118,8 @@
 	data-verify-context={recipe.context}
 	data-verify-prev={recipe.previous?.id ?? ''}
 	data-verify-next={recipe.next?.id ?? ''}
+	data-verify-open-in-book={`/books/${recipe.bookId}/read?at=${recipe.id}`}
+	data-verify-in-book={recipe.inBook === null ? 'unknown' : String(recipe.inBook)}
 >
 	<div class="topbar">
 		<nav class="crumb" aria-label="Breadcrumb">
@@ -422,6 +447,38 @@
 		gap: 0.6rem;
 		margin-top: 1.3rem;
 	}
+	.open-in-book {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.45rem;
+		font-family: var(--f-grotesk);
+		font-weight: 600;
+		font-size: 0.9rem;
+		padding: 0.7rem 1rem;
+		border-radius: 3px;
+		color: var(--ink);
+		border: 1px solid var(--line-strong);
+		text-decoration: none;
+		transition:
+			border-color 0.18s var(--ease-out),
+			color 0.18s var(--ease-out);
+	}
+	.open-in-book:hover {
+		border-color: var(--clay);
+		color: var(--clay-deep);
+	}
+	.open-in-book .glyph {
+		color: var(--clay);
+		font-size: 1rem;
+		line-height: 1;
+	}
+	/* Same slot, stated as fact rather than offered as a destination. */
+	.open-in-book.absent {
+		font-weight: 500;
+		color: var(--faint);
+		border-style: dashed;
+	}
+
 	/* Yield heads the ingredients column in the image layout. */
 	.yield-lead {
 		margin: 0 0 0.85rem;

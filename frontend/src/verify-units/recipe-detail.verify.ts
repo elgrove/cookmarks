@@ -22,6 +22,7 @@ const recipeSchema = z.object({
 	hasImage: z.boolean(),
 	isFavourite: z.boolean(),
 	context: z.string(),
+	inBook: z.boolean().nullable(),
 	contextQuery: z.string(),
 	searchHref: z.string().nullable(),
 	previous: z.object({ id: z.string(), name: z.string() }).nullable(),
@@ -56,6 +57,7 @@ const trofie: RecipeDetailData = {
 	hasImage: false,
 	isFavourite: false,
 	context: 'book',
+	inBook: null,
 	contextQuery: 'context=book',
 	searchHref: null,
 	previous: { id: '11111111-1111-4111-8111-111111111111', name: "Cornelia's Pansotti with Walnut Pesto" },
@@ -147,6 +149,17 @@ const unit: VerifiableUnit<Props> = {
 					searchHref: '/recipes?q=pesto&sort=name'
 				}
 			}
+		},
+		{
+			id: 'not-in-book',
+			description:
+				'the reader looked and the book never names this recipe: the jump is replaced by a plain note',
+			props: { recipe: { ...trofie, inBook: false } }
+		},
+		{
+			id: 'found-in-book',
+			description: 'a recipe whose position in the pages is known still offers the jump',
+			props: { recipe: { ...trofie, inBook: true } }
 		},
 		{
 			id: 'long-content',
@@ -345,6 +358,36 @@ const unit: VerifiableUnit<Props> = {
 					(root.querySelector('.crumb')?.textContent ?? '').includes('Search results') ||
 					'breadcrumb missing "Search results"'
 				);
+			}
+		},
+		{
+			id: 'open-in-book-link',
+			description: 'the actions row links into the reader at this recipe, contract-matched and named',
+			check: ({ root, contract, props }) => {
+				const state = props.recipe.inBook === null ? 'unknown' : String(props.recipe.inBook);
+				if (contract['in-book'] !== state)
+					return `contract in-book=${contract['in-book']} expected ${state}`;
+				// A recipe the book is known not to name says so instead of promising a jump —
+				// while staying a link, since following it is what looks again.
+				if (props.recipe.inBook === false) {
+					const note = root.querySelector('a.open-in-book.absent');
+					if (!note) return 'no not-in-book note in the actions row';
+					if (!(note.textContent ?? '').includes('Not in the book'))
+						return `unexpected note text: ${note.textContent}`;
+					return (
+						(note.getAttribute('aria-label') ?? '').includes('Look again') ||
+						'the note gives no accessible name for looking again'
+					);
+				}
+				const want = `/books/${props.recipe.bookId}/read?at=${props.recipe.id}`;
+				if (contract['open-in-book'] !== want)
+					return `contract open-in-book=${contract['open-in-book']} expected ${want}`;
+				const a = root.querySelector('a.open-in-book');
+				if (!a) return 'no open-in-book link in the actions row';
+				if (a.getAttribute('href') !== want)
+					return `href=${a.getAttribute('href')} expected ${want}`;
+				const name = a.getAttribute('aria-label')?.trim() ?? a.textContent?.trim() ?? '';
+				return name.length > 0 || 'open-in-book link has no accessible name';
 			}
 		},
 		{

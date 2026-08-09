@@ -1,7 +1,8 @@
 import uuid
+from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import JSON, Column, ForeignKey, String, Table, Text
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, String, Table, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, UUIDAuditBase
@@ -64,6 +65,11 @@ class Recipe(UUIDAuditBase):
     instructions: Mapped[list[str]] = mapped_column(JSON, default=list)
     yields: Mapped[str | None] = mapped_column(String(200))
     image: Mapped[str | None] = mapped_column(Text)
+    # Where the recipe sits in its book's EPUB, as resolved by the reader (a foliate
+    # CFI). The pair is a tri-state: never checked (`epub_checked_at` null) · found
+    # (both set) · checked and genuinely absent from the book's text (checked, no CFI).
+    epub_cfi: Mapped[str | None] = mapped_column(Text)
+    epub_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     book: Mapped["Book"] = relationship(back_populates="recipes")
     extraction_run: Mapped["TaskRun | None"] = relationship(back_populates="recipes")

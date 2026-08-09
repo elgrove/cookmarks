@@ -24,6 +24,7 @@
   "has_image": false,
   "is_favourite": true,
   "context": "book",
+  "in_book": true,
   "previous": {
     "id": "1f2e3d4c-5b6a-4079-8281-7060504a3b2c",
     "name": "Buttermilk Biscuits"

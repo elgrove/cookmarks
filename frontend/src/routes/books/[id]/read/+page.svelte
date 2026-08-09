@@ -40,7 +40,13 @@
 </svelte:head>
 
 {#if status === 'ready' && book}
-	<EpubReader bookId={book.id} title={book.title} author={book.author} resume={book.reading} />
+	<EpubReader
+		bookId={book.id}
+		title={book.title}
+		author={book.author}
+		resume={book.reading}
+		startRecipeId={$page.url.searchParams.get('at')}
+	/>
 {:else}
 	<div class="status">
 		{#if status === 'loading'}

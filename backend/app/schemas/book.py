@@ -90,10 +90,14 @@ class BookReadState(BaseModel):
 
 class RecipeIndexEntry(BaseModel):
     """A book's recipe reduced to what the in-book reader matcher needs: id, name,
-    favourite state. The full set (uncapped), so headings can be matched to recipes."""
+    favourite state. The full set (uncapped), so headings can be matched to recipes.
+
+    `epub_cfi` is the cached position from a previous open (null when never resolved,
+    or resolved to nothing), so a targeted jump skips the scan through the sections."""
 
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
     name: str
     is_favourite: bool
+    epub_cfi: str | None

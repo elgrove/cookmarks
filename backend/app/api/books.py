@@ -273,8 +273,11 @@ def book_recipe_index(
             ).all()
         )
     rows = session.execute(
-        select(Recipe.id, Recipe.name).where(Recipe.book_id == book_id).order_by(Recipe.order)
+        select(Recipe.id, Recipe.name, Recipe.epub_cfi)
+        .where(Recipe.book_id == book_id)
+        .order_by(Recipe.order)
     ).all()
     return [
-        RecipeIndexEntry(id=rid, name=name, is_favourite=rid in fav_ids) for rid, name in rows
+        RecipeIndexEntry(id=rid, name=name, is_favourite=rid in fav_ids, epub_cfi=cfi)
+        for rid, name, cfi in rows
     ]
