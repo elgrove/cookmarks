@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import CurrentUser, require_admin
 from app.api.lists import favourite_list_id
+from app.api.reading_queue import is_queued
 from app.config import settings
 from app.covers import cover_path, has_cover
 from app.db import SessionDep
@@ -125,6 +126,7 @@ def get_book(book_id: uuid.UUID, session: SessionDep, user: CurrentUser) -> Book
             )
             for r in recipes
         ],
+        queued=is_queued(session, user.id, book_id),
         reading=_reading_state(session, reading, total),
         resume_recipe=RecipeNeighbour(id=resume.id, name=resume.name) if resume else None,
     )

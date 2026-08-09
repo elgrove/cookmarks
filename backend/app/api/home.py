@@ -6,6 +6,7 @@ from sqlalchemy import exists, func, select
 from sqlalchemy.orm import Session, aliased
 
 from app.api.deps import CurrentUser
+from app.api.reading_queue import queued_books
 from app.covers import has_cover
 from app.db import SessionDep
 from app.models.book import Book
@@ -16,6 +17,7 @@ from app.schemas.home import BookFeature, ContinueBook, HomeData, RecentRecipe, 
 from app.services.reading import fraction
 
 CONTINUE_LIMIT = 4
+UP_NEXT_LIMIT = 4
 RECENT_LIMIT = 6
 
 
@@ -123,9 +125,14 @@ def home(session: SessionDep, user: CurrentUser) -> HomeData:
         )
         or 0,
     )
+    continue_reading = _continue_reading(session, user.id)
     return HomeData(
         stats=stats,
         book_of_the_day=_book_of_the_day(session),
-        continue_reading=_continue_reading(session, user.id),
+        continue_reading=continue_reading,
+        # Queued books not already on the Continue strip — one cover per book on the page.
+        up_next=queued_books(
+            session, user.id, exclude=[b.id for b in continue_reading], limit=UP_NEXT_LIMIT
+        ),
         recently_read=_recently_read(session, user.id),
     )

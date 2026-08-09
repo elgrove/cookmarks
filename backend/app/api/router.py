@@ -8,6 +8,7 @@ from app.api import (
     health,
     home,
     lists,
+    reading_queue,
     recipes,
     task_runs,
     tasks,
@@ -31,6 +32,7 @@ api_router.include_router(extraction.router, dependencies=_USER)
 api_router.include_router(home.router, dependencies=_USER)
 api_router.include_router(recipes.router, dependencies=_USER)
 api_router.include_router(lists.router, dependencies=_USER)
+api_router.include_router(reading_queue.router, dependencies=_USER)
 api_router.include_router(tickets.router, dependencies=_USER)
 api_router.include_router(config.router, dependencies=_ADMIN)
 api_router.include_router(tasks.router, dependencies=_ADMIN)
