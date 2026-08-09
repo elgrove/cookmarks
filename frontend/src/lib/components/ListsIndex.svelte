@@ -392,13 +392,11 @@
 		min-height: 8rem;
 		padding: 1.25rem;
 		background: var(--bg-warm);
+		/* Clay outline at the same weight the default Favourites card carries. */
 		border: var(--border);
+		border-color: var(--clay);
 		border-radius: 4px;
 		text-decoration: none;
-		transition: border-color 0.18s var(--ease-out);
-	}
-	.queue-card:hover {
-		border-color: var(--clay);
 	}
 	.queue-title {
 		display: flex;
