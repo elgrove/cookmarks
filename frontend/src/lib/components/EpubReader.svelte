@@ -23,6 +23,7 @@
 	} from '$lib/reader/match';
 	import { resolvedTheme, toggleTheme } from '$lib/theme';
 	import ReaderChrome, { type TocEntry } from './ReaderChrome.svelte';
+	import ReaderNotFound from './ReaderNotFound.svelte';
 	import ReaderRecipePanel, { type PanelAnchor } from './ReaderRecipePanel.svelte';
 
 	type Props = {
@@ -31,15 +32,19 @@
 		author: string;
 		/** How far the book has been read, either way, if it has been opened before. */
 		resume?: ReadingState | null;
+		/** Open at this recipe instead of the resume position — a targeted jump from its page. */
+		startRecipeId?: string | null;
 	};
-	let { bookId, title, author, resume = null }: Props = $props();
+	let { bookId, title, author, resume = null, startRecipeId = null }: Props = $props();
 
 	let host = $state<HTMLDivElement>();
 	let view: FoliateView | null = null;
 	// The book's recipes keyed by normalised name, for matching headings as sections render.
 	let recipeIndex: RecipeNameIndex | null = null;
 
-	let status = $state<'loading' | 'error' | 'ready'>('loading');
+	let status = $state<'loading' | 'error' | 'ready' | 'not-found'>('loading');
+	// The name behind a failed targeted jump (null when the id wasn't in the index at all).
+	let missedName = $state<string | null>(null);
 	let toc = $state<TocEntry[]>([]);
 	let currentHref = $state<string | null>(null);
 	let progress = $state(0);
@@ -251,7 +256,16 @@
 		);
 	}
 
+	// Arriving at a targeted recipe is not reading: the first relocate after the jump is
+	// swallowed so it moves neither the anchor nor the location. Page turns after it report
+	// as normal.
+	let suppressNextReport = false;
+
 	function recordPosition(location: string | null) {
+		if (suppressNextReport) {
+			suppressNextReport = false;
+			return;
+		}
 		pending = { recipe_id: reachedRecipeId(), location };
 		if (Date.now() - lastSaved >= SAVE_INTERVAL_MS) flushPosition();
 	}
@@ -311,14 +325,31 @@
 				el.renderer.setAttribute('max-column-count', '2');
 				applyStyles();
 				toc = flattenToc(el.book?.toc);
-				// One position, either way in: the pages resume at whichever is further through
-				// the book — the page they were left on, or the recipe the walk reached.
-				const target = await furthestCfi(
-					resume?.location ?? null,
-					resume?.anchor ? await locateRecipe(el, resume.anchor.name) : null
-				);
-				if (target) await el.goTo(target).catch(() => el.renderer.next());
-				else el.renderer.next(); // render the first page
+				if (startRecipeId) {
+					// A targeted jump from the recipe's own page: it wins over the resume
+					// position, and a miss lands on the not-found state, never a random page.
+					const entry = recipeIndex
+						? [...recipeIndex.values()].find((r) => r.id === startRecipeId)
+						: null;
+					const cfi = entry ? await locateRecipe(el, entry.name) : null;
+					if (cancelled) return;
+					if (!cfi) {
+						missedName = entry?.name ?? null;
+						status = 'not-found';
+						return;
+					}
+					suppressNextReport = true;
+					await el.goTo(cfi).catch(() => el.renderer.next());
+				} else {
+					// One position, either way in: the pages resume at whichever is further through
+					// the book — the page they were left on, or the recipe the walk reached.
+					const target = await furthestCfi(
+						resume?.location ?? null,
+						resume?.anchor ? await locateRecipe(el, resume.anchor.name) : null
+					);
+					if (target) await el.goTo(target).catch(() => el.renderer.next());
+					else el.renderer.next(); // render the first page
+				}
 				status = 'ready';
 			} catch (err) {
 				if (!cancelled) {
@@ -363,6 +394,15 @@
 		<div class="overlay" class:error={status === 'error'}>
 			{#if status === 'loading'}
 				<p class="msg">Opening the book…</p>
+			{:else if status === 'not-found'}
+				<ReaderNotFound
+					recipeName={missedName}
+					recipeHref={`/recipes/${startRecipeId}`}
+					onOpenAtStart={() => {
+						status = 'ready';
+						view?.renderer.next();
+					}}
+				/>
 			{:else}
 				<p class="msg">This book couldn’t be opened.</p>
 				<a class="back" href={`/books/${bookId}`}>← Back to book</a>
