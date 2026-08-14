@@ -786,7 +786,7 @@
 		font-family: var(--f-mono);
 		font-size: 0.76rem;
 		letter-spacing: 0.02em;
-		color: var(--muted);
+		color: var(--ink);
 		background: var(--bg-warm);
 		border: var(--border);
 		border-radius: 999px;
