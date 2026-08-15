@@ -30,6 +30,21 @@ def enqueue_extract_recipes(book_id: str, run_id: str) -> None:
     extract_recipes_from_book_task.delay(book_id, run_id)
 
 
+def queue_extraction(session: Session, book: Book) -> TaskRun:
+    """Record a QUEUED extraction run for a book and dispatch it. Shared by the manual
+    trigger and the ingest task's extract-after-add, so both leave the same record."""
+    run = TaskRun(
+        task_type=TaskType.EXTRACTION,
+        book_id=book.id,
+        provider_name=get_config(session).ai_provider,
+        status=TaskStatus.QUEUED,
+    )
+    session.add(run)
+    session.commit()
+    enqueue_extract_recipes(str(book.id), str(run.id))
+    return run
+
+
 def enqueue_resume_extraction(run_id: str, human_response: str) -> None:
     """Dispatch the resume of a paused run to the worker — the seam the resume endpoint
     goes through (and tests stub) so answering the review question drives the graph to

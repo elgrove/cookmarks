@@ -19,6 +19,7 @@ celery_app = Celery(
         "app.tasks.book_keywords",
         "app.tasks.keyword_dedup",
         "app.tasks.calibre_sync",
+        "app.tasks.ingest",
     ],
 )
 

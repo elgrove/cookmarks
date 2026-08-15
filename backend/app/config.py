@@ -28,6 +28,12 @@ class Settings(BaseSettings):
     calibre_sync_tag: str = "Food"
     calibre_sync_format: str = "EPUB"
 
+    # Where an uploaded or downloaded book waits between staging and ingestion. In prod
+    # this sits on the data volume (COOKMARKS_INGEST_STAGING_PATH=/data/ingest), so a
+    # staged file survives a restart between the confirm and the worker picking it up.
+    ingest_staging_path: Path = BACKEND_ROOT / "ingest-staging"
+    ingest_max_bytes: int = 500_000_000
+
     # SvelteKit adapter-static output, served by FastAPI in production.
     frontend_dist: Path = BACKEND_ROOT.parent / "frontend" / "build"
 

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models import CalibreExclusion, Recipe, RecipeListItem, User
+from app.services.ingest import IngestError
 from app.services.users import create_user
 from app.services.vector_store import EMBEDDING_DIMENSIONS, VectorStore
 
@@ -410,3 +411,40 @@ def test_delete_book_with_exclude_records_the_calibre_id(
     exclusion = session.scalars(select(CalibreExclusion)).one()
     assert exclusion.calibre_id == 1
     assert exclusion.title == "With Recipes"
+
+
+def test_delete_from_library_removes_the_calibre_entry_and_needs_no_exclusion(
+    client: TestClient, session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    removed: list[int] = []
+    monkeypatch.setattr("app.api.books.remove_from_library", removed.append)
+    book_id = _book_id(client, "With Recipes")
+
+    assert client.delete(f"/api/books/{book_id}?from_library=true").status_code == 204
+
+    assert removed == [1]
+    assert client.get(f"/api/books/{book_id}").status_code == 404
+    # Nothing is left in Calibre to re-sync, so an exclusion would be noise.
+    assert session.scalars(select(CalibreExclusion)).all() == []
+
+
+def test_delete_from_library_keeps_the_book_when_calibre_refuses(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def _refuse(_calibre_id: int) -> None:
+        raise IngestError("calibredb failed: library is locked")
+
+    monkeypatch.setattr("app.api.books.remove_from_library", _refuse)
+    book_id = _book_id(client, "With Recipes")
+
+    assert client.delete(f"/api/books/{book_id}?from_library=true").status_code == 502
+    # A half-done delete is worse than none: the book survives intact.
+    assert client.get(f"/api/books/{book_id}").status_code == 200
+
+
+def test_delete_cannot_both_exclude_and_remove_from_the_library(client: TestClient) -> None:
+    book_id = _book_id(client, "With Recipes")
+    res = client.delete(f"/api/books/{book_id}?exclude=true&from_library=true")
+
+    assert res.status_code == 422
+    assert client.get(f"/api/books/{book_id}").status_code == 200
