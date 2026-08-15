@@ -5,7 +5,7 @@ import { z } from 'zod';
 
 type Props = {
 	book: BookDetailData;
-	onDelete?: (opts: { exclude: boolean }) => void;
+	onDelete?: (opts: { exclude: boolean; fromLibrary: boolean }) => void;
 	onMarkBookRead?: () => void;
 	onResetProgress?: () => void;
 	onToggleQueue?: () => void;
@@ -13,7 +13,8 @@ type Props = {
 
 const DELETE_BTN = '.delete-btn';
 const CONFIRM_DELETE = '.confirm-delete';
-const EXCLUDE = '.exclude input';
+const EXCLUDE = '.exclude input[value="exclude"]';
+const FROM_LIBRARY = '.exclude input[value="library"]';
 const MARK_READ = '.mark-read';
 const QUEUE_TOGGLE = '.queue-toggle';
 const RESET_BTN = '.reset-btn';
@@ -313,11 +314,21 @@ const unit: VerifiableUnit<Props> = {
 		},
 		{
 			id: 'delete-excluded',
-			description: 'ticking the box before confirming deletes and excludes from future syncs',
+			description: 'choosing exclusion before confirming deletes and skips it on future syncs',
 			props: { book: pastaGrannies, onDelete: () => {} },
 			act: ({ click }) => {
 				click(DELETE_BTN);
 				click(EXCLUDE);
+				click(CONFIRM_DELETE);
+			}
+		},
+		{
+			id: 'delete-from-library',
+			description: 'the widest scope also takes the book out of the Calibre library itself',
+			props: { book: pastaGrannies, onDelete: () => {} },
+			act: ({ click }) => {
+				click(DELETE_BTN);
+				click(FROM_LIBRARY);
 				click(CONFIRM_DELETE);
 			}
 		},
@@ -600,19 +611,23 @@ const unit: VerifiableUnit<Props> = {
 		},
 		{
 			id: 'delete-confirm-step',
-			description: 'the confirm step exposes a labelled exclusion box, unticked by default',
+			description: 'the confirm step offers the three scopes, resting on the narrowest',
 			onlyFixtures: ['delete-confirm', 'delete-confirm-empty-book'],
 			check: ({ contract, root }) => {
 				if (contract['delete-mode'] !== 'confirm') return `delete-mode=${contract['delete-mode']}`;
+				if (contract['delete-scope'] !== 'app')
+					return `delete-scope=${contract['delete-scope']} — must rest on the narrowest`;
 				if (contract['delete-exclude'] !== 'false')
 					return `delete-exclude=${contract['delete-exclude']} — must default off`;
 				if (!root.querySelector(CONFIRM_DELETE)) return 'confirm button missing';
 				const box = root.querySelector<HTMLInputElement>(EXCLUDE);
-				if (!box) return 'exclusion checkbox missing';
-				if (box.checked) return 'exclusion checkbox pre-ticked';
+				if (!box) return 'exclusion choice missing';
+				if (box.checked) return 'exclusion pre-selected';
+				const library = root.querySelector<HTMLInputElement>(FROM_LIBRARY);
+				if (!library || library.checked) return 'library scope missing or pre-selected';
 				return (
 					(box.closest('label')?.textContent ?? '').includes('Calibre') ||
-					'exclusion checkbox is not labelled'
+					'exclusion choice is not labelled'
 				);
 			}
 		},
@@ -631,10 +646,15 @@ const unit: VerifiableUnit<Props> = {
 		},
 		{
 			id: 'delete-fires-handler',
-			description: 'confirming fires the delete handler with the exclusion choice, and closes the panel',
-			onlyFixtures: ['delete-plain', 'delete-excluded'],
+			description: 'confirming fires the delete handler with the chosen scope, and closes the panel',
+			onlyFixtures: ['delete-plain', 'delete-excluded', 'delete-from-library'],
 			check: ({ contract, fixture }) => {
-				const want = fixture.id === 'delete-excluded' ? 'exclude' : 'plain';
+				const want =
+					fixture.id === 'delete-excluded'
+						? 'exclude'
+						: fixture.id === 'delete-from-library'
+							? 'library'
+							: 'plain';
 				if (contract.deleted !== want) return `deleted=${contract.deleted} expected ${want}`;
 				return contract['delete-mode'] === 'view' || `delete-mode=${contract['delete-mode']}`;
 			}

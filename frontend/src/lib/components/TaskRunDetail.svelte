@@ -5,7 +5,8 @@
 		ExtractionDetail,
 		BookKeywordsDetail,
 		KeywordDedupDetail,
-		CalibreSyncDetail
+		CalibreSyncDetail,
+		BookIngestDetail
 	} from '$lib/api/task-runs';
 
 	export type TaskRunDetailProps = {
@@ -25,12 +26,14 @@
 		extraction: 'Extraction',
 		book_keywords: 'Book keywords',
 		keyword_dedup: 'Keyword dedup',
-		calibre_sync: 'Calibre sync'
+		calibre_sync: 'Calibre sync',
+		book_ingest: 'Add book'
 	};
 	const TYPE_TITLES: Record<Exclude<TaskType, 'extraction'>, string> = {
 		book_keywords: 'Book-keyword tagging',
 		keyword_dedup: 'Keyword vocabulary dedup',
-		calibre_sync: 'Calibre library sync'
+		calibre_sync: 'Calibre library sync',
+		book_ingest: 'Book added to the library'
 	};
 
 	const dateFmt = new Intl.DateTimeFormat('en-GB', {
@@ -118,6 +121,19 @@
 					{ label: 'Orphaned', value: count(d.orphaned?.length) },
 					{ label: 'Deleted', value: count(d.deleted?.length) },
 					{ label: 'Excluded', value: count(d.excluded?.length) }
+				];
+			}
+			case 'book_ingest': {
+				const d = run.detail as unknown as BookIngestDetail;
+				return [
+					{ label: 'Title', value: d.title || '—', wrap: true },
+					{ label: 'Author', value: d.author || '—', wrap: true },
+					{ label: 'Source format', value: d.format ? d.format.toUpperCase() : '—' },
+					{ label: 'Converted', value: d.converted ? 'Yes' : 'No' },
+					{ label: 'Calibre id', value: count(d.calibre_id) },
+					{ label: 'Cover', value: d.cover ? 'Fetched' : 'None' },
+					{ label: 'Metadata', value: d.metadata_fetched ? 'Fetched' : 'Confirmed only' },
+					{ label: 'Extraction', value: d.extraction_queued ? 'Queued' : 'Not queued' }
 				];
 			}
 		}

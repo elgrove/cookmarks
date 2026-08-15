@@ -100,6 +100,11 @@
 		>
 		{#if $currentUser?.is_admin}
 			<a
+				class="navlink"
+				class:active={$page.url.pathname.startsWith('/add')}
+				href="/add">Add</a
+			>
+			<a
 				class="admin-icon"
 				class:active={$page.url.pathname.startsWith('/admin')}
 				href="/admin"

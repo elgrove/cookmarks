@@ -27,6 +27,7 @@ import {
 	listSummarySchema
 } from './lists';
 import { taskRunSchema, reviewQuestionSchema } from './task-runs';
+import { stagedBookSchema } from './ingest';
 import { configSchema } from './config';
 import { taskRunAckSchema } from './tasks';
 import { authMeSchema, userSchema } from './auth';
@@ -224,6 +225,17 @@ describe('api wire contract', () => {
 		const { book_title, ...rest } = example;
 		const drifted = { ...rest, bookTitle: book_title };
 		expect(() => taskRunSchema.parse(drifted)).toThrow();
+	});
+
+	it('accepts the staged-book example', () => {
+		expect(() => stagedBookSchema.parse(load('stagedbook.example.json'))).not.toThrow();
+	});
+
+	it('rejects a staged-book example with a drifted field name', () => {
+		const example = load('stagedbook.example.json');
+		const { staging_id, ...rest } = example;
+		const drifted = { ...rest, stagingId: staging_id };
+		expect(() => stagedBookSchema.parse(drifted)).toThrow();
 	});
 
 	it('accepts the review-question example', () => {

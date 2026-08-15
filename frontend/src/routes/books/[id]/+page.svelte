@@ -139,8 +139,8 @@
 				}
 			: undefined}
 		onDelete={$currentUser?.is_admin
-			? async ({ exclude }) => {
-					await deleteBook(book!.id, { exclude });
+			? async ({ exclude, fromLibrary }) => {
+					await deleteBook(book!.id, { exclude, fromLibrary });
 					await goto('/books');
 				}
 			: undefined}

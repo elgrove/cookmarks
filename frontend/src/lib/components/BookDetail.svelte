@@ -70,7 +70,7 @@
 		onExtract?: () => Promise<void> | void;
 		review?: ReviewQuestion | null;
 		onAnswer?: (value: string) => Promise<void> | void;
-		onDelete?: (opts: { exclude: boolean }) => Promise<void> | void;
+		onDelete?: (opts: { exclude: boolean; fromLibrary: boolean }) => Promise<void> | void;
 		onMarkBookRead?: () => Promise<void> | void;
 		onResetProgress?: () => Promise<void> | void;
 		onToggleQueue?: () => Promise<void> | void;
@@ -79,7 +79,9 @@
 	let coverFailed = $state(false);
 	let expanded = $state(false);
 	let deleteMode = $state<'view' | 'confirm'>('view');
-	let exclude = $state(false);
+	// How far the delete reaches: out of the app only (the next sync brings it back),
+	// out of the app and off future syncs, or out of the Calibre library altogether.
+	let deleteScope = $state<'app' | 'exclude' | 'library'>('app');
 	let deleted = $state('');
 	let resetMode = $state<'view' | 'confirm'>('view');
 	// The last read-state action asked for, so the harness can verify the intent
@@ -89,8 +91,8 @@
 	let queueAction = $state('');
 
 	function confirmDelete() {
-		deleted = exclude ? 'exclude' : 'plain';
-		onDelete?.({ exclude });
+		deleted = deleteScope === 'app' ? 'plain' : deleteScope;
+		onDelete?.({ exclude: deleteScope === 'exclude', fromLibrary: deleteScope === 'library' });
 		deleteMode = 'view';
 	}
 
@@ -130,7 +132,8 @@
 	data-verify-empty={book.recipeCount === 0 ? 'true' : 'false'}
 	data-verify-keywords={book.keywords.length}
 	data-verify-delete-mode={deleteMode}
-	data-verify-delete-exclude={exclude ? 'true' : 'false'}
+	data-verify-delete-exclude={deleteScope === 'exclude' ? 'true' : 'false'}
+	data-verify-delete-scope={deleteScope}
 	data-verify-deleted={deleted}
 	data-verify-seen-action={seenAction}
 	data-verify-queued={book.queued ? 'true' : 'false'}
@@ -318,10 +321,21 @@
 									{book.recipeCount === 1 ? 'recipe' : 'recipes'} are removed for good.
 								{/if}
 							</p>
-							<label class="exclude">
-								<input type="checkbox" bind:checked={exclude} />
-								Exclude from future Calibre syncs
-							</label>
+							<fieldset class="scope">
+								<legend>How far does it go?</legend>
+								<label class="exclude">
+									<input type="radio" value="app" bind:group={deleteScope} />
+									From Cookmarks only — the next Calibre sync brings it back
+								</label>
+								<label class="exclude">
+									<input type="radio" value="exclude" bind:group={deleteScope} />
+									From Cookmarks, and exclude it from future Calibre syncs
+								</label>
+								<label class="exclude">
+									<input type="radio" value="library" bind:group={deleteScope} />
+									From the Calibre library too — the book file is deleted for good
+								</label>
+							</fieldset>
 							<button class="btn danger confirm-delete" type="button" onclick={confirmDelete}>
 								Delete book
 							</button>
@@ -330,7 +344,7 @@
 								type="button"
 								onclick={() => {
 									deleteMode = 'view';
-									exclude = false;
+									deleteScope = 'app';
 								}}
 							>
 								Cancel
@@ -717,6 +731,22 @@
 		line-height: 1.45;
 		color: var(--muted);
 		margin: 0;
+	}
+	.scope {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		border: none;
+		margin: 0;
+		padding: 0;
+	}
+	.scope legend {
+		font-family: var(--f-mono);
+		font-size: 0.64rem;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--muted);
+		padding: 0 0 0.4rem;
 	}
 	.exclude {
 		display: flex;
