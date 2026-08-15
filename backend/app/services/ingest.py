@@ -58,6 +58,11 @@ ACCEPTED_FORMATS: dict[str, tuple[int, bytes] | None] = {
 STAGING_MAX_AGE_SECONDS = 24 * 60 * 60
 _CLI_TIMEOUT = 300
 _METADATA_TIMEOUT = 60
+# fetch-ebook-metadata's own --timeout is per source, and it queries several, so a title
+# with no match spends well over a minute before giving up. Our ceiling has to sit above
+# its budget, not under it, or a slow-but-successful lookup is killed and reads as a miss.
+_FETCH_TIMEOUT = 180
+_FETCH_SOURCE_TIMEOUT = "30"
 _LOCK_RETRIES = 5
 
 
@@ -271,6 +276,10 @@ def prefill_metadata(path: Path, filename: str) -> tuple[str, str]:
             title = value.strip()
         elif field.strip().startswith("Author") and not author:
             author = re.sub(r"\s*\[[^\]]*\]", "", value).strip()
+    # A file carrying no title of its own makes ebook-meta echo the filename stem back —
+    # and ours is the staging uuid, which is no use to anybody. Prefer the real filename.
+    if title == path.stem:
+        title = ""
     if not title or title.lower() == "unknown":
         title = _title_from_filename(filename)
     if author.lower() == "unknown":
@@ -332,8 +341,9 @@ def _fetch_metadata(title: str, author: str, staging_id: str) -> tuple[Path | No
     """One metadata lookup on Calibre's default source mix, auto-accepted. A miss is
     normal and not fatal — the book goes in with the title and author the user confirmed,
     and no cover, which the UI is designed for."""
+    # Named "<id>.cover.jpg", not "<id>-cover.jpg", so the "<id>.*" cleanup sweeps it too.
     opf_path = staging_dir() / f"{staging_id}.opf"
-    cover_path = staging_dir() / f"{staging_id}-cover.jpg"
+    cover_path = staging_dir() / f"{staging_id}.cover.jpg"
     try:
         opf = run_cli(
             [
@@ -346,9 +356,9 @@ def _fetch_metadata(title: str, author: str, staging_id: str) -> tuple[Path | No
                 "--cover",
                 str(cover_path),
                 "--timeout",
-                "30",
+                _FETCH_SOURCE_TIMEOUT,
             ],
-            timeout=_METADATA_TIMEOUT,
+            timeout=_FETCH_TIMEOUT,
         )
     except CalibreCLIError as exc:
         logger.warning("Metadata lookup failed for %r: %s", title, exc)
@@ -358,6 +368,20 @@ def _fetch_metadata(title: str, author: str, staging_id: str) -> tuple[Path | No
         return None, cover_path if cover_path.exists() else None
     opf_path.write_text(opf[start:], encoding="utf-8")
     return opf_path, cover_path if cover_path.exists() else None
+
+
+def _cover_from_epub(epub: Path, staging_id: str) -> Path | None:
+    """The cover the book carries itself — the fallback when the metadata sources have
+    none, or found nothing at all. Applying a fetched OPF clears the cover Calibre
+    extracted on add, so without this a successful metadata lookup can leave a book
+    worse off than a failed one."""
+    path = staging_dir() / f"{staging_id}.epubcover.jpg"
+    try:
+        run_cli(["ebook-meta", str(epub), "--get-cover", str(path)], timeout=_METADATA_TIMEOUT)
+    except CalibreCLIError:
+        logger.warning("Could not read a cover out of %s", epub.name)
+        return None
+    return path if path.exists() else None
 
 
 def _existing_tags(calibre_id: int) -> list[str]:
@@ -444,6 +468,7 @@ def run_ingest(
         converted = True
 
     opf, cover = _fetch_metadata(title, author, staging_id)
+    cover = cover or _cover_from_epub(epub, staging_id)
     calibre_id = _added_id(_calibredb("add", "--duplicates", str(epub)))
 
     replaced: int | None = None

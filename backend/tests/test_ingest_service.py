@@ -44,6 +44,8 @@ class FakeCalibre:
         self.tags: list[str] = ["Cooking"]
         self.metadata_fails = False
         self.writes_cover = True
+        self.epub_has_cover = True
+        self.echo_filename_as_title = False
         self.title = "The Curry Guy"
         self.author = "Dan Toombs"
         self.fail_on: str | None = None
@@ -57,7 +59,12 @@ class FakeCalibre:
         if self.fail_on is not None and self.fail_on in args:
             raise CalibreCLIError(f"{binary} failed: refused")
         if binary == "ebook-meta":
-            return f"Title               : {self.title}\nAuthor(s)           : {self.author}\n"
+            if "--get-cover" in args:
+                if self.epub_has_cover:
+                    Path(args[args.index("--get-cover") + 1]).write_bytes(b"jpeg")
+                return ""
+            title = Path(args[1]).stem if self.echo_filename_as_title else self.title
+            return f"Title               : {title}\nAuthor(s)           : {self.author}\n"
         if binary == "fetch-ebook-metadata":
             return self._fetch(args)
         if binary == "ebook-convert":
@@ -197,6 +204,19 @@ def test_falls_back_to_a_tidied_filename_when_the_file_knows_nothing(
     assert (staged.title, staged.author) == ("The Curry Guy", "")
 
 
+def test_the_staging_id_is_never_offered_as_a_title(
+    library: Path, calibre: FakeCalibre
+) -> None:
+    # A file with no embedded title makes ebook-meta echo the filename stem, and ours is
+    # the staging uuid — the user's own filename is the only useful answer.
+    calibre.echo_filename_as_title = True
+
+    staged = stage_file("The_Curry_Guy.txt", BytesIO(b"just some text"))
+
+    assert staged.title == "The Curry Guy"
+    assert staged.staging_id not in staged.title
+
+
 def test_download_filename_prefers_content_disposition() -> None:
     response = httpx.Response(
         200, headers={"content-disposition": 'attachment; filename="Real Name.epub"'}
@@ -241,14 +261,43 @@ def test_ingest_adds_the_book_and_forces_the_confirmed_title_and_food_tag(
     assert any(f.startswith("cover:") for f in fields)
 
 
-def test_a_metadata_miss_still_adds_the_book(library: Path, calibre: FakeCalibre) -> None:
+def test_a_metadata_miss_still_adds_the_book_with_its_own_cover(
+    library: Path, calibre: FakeCalibre
+) -> None:
     calibre.metadata_fails = True
     staging_id = _stage_epub()
 
     outcome = run_ingest(staging_id, "The Curry Guy", "Dan Toombs")
 
     assert outcome.calibre_id == 42
-    assert (outcome.cover, outcome.metadata_fetched) == (False, False)
+    assert outcome.metadata_fetched is False
+    # Applying a fetched OPF clears the cover Calibre extracts on add, so the book's own
+    # cover is pulled out and set explicitly — a lookup must never cost a book its cover.
+    assert outcome.cover is True
+
+
+def test_a_book_with_no_cover_anywhere_is_still_added(
+    library: Path, calibre: FakeCalibre
+) -> None:
+    calibre.metadata_fails = True
+    calibre.epub_has_cover = False
+    staging_id = _stage_epub()
+
+    outcome = run_ingest(staging_id, "The Curry Guy", "Dan Toombs")
+
+    assert (outcome.calibre_id, outcome.cover) == (42, False)
+
+
+def test_a_finished_ingest_leaves_nothing_in_staging(
+    library: Path, calibre: FakeCalibre
+) -> None:
+    staging_id = _stage_epub()
+
+    run_ingest(staging_id, "The Curry Guy", "Dan Toombs")
+
+    # The book, the OPF and both candidate covers all share the staging id — a stray
+    # cover file would sit there until the 24h sweep.
+    assert list((library.parent / "staging").glob(f"{staging_id}*")) == []
 
 
 def test_a_non_epub_is_converted_first(library: Path, calibre: FakeCalibre) -> None:
