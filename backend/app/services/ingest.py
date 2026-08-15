@@ -337,13 +337,15 @@ def remove_from_library(calibre_id: int) -> None:
     logger.info("Cleared book directory Calibre left behind: %s", directory.name)
 
 
-def _fetch_metadata(title: str, author: str, staging_id: str) -> tuple[Path | None, Path | None]:
+def _fetch_metadata(title: str, author: str, staging_id: str) -> Path | None:
     """One metadata lookup on Calibre's default source mix, auto-accepted. A miss is
-    normal and not fatal — the book goes in with the title and author the user confirmed,
-    and no cover, which the UI is designed for."""
-    # Named "<id>.cover.jpg", not "<id>-cover.jpg", so the "<id>.*" cleanup sweeps it too.
+    normal and not fatal — the book goes in with the title and author the user confirmed.
+
+    Deliberately does not ask for a cover. Calibre's cover sources all go through its
+    embedded browser, which hangs here and takes the metadata down with it: the same
+    query returns in ~30s with --opf alone and times out with nothing when --cover is
+    added. The book's own cover is better anyway, and we extract that ourselves."""
     opf_path = staging_dir() / f"{staging_id}.opf"
-    cover_path = staging_dir() / f"{staging_id}.cover.jpg"
     try:
         opf = run_cli(
             [
@@ -353,8 +355,6 @@ def _fetch_metadata(title: str, author: str, staging_id: str) -> tuple[Path | No
                 "--authors",
                 author,
                 "--opf",
-                "--cover",
-                str(cover_path),
                 "--timeout",
                 _FETCH_SOURCE_TIMEOUT,
             ],
@@ -362,19 +362,19 @@ def _fetch_metadata(title: str, author: str, staging_id: str) -> tuple[Path | No
         )
     except CalibreCLIError as exc:
         logger.warning("Metadata lookup failed for %r: %s", title, exc)
-        return None, None
+        return None
     start = opf.find("<?xml")
     if start == -1:
-        return None, cover_path if cover_path.exists() else None
+        return None
     opf_path.write_text(opf[start:], encoding="utf-8")
-    return opf_path, cover_path if cover_path.exists() else None
+    return opf_path
 
 
 def _cover_from_epub(epub: Path, staging_id: str) -> Path | None:
-    """The cover the book carries itself — the fallback when the metadata sources have
-    none, or found nothing at all. Applying a fetched OPF clears the cover Calibre
-    extracted on add, so without this a successful metadata lookup can leave a book
-    worse off than a failed one."""
+    """The cover the book carries itself — the only cover source we use, since Calibre's
+    all go through its embedded browser. Applying a fetched OPF also clears the cover
+    Calibre extracts on add, so without this a successful metadata lookup would leave a
+    book worse off than a failed one."""
     path = staging_dir() / f"{staging_id}.epubcover.jpg"
     try:
         run_cli(["ebook-meta", str(epub), "--get-cover", str(path)], timeout=_METADATA_TIMEOUT)
@@ -467,8 +467,8 @@ def run_ingest(
         source.unlink(missing_ok=True)
         converted = True
 
-    opf, cover = _fetch_metadata(title, author, staging_id)
-    cover = cover or _cover_from_epub(epub, staging_id)
+    opf = _fetch_metadata(title, author, staging_id)
+    cover = _cover_from_epub(epub, staging_id)
     calibre_id = _added_id(_calibredb("add", "--duplicates", str(epub)))
 
     replaced: int | None = None

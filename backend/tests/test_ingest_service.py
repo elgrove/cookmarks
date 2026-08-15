@@ -43,7 +43,6 @@ class FakeCalibre:
         self.added_id = 42
         self.tags: list[str] = ["Cooking"]
         self.metadata_fails = False
-        self.writes_cover = True
         self.epub_has_cover = True
         self.echo_filename_as_title = False
         self.title = "The Curry Guy"
@@ -77,8 +76,6 @@ class FakeCalibre:
     def _fetch(self, args: list[str]) -> str:
         if self.metadata_fails:
             raise CalibreCLIError("fetch-ebook-metadata failed: no results")
-        if self.writes_cover:
-            Path(args[args.index("--cover") + 1]).write_bytes(b"jpeg")
         return "Fetching…\n<?xml version='1.0'?><package/>"
 
     def _calibredb(self, args: list[str]) -> str:
@@ -259,6 +256,20 @@ def test_ingest_adds_the_book_and_forces_the_confirmed_title_and_food_tag(
     assert "title:The Curry Guy" in fields
     assert "authors:Dan Toombs" in fields
     assert any(f.startswith("cover:") for f in fields)
+
+
+def test_the_lookup_never_asks_calibre_for_a_cover(
+    library: Path, calibre: FakeCalibre
+) -> None:
+    # Every Calibre cover source goes through its embedded browser, which hangs on a
+    # headless host and takes the metadata result down with it: the same query returns
+    # in ~30s with --opf alone and times out with nothing when --cover is added.
+    staging_id = _stage_epub()
+
+    run_ingest(staging_id, "The Curry Guy", "Dan Toombs")
+
+    fetch = next(c for c in calibre.calls if c[0] == "fetch-ebook-metadata")
+    assert "--cover" not in fetch
 
 
 def test_a_metadata_miss_still_adds_the_book_with_its_own_cover(
