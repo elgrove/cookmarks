@@ -25,7 +25,8 @@ export const taskTypeSchema = z.enum([
 	'extraction',
 	'book_keywords',
 	'keyword_dedup',
-	'calibre_sync'
+	'calibre_sync',
+	'book_ingest'
 ]);
 export const taskStatusSchema = z.enum(['queued', 'running', 'review', 'done', 'failed']);
 
@@ -76,6 +77,24 @@ export interface KeywordDedupDetail {
 	keywords_in: number;
 	merges_applied: number;
 	keywords_removed: number;
+}
+export interface BookIngestDetail {
+	// The job as submitted — kept on the run so the worker reads it from its own row,
+	// and so a duplicate-failed run can be re-submitted as a replace without re-staging.
+	staging_id: string;
+	extract: boolean;
+	title: string;
+	author: string;
+	format: string;
+	converted: boolean;
+	calibre_id: number;
+	cover: boolean;
+	metadata_fetched: boolean;
+	replaced_calibre_id: number | null;
+	extraction_queued: boolean;
+	// Set on a run that failed because the library already holds this book — the id of
+	// the Cookmarks book it clashed with, which is what makes the replace offer possible.
+	duplicate_of_book_id?: string;
 }
 export interface CalibreSyncDetail {
 	created: string[];

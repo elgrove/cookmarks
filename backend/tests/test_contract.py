@@ -16,6 +16,7 @@ from app.schemas.book import BookFilter, BookReadState, BookSummary, RecipeIndex
 from app.schemas.config import ConfigRead
 from app.schemas.extraction import ReviewQuestion
 from app.schemas.home import HomeData
+from app.schemas.ingest import StagedBookRead
 from app.schemas.reading_queue import QueuedBook, QueueState
 from app.schemas.recipe import (
     KeywordSummary,
@@ -45,6 +46,12 @@ def test_book_summary_model_matches_contract() -> None:
 def test_home_model_matches_contract() -> None:
     example = _example("home.example.json")
     dumped = HomeData.model_validate(example).model_dump(mode="json")
+    assert dumped == example
+
+
+def test_staged_book_model_matches_contract() -> None:
+    example = _example("stagedbook.example.json")
+    dumped = StagedBookRead.model_validate(example).model_dump(mode="json")
     assert dumped == example
 
 

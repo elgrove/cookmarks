@@ -20,6 +20,7 @@ RUN wget -q "https://github.com/just-containers/s6-overlay/releases/download/v${
 # Stage 3: Python backend + Redis + s6-overlay.
 FROM python:3.11.14-slim AS runtime
 ARG TARGETARCH
+ARG CALIBRE_VERSION=9.13.0
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     redis-server \
@@ -28,6 +29,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
     && rm -rf /var/lib/apt/lists/*
+
+# Calibre is the library engine for book ingestion: calibredb (add/remove/set_metadata),
+# fetch-ebook-metadata (metadata + cover), ebook-meta (read embedded metadata),
+# ebook-convert (anything → EPUB). Upstream binary build, not Debian's — the packaged
+# 6.x has rotted metadata-source plugins. The libs below are Qt client dependencies the
+# binaries load even headless; without them every CLI refuses to start.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libopengl0 libegl1 libglx0 libfontconfig1 libnss3 \
+    libxkbcommon0 libxkbcommon-x11-0 libxcb-cursor0 libxcb-xinerama0 \
+    && rm -rf /var/lib/apt/lists/* \
+    && curl -fsSL https://download.calibre-ebook.com/linux-installer.sh \
+       | sh /dev/stdin version="${CALIBRE_VERSION}" isolated=y install_dir=/opt \
+    && for b in calibredb fetch-ebook-metadata ebook-meta ebook-convert; do \
+         ln -sf "/opt/calibre/$b" "/usr/local/bin/$b"; \
+       done \
+    && calibredb --version
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 
@@ -61,6 +78,7 @@ ENV S6_BEHAVIOUR_IF_STAGE2_FAILS=2 \
     PYTHONUNBUFFERED=1 \
     COOKMARKS_ENV=prod \
     COOKMARKS_DB_PATH=/data/db.sqlite3 \
+    COOKMARKS_INGEST_STAGING_PATH=/data/ingest \
     COOKMARKS_FRONTEND_DIST=/app/static/frontend
 
 EXPOSE 8789

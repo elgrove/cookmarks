@@ -28,6 +28,7 @@ from app.schemas.book import (
 )
 from app.schemas.recipe import RecipeNeighbour, RecipeRow
 from app.services.calibre import delete_books
+from app.services.ingest import IngestError, remove_from_library
 from app.services.reading import (
     finish_reading,
     forget_reading,
@@ -211,14 +212,30 @@ def reset_book_progress(
     status_code=status.HTTP_204_NO_CONTENT,
     dependencies=[Depends(require_admin)],
 )
-def delete_book(book_id: uuid.UUID, session: SessionDep, exclude: bool = False) -> Response:
+def delete_book(
+    book_id: uuid.UUID,
+    session: SessionDep,
+    exclude: bool = False,
+    from_library: bool = False,
+) -> Response:
     """Delete a book and everything under it (recipes, runs, list membership, embeddings).
     With `exclude=true` the book's Calibre id is added to the exclusion list so the next
     sync skips it — without that, a book still in the library is re-created on the next
-    sync (recipes gone)."""
+    sync (recipes gone). With `from_library=true` the book is removed from the Calibre
+    library itself, which needs no exclusion because there is nothing left to re-sync."""
     book = session.get(Book, book_id)
     if book is None:
         raise HTTPException(status_code=404, detail="book not found")
+    if exclude and from_library:
+        raise HTTPException(
+            status_code=422, detail="a book removed from the library needs no exclusion"
+        )
+    if from_library:
+        # Before the row goes: a failure here must leave the book whole, not half-deleted.
+        try:
+            remove_from_library(book.calibre_id)
+        except IngestError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
     if exclude:
         # merge, not add: deleting the same Calibre book twice must not clash on the PK.
         session.merge(CalibreExclusion(calibre_id=book.calibre_id, title=book.title))

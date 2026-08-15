@@ -93,6 +93,11 @@ def test_non_admin_reads_but_cannot_reach_admin_surfaces(
     book_id = session.scalar(select(Book.id))
     assert anon.delete(f"/api/books/{book_id}").status_code == 403
     assert anon.post(f"/api/books/{book_id}/extract").status_code == 403
+    # Adding a book writes to the library and downloads from the internet — admin only.
+    staging = anon.post("/api/ingest/stage/url", json={"url": "https://example.com/x"})
+    assert staging.status_code == 403
+    confirm = anon.post("/api/ingest", json={"staging_id": "x", "title": "t", "author": "a"})
+    assert confirm.status_code == 403
 
 
 def test_admin_reaches_admin_surfaces(anon: TestClient) -> None:

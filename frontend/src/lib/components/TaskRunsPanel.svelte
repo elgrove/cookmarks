@@ -5,7 +5,8 @@
 		ExtractionDetail,
 		BookKeywordsDetail,
 		KeywordDedupDetail,
-		CalibreSyncDetail
+		CalibreSyncDetail,
+		BookIngestDetail
 	} from '$lib/api/task-runs';
 
 	export type TaskRunsPanelProps = {
@@ -21,14 +22,16 @@
 		{ id: 'extraction', label: 'Extraction' },
 		{ id: 'book_keywords', label: 'Keywords' },
 		{ id: 'keyword_dedup', label: 'Dedup' },
-		{ id: 'calibre_sync', label: 'Calibre' }
+		{ id: 'calibre_sync', label: 'Calibre' },
+		{ id: 'book_ingest', label: 'Added books' }
 	];
 
 	const TYPE_LABELS: Record<TaskType, string> = {
 		extraction: 'Extraction',
 		book_keywords: 'Book keywords',
 		keyword_dedup: 'Keyword dedup',
-		calibre_sync: 'Calibre sync'
+		calibre_sync: 'Calibre sync',
+		book_ingest: 'Add book'
 	};
 
 	const rowDateFmt = new Intl.DateTimeFormat('en-GB', {
@@ -59,6 +62,8 @@
 				const d = run.detail as unknown as CalibreSyncDetail;
 				return `${d.created?.length ?? 0} new · ${d.updated?.length ?? 0} updated`;
 			}
+			case 'book_ingest':
+				return (run.detail as unknown as BookIngestDetail).title || 'Add book';
 		}
 	}
 </script>

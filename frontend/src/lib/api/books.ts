@@ -158,10 +158,11 @@ export async function resetBookProgress(
  *  exclusion list so the next library sync doesn't bring it back. */
 export async function deleteBook(
 	id: string,
-	{ exclude = false }: { exclude?: boolean } = {},
+	{ exclude = false, fromLibrary = false }: { exclude?: boolean; fromLibrary?: boolean } = {},
 	fetchFn: typeof fetch = fetch
 ): Promise<void> {
-	const res = await fetchFn(`/api/books/${id}?exclude=${exclude}`, { method: 'DELETE' });
+	const query = `exclude=${exclude}&from_library=${fromLibrary}`;
+	const res = await fetchFn(`/api/books/${id}?${query}`, { method: 'DELETE' });
 	if (!res.ok) throw new Error(`DELETE /api/books/${id} → ${res.status}`);
 }
 
