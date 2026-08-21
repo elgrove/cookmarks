@@ -1,6 +1,8 @@
+import hashlib
+import json
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import FileResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
@@ -46,7 +48,9 @@ router = APIRouter(tags=["books"])
 
 
 @router.get("/books", response_model=list[BookSummary])
-def list_books(session: SessionDep, user: CurrentUser) -> list[BookSummary]:
+def list_books(
+    request: Request, response: Response, session: SessionDep, user: CurrentUser
+) -> list[BookSummary] | Response:
     # One grouped query, not N+1. count(Recipe.id) (not *) so books with no
     # recipes correctly count 0 across the outer join.
     rows = session.execute(
@@ -58,7 +62,7 @@ def list_books(session: SessionDep, user: CurrentUser) -> list[BookSummary]:
         .options(selectinload(Book.keywords))
     ).all()
     positions = reading_positions(session, user.id)
-    return [
+    items = [
         BookSummary(
             id=book.id,
             title=book.title,
@@ -73,6 +77,16 @@ def list_books(session: SessionDep, user: CurrentUser) -> list[BookSummary]:
         )
         for book, recipe_count in rows
     ]
+    # The ETag is a hash of the exact per-user payload, so any change — book, recipe
+    # count, keyword, or this user's reading progress — invalidates it; no-cache makes
+    # clients revalidate every time, trading a tiny 304 for guaranteed freshness.
+    body = json.dumps([b.model_dump(mode="json") for b in items], sort_keys=True)
+    etag = f'"{hashlib.sha256(body.encode()).hexdigest()[:32]}"'
+    headers = {"ETag": etag, "Cache-Control": "private, no-cache"}
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=status.HTTP_304_NOT_MODIFIED, headers=headers)
+    response.headers.update(headers)
+    return items
 
 
 # Declared before /books/{book_id} so the literal path wins — otherwise the UUID

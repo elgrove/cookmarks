@@ -1,0 +1,16 @@
+package com.cookmarks.app
+
+import android.app.Application
+import coil.Coil
+import coil.ImageLoader
+import com.cookmarks.app.api.Api
+
+class CookmarksApplication : Application() {
+    override fun onCreate() {
+        super.onCreate()
+        Api.init(this)
+        Coil.setImageLoader(
+            ImageLoader.Builder(this).okHttpClient(Api.client).build()
+        )
+    }
+}
