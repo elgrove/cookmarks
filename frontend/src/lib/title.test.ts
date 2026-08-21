@@ -18,7 +18,10 @@ describe('cleanTitle', () => {
 		expect(cleanTitle('Persiana')).toBe('Persiana');
 	});
 
-	it('keeps the subtitle separately', () => {
+});
+
+describe('titleSubtitle', () => {
+	it('keeps the subtitle, softening further colons', () => {
 		expect(titleSubtitle('A: B: C')).toBe('B — C');
 		expect(titleSubtitle('Persiana')).toBe('');
 	});

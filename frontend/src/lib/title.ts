@@ -1,5 +1,4 @@
-/** Document title pattern: the page first so it survives tab truncation, then the brand
- *  (e.g. "Recipes · Cookmarks"). Bare "Cookmarks" on the home page. */
+/** Page first so it survives tab truncation: "Recipes · Cookmarks". */
 export function pageTitle(section?: string | null): string {
 	const trimmed = section?.trim();
 	return trimmed ? `${trimmed} · Cookmarks` : 'Cookmarks';
