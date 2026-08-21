@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import com.cookmarks.app.BuildConfig
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.json.Json
+import okhttp3.Cache
 import okhttp3.Cookie
 import okhttp3.CookieJar
 import okhttp3.HttpUrl
@@ -60,6 +61,7 @@ object Api {
     fun init(context: Context) {
         cookieJar = SessionCookieJar(context.getSharedPreferences("session", Context.MODE_PRIVATE))
         client = OkHttpClient.Builder()
+            .cache(Cache(context.cacheDir.resolve("http"), 20L * 1024 * 1024))
             .cookieJar(cookieJar)
             .addInterceptor { chain ->
                 val response = chain.proceed(chain.request())

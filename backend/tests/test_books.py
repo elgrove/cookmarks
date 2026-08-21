@@ -52,6 +52,22 @@ def test_list_books_shape(client: TestClient) -> None:
         assert set(item.keys()) == EXPECTED_KEYS
 
 
+def test_list_books_etag_revalidation(client: TestClient) -> None:
+    first = client.get("/api/books")
+    etag = first.headers["ETag"]
+    assert first.headers["Cache-Control"] == "private, no-cache"
+
+    not_modified = client.get("/api/books", headers={"If-None-Match": etag})
+    assert not_modified.status_code == 304
+    assert not_modified.headers["ETag"] == etag
+
+    book_id = first.json()[0]["id"]
+    client.put(f"/api/books/{book_id}/reading", json={"mode": "book", "location": "epubcfi(/6/2)"})
+    changed = client.get("/api/books", headers={"If-None-Match": etag})
+    assert changed.status_code == 200
+    assert changed.headers["ETag"] != etag
+
+
 def test_recipe_counts(client: TestClient) -> None:
     books = {b["title"]: b for b in client.get("/api/books").json()}
     assert books["With Recipes"]["recipe_count"] == 3
