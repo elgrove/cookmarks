@@ -56,12 +56,11 @@ fun BooksScreen(onOpenBook: (String) -> Unit) {
         ) {
             item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(2) }) {
                 Column {
-                    MonoLabel("Library — ${books.size} books")
                     Text(
                         text = "Books",
                         style = MaterialTheme.typography.displaySmall,
                         color = colors.ink,
-                        modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
+                        modifier = Modifier.padding(bottom = 12.dp),
                     )
                     OutlinedTextField(
                         value = query,
@@ -129,10 +128,5 @@ private fun BookCard(book: BookSummary, onClick: () -> Unit) {
             modifier = Modifier.padding(top = 8.dp),
         )
         MonoLabel(book.author, modifier = Modifier.padding(top = 2.dp))
-        MonoLabel(
-            "${book.recipe_count} recipes",
-            colour = colors.faint,
-            modifier = Modifier.padding(top = 2.dp),
-        )
     }
 }

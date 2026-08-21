@@ -18,6 +18,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -63,9 +64,10 @@ fun MainShell() {
                     ) {
                         Tabs.forEach { tab ->
                             val active = route == tab.route || (tab.route == "books" && route.startsWith("books/"))
-                            MonoLabel(
-                                text = tab.label,
-                                colour = if (active) colors.clay else colors.muted,
+                            Text(
+                                text = tab.label.uppercase(),
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 13.sp, lineHeight = 18.sp),
+                                color = if (active) colors.clay else colors.muted,
                                 modifier = Modifier
                                     .clickable {
                                         navController.navigate(tab.route) {
@@ -74,7 +76,7 @@ fun MainShell() {
                                             restoreState = true
                                         }
                                     }
-                                    .padding(horizontal = 20.dp, vertical = 14.dp),
+                                    .padding(horizontal = 20.dp, vertical = 20.dp),
                             )
                         }
                     }
