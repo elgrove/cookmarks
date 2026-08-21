@@ -21,6 +21,7 @@ const lists: ListMembership[] = [
 
 const TRIGGER = '.trigger';
 const TOGGLE = '.list-toggle';
+const SECOND_ROW = '.lists li:nth-child(2) .list-toggle';
 const CREATE_INPUT = '.create-input';
 const CREATE_BTN = '.create-btn';
 
@@ -28,7 +29,7 @@ const unit: VerifiableUnit<Props> = {
 	id: 'add-to-list',
 	title: 'Add-to-list control',
 	description:
-		'A disclosure that lists every list with its membership as a button[aria-pressed], plus an inline create-new field. Favourites is pinned first.',
+		'A disclosure that lists every list with its membership as a button[aria-pressed], plus an inline create-new field, dismissed as soon as a choice is made. Favourites is pinned first.',
 	kind: 'component',
 	component: ListPicker,
 	fixtures: [
@@ -50,17 +51,34 @@ const unit: VerifiableUnit<Props> = {
 		},
 		{
 			id: 'toggle-member',
-			description: 'clicking a list row fires the toggle for that list',
+			description: 'clicking an unticked list row adds it and dismisses the panel',
 			props: { lists, open: true },
-			act: ({ click }) => click(TOGGLE)
+			act: async ({ click, wait }) => {
+				click(SECOND_ROW);
+				await wait(0);
+			}
+		},
+		{
+			id: 'toggle-error',
+			description: 'a rejected toggle leaves the panel open so the row can be retried',
+			props: {
+				lists,
+				open: true,
+				onToggle: () => Promise.reject(new Error('stub: could not add'))
+			},
+			act: async ({ click, wait }) => {
+				click(SECOND_ROW);
+				await wait(0);
+			}
 		},
 		{
 			id: 'create',
-			description: 'typing a name and pressing Create fires the create handler',
+			description: 'typing a name and pressing Create fires the create handler, then dismisses',
 			props: { lists, open: true },
-			act: ({ type, click }) => {
+			act: async ({ type, click, wait }) => {
 				type(CREATE_INPUT, 'Brunch');
 				click(CREATE_BTN);
+				await wait(0);
 			}
 		},
 		{
@@ -122,15 +140,32 @@ const unit: VerifiableUnit<Props> = {
 		},
 		{
 			id: 'toggle-wires',
-			description: 'clicking the first list row toggles Favourites',
+			description: 'clicking an unticked row toggles that list and dismisses the panel',
 			onlyFixtures: ['toggle-member'],
-			check: ({ contract }) => contract.toggled === 'Favourites' || `toggled=${contract.toggled}`
+			check: ({ contract, root }) => {
+				if (contract.toggled !== 'Weeknight dinners') return `toggled=${contract.toggled}`;
+				if (contract.open !== 'false') return `panel still open after toggle: open=${contract.open}`;
+				return root.querySelector('.panel') === null || 'panel should be dismissed after a toggle';
+			}
 		},
 		{
 			id: 'create-wires',
-			description: 'creating echoes the typed name into the contract',
+			description: 'creating echoes the typed name and dismisses the panel',
 			onlyFixtures: ['create'],
-			check: ({ contract }) => contract.created === 'Brunch' || `created=${contract.created}`
+			check: ({ contract, root }) => {
+				if (contract.created !== 'Brunch') return `created=${contract.created}`;
+				if (contract.open !== 'false') return `panel still open after a create: open=${contract.open}`;
+				return root.querySelector('.panel') === null || 'panel should be dismissed after a create';
+			}
+		},
+		{
+			id: 'failed-toggle-stays-open',
+			description: 'a rejected toggle leaves the panel mounted and open',
+			onlyFixtures: ['toggle-error'],
+			check: ({ contract, root }) => {
+				if (contract.open !== 'true') return 'panel dismissed after a failed toggle';
+				return root.querySelector('.panel') !== null || 'panel missing after a failed toggle';
+			}
 		},
 		{
 			id: 'long-names-render',

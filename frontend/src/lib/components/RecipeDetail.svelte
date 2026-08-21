@@ -58,8 +58,8 @@
 		/** List memberships for the add-to-list control; the picker is shown once loaded. */
 		lists?: ListMembership[];
 		onToggleFavourite?: () => void;
-		onToggleList?: (listId: string, contains: boolean) => void;
-		onCreateList?: (name: string) => void;
+		onToggleList?: (listId: string, contains: boolean) => void | Promise<void>;
+		onCreateList?: (name: string) => void | Promise<void>;
 	} = $props();
 
 	let coverFailed = $state(false);

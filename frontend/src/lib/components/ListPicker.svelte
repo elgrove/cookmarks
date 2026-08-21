@@ -7,8 +7,8 @@
 		/** Render the panel open from the start (the trigger still toggles it). */
 		open?: boolean;
 		/** Called with the list and its *current* membership when a row is clicked. */
-		onToggle?: (listId: string, contains: boolean) => void;
-		onCreate?: (name: string) => void;
+		onToggle?: (listId: string, contains: boolean) => void | Promise<void>;
+		onCreate?: (name: string) => void | Promise<void>;
 	};
 </script>
 
@@ -32,17 +32,33 @@
 			.join('|')
 	);
 
-	function toggle(list: ListMembership) {
-		lastToggled = list.name;
-		onToggle?.(list.id, list.contains);
+	function dismiss() {
+		isOpen = false;
+		triggerEl?.focus();
 	}
 
-	function create(name: string) {
+	async function toggle(list: ListMembership) {
+		lastToggled = list.name;
+		try {
+			await onToggle?.(list.id, list.contains);
+			dismiss();
+		} catch (e) {
+			console.error('list toggle failed', e);
+		}
+	}
+
+	async function create(name: string) {
 		lastCreated = name;
-		onCreate?.(name);
+		try {
+			await onCreate?.(name);
+			dismiss();
+		} catch (e) {
+			console.error('list create failed', e);
+		}
 	}
 
 	let pickerEl = $state<HTMLElement>();
+	let triggerEl = $state<HTMLButtonElement>();
 
 	// While open, a click anywhere outside the picker dismisses it. Clicks inside
 	// (the trigger, the list toggles, the create field) are left to their own
@@ -72,6 +88,7 @@
 	<button
 		class="trigger"
 		type="button"
+		bind:this={triggerEl}
 		aria-expanded={isOpen}
 		onclick={() => (isOpen = !isOpen)}
 	>

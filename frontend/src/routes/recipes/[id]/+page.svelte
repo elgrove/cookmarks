@@ -151,28 +151,22 @@
 		}
 	}
 
+	// These two throw on purpose: the picker dismisses itself on a settled choice and
+	// stays open on a failed one, so it has to see the failure.
 	async function onToggleList(listId: string, contains: boolean) {
 		if (!recipe) return;
 		const id = recipe.id;
-		try {
-			if (contains) await removeRecipeFromList(listId, id);
-			else await addRecipeToList(listId, id);
-			await refreshMemberships(id);
-		} catch (err) {
-			console.error('failed to update list membership', err);
-		}
+		if (contains) await removeRecipeFromList(listId, id);
+		else await addRecipeToList(listId, id);
+		await refreshMemberships(id);
 	}
 
 	async function onCreateList(name: string) {
 		if (!recipe) return;
 		const id = recipe.id;
-		try {
-			const list = await createList(name);
-			await addRecipeToList(list.id, id);
-			await refreshMemberships(id);
-		} catch (err) {
-			console.error('failed to create list', err);
-		}
+		const list = await createList(name);
+		await addRecipeToList(list.id, id);
+		await refreshMemberships(id);
 	}
 
 	// Reload whenever the id or context query changes — prev/next reuses this route.

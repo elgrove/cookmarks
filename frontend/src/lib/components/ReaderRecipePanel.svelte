@@ -45,6 +45,7 @@
 	let lastToggled = $state('');
 	let lastCreated = $state('');
 	let lastFavChange = $state('');
+	let dismissed = $state(false);
 
 	onMount(async () => {
 		try {
@@ -63,6 +64,11 @@
 			.join('|')
 	);
 
+	function dismiss() {
+		dismissed = true;
+		onClose();
+	}
+
 	async function toggle(list: ListMembership) {
 		if (busy) return;
 		busy = list.id;
@@ -75,6 +81,7 @@
 				lastFavChange = String(list.contains);
 				onFavouriteChange?.(list.contains);
 			}
+			dismiss();
 		} catch (e) {
 			console.error('list toggle failed', e);
 		} finally {
@@ -101,6 +108,7 @@
 				...lists,
 				{ id: created.id, name: created.name, is_default: created.is_default, contains }
 			];
+			if (contains) dismiss();
 		} catch (e) {
 			console.error('list create failed', e);
 		} finally {
@@ -141,6 +149,7 @@
 	data-verify-toggled={lastToggled}
 	data-verify-created={lastCreated}
 	data-verify-fav-change={lastFavChange}
+	data-verify-dismissed={dismissed ? 'true' : 'false'}
 >
 	<header class="head">
 		<span class="name">{recipeName}</span>
