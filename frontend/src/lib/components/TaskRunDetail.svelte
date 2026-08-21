@@ -131,8 +131,7 @@
 					{ label: 'Source format', value: d.format ? d.format.toUpperCase() : '—' },
 					{ label: 'Converted', value: d.converted ? 'Yes' : 'No' },
 					{ label: 'Calibre id', value: count(d.calibre_id) },
-					{ label: 'Cover', value: d.cover ? 'Fetched' : 'None' },
-					{ label: 'Metadata', value: d.metadata_fetched ? 'Fetched' : 'Confirmed only' },
+					{ label: 'Cover', value: d.cover ? 'From the book' : 'None' },
 					{ label: 'Extraction', value: d.extraction_queued ? 'Queued' : 'Not queued' }
 				];
 			}

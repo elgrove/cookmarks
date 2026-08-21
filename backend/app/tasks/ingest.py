@@ -86,7 +86,6 @@ def ingest_book_task(run_id: str) -> dict:
         "converted": outcome.converted,
         "calibre_id": outcome.calibre_id,
         "cover": outcome.cover,
-        "metadata_fetched": outcome.metadata_fetched,
         "replaced_calibre_id": outcome.replaced_calibre_id,
         "sync": {key: len(value) for key, value in sync.items()},
         "extraction_queued": extraction_queued,

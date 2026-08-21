@@ -42,7 +42,6 @@ class FakeCalibre:
         self.calls: list[list[str]] = []
         self.added_id = 42
         self.tags: list[str] = ["Cooking"]
-        self.metadata_fails = False
         self.epub_has_cover = True
         self.echo_filename_as_title = False
         self.title = "The Curry Guy"
@@ -65,18 +64,13 @@ class FakeCalibre:
             title = Path(args[1]).stem if self.echo_filename_as_title else self.title
             return f"Title               : {title}\nAuthor(s)           : {self.author}\n"
         if binary == "fetch-ebook-metadata":
-            return self._fetch(args)
+            raise AssertionError("ingestion must not reach the network")
         if binary == "ebook-convert":
             Path(args[2]).write_bytes(EPUB_BYTES)
             return "Output saved"
         if binary == "calibredb":
             return self._calibredb(args)
         raise AssertionError(f"unexpected binary {binary}")
-
-    def _fetch(self, args: list[str]) -> str:
-        if self.metadata_fails:
-            raise CalibreCLIError("fetch-ebook-metadata failed: no results")
-        return "Fetching…\n<?xml version='1.0'?><package/>"
 
     def _calibredb(self, args: list[str]) -> str:
         sub = args[3]
@@ -250,7 +244,7 @@ def test_ingest_adds_the_book_and_forces_the_confirmed_title_and_food_tag(
     outcome = run_ingest(staging_id, "The Curry Guy", "Dan Toombs")
 
     assert outcome.calibre_id == 42
-    assert (outcome.cover, outcome.metadata_fetched, outcome.converted) == (True, True, False)
+    assert (outcome.cover, outcome.converted) == (True, False)
     fields = calibre.commands("set_metadata")[-1]
     assert "tags:Cooking,Food" in fields
     assert "title:The Curry Guy" in fields
@@ -258,39 +252,29 @@ def test_ingest_adds_the_book_and_forces_the_confirmed_title_and_food_tag(
     assert any(f.startswith("cover:") for f in fields)
 
 
-def test_the_lookup_never_asks_calibre_for_a_cover(
-    library: Path, calibre: FakeCalibre
-) -> None:
-    # Every Calibre cover source goes through its embedded browser, which hangs on a
-    # headless host and takes the metadata result down with it: the same query returns
-    # in ~30s with --opf alone and times out with nothing when --cover is added.
+def test_ingestion_never_goes_near_the_network(library: Path, calibre: FakeCalibre) -> None:
+    # Everything the app shows — publisher, ISBN, pubdate, description — is embedded in
+    # the file and read by `calibredb add`. An online lookup cost ~30s, missed often, and
+    # sometimes described a different edition, so there is no lookup left to make.
     staging_id = _stage_epub()
 
     run_ingest(staging_id, "The Curry Guy", "Dan Toombs")
 
-    fetch = next(c for c in calibre.calls if c[0] == "fetch-ebook-metadata")
-    assert "--cover" not in fetch
+    assert [c[0] for c in calibre.calls if c[0] == "fetch-ebook-metadata"] == []
 
 
-def test_a_metadata_miss_still_adds_the_book_with_its_own_cover(
-    library: Path, calibre: FakeCalibre
-) -> None:
-    calibre.metadata_fails = True
+def test_the_book_keeps_its_own_cover(library: Path, calibre: FakeCalibre) -> None:
     staging_id = _stage_epub()
 
     outcome = run_ingest(staging_id, "The Curry Guy", "Dan Toombs")
 
     assert outcome.calibre_id == 42
-    assert outcome.metadata_fetched is False
-    # Applying a fetched OPF clears the cover Calibre extracts on add, so the book's own
-    # cover is pulled out and set explicitly — a lookup must never cost a book its cover.
     assert outcome.cover is True
 
 
 def test_a_book_with_no_cover_anywhere_is_still_added(
     library: Path, calibre: FakeCalibre
 ) -> None:
-    calibre.metadata_fails = True
     calibre.epub_has_cover = False
     staging_id = _stage_epub()
 
