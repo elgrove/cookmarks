@@ -89,7 +89,6 @@ export interface BookIngestDetail {
 	converted: boolean;
 	calibre_id: number;
 	cover: boolean;
-	metadata_fetched: boolean;
 	replaced_calibre_id: number | null;
 	extraction_queued: boolean;
 	// Set on a run that failed because the library already holds this book — the id of

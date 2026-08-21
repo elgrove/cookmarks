@@ -2,9 +2,15 @@
 
 Cookmarks owns its library (it is the single writer), so adding a book is a sequence of
 Calibre commands rather than a GUI session: convert to EPUB if the upload isn't one,
-fetch metadata and a cover, `calibredb add`, apply the metadata, and let the normal
+`calibredb add`, tag it and force the confirmed title and author on, then let the normal
 Calibre sync pull the result into the app. Calibre stays the library engine — nothing
 about its catalogue is reimplemented here.
+
+**No metadata is fetched over the network.** Everything the app displays — publisher,
+ISBN, publication date, description — is embedded in the book file, and `calibredb add`
+reads it. An online lookup was tried and dropped: it cost ~30s per ingest, missed often,
+and when it did answer it sometimes described a different edition of the book. Enriching
+a thin file is a deliberate per-book action for later, not a silent guess at ingest time.
 
 Two behaviours of the Calibre CLI shape this module:
 
@@ -58,11 +64,6 @@ ACCEPTED_FORMATS: dict[str, tuple[int, bytes] | None] = {
 STAGING_MAX_AGE_SECONDS = 24 * 60 * 60
 _CLI_TIMEOUT = 300
 _METADATA_TIMEOUT = 60
-# fetch-ebook-metadata's own --timeout is per source, and it queries several, so a title
-# with no match spends well over a minute before giving up. Our ceiling has to sit above
-# its budget, not under it, or a slow-but-successful lookup is killed and reads as a miss.
-_FETCH_TIMEOUT = 180
-_FETCH_SOURCE_TIMEOUT = "30"
 _LOCK_RETRIES = 5
 
 
@@ -115,7 +116,6 @@ class IngestOutcome:
     format: str
     converted: bool
     cover: bool
-    metadata_fetched: bool
     replaced_calibre_id: int | None
 
 
@@ -337,44 +337,11 @@ def remove_from_library(calibre_id: int) -> None:
     logger.info("Cleared book directory Calibre left behind: %s", directory.name)
 
 
-def _fetch_metadata(title: str, author: str, staging_id: str) -> tuple[Path | None, Path | None]:
-    """One metadata lookup on Calibre's default source mix, auto-accepted. A miss is
-    normal and not fatal — the book goes in with the title and author the user confirmed,
-    and no cover, which the UI is designed for."""
-    # Named "<id>.cover.jpg", not "<id>-cover.jpg", so the "<id>.*" cleanup sweeps it too.
-    opf_path = staging_dir() / f"{staging_id}.opf"
-    cover_path = staging_dir() / f"{staging_id}.cover.jpg"
-    try:
-        opf = run_cli(
-            [
-                "fetch-ebook-metadata",
-                "--title",
-                title,
-                "--authors",
-                author,
-                "--opf",
-                "--cover",
-                str(cover_path),
-                "--timeout",
-                _FETCH_SOURCE_TIMEOUT,
-            ],
-            timeout=_FETCH_TIMEOUT,
-        )
-    except CalibreCLIError as exc:
-        logger.warning("Metadata lookup failed for %r: %s", title, exc)
-        return None, None
-    start = opf.find("<?xml")
-    if start == -1:
-        return None, cover_path if cover_path.exists() else None
-    opf_path.write_text(opf[start:], encoding="utf-8")
-    return opf_path, cover_path if cover_path.exists() else None
-
-
 def _cover_from_epub(epub: Path, staging_id: str) -> Path | None:
-    """The cover the book carries itself — the fallback when the metadata sources have
-    none, or found nothing at all. Applying a fetched OPF clears the cover Calibre
-    extracted on add, so without this a successful metadata lookup can leave a book
-    worse off than a failed one."""
+    """The cover the book carries itself — the only cover source we use, since Calibre's
+    all go through its embedded browser. Applying a fetched OPF also clears the cover
+    Calibre extracts on add, so without this a successful metadata lookup would leave a
+    book worse off than a failed one."""
     path = staging_dir() / f"{staging_id}.epubcover.jpg"
     try:
         run_cli(["ebook-meta", str(epub), "--get-cover", str(path)], timeout=_METADATA_TIMEOUT)
@@ -394,13 +361,10 @@ def _existing_tags(calibre_id: int) -> list[str]:
     return [tags] if isinstance(tags, str) else list(tags)
 
 
-def _apply_metadata(
-    calibre_id: int, title: str, author: str, opf: Path | None, cover: Path | None
-) -> None:
-    """Write the fetched record onto the new entry, then force the user's title and
-    author back over the top — a fetched OPF must never silently rename the book."""
-    if opf is not None:
-        _calibredb("set_metadata", str(calibre_id), str(opf))
+def _apply_metadata(calibre_id: int, title: str, author: str, cover: Path | None) -> None:
+    """Add the selection tag and force the user's confirmed title and author over
+    whatever the file claimed. Everything else — publisher, ISBN, publication date,
+    description — calibredb read out of the book itself on add."""
     tags = _existing_tags(calibre_id)
     if settings.calibre_sync_tag not in tags:
         tags.append(settings.calibre_sync_tag)
@@ -467,13 +431,12 @@ def run_ingest(
         source.unlink(missing_ok=True)
         converted = True
 
-    opf, cover = _fetch_metadata(title, author, staging_id)
-    cover = cover or _cover_from_epub(epub, staging_id)
+    cover = _cover_from_epub(epub, staging_id)
     calibre_id = _added_id(_calibredb("add", "--duplicates", str(epub)))
 
     replaced: int | None = None
     try:
-        _apply_metadata(calibre_id, title, author, opf, cover)
+        _apply_metadata(calibre_id, title, author, cover)
         if replace_book_id is not None:
             replaced = _repoint_book(replace_book_id, calibre_id)
     except Exception:
@@ -505,6 +468,5 @@ def run_ingest(
         format=fmt,
         converted=converted,
         cover=cover is not None,
-        metadata_fetched=opf is not None,
         replaced_calibre_id=replaced,
     )
