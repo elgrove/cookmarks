@@ -32,7 +32,7 @@
 
 	onMount(load);
 
-	const docTitle = $derived(pageTitle(book?.title));
+	const docTitle = $derived(pageTitle(book?.title ?? 'Reader'));
 </script>
 
 <svelte:head>

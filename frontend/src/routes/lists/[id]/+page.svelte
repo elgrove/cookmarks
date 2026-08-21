@@ -147,7 +147,7 @@
 		void loadBarLists();
 	});
 
-	const docTitle = $derived(pageTitle(list?.name));
+	const docTitle = $derived(pageTitle(list?.name ?? 'List'));
 </script>
 
 <svelte:head>

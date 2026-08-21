@@ -118,7 +118,7 @@
 
 	onMount(load);
 
-	const docTitle = $derived(pageTitle(book ? cleanTitle(book.title) : undefined));
+	const docTitle = $derived(pageTitle(book ? cleanTitle(book.title) : 'Book'));
 </script>
 
 <svelte:head>

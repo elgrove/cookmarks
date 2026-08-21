@@ -225,7 +225,7 @@
 		return () => window.removeEventListener('keydown', onKey);
 	});
 
-	const docTitle = $derived(pageTitle(recipe?.name));
+	const docTitle = $derived(pageTitle(recipe?.name ?? 'Recipe'));
 </script>
 
 <svelte:head>
