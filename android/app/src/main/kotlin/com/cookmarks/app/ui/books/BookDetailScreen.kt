@@ -30,6 +30,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -74,7 +75,10 @@ private fun BookDetailContent(
     val description = remember(detail.description) {
         Html.fromHtml(detail.description, Html.FROM_HTML_MODE_COMPACT).toString().trim()
     }
-    var filter by remember { mutableStateOf("") }
+    var filter by rememberSaveable { mutableStateOf("") }
+    val positions = remember(index) {
+        index.withIndex().associate { (i, entry) -> entry.id to i + 1 }
+    }
     val shown = remember(index, filter) {
         val q = filter.trim().lowercase()
         if (q.isEmpty()) index else index.filter { it.name.lowercase().contains(q) }
@@ -194,7 +198,7 @@ private fun BookDetailContent(
                         .padding(horizontal = 20.dp, vertical = 12.dp),
                 ) {
                     MonoLabel(
-                        "%03d".format(index.indexOfFirst { it.id == entry.id } + 1),
+                        (positions.getValue(entry.id)).toString().padStart(3, '0'),
                         colour = colors.clay,
                     )
                     Text(

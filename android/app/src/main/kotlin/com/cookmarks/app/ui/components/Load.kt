@@ -5,12 +5,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.produceState
 import com.cookmarks.app.ui.theme.CmTheme
+import kotlin.coroutines.cancellation.CancellationException
 
 @Composable
 fun <T> rememberLoad(vararg keys: Any?, block: suspend () -> T): State<Result<T>?> =
     produceState<Result<T>?>(initialValue = null, keys = keys) {
         value = null
-        value = runCatching { block() }
+        value = try {
+            Result.success(block())
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 
 @Composable

@@ -27,6 +27,7 @@ import com.cookmarks.app.ui.components.Loaded
 import com.cookmarks.app.ui.components.MonoLabel
 import com.cookmarks.app.ui.components.rememberLoad
 import com.cookmarks.app.ui.theme.CmTheme
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.flow.collectLatest
 
 sealed interface PagerSource {
@@ -67,12 +68,16 @@ private fun Pager(
     if (source is PagerSource.Book) {
         LaunchedEffect(pagerState) {
             snapshotFlow { pagerState.settledPage }.collectLatest { page ->
-                runCatching {
+                try {
                     Api.service.updateReading(
                         source.bookId,
                         ReadingUpdate(mode = "recipes", recipe_id = entries[page].first),
                     )
-                }.onFailure { Log.w("RecipePager", "reading position not saved", it) }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.w("RecipePager", "reading position not saved", e)
+                }
             }
         }
     }

@@ -95,7 +95,7 @@ private fun RecipeContent(recipe: RecipeDetail) {
             ) {
                 recipe.instructions.forEachIndexed { i, step ->
                     Row {
-                        MonoLabel("%02d".format(i + 1), colour = colors.clay)
+                        MonoLabel((i + 1).toString().padStart(2, '0'), colour = colors.clay)
                         Text(
                             text = step,
                             style = MaterialTheme.typography.bodyLarge,

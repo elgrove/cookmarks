@@ -22,8 +22,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -42,8 +42,8 @@ import com.cookmarks.app.ui.theme.CmTheme
 fun BooksScreen(onOpenBook: (String) -> Unit) {
     val colors = CmTheme.colors
     val state by rememberLoad { Api.service.books() }
-    var query by remember { mutableStateOf("") }
-    var sort by remember { mutableStateOf(BookSort.ADDED) }
+    var query by rememberSaveable { mutableStateOf("") }
+    var sort by rememberSaveable { mutableStateOf(BookSort.ADDED) }
 
     Loaded(state) { books ->
         val shown = arrangeBooks(books, query, sort)
