@@ -87,3 +87,32 @@ def test_corrupt_epub_reads_as_no_chapters(tmp_path: Path) -> None:
     not_a_zip.write_bytes(b"BOOKMOBI not a zip at all")
 
     assert get_chapterlike_files_from_epub(not_a_zip) == []
+
+
+def test_one_recipe_per_file_book_is_not_pruned_to_its_essay_chapters(tmp_path: Path) -> None:
+    """American Sfoglino shape: prose chapters match the name whitelist, the recipe
+    files that carry the actual recipes do not."""
+    names = (
+        [f"{i:02d}-chapter{i:02d}.xhtml" for i in range(1, 35)]
+        + [f"{i}-recipe{i}.xhtml" for i in range(35, 103)]
+        + ["toc.xhtml"]
+    )
+    items = "\n".join(
+        f'<item id="i{n}" href="{name}" media-type="application/xhtml+xml"/>'
+        for n, name in enumerate(names)
+    )
+    refs = "\n".join(f'<itemref idref="i{n}"/>' for n in range(len(names)))
+    opf = '<?xml version="1.0"?><package xmlns="http://www.idpf.org/2007/opf" version="3.0">'
+    opf += f"<manifest>{items}</manifest><spine>{refs}</spine></package>"
+
+    epub_path = tmp_path / "book.epub"
+    with zipfile.ZipFile(epub_path, "w") as epub:
+        epub.writestr("META-INF/container.xml", CONTAINER_XML)
+        epub.writestr("OEBPS/content.opf", opf)
+        for name in names:
+            epub.writestr(f"OEBPS/{name}", "<html/>")
+
+    selected = get_chapterlike_files_from_epub(epub_path)
+
+    assert "OEBPS/35-recipe35.xhtml" in selected
+    assert len(selected) == len(names) - 1

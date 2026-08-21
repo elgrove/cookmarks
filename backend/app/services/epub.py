@@ -62,7 +62,7 @@ def get_chapterlike_files_from_epub(epub_path: Path) -> list[str]:
                 and "nav" not in manifest[sid]["props"]
             ]
 
-            chapter_like_pattern = r"p\d+|ch[_-]?\d[\d_-]*|(chapter|part)\d|chapter|part|_?c\d+"
+            chapter_like_pattern = r"p\d+|ch[_-]?\d[\d_-]*|(chapter|part)\d|chapter|part|_?c\d+|recipe\d"
             ignore_pattern = r"(toc|nav|cover|copyright|dedication|acknowledg|appendix)"
 
             chapter_like_files = [
