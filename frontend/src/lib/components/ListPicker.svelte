@@ -35,11 +35,13 @@
 	function toggle(list: ListMembership) {
 		lastToggled = list.name;
 		onToggle?.(list.id, list.contains);
+		isOpen = false;
 	}
 
 	function create(name: string) {
 		lastCreated = name;
 		onCreate?.(name);
+		isOpen = false;
 	}
 
 	let pickerEl = $state<HTMLElement>();

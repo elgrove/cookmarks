@@ -22,7 +22,7 @@ function membership(
 /** A stub of the list endpoints: resolves from the given memberships, no network. */
 function stubApi(
 	lists: ListMembership[],
-	opts: { failFetch?: boolean; delayMs?: number } = {}
+	opts: { failFetch?: boolean; failAdd?: boolean; delayMs?: number } = {}
 ): ListPanelApi {
 	let next = 0;
 	return {
@@ -35,7 +35,9 @@ function stubApi(
 				if (opts.delayMs) setTimeout(settle, opts.delayMs);
 				else settle();
 			}),
-		addRecipeToList: async () => {},
+		addRecipeToList: async () => {
+			if (opts.failAdd) throw new Error('stub: could not add');
+		},
 		removeRecipeFromList: async () => {},
 		createList: async (name: string) => ({ id: `created-${next++}`, name, is_default: false })
 	};
@@ -50,7 +52,7 @@ const THREE_LISTS = [
 function props(
 	lists: ListMembership[],
 	extra: Partial<Props> = {},
-	opts: { failFetch?: boolean; delayMs?: number } = {}
+	opts: { failFetch?: boolean; failAdd?: boolean; delayMs?: number } = {}
 ): Props {
 	return {
 		recipeId: 'a0054f3d-3f99-4502-aa48-dc933c13fab8',
@@ -65,7 +67,7 @@ const unit: VerifiableUnit<Props> = {
 	id: 'row-list-picker',
 	title: 'Row list picker',
 	description:
-		'The per-row [+] on a recipe row: a compact trigger opening a lazy-fetched list panel (membership toggles + create), flipped above the trigger when the fold is near.',
+		'The per-row [+] on a recipe row: a compact trigger opening a lazy-fetched list panel (membership toggles + create) that dismisses on a successful choice, flipped above the trigger when the fold is near.',
 	kind: 'component',
 	component: RowListPicker,
 	propsSchema: z.object({
@@ -92,6 +94,17 @@ const unit: VerifiableUnit<Props> = {
 			id: 'toggle-member',
 			description: 'clicking an unticked list adds the recipe and ticks the row',
 			props: props(THREE_LISTS),
+			act: async ({ click, wait }) => {
+				click(TRIGGER);
+				await wait(0);
+				click(`.lists li:nth-child(2) .list-toggle`);
+				await wait(0);
+			}
+		},
+		{
+			id: 'toggle-error',
+			description: 'a failed add leaves the panel open so the row can be retried',
+			props: props(THREE_LISTS, {}, { failAdd: true }),
 			act: async ({ click, wait }) => {
 				click(TRIGGER);
 				await wait(0);
@@ -189,13 +202,24 @@ const unit: VerifiableUnit<Props> = {
 		},
 		{
 			id: 'toggle-wires',
-			description: 'toggling an unticked list ticks it and echoes the toggle',
+			description: 'toggling an unticked list adds the recipe and dismisses the panel',
 			onlyFixtures: ['toggle-member'],
 			check: ({ contract, root }) => {
 				if (contract.toggled !== 'Weeknight') return `toggled=${contract.toggled}`;
+				if (!contract.members.includes('Weeknight')) return `members=${contract.members}`;
+				if (contract.open !== 'false') return `panel still open after toggle: open=${contract.open}`;
+				return root.querySelector('.panel') === null || 'panel should be dismissed after a toggle';
+			}
+		},
+		{
+			id: 'failed-toggle-stays-open',
+			description: 'a failed add keeps the panel open and the row unticked',
+			onlyFixtures: ['toggle-error'],
+			check: ({ contract, root }) => {
+				if (contract.open !== 'true') return 'panel dismissed after a failed toggle';
+				if (contract.members.includes('Weeknight')) return `members=${contract.members}`;
 				const row = root.querySelector(`.lists li:nth-child(2) .list-toggle`);
-				if (row?.getAttribute('aria-pressed') !== 'true') return 'row not ticked after toggle';
-				return contract.members.includes('Weeknight') || `members=${contract.members}`;
+				return row?.getAttribute('aria-pressed') === 'false' || 'row ticked despite the failure';
 			}
 		},
 		{
@@ -205,7 +229,8 @@ const unit: VerifiableUnit<Props> = {
 			check: ({ contract }) => {
 				if (contract.created !== 'Weekend baking') return `created=${contract.created}`;
 				if (!contract.members.includes('Weekend baking')) return `members=${contract.members}`;
-				return Number(contract.lists) === 4 || `lists=${contract.lists} expected 4`;
+				if (Number(contract.lists) !== 4) return `lists=${contract.lists} expected 4`;
+				return contract.open === 'false' || 'panel still open after a create';
 			}
 		},
 		{

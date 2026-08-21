@@ -28,7 +28,7 @@ const unit: VerifiableUnit<Props> = {
 	id: 'add-to-list',
 	title: 'Add-to-list control',
 	description:
-		'A disclosure that lists every list with its membership as a button[aria-pressed], plus an inline create-new field. Favourites is pinned first.',
+		'A disclosure that lists every list with its membership as a button[aria-pressed], plus an inline create-new field, dismissed as soon as a choice is made. Favourites is pinned first.',
 	kind: 'component',
 	component: ListPicker,
 	fixtures: [
@@ -122,15 +122,22 @@ const unit: VerifiableUnit<Props> = {
 		},
 		{
 			id: 'toggle-wires',
-			description: 'clicking the first list row toggles Favourites',
+			description: 'clicking the first list row toggles Favourites and dismisses the panel',
 			onlyFixtures: ['toggle-member'],
-			check: ({ contract }) => contract.toggled === 'Favourites' || `toggled=${contract.toggled}`
+			check: ({ contract, root }) => {
+				if (contract.toggled !== 'Favourites') return `toggled=${contract.toggled}`;
+				if (contract.open !== 'false') return `panel still open after toggle: open=${contract.open}`;
+				return root.querySelector('.panel') === null || 'panel should be dismissed after a toggle';
+			}
 		},
 		{
 			id: 'create-wires',
-			description: 'creating echoes the typed name into the contract',
+			description: 'creating echoes the typed name and dismisses the panel',
 			onlyFixtures: ['create'],
-			check: ({ contract }) => contract.created === 'Brunch' || `created=${contract.created}`
+			check: ({ contract }) => {
+				if (contract.created !== 'Brunch') return `created=${contract.created}`;
+				return contract.open === 'false' || 'panel still open after a create';
+			}
 		},
 		{
 			id: 'long-names-render',
