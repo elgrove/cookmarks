@@ -7,6 +7,7 @@ import type { VerifiableUnit } from '$lib/verify/types';
 import { z } from 'zod';
 
 const ROW = '.lists .list-toggle';
+const SECOND_ROW = '.lists li:nth-child(2) .list-toggle';
 const CREATE_INPUT = '.create-input';
 const CREATE_BTN = '.create-btn';
 
@@ -61,7 +62,7 @@ const unit: VerifiableUnit<ReaderRecipePanelProps> = {
 	id: 'reader-recipe-panel',
 	title: 'Reader recipe panel',
 	description:
-		'The save-to-list popover the EPUB reader opens from an injected control beside a matched recipe title: list membership toggles, new-list creation, and a link to the extracted recipe.',
+		'The save-to-list popover the EPUB reader opens from an injected control beside a matched recipe title: list membership toggles, new-list creation, and a link to the extracted recipe. A settled choice dismisses it.',
 	kind: 'component',
 	component: ReaderRecipePanel,
 	propsSchema: z.object({
@@ -90,11 +91,11 @@ const unit: VerifiableUnit<ReaderRecipePanelProps> = {
 		},
 		{
 			id: 'toggle-on',
-			description: 'clicking a list the recipe is not in adds it and ticks the row',
+			description: 'clicking a list the recipe is not in adds it, ticks the row and dismisses',
 			props: props(FOUR_LISTS),
 			act: async ({ wait, click }) => {
 				await wait(0);
-				click(`.lists li:nth-child(2) .list-toggle`);
+				click(SECOND_ROW);
 				await wait(0);
 			}
 		},
@@ -110,7 +111,7 @@ const unit: VerifiableUnit<ReaderRecipePanelProps> = {
 		},
 		{
 			id: 'create-list',
-			description: 'creating a list adds the recipe to it straight away',
+			description: 'creating a list adds the recipe to it straight away, then dismisses',
 			props: props(FOUR_LISTS),
 			act: async ({ wait, click, type }) => {
 				await wait(0);
@@ -205,13 +206,14 @@ const unit: VerifiableUnit<ReaderRecipePanelProps> = {
 		},
 		{
 			id: 'toggle-adds',
-			description: 'toggling an unticked list ticks it and echoes the toggle',
+			description: 'toggling an unticked list ticks it, echoes the toggle and dismisses',
 			onlyFixtures: ['toggle-on'],
 			check: ({ contract, root }) => {
 				if (contract.toggled !== 'Weeknight') return `toggled=${contract.toggled}`;
-				const row = root.querySelector(`.lists li:nth-child(2) .list-toggle`);
+				const row = root.querySelector(SECOND_ROW);
 				if (row?.getAttribute('aria-pressed') !== 'true') return 'row not ticked after toggle';
-				return contract.members.includes('Weeknight') || `members=${contract.members}`;
+				if (!contract.members.includes('Weeknight')) return `members=${contract.members}`;
+				return contract.dismissed === 'true' || 'popover not dismissed after a toggle';
 			}
 		},
 		{
@@ -230,7 +232,8 @@ const unit: VerifiableUnit<ReaderRecipePanelProps> = {
 			check: ({ contract }) => {
 				if (contract.created !== 'Weekend baking') return `created=${contract.created}`;
 				if (!contract.members.includes('Weekend baking')) return `members=${contract.members}`;
-				return Number(contract.lists) === 5 || `lists=${contract.lists} expected 5`;
+				if (Number(contract.lists) !== 5) return `lists=${contract.lists} expected 5`;
+				return contract.dismissed === 'true' || 'popover not dismissed after a create';
 			}
 		},
 		{

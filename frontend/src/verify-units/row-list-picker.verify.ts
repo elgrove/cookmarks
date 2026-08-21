@@ -7,6 +7,7 @@ type Props = RowListPickerProps;
 
 const TRIGGER = '.add-trigger';
 const ROW = '.lists .list-toggle';
+const SECOND_ROW = '.lists li:nth-child(2) .list-toggle';
 const CREATE_INPUT = '.create-input';
 const CREATE_BTN = '.create-btn';
 
@@ -92,12 +93,12 @@ const unit: VerifiableUnit<Props> = {
 		},
 		{
 			id: 'toggle-member',
-			description: 'clicking an unticked list adds the recipe and ticks the row',
+			description: 'clicking an unticked list adds the recipe and dismisses the panel',
 			props: props(THREE_LISTS),
 			act: async ({ click, wait }) => {
 				click(TRIGGER);
 				await wait(0);
-				click(`.lists li:nth-child(2) .list-toggle`);
+				click(SECOND_ROW);
 				await wait(0);
 			}
 		},
@@ -108,14 +109,26 @@ const unit: VerifiableUnit<Props> = {
 			act: async ({ click, wait }) => {
 				click(TRIGGER);
 				await wait(0);
-				click(`.lists li:nth-child(2) .list-toggle`);
+				click(SECOND_ROW);
 				await wait(0);
 			}
 		},
 		{
 			id: 'create',
-			description: 'creating a list from the row adds the recipe to it straight away',
+			description: 'creating a list from the row adds the recipe to it and dismisses the panel',
 			props: props(THREE_LISTS),
+			act: async ({ click, type, wait }) => {
+				click(TRIGGER);
+				await wait(0);
+				type(CREATE_INPUT, 'Weekend baking');
+				click(CREATE_BTN);
+				await wait(0);
+			}
+		},
+		{
+			id: 'create-error',
+			description: 'a created list whose add fails is left unticked and the panel stays open',
+			props: props(THREE_LISTS, {}, { failAdd: true }),
 			act: async ({ click, type, wait }) => {
 				click(TRIGGER);
 				await wait(0);
@@ -218,7 +231,7 @@ const unit: VerifiableUnit<Props> = {
 			check: ({ contract, root }) => {
 				if (contract.open !== 'true') return 'panel dismissed after a failed toggle';
 				if (contract.members.includes('Weeknight')) return `members=${contract.members}`;
-				const row = root.querySelector(`.lists li:nth-child(2) .list-toggle`);
+				const row = root.querySelector(SECOND_ROW);
 				return row?.getAttribute('aria-pressed') === 'false' || 'row ticked despite the failure';
 			}
 		},
@@ -231,6 +244,17 @@ const unit: VerifiableUnit<Props> = {
 				if (!contract.members.includes('Weekend baking')) return `members=${contract.members}`;
 				if (Number(contract.lists) !== 4) return `lists=${contract.lists} expected 4`;
 				return contract.open === 'false' || 'panel still open after a create';
+			}
+		},
+		{
+			id: 'failed-create-stays-open',
+			description: 'the created list is shown unticked and the panel stays open for a retry',
+			onlyFixtures: ['create-error'],
+			check: ({ contract, root }) => {
+				if (contract.created !== 'Weekend baking') return `created=${contract.created}`;
+				if (contract.members.includes('Weekend baking')) return `members=${contract.members}`;
+				if (contract.open !== 'true') return 'panel dismissed after a failed create';
+				return root.querySelector('.panel') !== null || 'panel missing after a failed create';
 			}
 		},
 		{

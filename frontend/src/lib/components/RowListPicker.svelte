@@ -80,6 +80,11 @@
 		}
 	}
 
+	function dismiss() {
+		open = false;
+		triggerEl?.focus();
+	}
+
 	async function toggle(list: ListMembership) {
 		if (busy) return;
 		busy = list.id;
@@ -89,7 +94,7 @@
 			list.contains = !list.contains;
 			lastToggled = list.name;
 			onMembershipChange?.(list.id, list.contains);
-			open = false;
+			dismiss();
 		} catch (e) {
 			console.error('list toggle failed', e);
 		} finally {
@@ -118,7 +123,7 @@
 			];
 			if (contains) {
 				onMembershipChange?.(created.id, true);
-				open = false;
+				dismiss();
 			}
 		} catch (e) {
 			console.error('list create failed', e);
