@@ -41,7 +41,10 @@ class SessionCookieJar(private val prefs: SharedPreferences) : CookieJar {
 }
 
 object Api {
-    val json = Json { ignoreUnknownKeys = true }
+    val json = Json {
+        ignoreUnknownKeys = true
+        encodeDefaults = true
+    }
 
     val loggedIn = MutableStateFlow(false)
 

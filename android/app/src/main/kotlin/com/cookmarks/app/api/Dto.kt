@@ -61,7 +61,7 @@ data class BookDetail(
 
 @Serializable
 data class ReadingUpdate(
-    val mode: String = "recipes",
+    val mode: String,
     val recipe_id: String? = null,
     val location: String? = null,
 )

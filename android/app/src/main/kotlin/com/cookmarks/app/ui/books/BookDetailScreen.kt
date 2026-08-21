@@ -1,5 +1,6 @@
 package com.cookmarks.app.ui.books
 
+import android.text.Html
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -70,6 +71,9 @@ private fun BookDetailContent(
     onReadFrom: (String?) -> Unit,
 ) {
     val colors = CmTheme.colors
+    val description = remember(detail.description) {
+        Html.fromHtml(detail.description, Html.FROM_HTML_MODE_COMPACT).toString().trim()
+    }
     var filter by remember { mutableStateOf("") }
     val shown = remember(index, filter) {
         val q = filter.trim().lowercase()
@@ -129,10 +133,10 @@ private fun BookDetailContent(
                 }
             }
         }
-        if (detail.description.isNotBlank()) {
+        if (description.isNotBlank()) {
             item {
                 Text(
-                    text = detail.description,
+                    text = description,
                     style = MaterialTheme.typography.bodyMedium,
                     color = colors.ink,
                     maxLines = 6,
