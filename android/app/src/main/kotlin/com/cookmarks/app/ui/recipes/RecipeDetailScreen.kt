@@ -31,8 +31,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -43,6 +45,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.cookmarks.app.api.Api
 import com.cookmarks.app.api.ListRecipeRef
+import com.cookmarks.app.api.RecipeDetail
 import com.cookmarks.app.ui.cleanTitle
 import com.cookmarks.app.ui.components.Loaded
 import com.cookmarks.app.ui.components.MonoLabel
@@ -59,78 +62,84 @@ fun RecipeDetailScreen(
     onOpenRecipe: (String, List<String>) -> Unit,
     contextIds: List<String> = emptyList(),
 ) {
+    val colors = CmTheme.colors
+    val scope = rememberCoroutineScope()
     val ids = remember(recipeId) {
         if (contextIds.size > 1 && recipeId in contextIds) contextIds else listOf(recipeId)
     }
-    if (ids.size == 1) {
-        RecipeDetailPage(recipeId, null, onBack, onOpenRecipe)
-        return
-    }
     val pagerState = rememberPagerState(initialPage = ids.indexOf(recipeId)) { ids.size }
-    HorizontalPager(state = pagerState, beyondViewportPageCount = 1) { page ->
-        RecipeDetailPage(ids[page], "${page + 1} / ${ids.size}", onBack, onOpenRecipe)
+    val favourites = remember { mutableStateMapOf<String, Boolean>() }
+    val currentId = ids[pagerState.currentPage]
+    val favourite = favourites[currentId] == true
+    var sheetOpen by remember { mutableStateOf(false) }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth().padding(end = 12.dp),
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back",
+                    tint = colors.muted,
+                )
+            }
+            if (ids.size > 1) {
+                MonoLabel("${pagerState.currentPage + 1} / ${ids.size}", colour = colors.faint)
+            }
+            Spacer(modifier = Modifier.weight(1f))
+            MonoLabel(
+                "Lists",
+                colour = colors.muted,
+                modifier = Modifier.clickable { sheetOpen = true }.padding(12.dp),
+            )
+            IconButton(onClick = {
+                scope.launch {
+                    try {
+                        favourites[currentId] = Api.service.toggleFavourite(currentId).is_favourite
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        Log.w("RecipeDetail", "favourite toggle failed", e)
+                    }
+                }
+            }) {
+                Icon(
+                    if (favourite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                    contentDescription = if (favourite) "Remove from favourites" else "Add to favourites",
+                    tint = if (favourite) colors.clay else colors.muted,
+                )
+            }
+        }
+        HorizontalDivider(color = colors.line)
+        HorizontalPager(
+            state = pagerState,
+            beyondViewportPageCount = 1,
+            modifier = Modifier.weight(1f),
+        ) { page ->
+            RecipeDetailPage(ids[page], onOpenRecipe, onLoaded = { recipe ->
+                if (recipe.id !in favourites) favourites[recipe.id] = recipe.is_favourite
+            })
+        }
+    }
+    if (sheetOpen) {
+        ListsSheet(currentId, onDismiss = { sheetOpen = false })
     }
 }
 
 @Composable
 private fun RecipeDetailPage(
     recipeId: String,
-    position: String?,
-    onBack: () -> Unit,
     onOpenRecipe: (String, List<String>) -> Unit,
+    onLoaded: (RecipeDetail) -> Unit,
 ) {
-    val colors = CmTheme.colors
-    val scope = rememberCoroutineScope()
     var tick by remember { mutableIntStateOf(0) }
     val state by rememberLoad(recipeId, tick) { Api.service.recipe(recipeId) }
-    var sheetOpen by remember { mutableStateOf(false) }
-
     Loaded(state, onRetry = { tick++ }) { recipe ->
-        var favourite by remember(recipe) { mutableStateOf(recipe.is_favourite) }
-        Column(modifier = Modifier.fillMaxSize()) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth().padding(end = 12.dp),
-            ) {
-                IconButton(onClick = onBack) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
-                        tint = colors.muted,
-                    )
-                }
-                position?.let { MonoLabel(it, colour = colors.faint) }
-                Spacer(modifier = Modifier.weight(1f))
-                MonoLabel(
-                    "Lists",
-                    colour = colors.muted,
-                    modifier = Modifier.clickable { sheetOpen = true }.padding(12.dp),
-                )
-                IconButton(onClick = {
-                    scope.launch {
-                        try {
-                            favourite = Api.service.toggleFavourite(recipe.id).is_favourite
-                        } catch (e: CancellationException) {
-                            throw e
-                        } catch (e: Exception) {
-                            Log.w("RecipeDetail", "favourite toggle failed", e)
-                        }
-                    }
-                }) {
-                    Icon(
-                        if (favourite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                        contentDescription = if (favourite) "Remove from favourites" else "Add to favourites",
-                        tint = if (favourite) colors.clay else colors.muted,
-                    )
-                }
-            }
-            HorizontalDivider(color = colors.line)
-            RecipeContent(recipe) {
-                SimilarRail(recipe.id, onOpenRecipe)
-            }
-        }
-        if (sheetOpen) {
-            ListsSheet(recipe.id, onDismiss = { sheetOpen = false })
+        LaunchedEffect(recipe) { onLoaded(recipe) }
+        RecipeContent(recipe) {
+            SimilarRail(recipe.id, onOpenRecipe)
         }
     }
 }
