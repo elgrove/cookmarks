@@ -1,0 +1,41 @@
+{
+  "id": "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+  "title": "Salt, Fat, Acid, Heat",
+  "author": "Samin Nosrat",
+  "isbn": "9781476753836",
+  "pubdate": "2017-04-25",
+  "description": "A visionary new master class in cooking.",
+  "recipe_count": 100,
+  "has_cover": true,
+  "has_epub": true,
+  "added": "2026-06-05T10:00:00Z",
+  "keywords": [
+    "Fundamentals",
+    "Technique"
+  ],
+  "recipes": [
+    {
+      "id": "1b2c3d4e-5f6a-4b7c-8d9e-0f1a2b3c4d5e",
+      "name": "Buttermilk-Roasted Chicken",
+      "keywords": [
+        "Chicken",
+        "Roast"
+      ]
+    }
+  ],
+  "queued": false,
+  "reading": {
+    "mode": "recipes",
+    "fraction": 0.37,
+    "anchor": {
+      "id": "1b2c3d4e-5f6a-4b7c-8d9e-0f1a2b3c4d5e",
+      "name": "Buttermilk-Roasted Chicken"
+    },
+    "location": null,
+    "finished": false
+  },
+  "resume_recipe": {
+    "id": "1b2c3d4e-5f6a-4b7c-8d9e-0f1a2b3c4d5e",
+    "name": "Buttermilk-Roasted Chicken"
+  }
+}

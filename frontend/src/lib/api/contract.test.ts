@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import {
 	bookFiltersResponseSchema,
 	bookFilterSchema,
+	bookDetailSchema,
 	bookReadStateSchema,
 	booksResponseSchema,
 	bookSummarySchema,
@@ -58,6 +59,17 @@ describe('api wire contract', () => {
 		const example = load('bookfilters.example.json');
 		expect(() => bookFilterSchema.parse(example)).not.toThrow();
 		expect(() => bookFiltersResponseSchema.parse([example])).not.toThrow();
+	});
+
+	it('accepts the book detail example', () => {
+		expect(() => bookDetailSchema.parse(load('bookdetail.example.json'))).not.toThrow();
+	});
+
+	it('rejects a book detail example with a drifted field name', () => {
+		const example = load('bookdetail.example.json');
+		const { recipe_count, ...rest } = example;
+		const drifted = { ...rest, recipeCount: recipe_count };
+		expect(() => bookDetailSchema.parse(drifted)).toThrow();
 	});
 
 	it('accepts the book read-state example', () => {
