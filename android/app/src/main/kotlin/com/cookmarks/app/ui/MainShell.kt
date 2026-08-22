@@ -65,17 +65,23 @@ fun MainShell() {
                     ) {
                         Tabs.forEach { tab ->
                             val active = route == tab.route || route.startsWith("${tab.route}/") ||
-                                (tab.route == "recipes" && route.startsWith("recipe/"))
+                                (tab.route == "recipes" && route.startsWith("recipe/")) ||
+                                (tab.route == "books" && route.startsWith("read/")) ||
+                                (tab.route == "lists" && route.startsWith("read-list/"))
                             Text(
                                 text = tab.label.uppercase(),
                                 style = MaterialTheme.typography.labelSmall.copy(fontSize = 13.sp, lineHeight = 18.sp),
                                 color = if (active) colors.clay else colors.muted,
                                 modifier = Modifier
                                     .clickable {
-                                        navController.navigate(tab.route) {
-                                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                            launchSingleTop = true
-                                            restoreState = true
+                                        if (active) {
+                                            navController.popBackStack(tab.route, inclusive = false)
+                                        } else {
+                                            navController.navigate(tab.route) {
+                                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                                launchSingleTop = true
+                                                restoreState = true
+                                            }
                                         }
                                     }
                                     .padding(horizontal = 20.dp, vertical = 20.dp),
@@ -129,8 +135,16 @@ fun MainShell() {
                     ListDetailScreen(
                         listId = listId,
                         onBack = { navController.popBackStack() },
-                        onOpenRecipe = { navController.navigate("recipe/$it") },
+                        onOpenRecipe = { navController.navigate("lists/recipe/$it") },
                         onReadThrough = { navController.navigate("read-list/$listId") },
+                    )
+                }
+                composable("lists/recipe/{recipeId}") { entry ->
+                    val recipeId = entry.arguments?.getString("recipeId") ?: return@composable
+                    RecipeDetailScreen(
+                        recipeId = recipeId,
+                        onBack = { navController.popBackStack() },
+                        onOpenRecipe = { navController.navigate("lists/recipe/$it") },
                     )
                 }
                 composable("read-list/{listId}") { entry ->

@@ -189,6 +189,9 @@ fun RecipesScreen(onOpenRecipe: (String) -> Unit) {
             semantic && query.isBlank() -> item {
                 StateLine("Type a craving and semantic search finds the nearest recipes.")
             }
+            !semantic && query.isBlank() && selected.isEmpty() -> item {
+                StateLine("Search, or pick a keyword to browse.")
+            }
             items.isEmpty() -> item {
                 StateLine("No matches.")
             }
