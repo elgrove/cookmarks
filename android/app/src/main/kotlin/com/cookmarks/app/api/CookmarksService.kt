@@ -34,6 +34,7 @@ interface CookmarksService {
     suspend fun searchRecipes(
         @Query("q") q: String = "",
         @Query("keyword") keywords: List<String> = emptyList(),
+        @Query("seed") seed: Int = 0,
         @Query("limit") limit: Int = 30,
         @Query("offset") offset: Int = 0,
     ): RecipeSearchResults

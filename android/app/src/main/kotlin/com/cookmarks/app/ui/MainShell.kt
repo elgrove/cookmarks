@@ -28,9 +28,9 @@ import com.cookmarks.app.ui.books.BooksScreen
 import com.cookmarks.app.ui.lists.ListDetailScreen
 import com.cookmarks.app.ui.lists.ListsScreen
 import com.cookmarks.app.ui.reader.PagerSource
+import com.cookmarks.app.ui.reader.RecipePagerScreen
 import com.cookmarks.app.ui.recipes.RecipeDetailScreen
 import com.cookmarks.app.ui.recipes.RecipesScreen
-import com.cookmarks.app.ui.reader.RecipePagerScreen
 import com.cookmarks.app.ui.theme.CmTheme
 
 private data class Tab(val route: String, val label: String)

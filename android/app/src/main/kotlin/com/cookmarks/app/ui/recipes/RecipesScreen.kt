@@ -43,6 +43,7 @@ import com.cookmarks.app.ui.components.MonoLabel
 import com.cookmarks.app.ui.components.rememberLoad
 import com.cookmarks.app.ui.theme.CmTheme
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.random.Random
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -65,10 +66,11 @@ fun RecipesScreen(onOpenRecipe: (String) -> Unit) {
     var loadingMore by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
-    val restingKeywords by rememberLoad { Api.service.keywords() }
+    var seed by remember { mutableIntStateOf(Random.nextInt(1_000_000)) }
+    val restingKeywords by rememberLoad(tick) { Api.service.keywords() }
 
     LaunchedEffect(query, selected, semantic, tick) {
-        if (query.isNotEmpty()) delay(300)
+        if (query.isNotEmpty()) delay(if (semantic) 600 else 300)
         loading = true
         error = null
         semanticUnavailable = false
@@ -86,7 +88,10 @@ fun RecipesScreen(onOpenRecipe: (String) -> Unit) {
                     total = r.total
                 }
             } else {
-                val r = Api.service.searchRecipes(q = query, keywords = selected, limit = PAGE_SIZE)
+                seed = Random.nextInt(1_000_000)
+                val r = Api.service.searchRecipes(
+                    q = query, keywords = selected, seed = seed, limit = PAGE_SIZE,
+                )
                 items = r.items
                 total = r.total
                 facets = r.facets
@@ -103,13 +108,19 @@ fun RecipesScreen(onOpenRecipe: (String) -> Unit) {
     fun loadMore() {
         if (loadingMore || semantic || items.size >= total) return
         loadingMore = true
+        val forQuery = query
+        val forSelected = selected
+        val forSeed = seed
         scope.launch {
             try {
                 val r = Api.service.searchRecipes(
-                    q = query, keywords = selected, limit = PAGE_SIZE, offset = items.size,
+                    q = forQuery, keywords = forSelected, seed = forSeed,
+                    limit = PAGE_SIZE, offset = items.size,
                 )
-                items = items + r.items
-                total = r.total
+                if (query == forQuery && selected == forSelected && seed == forSeed) {
+                    items = (items + r.items).distinctBy { it.id }
+                    total = r.total
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
@@ -173,7 +184,7 @@ fun RecipesScreen(onOpenRecipe: (String) -> Unit) {
             }
         }
         when {
-            loading -> item {
+            loading && items.isEmpty() -> item {
                 Box(modifier = Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = colors.clay)
                 }

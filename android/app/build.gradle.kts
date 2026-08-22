@@ -39,9 +39,13 @@ android {
         create("release") {
             secret("cookmarks.keystore", "COOKMARKS_KEYSTORE")?.let { path ->
                 storeFile = file(path)
-                storePassword = secret("cookmarks.keystore.password", "COOKMARKS_KEYSTORE_PASSWORD")
+                storePassword = requireNotNull(secret("cookmarks.keystore.password", "COOKMARKS_KEYSTORE_PASSWORD")) {
+                    "cookmarks.keystore is set but cookmarks.keystore.password is missing"
+                }
                 keyAlias = secret("cookmarks.key.alias", "COOKMARKS_KEY_ALIAS") ?: "cookmarks"
-                keyPassword = secret("cookmarks.key.password", "COOKMARKS_KEY_PASSWORD")
+                keyPassword = requireNotNull(secret("cookmarks.key.password", "COOKMARKS_KEY_PASSWORD")) {
+                    "cookmarks.keystore is set but cookmarks.key.password is missing"
+                }
             }
         }
     }

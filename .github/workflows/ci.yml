@@ -45,6 +45,7 @@ jobs:
       - run: npm run build
 
   android:
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     defaults:
       run:
