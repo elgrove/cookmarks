@@ -15,6 +15,7 @@ from app.schemas.auth import AuthMe, UserRead
 from app.schemas.book import BookDetail, BookFilter, BookReadState, BookSummary, RecipeIndexEntry
 from app.schemas.config import ConfigRead
 from app.schemas.extraction import ReviewQuestion
+from app.schemas.game import DismissState, GameRecipeIds
 from app.schemas.home import HomeData
 from app.schemas.ingest import StagedBookRead
 from app.schemas.reading_queue import QueuedBook, QueueState
@@ -335,3 +336,27 @@ def test_users_endpoint_keys_match_contract(client: TestClient) -> None:
     example = _example("user.example.json")
     item = client.get("/api/users").json()[0]
     assert set(item.keys()) == set(example.keys())
+
+
+def test_game_recipe_ids_model_matches_contract() -> None:
+    example = _example("gameeligible.example.json")
+    dumped = GameRecipeIds.model_validate(example).model_dump(mode="json")
+    assert dumped == example
+
+
+def test_dismiss_state_model_matches_contract() -> None:
+    example = _example("dismissstate.example.json")
+    dumped = DismissState.model_validate(example).model_dump(mode="json")
+    assert dumped == example
+
+
+def test_game_eligible_endpoint_keys_match_contract(client: TestClient) -> None:
+    example = _example("gameeligible.example.json")
+    body = client.post("/api/game/eligible", json={"recipe_ids": [_a_recipe_id(client)]}).json()
+    assert set(body.keys()) == set(example.keys())
+
+
+def test_dismiss_endpoint_keys_match_contract(client: TestClient) -> None:
+    example = _example("dismissstate.example.json")
+    body = client.put(f"/api/game/dismissals/{_a_recipe_id(client)}").json()
+    assert set(body.keys()) == set(example.keys())

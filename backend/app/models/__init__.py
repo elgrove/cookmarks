@@ -4,6 +4,7 @@ from app.models.book_reading import BookReading
 from app.models.calibre_exclusion import CalibreExclusion
 from app.models.config import Config
 from app.models.enums import AIProvider, ExtractionMethod, TaskStatus, TaskType
+from app.models.game import GameDismissal
 from app.models.reading_queue import ReadingQueueItem
 from app.models.recipe import Keyword, Recipe, recipe_keywords
 from app.models.recipe_list import RecipeList, RecipeListItem
@@ -19,6 +20,7 @@ __all__ = [
     "CalibreExclusion",
     "Config",
     "ExtractionMethod",
+    "GameDismissal",
     "Keyword",
     "ReadingQueueItem",
     "Recipe",

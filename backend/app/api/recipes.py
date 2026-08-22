@@ -125,13 +125,15 @@ def search_recipes(
     seed: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=100)] = 30,
     offset: Annotated[int, Query(ge=0)] = 0,
+    all_recipes: Annotated[bool, Query(alias="all")] = False,
 ) -> RecipeSearchResults:
     # The page is empty until *something* is asked for: a typed query or any
     # filter. Filters count as a query, so a keyword/book/author alone returns
-    # results; nothing set returns the resting (empty) state.
+    # results; nothing set returns the resting (empty) state — unless the caller
+    # explicitly asks for everything (`all=true`, the game's play-all deck source).
     keywords = keyword or []
     q = q.strip()
-    if not (q or keywords or book_id or author):
+    if not (q or keywords or book_id or author or all_recipes):
         return RecipeSearchResults(total=0, items=[])
 
     conditions = _search_conditions(q, keywords, book_id, author)

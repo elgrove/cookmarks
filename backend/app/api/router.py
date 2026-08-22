@@ -5,6 +5,7 @@ from app.api import (
     books,
     config,
     extraction,
+    game,
     health,
     home,
     ingest,
@@ -30,6 +31,7 @@ api_router.include_router(health.router)
 api_router.include_router(auth.router)
 api_router.include_router(books.router, dependencies=_USER)
 api_router.include_router(extraction.router, dependencies=_USER)
+api_router.include_router(game.router, dependencies=_USER)
 api_router.include_router(home.router, dependencies=_USER)
 api_router.include_router(recipes.router, dependencies=_USER)
 api_router.include_router(lists.router, dependencies=_USER)
