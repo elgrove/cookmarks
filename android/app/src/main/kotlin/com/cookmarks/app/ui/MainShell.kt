@@ -127,14 +127,17 @@ fun MainShell() {
                     )
                 }
                 composable("recipes") {
-                    RecipesScreen(onOpenRecipe = { navController.navigate("recipe/$it") })
+                    RecipesScreen(onOpenRecipe = { id, ids ->
+                        navController.navigate("recipe/$id?ctx=${RecipeContexts.put(ids)}")
+                    })
                 }
-                composable("recipe/{recipeId}") { entry ->
+                composable("recipe/{recipeId}?ctx={ctx}") { entry ->
                     val recipeId = entry.arguments?.getString("recipeId") ?: return@composable
                     RecipeDetailScreen(
                         recipeId = recipeId,
                         onBack = { navController.popBackStack() },
-                        onOpenRecipe = { navController.navigate("recipe/$it") },
+                        onOpenRecipe = { navController.navigate("recipe/$it?ctx=") },
+                        contextIds = RecipeContexts.get(entry.arguments?.getString("ctx")),
                     )
                 }
                 composable("lists") {
@@ -145,16 +148,19 @@ fun MainShell() {
                     ListDetailScreen(
                         listId = listId,
                         onBack = { navController.popBackStack() },
-                        onOpenRecipe = { navController.navigate("lists/recipe/$it") },
+                        onOpenRecipe = { id, ids ->
+                            navController.navigate("lists/recipe/$id?ctx=${RecipeContexts.put(ids)}")
+                        },
                         onReadThrough = { navController.navigate("read-list/$listId") },
                     )
                 }
-                composable("lists/recipe/{recipeId}") { entry ->
+                composable("lists/recipe/{recipeId}?ctx={ctx}") { entry ->
                     val recipeId = entry.arguments?.getString("recipeId") ?: return@composable
                     RecipeDetailScreen(
                         recipeId = recipeId,
                         onBack = { navController.popBackStack() },
-                        onOpenRecipe = { navController.navigate("lists/recipe/$it") },
+                        onOpenRecipe = { navController.navigate("lists/recipe/$it?ctx=") },
+                        contextIds = RecipeContexts.get(entry.arguments?.getString("ctx")),
                     )
                 }
                 composable("read-list/{listId}") { entry ->

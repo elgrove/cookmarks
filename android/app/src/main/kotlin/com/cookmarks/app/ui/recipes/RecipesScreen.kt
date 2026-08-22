@@ -62,7 +62,7 @@ import kotlinx.coroutines.launch
 private const val PAGE_SIZE = 30
 
 @Composable
-fun RecipesScreen(onOpenRecipe: (String) -> Unit) {
+fun RecipesScreen(onOpenRecipe: (String, List<String>) -> Unit) {
     val colors = CmTheme.colors
     val scope = rememberCoroutineScope()
     var query by rememberSaveable { mutableStateOf("") }
@@ -257,7 +257,7 @@ fun RecipesScreen(onOpenRecipe: (String) -> Unit) {
                     )
                 }
                 itemsIndexed(items, key = { _, r -> r.id }) { i, recipe ->
-                    RecipeRow(recipe, onClick = { onOpenRecipe(recipe.id) })
+                    RecipeRow(recipe, onClick = { onOpenRecipe(recipe.id, items.map { it.id }) })
                     if (i < items.lastIndex) {
                         HorizontalDivider(color = colors.line, modifier = Modifier.padding(horizontal = 20.dp))
                     }

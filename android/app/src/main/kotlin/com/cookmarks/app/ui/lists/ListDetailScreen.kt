@@ -48,7 +48,7 @@ import kotlinx.coroutines.launch
 fun ListDetailScreen(
     listId: String,
     onBack: () -> Unit,
-    onOpenRecipe: (String) -> Unit,
+    onOpenRecipe: (String, List<String>) -> Unit,
     onReadThrough: () -> Unit,
 ) {
     val colors = CmTheme.colors
@@ -123,7 +123,7 @@ fun ListDetailScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { onOpenRecipe(recipe.id) }
+                        .clickable { onOpenRecipe(recipe.id, shown.map { it.id }) }
                         .padding(start = 20.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
                 ) {
                     Column(modifier = Modifier.weight(1f)) {

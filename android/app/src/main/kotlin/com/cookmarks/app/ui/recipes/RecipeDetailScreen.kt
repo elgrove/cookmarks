@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -55,6 +57,27 @@ fun RecipeDetailScreen(
     recipeId: String,
     onBack: () -> Unit,
     onOpenRecipe: (String) -> Unit,
+    contextIds: List<String> = emptyList(),
+) {
+    val ids = remember(recipeId) {
+        if (contextIds.size > 1 && recipeId in contextIds) contextIds else listOf(recipeId)
+    }
+    if (ids.size == 1) {
+        RecipeDetailPage(recipeId, null, onBack, onOpenRecipe)
+        return
+    }
+    val pagerState = rememberPagerState(initialPage = ids.indexOf(recipeId)) { ids.size }
+    HorizontalPager(state = pagerState, beyondViewportPageCount = 1) { page ->
+        RecipeDetailPage(ids[page], "${page + 1} / ${ids.size}", onBack, onOpenRecipe)
+    }
+}
+
+@Composable
+private fun RecipeDetailPage(
+    recipeId: String,
+    position: String?,
+    onBack: () -> Unit,
+    onOpenRecipe: (String) -> Unit,
 ) {
     val colors = CmTheme.colors
     val scope = rememberCoroutineScope()
@@ -76,6 +99,7 @@ fun RecipeDetailScreen(
                         tint = colors.muted,
                     )
                 }
+                position?.let { MonoLabel(it, colour = colors.faint) }
                 Spacer(modifier = Modifier.weight(1f))
                 MonoLabel(
                     "Lists",
