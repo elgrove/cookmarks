@@ -55,6 +55,7 @@ class DeckController(private val source: GameSource, private val scope: Coroutin
             try {
                 while (cards.size < GameDeck.REFILL_BELOW && !exhausted) {
                     val batch = nextBatch()
+                    if (source is GameSource.Semantic || source is GameSource.Book) exhausted = true
                     if (batch.isEmpty()) {
                         exhausted = true
                         break
@@ -83,7 +84,17 @@ class DeckController(private val source: GameSource, private val scope: Coroutin
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                Log.w("GameDeck", "swipe not saved", e)
+                if (favourite) {
+                    Log.w("DeckController", "favourite not saved", e)
+                } else {
+                    try {
+                        Api.service.dismissRecipe(card.id)
+                    } catch (e2: CancellationException) {
+                        throw e2
+                    } catch (e2: Exception) {
+                        Log.w("DeckController", "dismissal not saved", e2)
+                    }
+                }
             }
         }
         if (cards.size < GameDeck.REFILL_BELOW) refill()
@@ -104,14 +115,13 @@ class DeckController(private val source: GameSource, private val scope: Coroutin
             r.items.map { GameCard(it.id, it.name) }
         }
         is GameSource.Semantic -> {
-            exhausted = true
             val r = Api.service.semanticSearch(source.q, limit = 100)
-            if (!r.available) error = "No AI provider configured — semantic search is off."
+            if (!r.available) {
+                throw IllegalStateException("No AI provider configured — semantic search is off.")
+            }
             r.items.map { GameCard(it.id, it.name) }
         }
-        is GameSource.Book -> {
-            exhausted = true
+        is GameSource.Book ->
             Api.service.recipeIndex(source.bookId).map { GameCard(it.id, it.name) }.shuffled()
-        }
     }
 }

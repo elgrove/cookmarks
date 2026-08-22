@@ -110,13 +110,13 @@ private fun sourceLabel(source: GameSource): String = when (source) {
 private fun CardStack(deck: DeckController) {
     BoxWithConstraints(modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 16.dp)) {
         val width = constraints.maxWidth.toFloat()
-        val top = deck.cards.first()
-        deck.cards.take(3).asReversed().forEach { card ->
+        val visible = deck.cards.take(3)
+        visible.asReversed().forEach { card ->
             key(card.id) {
                 PlayCard(
                     card = card,
                     width = width,
-                    onTop = card.id == top.id,
+                    depth = visible.indexOf(card),
                     onSwipe = { favourite -> deck.swipe(card, favourite) },
                 )
             }
@@ -125,8 +125,9 @@ private fun CardStack(deck: DeckController) {
 }
 
 @Composable
-private fun PlayCard(card: GameCard, width: Float, onTop: Boolean, onSwipe: (Boolean) -> Unit) {
+private fun PlayCard(card: GameCard, width: Float, depth: Int, onSwipe: (Boolean) -> Unit) {
     val colors = CmTheme.colors
+    val onTop = depth == 0
     val scope = rememberCoroutineScope()
     val offsetX = remember { Animatable(0f) }
     val threshold = width * 0.35f
@@ -142,7 +143,7 @@ private fun PlayCard(card: GameCard, width: Float, onTop: Boolean, onSwipe: (Boo
                 if (settled) return@draggable
                 if (abs(offsetX.value) > threshold || abs(velocity) > 4000f) {
                     settled = true
-                    val direction = if (offsetX.value != 0f) offsetX.value else velocity
+                    val direction = if (abs(offsetX.value) > threshold) offsetX.value else velocity
                     scope.launch {
                         offsetX.animateTo(if (direction > 0f) width * 1.4f else -width * 1.4f, tween(200))
                         onSwipe(direction > 0f)
@@ -165,9 +166,9 @@ private fun PlayCard(card: GameCard, width: Float, onTop: Boolean, onSwipe: (Boo
                     translationX = offsetX.value
                     rotationZ = (offsetX.value / width) * 10f
                 } else {
-                    scaleX = 0.96f
-                    scaleY = 0.96f
-                    translationY = 14.dp.toPx()
+                    scaleX = 1f - 0.04f * depth
+                    scaleY = 1f - 0.04f * depth
+                    translationY = (14 * depth).dp.toPx()
                 }
             }
             .then(dragModifier),
@@ -250,17 +251,14 @@ private fun CardFront(card: GameCard, state: Result<RecipeDetail>?) {
             color = colors.ink,
             modifier = Modifier.padding(top = 8.dp, bottom = 12.dp),
         )
-        when {
-            state?.isFailure == true -> {
-                MonoLabel("Couldn't load this recipe — swipe on", colour = colors.muted)
-                return@Column
-            }
-            recipe == null -> {
-                CircularProgressIndicator(color = colors.clay, modifier = Modifier.padding(top = 16.dp))
-                return@Column
-            }
+        if (state?.isFailure == true) {
+            MonoLabel("Couldn't load this recipe — swipe on", colour = colors.muted)
+            return@Column
         }
-        checkNotNull(recipe)
+        if (recipe == null) {
+            CircularProgressIndicator(color = colors.clay, modifier = Modifier.padding(top = 16.dp))
+            return@Column
+        }
         if (recipe.keywords.isNotEmpty()) {
             MonoLabel(
                 recipe.keywords.joinToString("  ·  "),

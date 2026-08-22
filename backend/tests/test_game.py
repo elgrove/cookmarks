@@ -69,3 +69,12 @@ def test_dismissals_are_per_user(
     create_user(session, "other", "other-password")
     act_as("other")
     assert _eligible(client, ids) == ids
+
+
+def test_all_param_pages_stably(client: TestClient) -> None:
+    params = {"all": "true", "seed": 5, "limit": 2}
+    first = client.get("/api/recipes", params=params).json()["items"]
+    second = client.get("/api/recipes", params={**params, "offset": 2}).json()["items"]
+    ids = [r["id"] for r in first + second]
+    assert len(ids) == 3
+    assert len(set(ids)) == 3

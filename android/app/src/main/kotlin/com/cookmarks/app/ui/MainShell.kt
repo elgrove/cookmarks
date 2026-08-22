@@ -1,5 +1,6 @@
 package com.cookmarks.app.ui
 
+import android.net.Uri
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -26,7 +27,6 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import android.net.Uri
 import com.cookmarks.app.ui.books.BookDetailScreen
 import com.cookmarks.app.ui.books.BooksScreen
 import com.cookmarks.app.ui.discover.DiscoverScreen
