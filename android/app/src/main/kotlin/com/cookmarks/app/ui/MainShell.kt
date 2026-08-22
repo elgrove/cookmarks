@@ -1,5 +1,8 @@
 package com.cookmarks.app.ui
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -93,7 +96,14 @@ fun MainShell() {
         },
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-            NavHost(navController = navController, startDestination = "books") {
+            NavHost(
+                navController = navController,
+                startDestination = "books",
+                enterTransition = { fadeIn(tween(90)) },
+                exitTransition = { fadeOut(tween(90)) },
+                popEnterTransition = { fadeIn(tween(90)) },
+                popExitTransition = { fadeOut(tween(90)) },
+            ) {
                 composable("books") {
                     BooksScreen(onOpenBook = { navController.navigate("books/$it") })
                 }

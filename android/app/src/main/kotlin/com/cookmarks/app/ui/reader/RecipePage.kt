@@ -24,7 +24,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontStyle
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.cookmarks.app.api.Api
@@ -58,37 +57,34 @@ fun RecipeContent(recipe: RecipeDetail, after: @Composable ColumnScope.() -> Uni
             color = colors.ink,
             modifier = Modifier.padding(top = 8.dp, bottom = 16.dp),
         )
-        if (!recipe.description.isNullOrBlank()) {
-            var expanded by remember(recipe.id) { mutableStateOf(false) }
-            var overflowed by remember(recipe.id) { mutableStateOf(false) }
-            Text(
-                text = recipe.description,
-                style = MaterialTheme.typography.bodyLarge.copy(fontStyle = FontStyle.Italic),
-                color = colors.ink,
-                maxLines = if (expanded) Int.MAX_VALUE else 2,
-                overflow = TextOverflow.Ellipsis,
-                onTextLayout = { overflowed = it.hasVisualOverflow },
-                modifier = Modifier.clickable { expanded = !expanded },
-            )
-            if (overflowed || expanded) {
-                MonoLabel(
-                    if (expanded) "Less" else "More",
-                    colour = colors.clay,
-                    modifier = Modifier.clickable { expanded = !expanded }.padding(vertical = 6.dp),
+        val hasDescription = !recipe.description.isNullOrBlank()
+        if (hasDescription || recipe.has_image) {
+            var showDescription by remember(recipe.id) { mutableStateOf(false) }
+            var showPhoto by remember(recipe.id) { mutableStateOf(false) }
+            Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                if (hasDescription) {
+                    MonoLabel(
+                        if (showDescription) "Hide description" else "Show description",
+                        colour = colors.clay,
+                        modifier = Modifier.clickable { showDescription = !showDescription }.padding(vertical = 6.dp),
+                    )
+                }
+                if (recipe.has_image) {
+                    MonoLabel(
+                        if (showPhoto) "Hide photo" else "Show photo",
+                        colour = colors.clay,
+                        modifier = Modifier.clickable { showPhoto = !showPhoto }.padding(vertical = 6.dp),
+                    )
+                }
+            }
+            if (showDescription && hasDescription) {
+                Text(
+                    text = recipe.description.orEmpty(),
+                    style = MaterialTheme.typography.bodyLarge.copy(fontStyle = FontStyle.Italic),
+                    color = colors.ink,
+                    modifier = Modifier.padding(vertical = 8.dp),
                 )
             }
-            Spacer(modifier = Modifier.height(10.dp))
-        }
-        recipe.yields?.let {
-            MonoLabel("Yields · $it", modifier = Modifier.padding(bottom = 16.dp))
-        }
-        if (recipe.has_image) {
-            var showPhoto by remember(recipe.id) { mutableStateOf(false) }
-            MonoLabel(
-                if (showPhoto) "Hide photo" else "Show photo",
-                colour = colors.clay,
-                modifier = Modifier.clickable { showPhoto = !showPhoto }.padding(vertical = 6.dp),
-            )
             if (showPhoto) {
                 AsyncImage(
                     model = Api.recipeImageUrl(recipe.id),
@@ -98,6 +94,9 @@ fun RecipeContent(recipe: RecipeDetail, after: @Composable ColumnScope.() -> Uni
                 )
             }
             Spacer(modifier = Modifier.height(10.dp))
+        }
+        recipe.yields?.let {
+            MonoLabel("Yields · $it", modifier = Modifier.padding(bottom = 16.dp))
         }
         if (recipe.ingredients.isNotEmpty()) {
             MonoLabel("Ingredients", colour = colors.clayDeep)
