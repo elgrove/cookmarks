@@ -2,6 +2,7 @@ package com.cookmarks.app
 
 import com.cookmarks.app.api.Api
 import com.cookmarks.app.api.AuthMe
+import com.cookmarks.app.api.BookDetail
 import com.cookmarks.app.api.BookSummary
 import com.cookmarks.app.api.KeywordSummary
 import com.cookmarks.app.api.ListDetail
@@ -41,6 +42,13 @@ class ContractTest {
         val book = pin<BookSummary>("books")
         assertEquals("Salt, Fat, Acid, Heat", book.title)
         assertEquals(100, book.recipe_count)
+    }
+
+    @Test
+    fun book_detail() {
+        val detail = pin<BookDetail>("bookdetail")
+        assertEquals("recipes", detail.reading!!.mode)
+        assertEquals(detail.resume_recipe!!.id, detail.reading!!.anchor!!.id)
     }
 
     @Test

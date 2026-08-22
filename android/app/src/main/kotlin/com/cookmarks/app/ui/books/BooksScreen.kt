@@ -21,17 +21,21 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.cookmarks.app.api.Api
 import com.cookmarks.app.api.BookSummary
+import com.cookmarks.app.ui.cleanTitle
 import com.cookmarks.app.ui.components.CoverPlate
 import com.cookmarks.app.ui.components.Loaded
 import com.cookmarks.app.ui.components.MonoLabel
@@ -41,12 +45,15 @@ import com.cookmarks.app.ui.theme.CmTheme
 @Composable
 fun BooksScreen(onOpenBook: (String) -> Unit) {
     val colors = CmTheme.colors
-    val state by rememberLoad { Api.service.books() }
+    var tick by remember { mutableIntStateOf(0) }
+    val state by rememberLoad(tick) { Api.service.books() }
+    val queueState by rememberLoad(tick) { Api.service.readingQueue() }
     var query by rememberSaveable { mutableStateOf("") }
     var sort by rememberSaveable { mutableStateOf(BookSort.ADDED) }
 
-    Loaded(state) { books ->
-        val shown = arrangeBooks(books, query, sort)
+    Loaded(state, onRetry = { tick++ }) { books ->
+        val queue = queueState?.getOrNull().orEmpty().reversed().map { it.id }
+        val shown = arrangeBooks(books, query, sort, queue)
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
             modifier = Modifier.fillMaxSize(),
@@ -88,6 +95,16 @@ fun BooksScreen(onOpenBook: (String) -> Unit) {
                     }
                 }
             }
+            if (sort == BookSort.QUEUE && shown.isEmpty()) {
+                item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(2) }) {
+                    Text(
+                        text = "Nothing queued yet.",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontStyle = FontStyle.Italic),
+                        color = colors.muted,
+                        modifier = Modifier.padding(vertical = 20.dp),
+                    )
+                }
+            }
             items(shown, key = { it.id }) { book ->
                 BookCard(book, onClick = { onOpenBook(book.id) })
             }
@@ -108,7 +125,7 @@ private fun BookCard(book: BookSummary, onClick: () -> Unit) {
                     modifier = Modifier.fillMaxSize(),
                 )
             } else {
-                CoverPlate(book.title, modifier = Modifier.fillMaxSize())
+                CoverPlate(cleanTitle(book.title), modifier = Modifier.fillMaxSize())
             }
         }
         if (book.progress != null) {
@@ -120,7 +137,7 @@ private fun BookCard(book: BookSummary, onClick: () -> Unit) {
             )
         }
         Text(
-            text = book.title,
+            text = cleanTitle(book.title),
             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
             color = colors.ink,
             maxLines = 2,

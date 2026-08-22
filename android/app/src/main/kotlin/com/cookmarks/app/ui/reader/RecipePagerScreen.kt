@@ -17,6 +17,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,7 +40,8 @@ sealed interface PagerSource {
 
 @Composable
 fun RecipePagerScreen(source: PagerSource, startRecipeId: String?, onBack: () -> Unit) {
-    val state by rememberLoad(source) {
+    var tick by remember { mutableIntStateOf(0) }
+    val state by rememberLoad(source, tick) {
         when (source) {
             is PagerSource.Book ->
                 Api.service.recipeIndex(source.bookId).map { it.id to it.name }
@@ -45,7 +49,7 @@ fun RecipePagerScreen(source: PagerSource, startRecipeId: String?, onBack: () ->
                 Api.service.list(source.listId).recipes.map { it.id to it.name }
         }
     }
-    Loaded(state) { entries ->
+    Loaded(state, onRetry = { tick++ }) { entries ->
         if (entries.isEmpty()) {
             MonoLabel("Nothing to read", modifier = Modifier.padding(20.dp))
             return@Loaded

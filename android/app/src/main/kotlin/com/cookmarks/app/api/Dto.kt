@@ -170,3 +170,15 @@ data class ListCreate(val name: String)
 
 @Serializable
 data class ListRecipeRef(val recipe_id: String)
+
+@Serializable
+data class QueuedBook(
+    val id: String,
+    val title: String,
+    val author: String,
+    val has_cover: Boolean,
+    val recipe_count: Int,
+)
+
+@Serializable
+data class QueueState(val queued: Boolean)

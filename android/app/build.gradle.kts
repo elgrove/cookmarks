@@ -1,3 +1,4 @@
+import java.util.Properties
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -6,6 +7,14 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
 }
+
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+
+fun secret(property: String, env: String): String? =
+    localProperties.getProperty(property) ?: System.getenv(env)
 
 android {
     namespace = "com.cookmarks.app"
@@ -16,7 +25,7 @@ android {
         minSdk = 34
         targetSdk = 36
         versionCode = 1
-        versionName = "0.1"
+        versionName = "1.0"
         val baseUrl = providers.gradleProperty("cookmarksBaseUrl").getOrElse("http://100.76.187.39:8789")
         buildConfigField("String", "BASE_URL", "\"$baseUrl\"")
     }
@@ -24,6 +33,27 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+
+    signingConfigs {
+        create("release") {
+            secret("cookmarks.keystore", "COOKMARKS_KEYSTORE")?.let { path ->
+                storeFile = file(path)
+                storePassword = requireNotNull(secret("cookmarks.keystore.password", "COOKMARKS_KEYSTORE_PASSWORD")) {
+                    "cookmarks.keystore is set but cookmarks.keystore.password is missing"
+                }
+                keyAlias = secret("cookmarks.key.alias", "COOKMARKS_KEY_ALIAS") ?: "cookmarks"
+                keyPassword = requireNotNull(secret("cookmarks.key.password", "COOKMARKS_KEY_PASSWORD")) {
+                    "cookmarks.keystore is set but cookmarks.key.password is missing"
+                }
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig = signingConfigs.getByName("release").takeIf { it.storeFile != null }
+        }
     }
 
     compileOptions {

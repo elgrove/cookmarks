@@ -12,7 +12,7 @@ from typing import Any
 from fastapi.testclient import TestClient
 
 from app.schemas.auth import AuthMe, UserRead
-from app.schemas.book import BookFilter, BookReadState, BookSummary, RecipeIndexEntry
+from app.schemas.book import BookDetail, BookFilter, BookReadState, BookSummary, RecipeIndexEntry
 from app.schemas.config import ConfigRead
 from app.schemas.extraction import ReviewQuestion
 from app.schemas.home import HomeData
@@ -40,6 +40,12 @@ def _example(name: str) -> dict[str, Any]:
 def test_book_summary_model_matches_contract() -> None:
     example = _example("books.example.json")
     dumped = BookSummary.model_validate(example).model_dump(mode="json")
+    assert dumped == example
+
+
+def test_book_detail_model_matches_contract() -> None:
+    example = _example("bookdetail.example.json")
+    dumped = BookDetail.model_validate(example).model_dump(mode="json")
     assert dumped == example
 
 
