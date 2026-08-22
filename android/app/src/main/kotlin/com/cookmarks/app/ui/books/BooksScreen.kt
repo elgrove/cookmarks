@@ -21,6 +21,8 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -41,11 +43,12 @@ import com.cookmarks.app.ui.theme.CmTheme
 @Composable
 fun BooksScreen(onOpenBook: (String) -> Unit) {
     val colors = CmTheme.colors
-    val state by rememberLoad { Api.service.books() }
+    var tick by remember { mutableIntStateOf(0) }
+    val state by rememberLoad(tick) { Api.service.books() }
     var query by rememberSaveable { mutableStateOf("") }
     var sort by rememberSaveable { mutableStateOf(BookSort.ADDED) }
 
-    Loaded(state) { books ->
+    Loaded(state, onRetry = { tick++ }) { books ->
         val shown = arrangeBooks(books, query, sort)
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),

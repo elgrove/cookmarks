@@ -2,6 +2,7 @@ package com.cookmarks.app.ui.reader
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -13,6 +14,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontStyle
@@ -28,12 +32,13 @@ import com.cookmarks.app.ui.theme.CmTheme
 
 @Composable
 fun RecipePage(recipeId: String) {
-    val state by rememberLoad(recipeId) { Api.service.recipe(recipeId) }
-    Loaded(state) { recipe -> RecipeContent(recipe) }
+    var tick by remember { mutableIntStateOf(0) }
+    val state by rememberLoad(recipeId, tick) { Api.service.recipe(recipeId) }
+    Loaded(state, onRetry = { tick++ }) { recipe -> RecipeContent(recipe) }
 }
 
 @Composable
-private fun RecipeContent(recipe: RecipeDetail) {
+fun RecipeContent(recipe: RecipeDetail, after: @Composable ColumnScope.() -> Unit = {}) {
     val colors = CmTheme.colors
     Column(
         modifier = Modifier
@@ -109,5 +114,6 @@ private fun RecipeContent(recipe: RecipeDetail) {
         if (recipe.keywords.isNotEmpty()) {
             MonoLabel(recipe.keywords.joinToString("  ·  "), colour = colors.faint)
         }
+        after()
     }
 }

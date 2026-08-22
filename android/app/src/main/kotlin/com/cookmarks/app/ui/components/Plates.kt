@@ -2,6 +2,7 @@ package com.cookmarks.app.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -98,7 +99,7 @@ fun CentredState(modifier: Modifier = Modifier, content: @Composable () -> Unit)
 }
 
 @Composable
-fun ErrorState(message: String, modifier: Modifier = Modifier) {
+fun ErrorState(message: String, modifier: Modifier = Modifier, onRetry: (() -> Unit)? = null) {
     CentredState(modifier) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
             MonoLabel("Something went wrong")
@@ -108,6 +109,13 @@ fun ErrorState(message: String, modifier: Modifier = Modifier) {
                 color = CmTheme.colors.muted,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 40.dp),
             )
+            if (onRetry != null) {
+                MonoLabel(
+                    "Try again",
+                    colour = CmTheme.colors.clay,
+                    modifier = Modifier.clickable(onClick = onRetry).padding(8.dp),
+                )
+            }
         }
     }
 }

@@ -28,6 +28,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -54,12 +55,13 @@ fun BookDetailScreen(
     onBack: () -> Unit,
     onReadFrom: (String?) -> Unit,
 ) {
-    val state by rememberLoad(bookId) {
+    var tick by remember { mutableIntStateOf(0) }
+    val state by rememberLoad(bookId, tick) {
         val detail = Api.service.book(bookId)
         val index = Api.service.recipeIndex(bookId)
         detail to index
     }
-    Loaded(state) { (detail, index) ->
+    Loaded(state, onRetry = { tick++ }) { (detail, index) ->
         BookDetailContent(detail, index, onBack, onReadFrom)
     }
 }

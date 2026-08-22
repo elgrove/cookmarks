@@ -21,10 +21,10 @@ fun <T> rememberLoad(vararg keys: Any?, block: suspend () -> T): State<Result<T>
     }
 
 @Composable
-fun <T> Loaded(state: Result<T>?, content: @Composable (T) -> Unit) {
+fun <T> Loaded(state: Result<T>?, onRetry: (() -> Unit)? = null, content: @Composable (T) -> Unit) {
     when {
         state == null -> CentredState { CircularProgressIndicator(color = CmTheme.colors.clay) }
-        state.isFailure -> ErrorState(state.exceptionOrNull()?.message ?: "Unknown error")
+        state.isFailure -> ErrorState(state.exceptionOrNull()?.message ?: "Unknown error", onRetry = onRetry)
         else -> content(state.getOrThrow())
     }
 }

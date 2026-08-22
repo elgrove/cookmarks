@@ -16,7 +16,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -26,9 +25,11 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.cookmarks.app.ui.books.BookDetailScreen
 import com.cookmarks.app.ui.books.BooksScreen
-import com.cookmarks.app.ui.components.CentredState
-import com.cookmarks.app.ui.components.MonoLabel
+import com.cookmarks.app.ui.lists.ListDetailScreen
+import com.cookmarks.app.ui.lists.ListsScreen
 import com.cookmarks.app.ui.reader.PagerSource
+import com.cookmarks.app.ui.recipes.RecipeDetailScreen
+import com.cookmarks.app.ui.recipes.RecipesScreen
 import com.cookmarks.app.ui.reader.RecipePagerScreen
 import com.cookmarks.app.ui.theme.CmTheme
 
@@ -46,7 +47,7 @@ fun MainShell() {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val route = backStackEntry?.destination?.route ?: "books"
-    val immersive = route.startsWith("read/")
+    val immersive = route.startsWith("read/") || route.startsWith("read-list/")
 
     Scaffold(
         containerColor = colors.bg,
@@ -63,7 +64,8 @@ fun MainShell() {
                             .padding(bottom = 8.dp),
                     ) {
                         Tabs.forEach { tab ->
-                            val active = route == tab.route || (tab.route == "books" && route.startsWith("books/"))
+                            val active = route == tab.route || route.startsWith("${tab.route}/") ||
+                                (tab.route == "recipes" && route.startsWith("recipe/"))
                             Text(
                                 text = tab.label.uppercase(),
                                 style = MaterialTheme.typography.labelSmall.copy(fontSize = 13.sp, lineHeight = 18.sp),
@@ -108,25 +110,38 @@ fun MainShell() {
                         onBack = { navController.popBackStack() },
                     )
                 }
-                composable("recipes") { PlaceholderScreen("Recipes") }
-                composable("lists") { PlaceholderScreen("Lists") }
+                composable("recipes") {
+                    RecipesScreen(onOpenRecipe = { navController.navigate("recipe/$it") })
+                }
+                composable("recipe/{recipeId}") { entry ->
+                    val recipeId = entry.arguments?.getString("recipeId") ?: return@composable
+                    RecipeDetailScreen(
+                        recipeId = recipeId,
+                        onBack = { navController.popBackStack() },
+                        onOpenRecipe = { navController.navigate("recipe/$it") },
+                    )
+                }
+                composable("lists") {
+                    ListsScreen(onOpenList = { navController.navigate("lists/$it") })
+                }
+                composable("lists/{listId}") { entry ->
+                    val listId = entry.arguments?.getString("listId") ?: return@composable
+                    ListDetailScreen(
+                        listId = listId,
+                        onBack = { navController.popBackStack() },
+                        onOpenRecipe = { navController.navigate("recipe/$it") },
+                        onReadThrough = { navController.navigate("read-list/$listId") },
+                    )
+                }
+                composable("read-list/{listId}") { entry ->
+                    val listId = entry.arguments?.getString("listId") ?: return@composable
+                    RecipePagerScreen(
+                        source = PagerSource.RecipeList(listId),
+                        startRecipeId = null,
+                        onBack = { navController.popBackStack() },
+                    )
+                }
             }
-        }
-    }
-}
-
-@Composable
-private fun PlaceholderScreen(name: String) {
-    val colors = CmTheme.colors
-    CentredState {
-        Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
-            MonoLabel("Under construction", colour = colors.faint)
-            Text(
-                text = "The $name tab arrives with the next slice.",
-                style = MaterialTheme.typography.bodyLarge.copy(fontStyle = FontStyle.Italic),
-                color = colors.muted,
-                modifier = Modifier.padding(top = 8.dp),
-            )
         }
     }
 }
