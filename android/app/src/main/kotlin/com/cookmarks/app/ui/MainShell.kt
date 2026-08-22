@@ -26,8 +26,12 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import android.net.Uri
 import com.cookmarks.app.ui.books.BookDetailScreen
 import com.cookmarks.app.ui.books.BooksScreen
+import com.cookmarks.app.ui.discover.DiscoverScreen
+import com.cookmarks.app.ui.discover.GameScreen
+import com.cookmarks.app.ui.discover.GameSource
 import com.cookmarks.app.ui.lists.ListDetailScreen
 import com.cookmarks.app.ui.lists.ListsScreen
 import com.cookmarks.app.ui.lists.ReadingQueueScreen
@@ -43,7 +47,16 @@ private val Tabs = listOf(
     Tab("books", "Books"),
     Tab("recipes", "Recipes"),
     Tab("lists", "Lists"),
+    Tab("discover", "Discover"),
 )
+
+private fun gameRoute(source: GameSource): String = when (source) {
+    GameSource.All -> "discover/play?mode=all"
+    is GameSource.Search ->
+        "discover/play?mode=search&q=${Uri.encode(source.q)}&keyword=${Uri.encode(source.keyword.orEmpty())}"
+    is GameSource.Semantic -> "discover/play?mode=semantic&q=${Uri.encode(source.q)}"
+    is GameSource.Book -> "discover/play?mode=book&book=${source.bookId}"
+}
 
 @Composable
 fun MainShell() {
@@ -51,7 +64,8 @@ fun MainShell() {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val route = backStackEntry?.destination?.route ?: "books"
-    val immersive = route.startsWith("read/") || route.startsWith("read-list/")
+    val immersive = route.startsWith("read/") || route.startsWith("read-list/") ||
+        route.startsWith("discover/play")
 
     Scaffold(
         containerColor = colors.bg,
@@ -116,6 +130,7 @@ fun MainShell() {
                         onReadFrom = { start ->
                             navController.navigate("read/$bookId?start=${start ?: ""}")
                         },
+                        onDiscover = { navController.navigate(gameRoute(GameSource.Book(bookId))) },
                     )
                 }
                 composable("read/{bookId}?start={start}") { entry ->
@@ -163,6 +178,7 @@ fun MainShell() {
                         onReadFrom = { start ->
                             navController.navigate("read/$bookId?start=${start ?: ""}")
                         },
+                        onDiscover = { navController.navigate(gameRoute(GameSource.Book(bookId))) },
                     )
                 }
                 composable("lists/{listId}") { entry ->
@@ -186,6 +202,24 @@ fun MainShell() {
                         },
                         contextIds = RecipeContexts.get(entry.arguments?.getString("ctx")),
                     )
+                }
+                composable("discover") {
+                    DiscoverScreen(onPlay = { source -> navController.navigate(gameRoute(source)) })
+                }
+                composable("discover/play?mode={mode}&q={q}&keyword={keyword}&book={book}") { entry ->
+                    val mode = entry.arguments?.getString("mode") ?: "all"
+                    val q = entry.arguments?.getString("q").orEmpty()
+                    val keyword = entry.arguments?.getString("keyword")?.takeIf { it.isNotEmpty() }
+                    val source = when (mode) {
+                        "search" -> GameSource.Search(q, keyword)
+                        "semantic" -> GameSource.Semantic(q)
+                        "book" -> {
+                            val bookId = entry.arguments?.getString("book") ?: return@composable
+                            GameSource.Book(bookId)
+                        }
+                        else -> GameSource.All
+                    }
+                    GameScreen(source = source, onBack = { navController.popBackStack() })
                 }
                 composable("read-list/{listId}") { entry ->
                     val listId = entry.arguments?.getString("listId") ?: return@composable

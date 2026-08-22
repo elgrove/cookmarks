@@ -182,3 +182,9 @@ data class QueuedBook(
 
 @Serializable
 data class QueueState(val queued: Boolean)
+
+@Serializable
+data class GameRecipeIds(val recipe_ids: List<String>)
+
+@Serializable
+data class DismissState(val dismissed: Boolean)

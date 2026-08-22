@@ -56,6 +56,7 @@ fun BookDetailScreen(
     bookId: String,
     onBack: () -> Unit,
     onReadFrom: (String?) -> Unit,
+    onDiscover: () -> Unit,
 ) {
     var tick by remember { mutableIntStateOf(0) }
     val state by rememberLoad(bookId, tick) {
@@ -64,7 +65,7 @@ fun BookDetailScreen(
         detail to index
     }
     Loaded(state, onRetry = { tick++ }) { (detail, index) ->
-        BookDetailContent(detail, index, onBack, onReadFrom)
+        BookDetailContent(detail, index, onBack, onReadFrom, onDiscover)
     }
 }
 
@@ -74,6 +75,7 @@ private fun BookDetailContent(
     index: List<RecipeIndexEntry>,
     onBack: () -> Unit,
     onReadFrom: (String?) -> Unit,
+    onDiscover: () -> Unit,
 ) {
     val colors = CmTheme.colors
     val description = remember(detail.description) {
@@ -182,6 +184,15 @@ private fun BookDetailContent(
             }
         }
         if (index.isNotEmpty()) {
+            item {
+                MonoLabel(
+                    "Play in Discover \u2192",
+                    colour = colors.clayDeep,
+                    modifier = Modifier
+                        .clickable(onClick = onDiscover)
+                        .padding(horizontal = 20.dp, vertical = 10.dp),
+                )
+            }
             item {
                 Column(modifier = Modifier.padding(horizontal = 20.dp)) {
                     HorizontalDivider(color = colors.lineStrong, modifier = Modifier.padding(top = 20.dp, bottom = 16.dp))

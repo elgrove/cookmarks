@@ -4,6 +4,8 @@ import com.cookmarks.app.api.Api
 import com.cookmarks.app.api.AuthMe
 import com.cookmarks.app.api.BookDetail
 import com.cookmarks.app.api.BookSummary
+import com.cookmarks.app.api.DismissState
+import com.cookmarks.app.api.GameRecipeIds
 import com.cookmarks.app.api.KeywordSummary
 import com.cookmarks.app.api.ListDetail
 import com.cookmarks.app.api.ListMembership
@@ -110,5 +112,15 @@ class ContractTest {
         val reading = Api.json.decodeFromJsonElement<ReadingState>(wrapper["reading"]!!)
         assertTrue(reading.finished)
         assertEquals("Buttermilk-Marinated Roast Chicken", reading.anchor!!.name)
+    }
+
+    @Test
+    fun game_recipe_ids() {
+        assertEquals(1, pin<GameRecipeIds>("gameeligible").recipe_ids.size)
+    }
+
+    @Test
+    fun dismiss_state() {
+        assertTrue(pin<DismissState>("dismissstate").dismissed)
     }
 }

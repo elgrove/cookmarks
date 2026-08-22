@@ -43,6 +43,7 @@ interface CookmarksService {
         @Query("seed") seed: Int = 0,
         @Query("limit") limit: Int = 30,
         @Query("offset") offset: Int = 0,
+        @Query("all") all: Boolean = false,
     ): RecipeSearchResults
 
     @GET("api/recipes/semantic")
@@ -80,4 +81,10 @@ interface CookmarksService {
 
     @DELETE("api/lists/{listId}/recipes/{recipeId}")
     suspend fun removeFromList(@Path("listId") listId: String, @Path("recipeId") recipeId: String)
+
+    @POST("api/game/eligible")
+    suspend fun gameEligible(@Body body: GameRecipeIds): GameRecipeIds
+
+    @PUT("api/game/dismissals/{id}")
+    suspend fun dismissRecipe(@Path("id") id: String): DismissState
 }
