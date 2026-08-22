@@ -42,6 +42,13 @@ class BookSortTest {
     }
 
     @Test
+    fun queue_sort_filters_to_queued_books_in_queue_order() {
+        val queue = listOf("apples galore", "Salt, Fat, Acid, Heat")
+        val titles = arrangeBooks(books, "", BookSort.QUEUE, queue).map { it.title }
+        assertEquals(queue, titles)
+    }
+
+    @Test
     fun filter_matches_title_or_author_case_insensitively() {
         assertEquals(1, arrangeBooks(books, "sodha", BookSort.ADDED).size)
         assertEquals(1, arrangeBooks(books, "SALT", BookSort.ADDED).size)

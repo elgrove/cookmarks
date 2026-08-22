@@ -37,11 +37,12 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.launch
 
 @Composable
-fun ListsScreen(onOpenList: (String) -> Unit) {
+fun ListsScreen(onOpenList: (String) -> Unit, onOpenQueue: () -> Unit) {
     val colors = CmTheme.colors
     val scope = rememberCoroutineScope()
     var tick by remember { mutableIntStateOf(0) }
     val state by rememberLoad(tick) { Api.service.lists() }
+    val queueState by rememberLoad(tick) { Api.service.readingQueue() }
     var newName by rememberSaveable { mutableStateOf("") }
 
     fun create() {
@@ -93,6 +94,31 @@ fun ListsScreen(onOpenList: (String) -> Unit) {
                         )
                     }
                 }
+            }
+            item {
+                val count = queueState?.getOrNull()?.size ?: 0
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onOpenQueue() }
+                        .padding(horizontal = 20.dp, vertical = 16.dp),
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Reading queue",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = colors.ink,
+                        )
+                        MonoLabel(
+                            "$count ${if (count == 1) "book" else "books"}",
+                            colour = colors.faint,
+                            modifier = Modifier.padding(top = 2.dp),
+                        )
+                    }
+                    Text("\u25B8", color = colors.clay)
+                }
+                HorizontalDivider(color = colors.lineStrong, modifier = Modifier.padding(horizontal = 20.dp))
             }
             itemsIndexed(lists, key = { _, l -> l.id }) { i, list ->
                 Row(

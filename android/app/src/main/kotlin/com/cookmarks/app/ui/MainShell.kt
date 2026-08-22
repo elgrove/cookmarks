@@ -30,6 +30,7 @@ import com.cookmarks.app.ui.books.BookDetailScreen
 import com.cookmarks.app.ui.books.BooksScreen
 import com.cookmarks.app.ui.lists.ListDetailScreen
 import com.cookmarks.app.ui.lists.ListsScreen
+import com.cookmarks.app.ui.lists.ReadingQueueScreen
 import com.cookmarks.app.ui.reader.PagerSource
 import com.cookmarks.app.ui.reader.RecipePagerScreen
 import com.cookmarks.app.ui.recipes.RecipeDetailScreen
@@ -143,7 +144,26 @@ fun MainShell() {
                     )
                 }
                 composable("lists") {
-                    ListsScreen(onOpenList = { navController.navigate("lists/$it") })
+                    ListsScreen(
+                        onOpenList = { navController.navigate("lists/$it") },
+                        onOpenQueue = { navController.navigate("lists/reading-queue") },
+                    )
+                }
+                composable("lists/reading-queue") {
+                    ReadingQueueScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenBook = { navController.navigate("lists/book/$it") },
+                    )
+                }
+                composable("lists/book/{bookId}") { entry ->
+                    val bookId = entry.arguments?.getString("bookId") ?: return@composable
+                    BookDetailScreen(
+                        bookId = bookId,
+                        onBack = { navController.popBackStack() },
+                        onReadFrom = { start ->
+                            navController.navigate("read/$bookId?start=${start ?: ""}")
+                        },
+                    )
                 }
                 composable("lists/{listId}") { entry ->
                     val listId = entry.arguments?.getString("listId") ?: return@composable

@@ -28,6 +28,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -46,11 +47,13 @@ fun BooksScreen(onOpenBook: (String) -> Unit) {
     val colors = CmTheme.colors
     var tick by remember { mutableIntStateOf(0) }
     val state by rememberLoad(tick) { Api.service.books() }
+    val queueState by rememberLoad(tick) { Api.service.readingQueue() }
     var query by rememberSaveable { mutableStateOf("") }
     var sort by rememberSaveable { mutableStateOf(BookSort.ADDED) }
 
     Loaded(state, onRetry = { tick++ }) { books ->
-        val shown = arrangeBooks(books, query, sort)
+        val queue = queueState?.getOrNull().orEmpty().reversed().map { it.id }
+        val shown = arrangeBooks(books, query, sort, queue)
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
             modifier = Modifier.fillMaxSize(),
@@ -90,6 +93,16 @@ fun BooksScreen(onOpenBook: (String) -> Unit) {
                             )
                         }
                     }
+                }
+            }
+            if (sort == BookSort.QUEUE && shown.isEmpty()) {
+                item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(2) }) {
+                    Text(
+                        text = "Nothing queued yet.",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontStyle = FontStyle.Italic),
+                        color = colors.muted,
+                        modifier = Modifier.padding(vertical = 20.dp),
+                    )
                 }
             }
             items(shown, key = { it.id }) { book ->

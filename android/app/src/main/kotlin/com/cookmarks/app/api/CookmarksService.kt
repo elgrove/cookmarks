@@ -30,6 +30,12 @@ interface CookmarksService {
     @PUT("api/books/{id}/reading")
     suspend fun updateReading(@Path("id") id: String, @Body body: ReadingUpdate): ReadingState
 
+    @GET("api/reading-queue")
+    suspend fun readingQueue(): List<QueuedBook>
+
+    @DELETE("api/books/{id}/queue")
+    suspend fun unqueueBook(@Path("id") id: String): QueueState
+
     @GET("api/recipes")
     suspend fun searchRecipes(
         @Query("q") q: String = "",
