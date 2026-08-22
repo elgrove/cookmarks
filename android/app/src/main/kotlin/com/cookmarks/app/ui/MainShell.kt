@@ -136,7 +136,9 @@ fun MainShell() {
                     RecipeDetailScreen(
                         recipeId = recipeId,
                         onBack = { navController.popBackStack() },
-                        onOpenRecipe = { navController.navigate("recipe/$it?ctx=") },
+                        onOpenRecipe = { id, ids ->
+                            navController.navigate("recipe/$id?ctx=${RecipeContexts.put(ids)}")
+                        },
                         contextIds = RecipeContexts.get(entry.arguments?.getString("ctx")),
                     )
                 }
@@ -159,7 +161,9 @@ fun MainShell() {
                     RecipeDetailScreen(
                         recipeId = recipeId,
                         onBack = { navController.popBackStack() },
-                        onOpenRecipe = { navController.navigate("lists/recipe/$it?ctx=") },
+                        onOpenRecipe = { id, ids ->
+                            navController.navigate("lists/recipe/$id?ctx=${RecipeContexts.put(ids)}")
+                        },
                         contextIds = RecipeContexts.get(entry.arguments?.getString("ctx")),
                     )
                 }

@@ -56,7 +56,7 @@ import kotlinx.coroutines.launch
 fun RecipeDetailScreen(
     recipeId: String,
     onBack: () -> Unit,
-    onOpenRecipe: (String) -> Unit,
+    onOpenRecipe: (String, List<String>) -> Unit,
     contextIds: List<String> = emptyList(),
 ) {
     val ids = remember(recipeId) {
@@ -77,7 +77,7 @@ private fun RecipeDetailPage(
     recipeId: String,
     position: String?,
     onBack: () -> Unit,
-    onOpenRecipe: (String) -> Unit,
+    onOpenRecipe: (String, List<String>) -> Unit,
 ) {
     val colors = CmTheme.colors
     val scope = rememberCoroutineScope()
@@ -136,7 +136,7 @@ private fun RecipeDetailPage(
 }
 
 @Composable
-private fun SimilarRail(recipeId: String, onOpenRecipe: (String) -> Unit) {
+private fun SimilarRail(recipeId: String, onOpenRecipe: (String, List<String>) -> Unit) {
     val colors = CmTheme.colors
     val state by rememberLoad(recipeId) { Api.service.similarRecipes(recipeId) }
     val similar = state?.getOrNull() ?: return
@@ -152,7 +152,7 @@ private fun SimilarRail(recipeId: String, onOpenRecipe: (String) -> Unit) {
                     modifier = Modifier
                         .width(180.dp)
                         .border(1.dp, colors.line)
-                        .clickable { onOpenRecipe(recipe.id) }
+                        .clickable { onOpenRecipe(recipe.id, similar.items.map { it.id }) }
                         .padding(14.dp),
                 ) {
                     Text(
