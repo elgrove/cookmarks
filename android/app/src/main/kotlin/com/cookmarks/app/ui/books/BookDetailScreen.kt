@@ -43,11 +43,13 @@ import coil.compose.AsyncImage
 import com.cookmarks.app.api.Api
 import com.cookmarks.app.api.BookDetail
 import com.cookmarks.app.api.RecipeIndexEntry
+import com.cookmarks.app.ui.cleanTitle
 import com.cookmarks.app.ui.components.CoverPlate
 import com.cookmarks.app.ui.components.Loaded
 import com.cookmarks.app.ui.components.MonoLabel
 import com.cookmarks.app.ui.components.rememberLoad
 import com.cookmarks.app.ui.theme.CmTheme
+import com.cookmarks.app.ui.titleSubtitle
 
 @Composable
 fun BookDetailScreen(
@@ -110,17 +112,26 @@ private fun BookDetailContent(
                             modifier = Modifier.fillMaxSize(),
                         )
                     } else {
-                        CoverPlate(detail.title, modifier = Modifier.fillMaxSize())
+                        CoverPlate(cleanTitle(detail.title), modifier = Modifier.fillMaxSize())
                     }
                 }
                 Column(modifier = Modifier.padding(start = 16.dp)) {
                     MonoLabel(detail.author)
                     Text(
-                        text = detail.title,
+                        text = cleanTitle(detail.title),
                         style = MaterialTheme.typography.displaySmall,
                         color = colors.ink,
                         modifier = Modifier.padding(top = 4.dp),
                     )
+                    val subtitle = titleSubtitle(detail.title)
+                    if (subtitle.isNotEmpty()) {
+                        Text(
+                            text = subtitle,
+                            style = MaterialTheme.typography.bodyMedium.copy(fontStyle = FontStyle.Italic),
+                            color = colors.muted,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
                     MonoLabel(
                         listOfNotNull(
                             "${detail.recipe_count} recipes",

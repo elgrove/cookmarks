@@ -41,6 +41,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.cookmarks.app.api.Api
 import com.cookmarks.app.api.ListRecipeRef
+import com.cookmarks.app.ui.cleanTitle
 import com.cookmarks.app.ui.components.Loaded
 import com.cookmarks.app.ui.components.MonoLabel
 import com.cookmarks.app.ui.components.rememberLoad
@@ -138,7 +139,7 @@ private fun SimilarRail(recipeId: String, onOpenRecipe: (String) -> Unit) {
                         overflow = TextOverflow.Ellipsis,
                     )
                     MonoLabel(
-                        recipe.book_title,
+                        cleanTitle(recipe.book_title),
                         colour = colors.faint,
                         modifier = Modifier.padding(top = 6.dp),
                     )

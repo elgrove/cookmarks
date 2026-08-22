@@ -15,8 +15,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -32,12 +39,17 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.cookmarks.app.api.Api
 import com.cookmarks.app.api.KeywordSummary
 import com.cookmarks.app.api.RecipeSummary
+import com.cookmarks.app.ui.cleanTitle
 import com.cookmarks.app.ui.components.ErrorState
 import com.cookmarks.app.ui.components.MonoLabel
 import com.cookmarks.app.ui.components.rememberLoad
@@ -70,7 +82,7 @@ fun RecipesScreen(onOpenRecipe: (String) -> Unit) {
     val restingKeywords by rememberLoad(tick) { Api.service.keywords() }
 
     LaunchedEffect(query, selected, semantic, tick) {
-        if (query.isNotEmpty()) delay(if (semantic) 600 else 300)
+        if (!semantic && query.isNotEmpty()) delay(300)
         loading = true
         error = null
         semanticUnavailable = false
@@ -144,9 +156,57 @@ fun RecipesScreen(onOpenRecipe: (String) -> Unit) {
                 )
                 OutlinedTextField(
                     value = query,
-                    onValueChange = { query = it },
-                    placeholder = { Text(if (semantic) "Describe what you fancy" else "Search recipes") },
+                    onValueChange = {
+                        query = it
+                        semantic = false
+                    },
+                    placeholder = { Text("Search, or describe a dish") },
                     singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = {
+                        semantic = false
+                        tick++
+                    }),
+                    trailingIcon = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (query.isNotEmpty()) {
+                                IconButton(onClick = {
+                                    query = ""
+                                    semantic = false
+                                }) {
+                                    Icon(
+                                        Icons.Filled.Close,
+                                        contentDescription = "Clear search",
+                                        tint = colors.faint,
+                                    )
+                                }
+                            }
+                            IconButton(onClick = {
+                                semantic = false
+                                tick++
+                            }) {
+                                Icon(
+                                    Icons.Filled.Search,
+                                    contentDescription = "Search",
+                                    tint = colors.muted,
+                                )
+                            }
+                            IconButton(
+                                onClick = {
+                                    if (query.isNotBlank()) {
+                                        if (semantic) tick++ else semantic = true
+                                    }
+                                },
+                                modifier = Modifier.semantics { contentDescription = "AI search" },
+                            ) {
+                                Text(
+                                    text = "\u2726",
+                                    fontSize = 20.sp,
+                                    color = if (semantic) colors.clay else colors.muted,
+                                )
+                            }
+                        }
+                    },
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = colors.clay,
                         unfocusedBorderColor = colors.lineStrong,
@@ -154,21 +214,6 @@ fun RecipesScreen(onOpenRecipe: (String) -> Unit) {
                     ),
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(20.dp),
-                    modifier = Modifier.padding(top = 12.dp),
-                ) {
-                    MonoLabel(
-                        "Text",
-                        colour = if (!semantic) colors.clay else colors.faint,
-                        modifier = Modifier.clickable { semantic = false },
-                    )
-                    MonoLabel(
-                        "Semantic",
-                        colour = if (semantic) colors.clay else colors.faint,
-                        modifier = Modifier.clickable { semantic = true },
-                    )
-                }
             }
         }
         if (!semantic) {
@@ -197,11 +242,8 @@ fun RecipesScreen(onOpenRecipe: (String) -> Unit) {
             semanticUnavailable -> item {
                 StateLine("No AI provider configured — semantic search is off.")
             }
-            semantic && query.isBlank() -> item {
-                StateLine("Type a craving and semantic search finds the nearest recipes.")
-            }
-            !semantic && query.isBlank() && selected.isEmpty() -> item {
-                StateLine("Search, or pick a keyword to browse.")
+            query.isBlank() && selected.isEmpty() -> item {
+                StateLine("Search, pick a keyword, or describe a dish and press \u2726.")
             }
             items.isEmpty() -> item {
                 StateLine("No matches.")
@@ -215,7 +257,7 @@ fun RecipesScreen(onOpenRecipe: (String) -> Unit) {
                     )
                 }
                 itemsIndexed(items, key = { _, r -> r.id }) { i, recipe ->
-                    RecipeRow(i + 1, recipe, onClick = { onOpenRecipe(recipe.id) })
+                    RecipeRow(recipe, onClick = { onOpenRecipe(recipe.id) })
                     if (i < items.lastIndex) {
                         HorizontalDivider(color = colors.line, modifier = Modifier.padding(horizontal = 20.dp))
                     }
@@ -268,30 +310,26 @@ private fun KeywordChips(
 }
 
 @Composable
-private fun RecipeRow(position: Int, recipe: RecipeSummary, onClick: () -> Unit) {
+private fun RecipeRow(recipe: RecipeSummary, onClick: () -> Unit) {
     val colors = CmTheme.colors
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
             .padding(horizontal = 20.dp, vertical = 12.dp),
     ) {
-        MonoLabel(position.toString().padStart(3, '0'), colour = colors.clay)
-        Column(modifier = Modifier.weight(1f).padding(start = 14.dp)) {
-            Text(
-                text = recipe.name,
-                style = MaterialTheme.typography.bodyLarge,
-                color = colors.ink,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            MonoLabel(
-                "${recipe.book_title} — ${recipe.book_author}",
-                colour = colors.faint,
-                modifier = Modifier.padding(top = 2.dp),
-            )
-        }
+        Text(
+            text = recipe.name,
+            style = MaterialTheme.typography.bodyLarge,
+            color = colors.ink,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        MonoLabel(
+            "${recipe.book_author} — ${cleanTitle(recipe.book_title)}",
+            colour = colors.faint,
+            modifier = Modifier.padding(top = 2.dp),
+        )
     }
 }
 

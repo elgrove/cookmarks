@@ -36,6 +36,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.cookmarks.app.api.Api
+import com.cookmarks.app.ui.cleanTitle
 import com.cookmarks.app.ui.components.Loaded
 import com.cookmarks.app.ui.components.MonoLabel
 import com.cookmarks.app.ui.components.rememberLoad
@@ -125,8 +126,7 @@ fun ListDetailScreen(
                         .clickable { onOpenRecipe(recipe.id) }
                         .padding(start = 20.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
                 ) {
-                    MonoLabel((i + 1).toString().padStart(3, '0'), colour = colors.clay)
-                    Column(modifier = Modifier.weight(1f).padding(start = 14.dp)) {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = recipe.name,
                             style = MaterialTheme.typography.bodyLarge,
@@ -135,7 +135,7 @@ fun ListDetailScreen(
                             overflow = TextOverflow.Ellipsis,
                         )
                         MonoLabel(
-                            recipe.book_title,
+                            cleanTitle(recipe.book_title),
                             colour = colors.faint,
                             modifier = Modifier.padding(top = 2.dp),
                         )

@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.cookmarks.app.api.Api
 import com.cookmarks.app.api.BookSummary
+import com.cookmarks.app.ui.cleanTitle
 import com.cookmarks.app.ui.components.CoverPlate
 import com.cookmarks.app.ui.components.Loaded
 import com.cookmarks.app.ui.components.MonoLabel
@@ -111,7 +112,7 @@ private fun BookCard(book: BookSummary, onClick: () -> Unit) {
                     modifier = Modifier.fillMaxSize(),
                 )
             } else {
-                CoverPlate(book.title, modifier = Modifier.fillMaxSize())
+                CoverPlate(cleanTitle(book.title), modifier = Modifier.fillMaxSize())
             }
         }
         if (book.progress != null) {
@@ -123,7 +124,7 @@ private fun BookCard(book: BookSummary, onClick: () -> Unit) {
             )
         }
         Text(
-            text = book.title,
+            text = cleanTitle(book.title),
             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
             color = colors.ink,
             maxLines = 2,
