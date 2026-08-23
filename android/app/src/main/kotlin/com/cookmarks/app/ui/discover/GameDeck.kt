@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.cookmarks.app.api.Api
 import com.cookmarks.app.api.GameRecipeIds
+import com.cookmarks.app.api.ReadingUpdate
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.random.Random
 import kotlinx.coroutines.CoroutineScope
@@ -23,6 +24,11 @@ sealed interface GameSource {
 object GameDeck {
     const val REFILL_BELOW = 5
     const val PAGE_SIZE = 30
+
+    fun resumeFrom(entries: List<GameCard>, resumeId: String?): List<GameCard> {
+        val start = entries.indexOfFirst { it.id == resumeId }
+        return if (start < 0) entries else entries.drop(start)
+    }
 
     fun merge(hand: List<GameCard>, fetched: List<GameCard>, spent: Set<String>): List<GameCard> {
         val held = spent.toMutableSet()
@@ -97,7 +103,20 @@ class DeckController(private val source: GameSource, private val scope: Coroutin
                 }
             }
         }
+        if (source is GameSource.Book) markRead(source.bookId, card.id)
         if (cards.size < GameDeck.REFILL_BELOW) refill()
+    }
+
+    private fun markRead(bookId: String, recipeId: String) {
+        scope.launch {
+            try {
+                Api.service.updateReading(bookId, ReadingUpdate(mode = "recipes", recipe_id = recipeId))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w("DeckController", "reading position not saved", e)
+            }
+        }
     }
 
     private suspend fun nextBatch(): List<GameCard> = when (source) {
@@ -121,7 +140,9 @@ class DeckController(private val source: GameSource, private val scope: Coroutin
             }
             r.items.map { GameCard(it.id, it.name) }
         }
-        is GameSource.Book ->
-            Api.service.recipeIndex(source.bookId).map { GameCard(it.id, it.name) }.shuffled()
+        is GameSource.Book -> {
+            val entries = Api.service.recipeIndex(source.bookId).map { GameCard(it.id, it.name) }
+            GameDeck.resumeFrom(entries, Api.service.book(source.bookId).resume_recipe?.id)
+        }
     }
 }
