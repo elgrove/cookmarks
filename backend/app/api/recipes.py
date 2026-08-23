@@ -426,7 +426,7 @@ def get_recipe(
         instructions=recipe.instructions,
         yields=recipe.yields,
         keywords=sorted(k.name for k in recipe.keywords),
-        has_image=recipe.image is not None,
+        has_image=bool(recipe.image),
         is_favourite=_is_favourite(session, recipe.id, user.id),
         context=resolved_context,
         in_book=None if recipe.epub_checked_at is None else recipe.epub_cfi is not None,
@@ -496,7 +496,7 @@ def recipe_image(recipe_id: uuid.UUID, session: SessionDep) -> Response:
     recipe = session.scalar(
         select(Recipe).where(Recipe.id == recipe_id).options(joinedload(Recipe.book))
     )
-    if recipe is None or recipe.image is None:
+    if recipe is None or not recipe.image:
         raise HTTPException(status_code=404, detail="recipe image not found")
     result = read_epub_image(recipe.book, recipe.image)
     if result is None:

@@ -33,6 +33,7 @@ from app.services.extraction.state import ExtractionState
 from app.services.extraction.utils import (
     build_image_path_lookup,
     deduplicate_recipes_by_title,
+    find_decorative_images,
     resolve_image_path_in_epub,
 )
 from app.services.rate_limiter import RateLimitedExecutor
@@ -335,8 +336,16 @@ def resolve_images(state: ExtractionState) -> dict:
         if recipe_dict["image"]:
             images_resolved += 1
 
+    decorative = find_decorative_images(epub_path, [r["image"] for r in raw_recipes if r["image"]])
+    images_rejected = 0
+    for recipe_dict in raw_recipes:
+        if recipe_dict["image"] in decorative:
+            recipe_dict["image"] = None
+            images_rejected += 1
+
     logger.info(
-        f"Image resolution: {images_resolved}/{images_attempted} images successfully resolved"
+        f"Image resolution: {images_resolved}/{images_attempted} images successfully resolved, "
+        f"{images_rejected} rejected as decorative"
     )
 
     return {"raw_recipes": raw_recipes}

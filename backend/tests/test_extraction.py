@@ -1,3 +1,4 @@
+import io
 import uuid
 import zipfile
 from collections.abc import Iterator
@@ -7,6 +8,7 @@ from typing import Any
 import pytest
 import sqlite_vec
 from langgraph.checkpoint.sqlite import SqliteSaver
+from PIL import Image
 from sqlalchemy import create_engine, event, select
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -22,6 +24,7 @@ from app.services.ai import ModelRole, StubProvider, Usage, get_ai_provider, get
 from app.services.extraction import graph
 from app.services.extraction.graph import get_extraction_graph
 from app.services.extraction.state import ExtractionState
+from app.services.extraction.utils import find_decorative_images
 from app.tasks.extraction import (
     extract_recipes_from_book,
     extract_recipes_from_book_task,
@@ -629,3 +632,48 @@ def test_task_marks_run_failed_on_error(
         assert run.status == TaskStatus.FAILED
         assert run.completed_at is not None
         assert any("kaboom" in e for e in run.errors)
+
+
+def _epub_with_images(path: Path, images: dict[str, tuple[int, int]]) -> Path:
+    epub = path / "book.epub"
+    with zipfile.ZipFile(epub, "w") as archive:
+        for member, size in images.items():
+            buffer = io.BytesIO()
+            Image.new("RGB", size).save(buffer, format="JPEG")
+            archive.writestr(member, buffer.getvalue())
+    return epub
+
+
+def test_find_decorative_images_keeps_dish_photos(tmp_path: Path) -> None:
+    epub = _epub_with_images(
+        tmp_path,
+        {
+            "photo.jpg": (800, 600),
+            "group.jpg": (1200, 1600),
+            "icon.jpg": (40, 40),
+            "rule.jpg": (900, 10),
+            "banner.jpg": (2100, 325),
+            "nameplate.jpg": (250, 200),
+        },
+    )
+    members = [
+        "photo.jpg",
+        *["group.jpg"] * 5,
+        "icon.jpg",
+        "rule.jpg",
+        "banner.jpg",
+        *["nameplate.jpg"] * 3,
+        "gone.jpg",
+    ]
+
+    assert find_decorative_images(epub, members) == {
+        "icon.jpg",
+        "rule.jpg",
+        "banner.jpg",
+        "nameplate.jpg",
+        "gone.jpg",
+    }
+
+
+def test_find_decorative_images_keeps_all_when_epub_unreadable(tmp_path: Path) -> None:
+    assert find_decorative_images(tmp_path / "missing.epub", ["photo.jpg"]) == set()
