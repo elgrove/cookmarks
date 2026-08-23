@@ -55,7 +55,6 @@ class DeckController(private val source: GameSource, private val scope: Coroutin
             try {
                 while (cards.size < GameDeck.REFILL_BELOW && !exhausted) {
                     val batch = nextBatch()
-                    if (source is GameSource.Semantic || source is GameSource.Book) exhausted = true
                     if (batch.isEmpty()) {
                         exhausted = true
                         break
@@ -63,6 +62,7 @@ class DeckController(private val source: GameSource, private val scope: Coroutin
                     val eligible =
                         Api.service.gameEligible(GameRecipeIds(batch.map { it.id })).recipe_ids.toSet()
                     cards = GameDeck.merge(cards, batch.filter { it.id in eligible }, spent)
+                    if (source is GameSource.Semantic || source is GameSource.Book) exhausted = true
                 }
             } catch (e: CancellationException) {
                 throw e
