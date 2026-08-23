@@ -108,7 +108,7 @@ def _upsert_recipe(session: Session, book: Book, run: TaskRun, data: RecipeData)
     recipe.ingredients = data.ingredients
     recipe.instructions = data.instructions
     recipe.yields = data.yields
-    recipe.image = data.image
+    recipe.image = data.image or None
     recipe.keywords = [get_or_create_keyword(session, name) for name in data.keywords]
     session.flush()
     return recipe

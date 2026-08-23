@@ -1,9 +1,9 @@
 import logging
 from decimal import Decimal
-from typing import ClassVar
+from typing import ClassVar, cast
 
 from google import genai
-from google.genai.types import GenerateContentConfigDict
+from google.genai.types import ContentListUnion, GenerateContentConfigDict
 
 from app.services.ai.base import AIProvider, EmbedTask, ModelRole, Usage
 
@@ -84,7 +84,9 @@ class GeminiProvider(AIProvider):
 
     def embed_batch(self, texts: list[str], task: EmbedTask) -> list[list[float]]:
         response = self.client.models.embed_content(
-            model=self.embedding_model, contents=texts, config={"task_type": task.value}
+            model=self.embedding_model,
+            contents=cast(ContentListUnion, texts),
+            config={"task_type": task.value},
         )
         embeddings = response.embeddings or []
         if len(embeddings) != len(texts):
