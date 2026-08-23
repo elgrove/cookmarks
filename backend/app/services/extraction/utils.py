@@ -1,10 +1,24 @@
+import io
 import logging
 import zipfile
+from collections import Counter
 from pathlib import Path
+
+from PIL import Image, UnidentifiedImageError
 
 from app.schemas.extraction import RecipeData
 
 logger = logging.getLogger(__name__)
+
+# Cookbook EPUBs carry page furniture — dietary icons, dingbats, chapter name-plates,
+# rules set as images rather than markup — that the extractor happily attaches to a
+# recipe. None of it is a dish photo, and all of it is either too small, the wrong
+# shape, or repeated across the book.
+MIN_SHORT_SIDE = 150
+REUSED_SHORT_SIDE = 300
+REUSE_LIMIT = 3
+MIN_ASPECT_RATIO = 0.25
+MAX_ASPECT_RATIO = 4.0
 
 
 def build_image_path_lookup(epub_path: Path) -> dict[str, list[str]]:
@@ -46,6 +60,38 @@ def resolve_image_path_in_epub(
 
     logger.warning(f"Multiple matches for {filename}, using first: {matches[0]}")
     return matches[0]
+
+
+def find_decorative_images(epub_path: Path, members: list[str]) -> set[str]:
+    """Of the images attached to a book's recipes, the ones that are page furniture
+    rather than dish photos. Unreadable and missing members are rejected too, since
+    they would only surface as a broken image. A book whose archive won't open keeps
+    every image — a transient read failure must not strip a whole book."""
+    if not members:
+        return set()
+    uses = Counter(members)
+    decorative: set[str] = set()
+    try:
+        with zipfile.ZipFile(epub_path, "r") as epub:
+            for member, count in uses.items():
+                try:
+                    with Image.open(io.BytesIO(epub.read(member))) as image:
+                        width, height = image.size
+                except (KeyError, OSError, UnidentifiedImageError, ValueError):
+                    decorative.add(member)
+                    continue
+                short_side = min(width, height)
+                ratio = width / height if height else 0.0
+                if (
+                    short_side < MIN_SHORT_SIDE
+                    or not MIN_ASPECT_RATIO <= ratio <= MAX_ASPECT_RATIO
+                    or (short_side < REUSED_SHORT_SIDE and count >= REUSE_LIMIT)
+                ):
+                    decorative.add(member)
+    except (zipfile.BadZipFile, OSError) as e:
+        logger.error(f"Cannot screen images in {epub_path}, keeping all: {e}")
+        return set()
+    return decorative
 
 
 def deduplicate_recipes_by_title(recipes: list[RecipeData]) -> list[RecipeData]:
