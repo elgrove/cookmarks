@@ -42,7 +42,12 @@ fun RecipePage(recipeId: String) {
 }
 
 @Composable
-fun RecipeContent(recipe: RecipeDetail, after: @Composable ColumnScope.() -> Unit = {}) {
+fun RecipeContent(
+    recipe: RecipeDetail,
+    controls: Boolean = true,
+    header: @Composable ColumnScope.() -> Unit = { RecipeHeading(recipe) },
+    after: @Composable ColumnScope.() -> Unit = {},
+) {
     val colors = CmTheme.colors
     Column(
         modifier = Modifier
@@ -50,15 +55,9 @@ fun RecipeContent(recipe: RecipeDetail, after: @Composable ColumnScope.() -> Uni
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 24.dp, vertical = 20.dp),
     ) {
-        MonoLabel("${cleanTitle(recipe.book_title)} — ${recipe.book_author}", colour = colors.faint)
-        Text(
-            text = recipe.name,
-            style = MaterialTheme.typography.displaySmall,
-            color = colors.ink,
-            modifier = Modifier.padding(top = 8.dp, bottom = 16.dp),
-        )
+        header()
         val hasDescription = !recipe.description.isNullOrBlank()
-        if (hasDescription || recipe.has_image) {
+        if (controls && (hasDescription || recipe.has_image)) {
             var showDescription by remember(recipe.id) { mutableStateOf(false) }
             var showPhoto by remember(recipe.id) { mutableStateOf(false) }
             Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
@@ -133,4 +132,16 @@ fun RecipeContent(recipe: RecipeDetail, after: @Composable ColumnScope.() -> Uni
         }
         after()
     }
+}
+
+@Composable
+private fun RecipeHeading(recipe: RecipeDetail) {
+    val colors = CmTheme.colors
+    MonoLabel("${cleanTitle(recipe.book_title)} — ${recipe.book_author}", colour = colors.faint)
+    Text(
+        text = recipe.name,
+        style = MaterialTheme.typography.displaySmall,
+        color = colors.ink,
+        modifier = Modifier.padding(top = 8.dp, bottom = 16.dp),
+    )
 }

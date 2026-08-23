@@ -11,11 +11,13 @@ import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -41,13 +43,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
 import com.cookmarks.app.api.Api
 import com.cookmarks.app.api.RecipeDetail
-import com.cookmarks.app.ui.cleanTitle
 import com.cookmarks.app.ui.components.CentredState
 import com.cookmarks.app.ui.components.ErrorState
 import com.cookmarks.app.ui.components.MonoLabel
@@ -225,13 +227,60 @@ private fun GameCardFace(card: GameCard, flippable: Boolean) {
             CardFront(card, state)
         } else {
             Box(modifier = Modifier.fillMaxSize().graphicsLayer { rotationY = 180f }) {
-                val recipe = state?.getOrNull()
-                if (recipe == null) {
-                    CentredState { CircularProgressIndicator(color = colors.clay) }
-                } else {
-                    RecipeContent(recipe)
-                }
+                CardBack(state)
             }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun CardHeading(recipe: RecipeDetail) {
+    val colors = CmTheme.colors
+    Text(
+        text = recipe.name,
+        style = MaterialTheme.typography.displaySmall,
+        color = colors.ink,
+        modifier = Modifier.padding(bottom = 12.dp),
+    )
+    if (recipe.keywords.isNotEmpty()) {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(bottom = 16.dp),
+        ) {
+            recipe.keywords.forEach { keyword ->
+                MonoLabel(
+                    keyword,
+                    colour = colors.bg,
+                    modifier = Modifier
+                        .background(colors.clay)
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CardBack(state: Result<RecipeDetail>?) {
+    val colors = CmTheme.colors
+    val recipe = state?.getOrNull()
+    when {
+        recipe == null -> CentredState { CircularProgressIndicator(color = colors.clay) }
+        recipe.has_image -> RecipeContent(recipe, controls = false, header = { CardHeading(recipe) })
+        else -> Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp, vertical = 24.dp),
+        ) {
+            CardHeading(recipe)
+            Text(
+                text = recipe.description?.takeIf { it.isNotBlank() } ?: "No description for this recipe.",
+                style = MaterialTheme.typography.bodyLarge.copy(fontStyle = FontStyle.Italic),
+                color = if (recipe.description.isNullOrBlank()) colors.muted else colors.ink,
+            )
         }
     }
 }
@@ -240,46 +289,36 @@ private fun GameCardFace(card: GameCard, flippable: Boolean) {
 private fun CardFront(card: GameCard, state: Result<RecipeDetail>?) {
     val colors = CmTheme.colors
     val recipe = state?.getOrNull()
+    if (recipe != null && !recipe.has_image) {
+        RecipeContent(recipe, controls = false, header = { CardHeading(recipe) })
+        return
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 24.dp, vertical = 24.dp),
     ) {
-        if (recipe != null) {
-            MonoLabel(cleanTitle(recipe.book_title), colour = colors.faint)
-            MonoLabel(recipe.book_author, colour = colors.faint)
-        }
-        Text(
-            text = recipe?.name ?: card.name,
-            style = MaterialTheme.typography.displaySmall,
-            color = colors.ink,
-            modifier = Modifier.padding(top = 8.dp, bottom = 12.dp),
-        )
-        if (state?.isFailure == true) {
-            MonoLabel("Couldn't load this recipe — swipe on", colour = colors.muted)
-            return@Column
-        }
         if (recipe == null) {
-            CircularProgressIndicator(color = colors.clay, modifier = Modifier.padding(top = 16.dp))
+            Text(
+                text = card.name,
+                style = MaterialTheme.typography.displaySmall,
+                color = colors.ink,
+                modifier = Modifier.padding(bottom = 12.dp),
+            )
+            if (state?.isFailure == true) {
+                MonoLabel("Couldn't load this recipe — swipe on", colour = colors.muted)
+            } else {
+                CircularProgressIndicator(color = colors.clay, modifier = Modifier.padding(top = 16.dp))
+            }
             return@Column
         }
-        if (recipe.keywords.isNotEmpty()) {
-            MonoLabel(
-                recipe.keywords.joinToString("  ·  "),
-                colour = colors.clayDeep,
-                modifier = Modifier.padding(bottom = 16.dp),
-            )
-        }
-        if (recipe.has_image) {
-            AsyncImage(
-                model = Api.recipeImageUrl(recipe.id),
-                contentDescription = "Image of ${recipe.name}",
-                contentScale = ContentScale.FillWidth,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-            )
-        }
-        Spacer(modifier = Modifier.padding(4.dp))
-        MonoLabel("Tap for the full recipe", colour = colors.faint)
+        CardHeading(recipe)
+        AsyncImage(
+            model = Api.recipeImageUrl(recipe.id),
+            contentDescription = "Image of ${recipe.name}",
+            contentScale = ContentScale.FillWidth,
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
