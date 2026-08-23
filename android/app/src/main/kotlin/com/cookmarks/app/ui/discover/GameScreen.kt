@@ -40,9 +40,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import coil.compose.AsyncImage
 import com.cookmarks.app.api.Api
 import com.cookmarks.app.api.RecipeDetail
 import com.cookmarks.app.ui.cleanTitle
@@ -92,7 +94,7 @@ fun GameScreen(source: GameSource, onBack: () -> Unit) {
             }
         }
         MonoLabel(
-            "← dismiss for good  ·  favourite →",
+            "← dismiss  ·  favourite →",
             colour = colors.faint,
             modifier = Modifier.align(Alignment.CenterHorizontally).padding(vertical = 10.dp),
         )
@@ -100,10 +102,12 @@ fun GameScreen(source: GameSource, onBack: () -> Unit) {
 }
 
 private fun sourceLabel(source: GameSource): String = when (source) {
-    GameSource.All -> "Everything"
-    is GameSource.Search -> source.keyword ?: "“${source.q}”"
+    GameSource.All -> "All recipes"
+    is GameSource.Search ->
+        (listOfNotNull(source.q.takeIf { it.isNotBlank() }?.let { "“$it”" }) + source.keywords)
+            .joinToString("  ·  ")
     is GameSource.Semantic -> "✦ ${source.q}"
-    is GameSource.Book -> "This book"
+    is GameSource.Book -> source.title
 }
 
 @Composable
@@ -243,7 +247,8 @@ private fun CardFront(card: GameCard, state: Result<RecipeDetail>?) {
             .padding(horizontal = 24.dp, vertical = 24.dp),
     ) {
         if (recipe != null) {
-            MonoLabel("${cleanTitle(recipe.book_title)} — ${recipe.book_author}", colour = colors.faint)
+            MonoLabel(cleanTitle(recipe.book_title), colour = colors.faint)
+            MonoLabel(recipe.book_author, colour = colors.faint)
         }
         Text(
             text = recipe?.name ?: card.name,
@@ -266,21 +271,15 @@ private fun CardFront(card: GameCard, state: Result<RecipeDetail>?) {
                 modifier = Modifier.padding(bottom = 16.dp),
             )
         }
-        if (recipe.ingredients.isNotEmpty()) {
-            MonoLabel("Ingredients")
-            Column(modifier = Modifier.padding(top = 8.dp)) {
-                recipe.ingredients.forEachIndexed { i, ingredient ->
-                    Text(
-                        text = ingredient,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = colors.ink,
-                        modifier = Modifier.padding(vertical = 6.dp),
-                    )
-                    if (i < recipe.ingredients.lastIndex) HorizontalDivider(color = colors.line)
-                }
-            }
+        if (recipe.has_image) {
+            AsyncImage(
+                model = Api.recipeImageUrl(recipe.id),
+                contentDescription = "Image of ${recipe.name}",
+                contentScale = ContentScale.FillWidth,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+            )
         }
-        Spacer(modifier = Modifier.padding(8.dp))
+        Spacer(modifier = Modifier.padding(4.dp))
         MonoLabel("Tap for the full recipe", colour = colors.faint)
     }
 }

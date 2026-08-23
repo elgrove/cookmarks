@@ -56,7 +56,7 @@ fun BookDetailScreen(
     bookId: String,
     onBack: () -> Unit,
     onReadFrom: (String?) -> Unit,
-    onDiscover: () -> Unit,
+    onDiscover: (String) -> Unit,
 ) {
     var tick by remember { mutableIntStateOf(0) }
     val state by rememberLoad(bookId, tick) {
@@ -75,7 +75,7 @@ private fun BookDetailContent(
     index: List<RecipeIndexEntry>,
     onBack: () -> Unit,
     onReadFrom: (String?) -> Unit,
-    onDiscover: () -> Unit,
+    onDiscover: (String) -> Unit,
 ) {
     val colors = CmTheme.colors
     val description = remember(detail.description) {
@@ -189,7 +189,7 @@ private fun BookDetailContent(
                     "Play in Discover \u2192",
                     colour = colors.clayDeep,
                     modifier = Modifier
-                        .clickable(onClick = onDiscover)
+                        .clickable { onDiscover(cleanTitle(detail.title)) }
                         .padding(horizontal = 20.dp, vertical = 10.dp),
                 )
             }

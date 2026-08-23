@@ -52,6 +52,7 @@ import com.cookmarks.app.ui.cleanTitle
 import com.cookmarks.app.ui.components.ErrorState
 import com.cookmarks.app.ui.components.MonoLabel
 import com.cookmarks.app.ui.components.rememberLoad
+import com.cookmarks.app.ui.discover.GameSource
 import com.cookmarks.app.ui.theme.CmTheme
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.random.Random
@@ -74,7 +75,7 @@ private object RecipesState {
 }
 
 @Composable
-fun RecipesScreen(onOpenRecipe: (String, List<String>) -> Unit) {
+fun RecipesScreen(onOpenRecipe: (String, List<String>) -> Unit, onPlay: (GameSource) -> Unit) {
     val colors = CmTheme.colors
     val scope = rememberCoroutineScope()
     val st = RecipesState
@@ -255,11 +256,29 @@ fun RecipesScreen(onOpenRecipe: (String, List<String>) -> Unit) {
             }
             else -> {
                 item {
-                    MonoLabel(
-                        "${st.total} recipes",
-                        colour = colors.faint,
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
-                    )
+                    Row(
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                    ) {
+                        MonoLabel(
+                            "${st.total} recipes",
+                            colour = colors.faint,
+                            modifier = Modifier.padding(vertical = 8.dp),
+                        )
+                        MonoLabel(
+                            "Play in Discover \u2192",
+                            colour = colors.clayDeep,
+                            modifier = Modifier
+                                .clickable {
+                                    onPlay(
+                                        if (st.semantic) GameSource.Semantic(st.query)
+                                        else GameSource.Search(st.query, st.selected)
+                                    )
+                                }
+                                .padding(vertical = 8.dp),
+                        )
+                    }
                 }
                 itemsIndexed(st.items, key = { _, r -> r.id }) { i, recipe ->
                     RecipeRow(recipe, onClick = { onOpenRecipe(recipe.id, st.items.map { it.id }) })

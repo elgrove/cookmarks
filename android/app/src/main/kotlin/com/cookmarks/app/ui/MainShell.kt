@@ -53,9 +53,9 @@ private val Tabs = listOf(
 private fun gameRoute(source: GameSource): String = when (source) {
     GameSource.All -> "discover/play?mode=all"
     is GameSource.Search ->
-        "discover/play?mode=search&q=${Uri.encode(source.q)}&keyword=${Uri.encode(source.keyword.orEmpty())}"
+        "discover/play?mode=search&q=${Uri.encode(source.q)}&keywords=${Uri.encode(source.keywords.joinToString("|"))}"
     is GameSource.Semantic -> "discover/play?mode=semantic&q=${Uri.encode(source.q)}"
-    is GameSource.Book -> "discover/play?mode=book&book=${source.bookId}"
+    is GameSource.Book -> "discover/play?mode=book&book=${source.bookId}&title=${Uri.encode(source.title)}"
 }
 
 @Composable
@@ -130,7 +130,7 @@ fun MainShell() {
                         onReadFrom = { start ->
                             navController.navigate("read/$bookId?start=${start ?: ""}")
                         },
-                        onDiscover = { navController.navigate(gameRoute(GameSource.Book(bookId))) },
+                        onDiscover = { title -> navController.navigate(gameRoute(GameSource.Book(bookId, title))) },
                     )
                 }
                 composable("read/{bookId}?start={start}") { entry ->
@@ -143,9 +143,12 @@ fun MainShell() {
                     )
                 }
                 composable("recipes") {
-                    RecipesScreen(onOpenRecipe = { id, ids ->
-                        navController.navigate("recipe/$id?ctx=${RecipeContexts.put(ids)}")
-                    })
+                    RecipesScreen(
+                        onOpenRecipe = { id, ids ->
+                            navController.navigate("recipe/$id?ctx=${RecipeContexts.put(ids)}")
+                        },
+                        onPlay = { source -> navController.navigate(gameRoute(source)) },
+                    )
                 }
                 composable("recipe/{recipeId}?ctx={ctx}") { entry ->
                     val recipeId = entry.arguments?.getString("recipeId") ?: return@composable
@@ -178,7 +181,7 @@ fun MainShell() {
                         onReadFrom = { start ->
                             navController.navigate("read/$bookId?start=${start ?: ""}")
                         },
-                        onDiscover = { navController.navigate(gameRoute(GameSource.Book(bookId))) },
+                        onDiscover = { title -> navController.navigate(gameRoute(GameSource.Book(bookId, title))) },
                     )
                 }
                 composable("lists/{listId}") { entry ->
@@ -206,16 +209,17 @@ fun MainShell() {
                 composable("discover") {
                     DiscoverScreen(onPlay = { source -> navController.navigate(gameRoute(source)) })
                 }
-                composable("discover/play?mode={mode}&q={q}&keyword={keyword}&book={book}") { entry ->
+                composable("discover/play?mode={mode}&q={q}&keywords={keywords}&book={book}&title={title}") { entry ->
                     val mode = entry.arguments?.getString("mode") ?: "all"
                     val q = entry.arguments?.getString("q").orEmpty()
-                    val keyword = entry.arguments?.getString("keyword")?.takeIf { it.isNotEmpty() }
+                    val keywords =
+                        entry.arguments?.getString("keywords").orEmpty().split("|").filter { it.isNotEmpty() }
                     val source = when (mode) {
-                        "search" -> GameSource.Search(q, keyword)
+                        "search" -> GameSource.Search(q, keywords)
                         "semantic" -> GameSource.Semantic(q)
                         "book" -> {
                             val bookId = entry.arguments?.getString("book") ?: return@composable
-                            GameSource.Book(bookId)
+                            GameSource.Book(bookId, entry.arguments?.getString("title").orEmpty())
                         }
                         else -> GameSource.All
                     }

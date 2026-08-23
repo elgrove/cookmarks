@@ -15,9 +15,9 @@ data class GameCard(val id: String, val name: String)
 
 sealed interface GameSource {
     data object All : GameSource
-    data class Search(val q: String, val keyword: String?) : GameSource
+    data class Search(val q: String, val keywords: List<String>) : GameSource
     data class Semantic(val q: String) : GameSource
-    data class Book(val bookId: String) : GameSource
+    data class Book(val bookId: String, val title: String) : GameSource
 }
 
 object GameDeck {
@@ -105,7 +105,7 @@ class DeckController(private val source: GameSource, private val scope: Coroutin
             val search = source as? GameSource.Search
             val r = Api.service.searchRecipes(
                 q = search?.q.orEmpty(),
-                keywords = listOfNotNull(search?.keyword),
+                keywords = search?.keywords.orEmpty(),
                 seed = seed,
                 limit = GameDeck.PAGE_SIZE,
                 offset = offset,
