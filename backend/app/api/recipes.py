@@ -245,6 +245,7 @@ def _clear_keyword_cache() -> None:
 @router.get("/keywords", response_model=list[KeywordSummary])
 def list_keywords(
     session: SessionDep,
+    response: Response,
     limit: Annotated[int, Query(ge=1, le=_KEYWORD_CACHE_CAP)] = 50,
 ) -> list[KeywordSummary]:
     # Resting-state filter chips: the client renders only the most-used few. Served
@@ -262,6 +263,9 @@ def list_keywords(
             .limit(_KEYWORD_CACHE_CAP)
         ).all()
         _top_keywords = [KeywordSummary(name=name, recipe_count=count) for name, count in rows]
+    # The chips only shift when a book is extracted, so let the mobile client's HTTP
+    # cache answer this from disk instead of a round trip on every Discover open.
+    response.headers["Cache-Control"] = "private, max-age=600"
     return _top_keywords[:limit]
 
 
