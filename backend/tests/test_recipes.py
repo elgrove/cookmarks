@@ -69,6 +69,14 @@ def test_search_matches_ingredients(client: TestClient) -> None:
     assert body["items"][0]["name"] == "Recipe 0"
 
 
+def test_search_terms_need_not_be_adjacent(client: TestClient) -> None:
+    # Each term matches independently: "anchovy" is an ingredient, "0" the name.
+    body = client.get("/api/recipes", params={"q": "anchovy 0"}).json()
+    assert body["total"] == 1
+    assert body["items"][0]["name"] == "Recipe 0"
+    assert client.get("/api/recipes", params={"q": "anchovy sardine"}).json()["total"] == 0
+
+
 def test_search_matches_book_author(client: TestClient) -> None:
     body = client.get("/api/recipes", params={"q": "author one"}).json()
     assert body["total"] == 3

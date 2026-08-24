@@ -92,8 +92,10 @@ def _search_conditions(
 ) -> list:
     """The AND-narrowing filter shared by the result rows, total and facets."""
     conditions = []
-    if q:
-        like = f"%{q}%"
+    # Every whitespace-separated term must appear somewhere, so "white curry"
+    # finds a curry with white pepper rather than only the literal phrase.
+    for term in q.split():
+        like = f"%{term}%"
         conditions.append(
             or_(
                 Recipe.name.ilike(like),
