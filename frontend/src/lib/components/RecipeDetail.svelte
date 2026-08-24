@@ -69,6 +69,10 @@
 	// Most recipes carry no image (DESIGN §7); show the figure only when the source
 	// had one, and fall back to the text-first default if the stream fails to load.
 	let showImage = $derived(recipe.hasImage && !imageFailed);
+	// A few sources carry a multi-panel step strip instead of a dish photo. The
+	// portrait rail would crop it to a single panel, so a wide one takes the full
+	// width below the title at its own proportions.
+	let wideImage = $state(false);
 
 	// The book's display title (pre-colon) for the breadcrumb and provenance.
 	let bookTitle = $derived(cleanTitle(recipe.bookTitle));
@@ -162,7 +166,7 @@
 		{/if}
 	</div>
 
-	<header class="masthead" class:has-image={showImage}>
+	<header class="masthead" class:has-image={showImage} class:wide-image={wideImage}>
 		<div class="head">
 			<div class="head-main">
 				<h1 class="display">{recipe.name}</h1>
@@ -197,6 +201,10 @@
 						class="recipe-image"
 						src={`/api/recipes/${recipe.id}/image`}
 						alt={`Image accompanying ${recipe.name}`}
+						onload={(e) => {
+							const img = e.currentTarget as HTMLImageElement;
+							wideImage = img.naturalHeight > 0 && img.naturalWidth / img.naturalHeight > 2;
+						}}
 						onerror={() => (imageFailed = true)}
 					/>
 				</figure>
@@ -498,6 +506,17 @@
 		border-radius: 2px;
 		background: var(--bg-warm);
 	}
+	/* A step strip drops out of the rail onto its own full-width row, uncropped. */
+	.masthead.wide-image .head {
+		grid-template-columns: 1fr;
+	}
+	.masthead.wide-image .recipe-figure {
+		margin-top: 2.25rem;
+	}
+	.masthead.wide-image .recipe-image {
+		aspect-ratio: auto;
+		object-fit: contain;
+	}
 
 	/* Body — ingredients rail + a wide method column fills the desktop width. */
 	.body {
@@ -636,6 +655,9 @@
 		/* The hero plate stacks under the title — a gentler landscape crop on phones. */
 		.recipe-image {
 			aspect-ratio: 3 / 2;
+		}
+		.masthead.wide-image .recipe-image {
+			aspect-ratio: auto;
 		}
 		.body {
 			grid-template-columns: 1fr;
