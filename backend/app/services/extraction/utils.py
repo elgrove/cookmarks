@@ -95,21 +95,26 @@ def find_decorative_images(epub_path: Path, members: list[str]) -> set[str]:
                         width, height = image.size
                         short_side = min(width, height)
                         ratio = width / height if height else 0.0
-                        step_strip = (
-                            width >= STRIP_MIN_WIDTH
-                            and short_side >= STRIP_MIN_SHORT_SIDE
-                            and ratio <= STRIP_MAX_ASPECT_RATIO
-                            and _is_photographic(image)
+                        reused_small = short_side < REUSED_SHORT_SIDE and count >= REUSE_LIMIT
+                        odd_shape = (
+                            short_side < MIN_SHORT_SIDE
+                            or not MIN_ASPECT_RATIO <= ratio <= MAX_ASPECT_RATIO
+                        )
+                        # Decoding for the colour test is the expensive part, so only
+                        # an image already headed for rejection is asked about.
+                        rejected = reused_small or (
+                            odd_shape
+                            and not (
+                                width >= STRIP_MIN_WIDTH
+                                and short_side >= STRIP_MIN_SHORT_SIDE
+                                and ratio <= STRIP_MAX_ASPECT_RATIO
+                                and _is_photographic(image)
+                            )
                         )
                 except (KeyError, OSError, UnidentifiedImageError, ValueError):
                     decorative.add(member)
                     continue
-                reused_small = short_side < REUSED_SHORT_SIDE and count >= REUSE_LIMIT
-                odd_shape = (
-                    short_side < MIN_SHORT_SIDE
-                    or not MIN_ASPECT_RATIO <= ratio <= MAX_ASPECT_RATIO
-                )
-                if reused_small or (odd_shape and not step_strip):
+                if rejected:
                     decorative.add(member)
     except (zipfile.BadZipFile, OSError) as e:
         logger.error(f"Cannot screen images in {epub_path}, keeping all: {e}")
