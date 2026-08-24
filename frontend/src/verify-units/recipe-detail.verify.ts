@@ -151,6 +151,19 @@ const unit: VerifiableUnit<Props> = {
 			}
 		},
 		{
+			id: 'semantic-context',
+			description:
+				'reached from an AI search: pager follows the relevance ordering; breadcrumb links back to it',
+			props: {
+				recipe: {
+					...trofie,
+					context: 'semantic',
+					contextQuery: 'context=semantic&q=something+warming&limit=30',
+					searchHref: '/recipes?q=something+warming&mode=ai'
+				}
+			}
+		},
+		{
 			id: 'not-in-book',
 			description:
 				'the reader looked and the book never names this recipe: the jump is replaced by a plain note',
@@ -350,7 +363,7 @@ const unit: VerifiableUnit<Props> = {
 		{
 			id: 'search-breadcrumb',
 			description: 'a search context shows a breadcrumb that links back to the originating search',
-			onlyFixtures: ['search-context'],
+			onlyFixtures: ['search-context', 'semantic-context'],
 			check: ({ root, props }) => {
 				const back = root.querySelector(`.crumb a[href="${props.recipe.searchHref}"]`);
 				if (!back) return `no breadcrumb link back to ${props.recipe.searchHref}`;

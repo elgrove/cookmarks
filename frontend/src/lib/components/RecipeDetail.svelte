@@ -15,7 +15,7 @@
 		isFavourite: boolean;
 		/** Whether this recipe counts towards its book's read percentage. Opening the
 		 *  page records it; the toggle is the way back out of an accidental open. */
-		/** The navigation ordering this page was reached through ('book' | 'search'). */
+		/** The navigation ordering this page was reached through ('book' | 'search' | 'semantic'). */
 		context: string;
 		/** What the reader last found looking for this recipe in the book's own text:
 		 *  null = never looked, true = found, false = the book doesn't name it, so the
@@ -127,7 +127,7 @@
 >
 	<div class="topbar">
 		<nav class="crumb" aria-label="Breadcrumb">
-			{#if recipe.context === 'search' && recipe.searchHref}
+			{#if recipe.searchHref}
 				<a href="/recipes">Recipes</a><span class="sep">›</span><a href={recipe.searchHref}
 					>Search results</a
 				><span class="sep">›</span><span class="here">{recipe.name}</span>

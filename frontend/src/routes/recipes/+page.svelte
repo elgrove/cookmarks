@@ -283,6 +283,7 @@
 	<RecipesSearch
 		{status}
 		{mode}
+		semanticLimit={SEMANTIC_LIMIT}
 		{results}
 		{semanticAvailable}
 		{keywords}
