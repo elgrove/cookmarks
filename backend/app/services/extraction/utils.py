@@ -19,6 +19,14 @@ REUSED_SHORT_SIDE = 300
 REUSE_LIMIT = 3
 MIN_ASPECT_RATIO = 0.25
 MAX_ASPECT_RATIO = 4.0
+# A multi-panel step strip is a single wide image of numbered method photos, and is
+# worth keeping despite its odd shape. Colour is what tells it from the typeset
+# recipe title bars and line drawings that share those proportions: the strip is
+# full of mid-tone colour, the title bar is black on white.
+STRIP_MIN_WIDTH = 400
+STRIP_MIN_SHORT_SIDE = 100
+STRIP_MAX_ASPECT_RATIO = 6.0
+STRIP_MIN_COLOURED_FRACTION = 0.2
 
 
 def build_image_path_lookup(epub_path: Path) -> dict[str, list[str]]:
@@ -62,6 +70,14 @@ def resolve_image_path_in_epub(
     return matches[0]
 
 
+def _is_photographic(image: Image.Image) -> bool:
+    hsv = image.convert("HSV").resize((32, 32))
+    saturation = hsv.getchannel("S").tobytes()
+    value = hsv.getchannel("V").tobytes()
+    coloured = sum(1 for s, v in zip(saturation, value, strict=True) if s > 45 and 25 < v < 245)
+    return coloured / 1024 >= STRIP_MIN_COLOURED_FRACTION
+
+
 def find_decorative_images(epub_path: Path, members: list[str]) -> set[str]:
     """Of the images attached to a book's recipes, the ones that are page furniture
     rather than dish photos. Unreadable and missing members are rejected too, since
@@ -77,16 +93,23 @@ def find_decorative_images(epub_path: Path, members: list[str]) -> set[str]:
                 try:
                     with Image.open(io.BytesIO(epub.read(member))) as image:
                         width, height = image.size
+                        short_side = min(width, height)
+                        ratio = width / height if height else 0.0
+                        step_strip = (
+                            width >= STRIP_MIN_WIDTH
+                            and short_side >= STRIP_MIN_SHORT_SIDE
+                            and ratio <= STRIP_MAX_ASPECT_RATIO
+                            and _is_photographic(image)
+                        )
                 except (KeyError, OSError, UnidentifiedImageError, ValueError):
                     decorative.add(member)
                     continue
-                short_side = min(width, height)
-                ratio = width / height if height else 0.0
-                if (
+                reused_small = short_side < REUSED_SHORT_SIDE and count >= REUSE_LIMIT
+                odd_shape = (
                     short_side < MIN_SHORT_SIDE
                     or not MIN_ASPECT_RATIO <= ratio <= MAX_ASPECT_RATIO
-                    or (short_side < REUSED_SHORT_SIDE and count >= REUSE_LIMIT)
-                ):
+                )
+                if reused_small or (odd_shape and not step_strip):
                     decorative.add(member)
     except (zipfile.BadZipFile, OSError) as e:
         logger.error(f"Cannot screen images in {epub_path}, keeping all: {e}")

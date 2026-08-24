@@ -634,12 +634,17 @@ def test_task_marks_run_failed_on_error(
         assert any("kaboom" in e for e in run.errors)
 
 
-def _epub_with_images(path: Path, images: dict[str, tuple[int, int]]) -> Path:
+# Black fills read as line art; the mid-tone colour marks an image as photographic.
+_INK = (0, 0, 0)
+_PHOTO = (180, 90, 40)
+
+
+def _epub_with_images(path: Path, images: dict[str, tuple[tuple[int, int], tuple[int, int, int]]]) -> Path:
     epub = path / "book.epub"
     with zipfile.ZipFile(epub, "w") as archive:
-        for member, size in images.items():
+        for member, (size, colour) in images.items():
             buffer = io.BytesIO()
-            Image.new("RGB", size).save(buffer, format="JPEG")
+            Image.new("RGB", size, colour).save(buffer, format="JPEG")
             archive.writestr(member, buffer.getvalue())
     return epub
 
@@ -648,17 +653,21 @@ def test_find_decorative_images_keeps_dish_photos(tmp_path: Path) -> None:
     epub = _epub_with_images(
         tmp_path,
         {
-            "photo.jpg": (800, 600),
-            "group.jpg": (1200, 1600),
-            "icon.jpg": (40, 40),
-            "rule.jpg": (900, 10),
-            "banner.jpg": (2100, 325),
-            "nameplate.jpg": (250, 200),
+            "photo.jpg": ((800, 600), _PHOTO),
+            "group.jpg": ((1200, 1600), _PHOTO),
+            "strip.jpg": ((512, 148), _PHOTO),
+            "titlebar.jpg": ((512, 148), _INK),
+            "icon.jpg": ((40, 40), _PHOTO),
+            "rule.jpg": ((900, 10), _PHOTO),
+            "banner.jpg": ((2100, 325), _PHOTO),
+            "nameplate.jpg": ((250, 200), _PHOTO),
         },
     )
     members = [
         "photo.jpg",
         *["group.jpg"] * 5,
+        "strip.jpg",
+        "titlebar.jpg",
         "icon.jpg",
         "rule.jpg",
         "banner.jpg",
@@ -667,6 +676,7 @@ def test_find_decorative_images_keeps_dish_photos(tmp_path: Path) -> None:
     ]
 
     assert find_decorative_images(epub, members) == {
+        "titlebar.jpg",
         "icon.jpg",
         "rule.jpg",
         "banner.jpg",
