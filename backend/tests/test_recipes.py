@@ -77,6 +77,13 @@ def test_search_terms_need_not_be_adjacent(client: TestClient) -> None:
     assert client.get("/api/recipes", params={"q": "anchovy sardine"}).json()["total"] == 0
 
 
+def test_search_quoted_phrase_is_one_term(client: TestClient) -> None:
+    assert client.get("/api/recipes", params={"q": '"100g anchovy"'}).json()["total"] == 1
+    assert client.get("/api/recipes", params={"q": '"anchovy 100g"'}).json()["total"] == 0
+    # An unbalanced quote falls back to plain terms rather than erroring.
+    assert client.get("/api/recipes", params={"q": '"anchovy'}).json()["total"] == 1
+
+
 def test_search_matches_book_author(client: TestClient) -> None:
     body = client.get("/api/recipes", params={"q": "author one"}).json()
     assert body["total"] == 3
