@@ -56,7 +56,7 @@ def complete_run(run_id: str, detail: dict | None = None, usage: Usage | None = 
         run.completed_at = datetime.now(UTC)
         if detail:
             run.detail = {**run.detail, **detail}
-        if usage:
+        if usage is not None:
             run.cost_usd = usage.cost_usd
             run.input_tokens = usage.input_tokens
             run.output_tokens = usage.output_tokens

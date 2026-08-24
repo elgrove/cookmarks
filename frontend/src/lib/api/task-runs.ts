@@ -78,7 +78,7 @@ export interface KeywordDedupDetail {
 	merges_applied: number;
 	keywords_removed: number;
 	// The rotating candidate window and the two merge stages counted apart. Optional:
-	// runs recorded before the window existed carry none of these.
+	// older runs may omit them.
 	candidates?: number;
 	pre_merges?: number;
 	ai_merges?: number;

@@ -233,8 +233,8 @@ class AIProvider(abc.ABC):
     def deduplicate_keywords(
         self, keywords: list[str], candidates: list[str], model: str | None = None
     ) -> tuple[dict[str, str], Usage, bool]:
-        """Propose merges over a keyword vocabulary: `keywords` is the whole vocabulary
-        (any of it may be a canonical target), `candidates` the subset the model may
+        """Propose merges over a keyword vocabulary: `keywords` is every keyword the
+        model may merge into, `candidates` the subset it may
         propose merges *for*. Returns the raw {duplicate -> canonical} map, the usage,
         and whether the map had to be salvaged from a truncated reply. A reply cut off
         mid-object keeps the pairs it did produce rather than throwing the run away.
@@ -254,17 +254,23 @@ class AIProvider(abc.ABC):
             raw = json.loads(_strip_json_fence(response))
         except json.JSONDecodeError:
             raw = _salvage_pairs(response)
-            truncated = True
-            logger.warning(f"Keyword-dedup reply was not valid JSON; salvaged {len(raw)} pair(s)")
+            # Pairs recovered from unparseable JSON means the object was cut off
+            # mid-generation; nothing recovered means a reply that was never a map.
+            truncated = bool(raw)
+            if raw:
+                logger.warning(f"Keyword-dedup reply was cut off; salvaged {len(raw)} pair(s)")
+            else:
+                logger.error(f"Failed to decode keyword-dedup JSON from AI response:\n{response}")
 
         if not isinstance(raw, dict):
             logger.warning(f"Keyword-dedup response was not a JSON object: {raw!r}")
             return {}, usage, truncated
 
         allowed = set(candidates)
-        merges = {
-            k: v
-            for k, v in raw.items()
-            if isinstance(k, str) and isinstance(v, str) and k in allowed
-        }
+        pairs = {k: v for k, v in raw.items() if isinstance(k, str) and isinstance(v, str)}
+        merges = {k: v for k, v in pairs.items() if k in allowed}
+        if len(merges) < len(pairs):
+            logger.debug(
+                f"Dropped {len(pairs) - len(merges)} dedup merge(s) keyed outside the candidates"
+            )
         return merges, usage, truncated

@@ -113,6 +113,9 @@ const unit: VerifiableUnit<Props> = {
 				run: maintenance({
 					id: 'm2',
 					task_type: 'keyword_dedup',
+					cost_usd: '0.0081',
+					input_tokens: 27526,
+					output_tokens: 940,
 					detail: {
 						keywords_in: 40,
 						candidates: 40,
@@ -136,6 +139,9 @@ const unit: VerifiableUnit<Props> = {
 				run: maintenance({
 					id: 'm5',
 					task_type: 'keyword_dedup',
+					cost_usd: '0.0248',
+					input_tokens: 27526,
+					output_tokens: 8192,
 					detail: {
 						keywords_in: 5551,
 						candidates: 1000,

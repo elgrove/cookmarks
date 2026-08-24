@@ -73,10 +73,12 @@ class GeminiProvider(AIProvider):
 
         candidates = response.candidates or []
         finish_reason = candidates[0].finish_reason if candidates else None
-        if finish_reason is not None and finish_reason.name != "STOP":
+        reason = getattr(finish_reason, "name", finish_reason)
+        if reason is not None and reason != "STOP":
             logger.warning(
-                f"{model} stopped with finish_reason={finish_reason.name} "
-                f"after {usage.output_tokens} output token(s); the reply is incomplete"
+                f"{model} stopped with finish_reason={reason} after "
+                f"{usage.output_tokens if usage.output_tokens is not None else 'unreported'} "
+                "output token(s); the reply is incomplete"
             )
 
         return response.text or "", usage

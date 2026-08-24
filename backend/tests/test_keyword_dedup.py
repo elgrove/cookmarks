@@ -3,14 +3,20 @@ apply step that reassigns associations across recipes and books and deletes the
 merged-away keyword."""
 
 import json
+from collections.abc import Iterator
+from datetime import UTC, datetime
+from pathlib import Path
 from typing import ClassVar
 
 import pytest
-from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy import create_engine, func, select
+from sqlalchemy.orm import Session, sessionmaker
 
+from app.models import Base
 from app.models.book import Book
+from app.models.enums import TaskStatus, TaskType
 from app.models.recipe import Keyword, Recipe
+from app.models.task_run import TaskRun
 from app.services.ai import AIProvider, ModelRole, Usage
 from app.services.keyword_dedup import (
     apply_merges,
@@ -19,6 +25,7 @@ from app.services.keyword_dedup import (
     propose_merges,
     select_candidates,
 )
+from app.tasks.keyword_dedup import _last_cursor
 
 
 class _MapProvider(AIProvider):
@@ -249,6 +256,8 @@ def test_propose_merges_yields_nothing_from_an_unsalvageable_reply() -> None:
 
     assert merges == {}
     assert stats.ai_merges == 0
+    # A refusal is not a truncation: nothing was salvaged, so the run must not claim one.
+    assert stats.ai_truncated is False
 
 
 def test_propose_merges_drops_a_key_outside_the_candidate_window(
@@ -320,3 +329,55 @@ def test_deduplicate_keywords_reports_both_stages(
     assert result.merges_applied == result.pre_merges + result.ai_merges
     assert result.keywords_removed == result.merges_applied
     assert result.cursor_to is not None
+
+
+# --- Carrying the cursor between runs ------------------------------------------------
+
+
+@pytest.fixture
+def task_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[sessionmaker[Session]]:
+    """A throwaway DB the task's own SessionLocal is patched onto, so the cursor lookup
+    is exercised against real TaskRun rows."""
+    engine = create_engine(
+        f"sqlite:///{tmp_path / 'dedup.sqlite3'}", connect_args={"check_same_thread": False}
+    )
+    Base.metadata.create_all(engine)
+    factory = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+    monkeypatch.setattr("app.tasks.keyword_dedup.SessionLocal", factory)
+    yield factory
+    engine.dispose()
+
+
+def _done_run(
+    factory: sessionmaker[Session], completed: datetime, detail: dict[str, object]
+) -> None:
+    with factory() as session:
+        session.add(
+            TaskRun(
+                task_type=TaskType.KEYWORD_DEDUP,
+                status=TaskStatus.DONE,
+                completed_at=completed,
+                detail=detail,
+            )
+        )
+        session.commit()
+
+
+def test_last_cursor_is_none_before_any_run(task_db: sessionmaker[Session]) -> None:
+    assert _last_cursor() is None
+
+
+def test_last_cursor_takes_the_newest_run(task_db: sessionmaker[Session]) -> None:
+    _done_run(task_db, datetime(2026, 8, 1, tzinfo=UTC), {"cursor_to": "Grain"})
+    _done_run(task_db, datetime(2026, 8, 8, tzinfo=UTC), {"cursor_to": "Mango"})
+
+    assert _last_cursor() == "Mango"
+
+
+def test_last_cursor_skips_a_run_that_recorded_none(task_db: sessionmaker[Session]) -> None:
+    _done_run(task_db, datetime(2026, 8, 1, tzinfo=UTC), {"cursor_to": "Mango"})
+    # A pass with no provider configured finishes DONE having swept nothing; letting it
+    # reset the cursor would restart the sweep and never reach the vocabulary's tail.
+    _done_run(task_db, datetime(2026, 8, 8, tzinfo=UTC), {"cursor_to": None})
+
+    assert _last_cursor() == "Mango"

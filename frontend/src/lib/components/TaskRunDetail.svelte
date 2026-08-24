@@ -113,7 +113,10 @@
 					{ label: 'Merges applied', value: count(d.merges_applied) },
 					{ label: 'Deterministic merges', value: count(d.pre_merges) },
 					{ label: 'AI merges', value: count(d.ai_merges) },
-					{ label: 'Keywords removed', value: count(d.keywords_removed) }
+					{ label: 'Keywords removed', value: count(d.keywords_removed) },
+					{ label: 'Swept to', value: d.cursor_to || '—', wrap: true },
+					{ label: 'Cost', value: formatCost(run.cost_usd) },
+					{ label: 'Tokens', value: formatTokens(run.input_tokens, run.output_tokens) }
 				];
 				if (d.ai_truncated) rows.push({ label: 'AI reply', value: 'Truncated — salvaged' });
 				return rows;

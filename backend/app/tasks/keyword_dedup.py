@@ -20,6 +20,9 @@ from app.tasks.runs import complete_run, create_task_run, fail_run, start_run
 
 logger = logging.getLogger(__name__)
 
+# How far back to look for a run that recorded a cursor before starting the sweep over.
+_CURSOR_LOOKBACK = 20
+
 
 def enqueue_dedup_keywords(run_id: str) -> None:
     """Dispatch the dedup to the Celery worker — the single seam the admin Tasks
@@ -29,17 +32,23 @@ def enqueue_dedup_keywords(run_id: str) -> None:
 
 
 def _last_cursor() -> str | None:
-    """Where the last finished run's candidate window ended, so this run takes the next
-    one. None (start of the vocabulary) when no run has recorded a cursor yet."""
+    """Where the most recent finished run's candidate window ended, so this run takes the
+    next one. The newest run that *recorded* a cursor wins, not simply the newest run: a
+    pass with no provider or an empty vocabulary records none, and letting that reset the
+    sweep to the start of the vocabulary would leave its tail never deduplicated. None
+    (start of the vocabulary) when no run has recorded a cursor yet."""
     with SessionLocal() as session:
         runs = session.scalars(
             select(TaskRun)
             .where(TaskRun.task_type == TaskType.KEYWORD_DEDUP, TaskRun.status == TaskStatus.DONE)
-            .order_by(TaskRun.created_at.desc())
-            .limit(1)
+            .order_by(TaskRun.completed_at.desc(), TaskRun.created_at.desc())
+            .limit(_CURSOR_LOOKBACK)
         ).all()
-    cursor = runs[0].detail.get("cursor_to") if runs else None
-    return cursor if isinstance(cursor, str) else None
+        for run in runs:
+            cursor = run.detail.get("cursor_to")
+            if isinstance(cursor, str):
+                return cursor
+    return None
 
 
 def run_dedup(cursor: str | None = None) -> DedupResult:

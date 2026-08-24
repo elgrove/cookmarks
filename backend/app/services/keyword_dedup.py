@@ -130,21 +130,23 @@ def propose_merges(
     """Build the final {duplicate -> canonical} map for `names`: the deterministic
     pre-pass plus the AI's semantic merges over a rotating window of the survivors,
     chains resolved. AI entries win on overlap. Returns the map and the run's stats —
-    the two stages counted apart, before any of it touches the database."""
+    the two stages counted apart, over the surviving merges rather than the proposals."""
     survivors, pre_map = pre_deduplicate(names)
     candidates, cursor_to = select_candidates(survivors, cursor)
     ai_map, usage, truncated = provider.deduplicate_keywords(survivors, candidates)
+    merges = _resolve_chains({**pre_map, **ai_map})
+    ai_merges = sum(1 for name in merges if name in ai_map)
     stats = DedupResult(
         keywords_in=len(names),
-        pre_merges=len(pre_map),
-        ai_merges=len(ai_map),
+        pre_merges=len(merges) - ai_merges,
+        ai_merges=ai_merges,
         ai_truncated=truncated,
         candidates=len(candidates),
         cursor_from=cursor,
         cursor_to=cursor_to,
         usage=usage,
     )
-    return _resolve_chains({**pre_map, **ai_map}), stats
+    return merges, stats
 
 
 def apply_merges(session: Session, merges: dict[str, str]) -> int:
@@ -206,8 +208,9 @@ def _vocabulary_by_usage(session: Session) -> list[str]:
 def deduplicate_keywords(session: Session, cursor: str | None = None) -> DedupResult:
     """Run one dedup pass over the whole keyword vocabulary, the AI stage limited to the
     candidate window that follows `cursor`. A no-op (returns zeros) when no AI provider
-    is configured or the vocabulary is empty. Writes ride the caller's transaction. Logs
-    a one-line summary; there is no review step before applying."""
+    is configured or the vocabulary is empty; a proposal that fails raises, so the run is
+    recorded FAILED rather than reported done having merged nothing. Writes ride the
+    caller's transaction. Logs a one-line summary; there is no review step before applying."""
     provider = get_ai_provider(session)
     if provider is None:
         logger.debug("No AI provider configured; skipping keyword dedup")
@@ -217,12 +220,7 @@ def deduplicate_keywords(session: Session, cursor: str | None = None) -> DedupRe
     if not names:
         return DedupResult()
 
-    try:
-        merges, stats = propose_merges(provider, names, cursor)
-    except Exception:
-        logger.exception("Keyword-dedup proposal failed; applying no merges")
-        return DedupResult(keywords_in=len(names))
-
+    merges, stats = propose_merges(provider, names, cursor)
     applied = apply_merges(session, merges)
     logger.info(
         f"Keyword dedup: applied {applied} merge(s) "

@@ -74,9 +74,9 @@ Cookbook:
 
 Return ONLY a JSON array of keyword strings. No other text."""
 
-DEDUPLICATE_KEYWORDS_PROMPT = """You are tasked with deduplicating a list of keywords. These are keywords/tags of recipes extracted from cookbooks.
+DEDUPLICATE_KEYWORDS_PROMPT = """You are tasked with deduplicating keywords. These are keywords/tags of recipes extracted from cookbooks.
 We already have the ability to search through ingredients in our application. We want to make searching/filtering with keywords effective.
-Analyse the provided list and identify keywords that are variations of each other (e.g., different capitalisation, pluralisation, or hyphenation), or are very similar and serve the same purpose as tags/keywords.
+Analyse the candidate keywords below and identify those that are variations of each other (e.g., different capitalisation, pluralisation, or hyphenation), or are very similar and serve the same purpose as tags/keywords.
 
 Respond with a JSON object where:
 - The keys are the duplicate keywords.
