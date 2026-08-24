@@ -94,6 +94,13 @@
 				s.delete('context');
 				const qs = s.toString();
 				searchHref = qs ? `/recipes?${qs}` : '/recipes';
+			} else if (r.context === 'semantic') {
+				// An AI search restores from its query plus the mode marker alone.
+				const s = new URLSearchParams();
+				const q = params.get('q');
+				if (q) s.set('q', q);
+				s.set('mode', 'ai');
+				searchHref = `/recipes?${s.toString()}`;
 			}
 			recipe = {
 				id: r.id,

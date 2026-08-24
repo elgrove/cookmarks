@@ -51,7 +51,7 @@ _SHUFFLE_HASH = 2654435761
 
 # Navigation orderings the recipe page can be reached through; "list" arrives with
 # that page, so unknown contexts resolve to book.
-SUPPORTED_CONTEXTS = {"book", "search"}
+SUPPORTED_CONTEXTS = {"book", "search", "semantic"}
 
 
 def _summary(recipe: Recipe, book: Book) -> RecipeSummary:
@@ -365,6 +365,37 @@ def _ordered_search_ids(
     return ids
 
 
+def _ordered_semantic_ids(session: Session, q: str, limit: int) -> list[uuid.UUID]:
+    """The AI search's relevance ordering, cached beside the keyword orderings under a
+    key its tuple shape can't collide with."""
+    key = ("semantic", q, limit)
+    cached = _SEARCH_ORDER_CACHE.get(key)
+    if cached is not None:
+        _SEARCH_ORDER_CACHE.move_to_end(key)
+        return cached
+    matches = embeddings.search(session, q, limit) or []
+    ids = [recipe_id for recipe_id, _ in matches]
+    _SEARCH_ORDER_CACHE[key] = ids
+    _SEARCH_ORDER_CACHE.move_to_end(key)
+    while len(_SEARCH_ORDER_CACHE) > _SEARCH_ORDER_CACHE_MAX:
+        _SEARCH_ORDER_CACHE.popitem(last=False)
+    return ids
+
+
+def _neighbours_in(
+    session: Session, ids: list[uuid.UUID], recipe_id: uuid.UUID
+) -> tuple[RecipeNeighbour | None, RecipeNeighbour | None]:
+    """The entries either side of this recipe in an ordering. Returns (None, None) if
+    it isn't in the result set."""
+    try:
+        idx = ids.index(recipe_id)
+    except ValueError:
+        return None, None
+    prev_id = ids[idx - 1] if idx > 0 else None
+    next_id = ids[idx + 1] if idx + 1 < len(ids) else None
+    return _neighbour(session, prev_id), _neighbour(session, next_id)
+
+
 def _search_neighbours(
     session: Session,
     recipe: Recipe,
@@ -376,15 +407,9 @@ def _search_neighbours(
     seed: int,
 ) -> tuple[RecipeNeighbour | None, RecipeNeighbour | None]:
     """Previous/next in the *search* ordering — the ordered ids (cached per search)
-    indexed to this recipe. Returns (None, None) if it isn't in the result set."""
+    indexed to this recipe."""
     ids = _ordered_search_ids(session, q, keywords, book_id, author, sort, seed)
-    try:
-        idx = ids.index(recipe.id)
-    except ValueError:
-        return None, None
-    prev_id = ids[idx - 1] if idx > 0 else None
-    next_id = ids[idx + 1] if idx + 1 < len(ids) else None
-    return _neighbour(session, prev_id), _neighbour(session, next_id)
+    return _neighbours_in(session, ids, recipe.id)
 
 
 @router.get("/recipes/{recipe_id}", response_model=RecipeDetail)
@@ -399,6 +424,7 @@ def get_recipe(
     author: Annotated[str | None, Query()] = None,
     sort: Sort = "random",
     seed: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=100)] = 30,
 ) -> RecipeDetail:
     recipe = session.scalar(
         select(Recipe)
@@ -415,6 +441,12 @@ def get_recipe(
         # evicted the pager simply goes quiet.
         previous, next_ = _search_neighbours(
             session, recipe, q.strip(), keyword or [], book_id, author, sort, seed
+        )
+    elif resolved_context == "semantic":
+        # The AI search's ordering, recomputed (and cached) from the same query and
+        # result size the results page ran with.
+        previous, next_ = _neighbours_in(
+            session, _ordered_semantic_ids(session, q.strip(), limit), recipe.id
         )
     else:
         previous, next_ = _book_neighbours(session, recipe)

@@ -126,3 +126,47 @@ def test_endpoint_ranks_and_shapes_results(client: TestClient, session: Session)
     # Distances are non-decreasing — closest first.
     distances = [item["distance"] for item in body["items"]]
     assert distances == sorted(distances)
+
+
+def test_recipe_nav_semantic_order(client: TestClient, session: Session) -> None:
+    # Opening a recipe out of an AI search steps through that search's relevance
+    # ordering, not the book it happens to sit in.
+    _configure_stub(session)
+    recipes = _seeded_recipes(session)
+    embeddings.embed_recipes(session, recipes)
+    session.commit()
+    query = embeddings.recipe_to_text(next(r for r in recipes if r.name == "Recipe 0"))
+
+    ranked = client.get("/api/recipes/semantic", params={"q": query, "limit": 3}).json()["items"]
+    middle = ranked[1]
+
+    body = client.get(
+        f"/api/recipes/{middle['id']}",
+        params={"context": "semantic", "q": query, "limit": 3},
+    ).json()
+
+    assert body["context"] == "semantic"
+    assert body["previous"]["id"] == ranked[0]["id"]
+    assert body["next"]["id"] == ranked[2]["id"]
+
+
+def test_recipe_nav_semantic_outside_results_has_no_pager(
+    client: TestClient, session: Session
+) -> None:
+    _configure_stub(session)
+    recipes = _seeded_recipes(session)
+    embeddings.embed_recipes(session, recipes)
+    session.commit()
+    query = embeddings.recipe_to_text(next(r for r in recipes if r.name == "Recipe 0"))
+
+    ranked = client.get("/api/recipes/semantic", params={"q": query, "limit": 1}).json()["items"]
+    outside = next(r for r in recipes if str(r.id) != ranked[0]["id"])
+
+    body = client.get(
+        f"/api/recipes/{outside.id}",
+        params={"context": "semantic", "q": query, "limit": 1},
+    ).json()
+
+    assert body["context"] == "semantic"
+    assert body["previous"] is None
+    assert body["next"] is None

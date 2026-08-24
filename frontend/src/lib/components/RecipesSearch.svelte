@@ -22,6 +22,8 @@
 		// False when semantic search can't run (no embedding-capable provider): the
 		// results area says so instead of implying nothing matched.
 		semanticAvailable?: boolean;
+		/** Result size the AI search ran with, so the recipe pager reproduces it. */
+		semanticLimit?: number;
 		keywords?: KeywordSummary[];
 		books?: { id: string; title: string }[];
 		authors?: string[];
@@ -46,6 +48,7 @@
 		mode = 'keyword',
 		results = { total: 0, items: [], facets: [] },
 		semanticAvailable = true,
+		semanticLimit = 30,
 		keywords = [],
 		books = [],
 		authors = [],
@@ -126,8 +129,8 @@
 	);
 
 	// Carried into each result's link so the recipe page's prev/next follow this
-	// exact search (keyword filters + sort + seed). Semantic results have no such
-	// ordering wired, so they open in the recipe's own book context.
+	// exact search (keyword filters + sort + seed). An AI search is ordered by
+	// relevance instead, and reproduced from its query and result size.
 	let contextQuery = $derived(
 		searchContextQuery({
 			q: query,
@@ -137,6 +140,14 @@
 			sort,
 			seed: sort === 'random' ? randomSeed : undefined
 		})
+	);
+
+	let semanticContextQuery = $derived(
+		new URLSearchParams({
+			context: 'semantic',
+			q: query.trim(),
+			limit: String(semanticLimit)
+		}).toString()
 	);
 
 	// The chips shown: selected keywords pinned first (so they stay deselectable
@@ -543,7 +554,7 @@
 						bookTitle={r.book_title}
 						bookAuthor={r.book_author}
 						keywords={r.keywords}
-						contextQuery={isSemantic ? '' : contextQuery}
+						contextQuery={isSemantic ? semanticContextQuery : contextQuery}
 						onKeyword={narrowByKeyword}
 						{listPicker}
 						selectable={selectMode}
