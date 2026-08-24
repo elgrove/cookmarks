@@ -18,6 +18,7 @@ from app.config import settings
 from app.db import SessionLocal
 from app.models.enums import TaskStatus, TaskType
 from app.models.task_run import TaskRun
+from app.services.ai import Usage
 
 logger = logging.getLogger(__name__)
 
@@ -44,8 +45,9 @@ def start_run(run_id: str) -> None:
         session.commit()
 
 
-def complete_run(run_id: str, detail: dict | None = None) -> None:
-    """Mark a run DONE, stamp `completed_at`, and merge in the job's result metrics."""
+def complete_run(run_id: str, detail: dict | None = None, usage: Usage | None = None) -> None:
+    """Mark a run DONE, stamp `completed_at`, and merge in the job's result metrics —
+    plus its token/cost accounting when the job made AI calls."""
     with SessionLocal() as session:
         run = session.get(TaskRun, uuid.UUID(run_id))
         if run is None:
@@ -54,6 +56,10 @@ def complete_run(run_id: str, detail: dict | None = None) -> None:
         run.completed_at = datetime.now(UTC)
         if detail:
             run.detail = {**run.detail, **detail}
+        if usage:
+            run.cost_usd = usage.cost_usd
+            run.input_tokens = usage.input_tokens
+            run.output_tokens = usage.output_tokens
         session.commit()
 
 

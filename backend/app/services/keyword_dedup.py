@@ -17,7 +17,8 @@ list membership ride on the canonical row, so nothing a user curated is lost.
 """
 
 import logging
-from dataclasses import dataclass
+from bisect import bisect_right
+from dataclasses import dataclass, field, replace
 
 import inflect
 from sqlalchemy import func, select
@@ -25,20 +26,34 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.models.book import book_keywords
 from app.models.recipe import Keyword, recipe_keywords
-from app.services.ai import AIProvider, get_ai_provider
+from app.services.ai import AIProvider, Usage, get_ai_provider
 from app.services.keywords import get_or_create_keyword
 
 logger = logging.getLogger(__name__)
+
+# How many keywords one run may propose merges *for*. The whole vocabulary still goes
+# to the model as possible canonical targets; only the keys are windowed, because the
+# reply length — not the prompt — is what hit Gemini's output cap and truncated a run.
+DEDUP_CANDIDATE_WINDOW = 1000
 
 
 @dataclass(frozen=True)
 class DedupResult:
     """What a dedup run did: how big the vocabulary was, how many merges applied, and
-    how many keyword rows that removed (one per merged-away duplicate)."""
+    how many keyword rows that removed (one per merged-away duplicate) — plus the two
+    stages measured apart, so a dead AI pass can't hide behind the pre-pass's count,
+    and the candidate window the run walked."""
 
     keywords_in: int = 0
     merges_applied: int = 0
     keywords_removed: int = 0
+    pre_merges: int = 0
+    ai_merges: int = 0
+    ai_truncated: bool = False
+    candidates: int = 0
+    cursor_from: str | None = None
+    cursor_to: str | None = None
+    usage: Usage = field(default_factory=Usage)
 
 
 def _normalise(name: str) -> str:
@@ -95,13 +110,41 @@ def _resolve_chains(raw: dict[str, str]) -> dict[str, str]:
     return {original: target for original, target in resolved.items() if target not in resolved}
 
 
-def propose_merges(provider: AIProvider, names: list[str]) -> dict[str, str]:
+def select_candidates(survivors: list[str], cursor: str | None) -> tuple[list[str], str | None]:
+    """The next window of keywords the AI may propose merges for, walking the name-sorted
+    vocabulary from `cursor` and wrapping at the end, with the cursor to resume from next
+    run. A cursor naming a keyword since merged away simply resumes at the next name."""
+    names = sorted(survivors)
+    if not names:
+        return [], None
+    start = 0 if cursor is None else bisect_right(names, cursor)
+    if start >= len(names):
+        start = 0
+    window = (names[start:] + names[:start])[:DEDUP_CANDIDATE_WINDOW]
+    return window, window[-1]
+
+
+def propose_merges(
+    provider: AIProvider, names: list[str], cursor: str | None = None
+) -> tuple[dict[str, str], DedupResult]:
     """Build the final {duplicate -> canonical} map for `names`: the deterministic
-    pre-pass plus the AI's semantic merges over the survivors, chains resolved. AI
-    entries win on overlap. Empty when nothing should change."""
+    pre-pass plus the AI's semantic merges over a rotating window of the survivors,
+    chains resolved. AI entries win on overlap. Returns the map and the run's stats —
+    the two stages counted apart, before any of it touches the database."""
     survivors, pre_map = pre_deduplicate(names)
-    ai_map, _usage = provider.deduplicate_keywords(survivors)
-    return _resolve_chains({**pre_map, **ai_map})
+    candidates, cursor_to = select_candidates(survivors, cursor)
+    ai_map, usage, truncated = provider.deduplicate_keywords(survivors, candidates)
+    stats = DedupResult(
+        keywords_in=len(names),
+        pre_merges=len(pre_map),
+        ai_merges=len(ai_map),
+        ai_truncated=truncated,
+        candidates=len(candidates),
+        cursor_from=cursor,
+        cursor_to=cursor_to,
+        usage=usage,
+    )
+    return _resolve_chains({**pre_map, **ai_map}), stats
 
 
 def apply_merges(session: Session, merges: dict[str, str]) -> int:
@@ -160,10 +203,11 @@ def _vocabulary_by_usage(session: Session) -> list[str]:
     return sorted(names, key=lambda name: (-uses.get(name, 0), name))
 
 
-def deduplicate_keywords(session: Session) -> DedupResult:
-    """Run a full dedup over the whole keyword vocabulary. A no-op (returns zeros) when
-    no AI provider is configured or the vocabulary is empty. Writes ride the caller's
-    transaction. Logs a one-line summary; there is no review step before applying."""
+def deduplicate_keywords(session: Session, cursor: str | None = None) -> DedupResult:
+    """Run one dedup pass over the whole keyword vocabulary, the AI stage limited to the
+    candidate window that follows `cursor`. A no-op (returns zeros) when no AI provider
+    is configured or the vocabulary is empty. Writes ride the caller's transaction. Logs
+    a one-line summary; there is no review step before applying."""
     provider = get_ai_provider(session)
     if provider is None:
         logger.debug("No AI provider configured; skipping keyword dedup")
@@ -174,14 +218,17 @@ def deduplicate_keywords(session: Session) -> DedupResult:
         return DedupResult()
 
     try:
-        merges = propose_merges(provider, names)
+        merges, stats = propose_merges(provider, names, cursor)
     except Exception:
         logger.exception("Keyword-dedup proposal failed; applying no merges")
         return DedupResult(keywords_in=len(names))
 
     applied = apply_merges(session, merges)
     logger.info(
-        f"Keyword dedup: applied {applied} merge(s), "
-        f"removed {applied} keyword(s) from a vocabulary of {len(names)}"
+        f"Keyword dedup: applied {applied} merge(s) "
+        f"({stats.pre_merges} deterministic, {stats.ai_merges} semantic"
+        f"{', reply truncated' if stats.ai_truncated else ''}), "
+        f"removed {applied} keyword(s) from a vocabulary of {len(names)} "
+        f"over {stats.candidates} candidate(s)"
     )
-    return DedupResult(keywords_in=len(names), merges_applied=applied, keywords_removed=applied)
+    return replace(stats, merges_applied=applied, keywords_removed=applied)

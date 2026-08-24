@@ -71,6 +71,14 @@ class GeminiProvider(AIProvider):
                 output_tokens=output_tokens,
             )
 
+        candidates = response.candidates or []
+        finish_reason = candidates[0].finish_reason if candidates else None
+        if finish_reason is not None and finish_reason.name != "STOP":
+            logger.warning(
+                f"{model} stopped with finish_reason={finish_reason.name} "
+                f"after {usage.output_tokens} output token(s); the reply is incomplete"
+            )
+
         return response.text or "", usage
 
     def embed(self, text: str, task: EmbedTask) -> list[float]:

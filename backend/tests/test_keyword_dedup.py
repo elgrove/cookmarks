@@ -17,6 +17,7 @@ from app.services.keyword_dedup import (
     deduplicate_keywords,
     pre_deduplicate,
     propose_merges,
+    select_candidates,
 )
 
 
@@ -36,6 +37,24 @@ class _MapProvider(AIProvider):
         self, prompt: str, model: str, *, schema: dict | None = None, temp: float = 0
     ) -> tuple[str, Usage]:
         return json.dumps(self._mapping), Usage()
+
+
+class _RawProvider(AIProvider):
+    """A provider whose dedup step returns a fixed raw string — lets a truncated or
+    malformed reply be exercised exactly as the model would deliver it."""
+
+    name = "RAW"
+    requires_api_key = False
+    models: ClassVar[dict[ModelRole, str]] = {ModelRole.KEYWORD_DEDUP: "raw"}
+
+    def __init__(self, response: str) -> None:
+        super().__init__("")
+        self._response = response
+
+    def _complete(
+        self, prompt: str, model: str, *, schema: dict | None = None, temp: float = 0
+    ) -> tuple[str, Usage]:
+        return self._response, Usage()
 
 
 def _recipe_zero(session: Session) -> Recipe:
@@ -87,7 +106,7 @@ def test_pre_deduplicate_leaves_distinct_terms_alone() -> None:
 def test_propose_merges_resolves_a_transitive_chain() -> None:
     provider = _MapProvider({"Veggie": "Veg", "Veg": "Vegetarian"})
 
-    merges = propose_merges(provider, ["Veggie", "Veg", "Vegetarian"])
+    merges, _stats = propose_merges(provider, ["Veggie", "Veg", "Vegetarian"])
 
     # A->B->C collapses so both duplicates point straight at the terminal canonical.
     assert merges == {"Veggie": "Vegetarian", "Veg": "Vegetarian"}
@@ -96,7 +115,7 @@ def test_propose_merges_resolves_a_transitive_chain() -> None:
 def test_propose_merges_drops_self_maps_and_cycles() -> None:
     provider = _MapProvider({"Keep": "Keep", "A": "B", "B": "A"})
 
-    assert propose_merges(provider, ["Keep", "A", "B"]) == {}
+    assert propose_merges(provider, ["Keep", "A", "B"])[0] == {}
 
 
 # --- Applying merges to the database -------------------------------------------------
@@ -207,3 +226,97 @@ def test_deduplicate_keywords_with_stub_provider_merges_nothing(
     assert result.keywords_in == before
     assert result.merges_applied == 0
     assert session.scalar(select(func.count()).select_from(Keyword)) == before
+
+
+# --- Salvaging a truncated reply -----------------------------------------------------
+
+
+def test_propose_merges_salvages_a_truncated_reply() -> None:
+    # Cut off mid-pair, exactly as Gemini leaves it when it hits the output cap.
+    provider = _RawProvider('{\n "Shrimp": "Prawn",\n "Eggplant": "Aubergine",\n "Zuc')
+
+    merges, stats = propose_merges(provider, ["Shrimp", "Prawn", "Eggplant", "Aubergine"])
+
+    assert merges == {"Shrimp": "Prawn", "Eggplant": "Aubergine"}
+    assert stats.ai_merges == 2
+    assert stats.ai_truncated is True
+
+
+def test_propose_merges_yields_nothing_from_an_unsalvageable_reply() -> None:
+    provider = _RawProvider("I'm sorry, I can't help with that.")
+
+    merges, stats = propose_merges(provider, ["Pasta", "Quick"])
+
+    assert merges == {}
+    assert stats.ai_merges == 0
+
+
+def test_propose_merges_drops_a_key_outside_the_candidate_window(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("app.services.keyword_dedup.DEDUP_CANDIDATE_WINDOW", 1)
+    # Sorted, the window is ["Aubergine"], so the Shrimp entry names a keyword the model
+    # was only given as context — it must not be merged away.
+    provider = _MapProvider({"Aubergine": "Brinjal", "Shrimp": "Prawn"})
+
+    merges, stats = propose_merges(provider, ["Shrimp", "Prawn", "Aubergine"])
+
+    assert merges == {"Aubergine": "Brinjal"}
+    assert stats.candidates == 1
+
+
+# --- The rotating candidate window ---------------------------------------------------
+
+
+def test_select_candidates_rotates_without_repeats_and_wraps(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("app.services.keyword_dedup.DEDUP_CANDIDATE_WINDOW", 2)
+    names = ["Egg", "Fish", "Grain", "Herb", "Ice"]
+
+    first, cursor = select_candidates(names, None)
+    second, cursor = select_candidates(names, cursor)
+    third, cursor = select_candidates(names, cursor)
+
+    assert first == ["Egg", "Fish"]
+    assert second == ["Grain", "Herb"]
+    # The tail is short, so the window wraps to the start of the vocabulary.
+    assert third == ["Ice", "Egg"]
+    assert cursor == "Egg"
+
+
+def test_select_candidates_resumes_past_a_removed_cursor(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("app.services.keyword_dedup.DEDUP_CANDIDATE_WINDOW", 2)
+
+    # "Fish" was merged away since the last run; the window simply starts at the next name.
+    window, _cursor = select_candidates(["Egg", "Grain", "Herb", "Ice"], "Fish")
+
+    assert window == ["Grain", "Herb"]
+
+
+def test_select_candidates_on_an_empty_vocabulary() -> None:
+    assert select_candidates([], None) == ([], None)
+
+
+def test_deduplicate_keywords_reports_both_stages(
+    session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    recipe = _recipe_zero(session)
+    recipe.keywords.append(Keyword(name="Pastas"))
+    session.commit()
+    monkeypatch.setattr(
+        "app.services.keyword_dedup.get_ai_provider",
+        lambda _session: _MapProvider({"Quick": "Fast"}),
+    )
+
+    result = deduplicate_keywords(session)
+    session.commit()
+
+    # "Pastas" folds into "Pasta" deterministically; "Quick" -> "Fast" is the AI's.
+    assert result.pre_merges == 1
+    assert result.ai_merges == 1
+    assert result.merges_applied == result.pre_merges + result.ai_merges
+    assert result.keywords_removed == result.merges_applied
+    assert result.cursor_to is not None

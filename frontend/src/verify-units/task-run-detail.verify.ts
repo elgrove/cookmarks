@@ -107,12 +107,46 @@ const unit: VerifiableUnit<Props> = {
 		},
 		{
 			id: 'keyword-dedup',
-			description: 'a keyword-dedup run shows keywords analysed / merges / removed',
+			description:
+				'a keyword-dedup run shows keywords analysed, the candidate window and the deterministic/AI split',
 			props: {
 				run: maintenance({
 					id: 'm2',
 					task_type: 'keyword_dedup',
-					detail: { keywords_in: 40, merges_applied: 6, keywords_removed: 6 }
+					detail: {
+						keywords_in: 40,
+						candidates: 40,
+						merges_applied: 6,
+						pre_merges: 4,
+						ai_merges: 2,
+						ai_truncated: false,
+						keywords_removed: 6,
+						cursor_from: null,
+						cursor_to: 'Wasabi'
+					}
+				})
+			}
+		},
+		{
+			id: 'keyword-dedup-truncated',
+			description:
+				'probe: the AI reply was cut off — the salvaged merges are reported and the truncation is named, not hidden behind a healthy-looking total',
+			probe: true,
+			props: {
+				run: maintenance({
+					id: 'm5',
+					task_type: 'keyword_dedup',
+					detail: {
+						keywords_in: 5551,
+						candidates: 1000,
+						merges_applied: 1731,
+						pre_merges: 1728,
+						ai_merges: 3,
+						ai_truncated: true,
+						keywords_removed: 1731,
+						cursor_from: 'Aubergine',
+						cursor_to: 'Chorizo'
+					}
 				})
 			}
 		},
@@ -269,11 +303,44 @@ const unit: VerifiableUnit<Props> = {
 		},
 		{
 			id: 'dedup-rows',
-			description: 'a dedup run shows its merge metrics',
-			onlyFixtures: ['keyword-dedup'],
+			description: 'a dedup run shows its merge metrics, split by stage',
+			onlyFixtures: ['keyword-dedup', 'keyword-dedup-truncated'],
 			check: ({ contract, root }) => {
 				if (contract['task-type'] !== 'keyword_dedup') return `task-type=${contract['task-type']}`;
-				return (root.textContent ?? '').includes('Merges applied') || 'merges row missing';
+				const text = root.textContent ?? '';
+				return (
+					(text.includes('Merges applied') &&
+						text.includes('Deterministic merges') &&
+						text.includes('AI merges') &&
+						text.includes('Candidates')) ||
+					'dedup rows missing'
+				);
+			}
+		},
+		{
+			id: 'dedup-split-within-window',
+			description: 'the AI can never be credited with more merges than there were candidates',
+			onlyFixtures: ['keyword-dedup', 'keyword-dedup-truncated'],
+			check: ({ root }) => {
+				const rows = [...root.querySelectorAll('.row')];
+				const value = (label: string) =>
+					Number(
+						rows.find((r) => r.querySelector('dt')?.textContent === label)?.querySelector('dd')
+							?.textContent ?? NaN
+					);
+				const ai = value('AI merges');
+				const candidates = value('Candidates');
+				if (Number.isNaN(ai) || Number.isNaN(candidates)) return 'split rows unreadable';
+				return ai <= candidates || `${ai} AI merges over ${candidates} candidates`;
+			}
+		},
+		{
+			id: 'dedup-truncation-named',
+			description: 'a salvaged run says so — a dead AI pass must not read as a healthy one',
+			onlyFixtures: ['keyword-dedup-truncated'],
+			check: ({ contract, root }) => {
+				if (contract['ai-truncated'] !== 'true') return `ai-truncated=${contract['ai-truncated']}`;
+				return (root.textContent ?? '').includes('Truncated') || 'truncation row missing';
 			}
 		},
 		{

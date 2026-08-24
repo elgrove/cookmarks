@@ -1,6 +1,7 @@
 import abc
 import json
 import logging
+import re
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import Enum
@@ -90,6 +91,23 @@ def _strip_json_fence(text: str) -> str:
     if text.endswith("```"):
         text = text[:-3]
     return text.strip()
+
+
+_PAIR_RE = re.compile(r'"((?:[^"\\]|\\.)*)"\s*:\s*"((?:[^"\\]|\\.)*)"')
+
+
+def _salvage_pairs(response: str) -> dict[str, str]:
+    """Recover the complete "key": "value" pairs from a JSON object that was cut off
+    mid-generation, so a truncated reply yields what the model did produce."""
+    pairs: dict[str, str] = {}
+    for raw_key, raw_value in _PAIR_RE.findall(response):
+        try:
+            key = json.loads(f'"{raw_key}"')
+            value = json.loads(f'"{raw_value}"')
+        except json.JSONDecodeError:
+            continue
+        pairs[key] = value
+    return pairs
 
 
 def _clean_keywords(raw: list[object], limit: int) -> list[str]:
@@ -213,28 +231,40 @@ class AIProvider(abc.ABC):
         return _clean_keywords(raw, MAX_BOOK_KEYWORDS), usage
 
     def deduplicate_keywords(
-        self, keywords: list[str], model: str | None = None
-    ) -> tuple[dict[str, str], Usage]:
-        """Propose merges across a keyword vocabulary: given the list, return a
-        {duplicate -> canonical} map naming, for each near-duplicate, the single
-        spelling to keep. An empty map (no merges) on anything unusable, so the
-        caller never acts on a malformed response. The map is raw — the caller
-        validates keys against the live vocabulary and resolves any chains."""
+        self, keywords: list[str], candidates: list[str], model: str | None = None
+    ) -> tuple[dict[str, str], Usage, bool]:
+        """Propose merges over a keyword vocabulary: `keywords` is the whole vocabulary
+        (any of it may be a canonical target), `candidates` the subset the model may
+        propose merges *for*. Returns the raw {duplicate -> canonical} map, the usage,
+        and whether the map had to be salvaged from a truncated reply. A reply cut off
+        mid-object keeps the pairs it did produce rather than throwing the run away.
+        The map is raw — the caller validates against the live vocabulary and resolves
+        any chains."""
         model = model or self.model_for(ModelRole.KEYWORD_DEDUP)
-        prompt = DEDUPLICATE_KEYWORDS_PROMPT.format(keywords=json.dumps(keywords))
+        prompt = DEDUPLICATE_KEYWORDS_PROMPT.format(
+            keywords=json.dumps(keywords), candidates=json.dumps(candidates)
+        )
         response, usage = self._complete(prompt, model, temp=0)
 
         if not response:
-            return {}, usage
+            return {}, usage, False
 
+        truncated = False
         try:
             raw = json.loads(_strip_json_fence(response))
         except json.JSONDecodeError:
-            logger.error(f"Failed to decode keyword-dedup JSON from AI response:\n{response}")
-            return {}, usage
+            raw = _salvage_pairs(response)
+            truncated = True
+            logger.warning(f"Keyword-dedup reply was not valid JSON; salvaged {len(raw)} pair(s)")
 
         if not isinstance(raw, dict):
             logger.warning(f"Keyword-dedup response was not a JSON object: {raw!r}")
-            return {}, usage
+            return {}, usage, truncated
 
-        return {k: v for k, v in raw.items() if isinstance(k, str) and isinstance(v, str)}, usage
+        allowed = set(candidates)
+        merges = {
+            k: v
+            for k, v in raw.items()
+            if isinstance(k, str) and isinstance(v, str) and k in allowed
+        }
+        return merges, usage, truncated

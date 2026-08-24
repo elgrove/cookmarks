@@ -106,8 +106,13 @@ Merged 'Vietnamese' into 'Asian' -- Asian is too broad, national and subnational
 Merged 'Scone' into 'Biscuit' -- replaced Britishism with Americanism
 Merged 'Wasabi' into 'Spice' -- doesn't even make sense
 
-Here is the list of keywords:
+Here is the whole keyword vocabulary. Any of these may be used as a canonical keyword to merge into:
 {keywords}
+
+Here are the candidate keywords. Propose merges ONLY for these:
+{candidates}
+
+Every key in the returned object MUST be one of the candidate keywords. A value may be any keyword in the vocabulary above.
 
 Return ONLY a valid JSON object. No other text.
 """
