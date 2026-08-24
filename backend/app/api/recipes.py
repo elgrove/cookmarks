@@ -1,3 +1,4 @@
+import shlex
 import uuid
 from collections import OrderedDict
 from typing import Annotated, Literal
@@ -84,6 +85,15 @@ def _search_order(sort: Sort, seed: int) -> list:
     return [((literal_column("recipes.rowid") * multiplier) % _SHUFFLE_MODULUS).asc()]
 
 
+def _search_terms(q: str) -> list[str]:
+    """Every term must appear somewhere, so "white curry" finds a curry with white
+    pepper rather than only the literal phrase; double quotes ask for the phrase."""
+    try:
+        return [term for term in shlex.split(q) if term]
+    except ValueError:
+        return q.replace('"', " ").split()
+
+
 def _search_conditions(
     q: str,
     keywords: list[str],
@@ -92,9 +102,7 @@ def _search_conditions(
 ) -> list:
     """The AND-narrowing filter shared by the result rows, total and facets."""
     conditions = []
-    # Every whitespace-separated term must appear somewhere, so "white curry"
-    # finds a curry with white pepper rather than only the literal phrase.
-    for term in q.split():
+    for term in _search_terms(q):
         like = f"%{term}%"
         conditions.append(
             or_(
