@@ -6,6 +6,7 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, HTTPException, Query, Response, status
 from sqlalchemy import String, case, cast, func, literal_column, or_, over, select
 from sqlalchemy.orm import Session, joinedload, selectinload
+from sqlalchemy.sql.elements import ColumnElement
 
 from app.api.deps import CurrentUser
 from app.api.lists import favourite_list_id
@@ -68,6 +69,16 @@ def _summary(recipe: Recipe, book: Book) -> RecipeSummary:
     )
 
 
+def _keyword_match(criterion: ColumnElement[bool]) -> ColumnElement[bool]:
+    """Recipes carrying a matching keyword. `Recipe.keywords.any()` would render a
+    correlated EXISTS, which SQLite re-runs once per candidate row."""
+    keyword_ids = select(Keyword.id).where(criterion)
+    recipe_ids = select(recipe_keywords.c.recipe_id).where(
+        recipe_keywords.c.keyword_id.in_(keyword_ids)
+    )
+    return Recipe.id.in_(recipe_ids)
+
+
 def _relevance_score(terms: list[str]):
     """How well a row answers the query: a name hit beats a keyword hit, which beats
     a hit only in the book or the ingredients. Ties fall through to the shuffle."""
@@ -78,18 +89,6 @@ def _relevance_score(terms: list[str]):
         (or_(*[Recipe.name_folded.contains(term) for term in terms]), 2),
         (_keyword_match(Keyword.name.ilike(f"%{whole}%")), 1),
         else_=0,
-    )
-
-
-def _keyword_match(criterion):
-    """Recipes carrying a keyword matching `criterion`, as a non-correlated IN.
-    `Recipe.keywords.any(...)` renders a correlated EXISTS, which SQLite re-runs
-    per candidate row; resolving the keyword ids once is dramatically cheaper."""
-    keyword_ids = select(Keyword.id).where(criterion).scalar_subquery()
-    return Recipe.id.in_(
-        select(recipe_keywords.c.recipe_id).where(
-            recipe_keywords.c.keyword_id.in_(keyword_ids)
-        )
     )
 
 
@@ -184,20 +183,30 @@ def search_recipes(
     conditions = _search_conditions(q, keywords, book_id, author)
 
     filtered = select(Recipe.id).join(Book, Recipe.book_id == Book.id).where(*conditions)
+    order = [*_search_order(q, sort, seed), Recipe.id]
 
-    # `count(*) OVER ()` is evaluated before LIMIT, so each row carries the true
-    # total and the page query answers both questions in one scan.
-    rows = session.execute(
-        select(Recipe, Book, over(func.count()).label("total"))
+    # `count(*) OVER ()` sees the whole filtered set, so the page carries its own
+    # total and no second counting scan is needed. It is windowed over ids alone —
+    # widening it to the entities makes SQLite materialise every matching row.
+    page = (
+        select(Recipe.id.label("id"), over(func.count()).label("total"))
         .join(Book, Recipe.book_id == Book.id)
         .where(*conditions)
-        .order_by(*_search_order(q, sort, seed), Recipe.id)
+        .order_by(*order)
         .offset(offset)
         .limit(limit)
+        .subquery()
+    )
+    rows = session.execute(
+        select(Recipe, Book, page.c.total)
+        .join(page, Recipe.id == page.c.id)
+        .join(Book, Recipe.book_id == Book.id)
+        .order_by(*order)
         .options(selectinload(Recipe.keywords))
     ).all()
 
-    # An offset past the end returns no rows, and so no total — count separately.
+    # An empty page carries no total, so a result set that ends before the offset
+    # (or matches nothing at all) still has to count.
     total = (
         rows[0].total
         if rows
