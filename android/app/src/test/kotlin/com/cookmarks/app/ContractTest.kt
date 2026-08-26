@@ -16,6 +16,7 @@ import com.cookmarks.app.api.RecipeIndexEntry
 import com.cookmarks.app.api.RecipeSearchResults
 import com.cookmarks.app.api.SemanticSearchResults
 import com.cookmarks.app.api.SimilarRecipes
+import com.cookmarks.app.api.TaskRun
 import java.io.File
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonObject
@@ -122,5 +123,12 @@ class ContractTest {
     @Test
     fun dismiss_state() {
         assertTrue(pin<DismissState>("dismissstate").dismissed)
+    }
+
+    @Test
+    fun task_run() {
+        val run = pin<TaskRun>("taskrun")
+        assertEquals("extraction", run.task_type)
+        assertEquals("The Flavour Thesaurus", run.book_title)
     }
 }

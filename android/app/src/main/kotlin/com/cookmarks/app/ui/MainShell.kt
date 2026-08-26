@@ -13,12 +13,17 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -27,6 +32,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.cookmarks.app.ui.admin.AdminScreen
 import com.cookmarks.app.ui.books.BookDetailScreen
 import com.cookmarks.app.ui.books.BooksScreen
 import com.cookmarks.app.ui.discover.DiscoverScreen
@@ -74,35 +80,50 @@ fun MainShell() {
                 Column {
                     HorizontalDivider(color = colors.lineStrong)
                     Row(
-                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .fillMaxWidth()
                             .background(colors.bg)
                             .padding(vertical = 4.dp)
                             .padding(bottom = 8.dp),
                     ) {
-                        Tabs.forEach { tab ->
-                            val active = route == tab.route || route.startsWith("${tab.route}/") ||
-                                (tab.route == "recipes" && route.startsWith("recipe/")) ||
-                                (tab.route == "books" && route.startsWith("read/")) ||
-                                (tab.route == "lists" && route.startsWith("read-list/"))
-                            Text(
-                                text = tab.label.uppercase(),
-                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 13.sp, lineHeight = 18.sp),
-                                color = if (active) colors.clay else colors.muted,
-                                modifier = Modifier
-                                    .clickable {
-                                        if (active) {
-                                            navController.popBackStack(tab.route, inclusive = false)
-                                        } else {
-                                            navController.navigate(tab.route) {
-                                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                                launchSingleTop = true
-                                                restoreState = true
+                        Row(
+                            horizontalArrangement = Arrangement.SpaceEvenly,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Tabs.forEach { tab ->
+                                val active = route == tab.route || route.startsWith("${tab.route}/") ||
+                                    (tab.route == "recipes" && route.startsWith("recipe/")) ||
+                                    (tab.route == "books" && route.startsWith("read/")) ||
+                                    (tab.route == "lists" && route.startsWith("read-list/"))
+                                Text(
+                                    text = tab.label.uppercase(),
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 13.sp, lineHeight = 18.sp),
+                                    color = if (active) colors.clay else colors.muted,
+                                    modifier = Modifier
+                                        .clickable {
+                                            if (active) {
+                                                navController.popBackStack(tab.route, inclusive = false)
+                                            } else {
+                                                navController.navigate(tab.route) {
+                                                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                                    launchSingleTop = true
+                                                    restoreState = true
+                                                }
                                             }
                                         }
-                                    }
-                                    .padding(horizontal = 20.dp, vertical = 20.dp),
+                                        .padding(horizontal = 20.dp, vertical = 20.dp),
+                                )
+                            }
+                        }
+                        IconButton(
+                            onClick = { navController.navigate("admin") { launchSingleTop = true } },
+                            modifier = Modifier.padding(end = 4.dp),
+                        ) {
+                            Icon(
+                                Icons.Filled.Person,
+                                contentDescription = "Admin",
+                                tint = if (route == "admin") colors.clay else colors.muted,
                             )
                         }
                     }
@@ -205,6 +226,9 @@ fun MainShell() {
                         },
                         contextIds = RecipeContexts.get(entry.arguments?.getString("ctx")),
                     )
+                }
+                composable("admin") {
+                    AdminScreen(onBack = { navController.popBackStack() })
                 }
                 composable("discover") {
                     DiscoverScreen(onPlay = { source -> navController.navigate(gameRoute(source)) })

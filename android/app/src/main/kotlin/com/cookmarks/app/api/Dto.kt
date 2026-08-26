@@ -1,6 +1,7 @@
 package com.cookmarks.app.api
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
 
 @Serializable
 data class LoginRequest(val username: String, val password: String)
@@ -188,3 +189,17 @@ data class GameRecipeIds(val recipe_ids: List<String>)
 
 @Serializable
 data class DismissState(val dismissed: Boolean)
+
+@Serializable
+data class TaskRun(
+    val id: String,
+    val task_type: String,
+    val status: String,
+    val book_title: String?,
+    val model_name: String?,
+    val cost_usd: String?,
+    val errors: List<String>,
+    val detail: JsonObject,
+    val created_at: String,
+    val completed_at: String?,
+)
