@@ -107,11 +107,19 @@
 			}
 			case 'keyword_dedup': {
 				const d = run.detail as unknown as KeywordDedupDetail;
-				return [
+				const rows: Row[] = [
 					{ label: 'Keywords analysed', value: count(d.keywords_in) },
+					{ label: 'Candidates', value: count(d.candidates) },
 					{ label: 'Merges applied', value: count(d.merges_applied) },
-					{ label: 'Keywords removed', value: count(d.keywords_removed) }
+					{ label: 'Deterministic merges', value: count(d.pre_merges) },
+					{ label: 'AI merges', value: count(d.ai_merges) },
+					{ label: 'Keywords removed', value: count(d.keywords_removed) },
+					{ label: 'Swept to', value: d.cursor_to || '—', wrap: true },
+					{ label: 'Cost', value: formatCost(run.cost_usd) },
+					{ label: 'Tokens', value: formatTokens(run.input_tokens, run.output_tokens) }
 				];
+				if (d.ai_truncated) rows.push({ label: 'AI reply', value: 'Truncated — salvaged' });
+				return rows;
 			}
 			case 'calibre_sync': {
 				const d = run.detail as unknown as CalibreSyncDetail;
@@ -161,6 +169,10 @@
 	data-verify-task-type={run ? run.task_type : 'none'}
 	data-verify-status={run ? run.status : 'none'}
 	data-verify-error-count={run ? run.errors.length : 0}
+	data-verify-ai-truncated={run?.task_type === 'keyword_dedup' &&
+	(run.detail as unknown as KeywordDedupDetail).ai_truncated
+		? 'true'
+		: 'false'}
 >
 	{#if run}
 		<header class="head">

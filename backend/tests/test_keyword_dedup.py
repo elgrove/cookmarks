@@ -3,21 +3,29 @@ apply step that reassigns associations across recipes and books and deletes the
 merged-away keyword."""
 
 import json
+from collections.abc import Iterator
+from datetime import UTC, datetime
+from pathlib import Path
 from typing import ClassVar
 
 import pytest
-from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy import create_engine, func, select
+from sqlalchemy.orm import Session, sessionmaker
 
+from app.models import Base
 from app.models.book import Book
+from app.models.enums import TaskStatus, TaskType
 from app.models.recipe import Keyword, Recipe
+from app.models.task_run import TaskRun
 from app.services.ai import AIProvider, ModelRole, Usage
 from app.services.keyword_dedup import (
     apply_merges,
     deduplicate_keywords,
     pre_deduplicate,
     propose_merges,
+    select_candidates,
 )
+from app.tasks.keyword_dedup import _last_cursor
 
 
 class _MapProvider(AIProvider):
@@ -36,6 +44,24 @@ class _MapProvider(AIProvider):
         self, prompt: str, model: str, *, schema: dict | None = None, temp: float = 0
     ) -> tuple[str, Usage]:
         return json.dumps(self._mapping), Usage()
+
+
+class _RawProvider(AIProvider):
+    """A provider whose dedup step returns a fixed raw string — lets a truncated or
+    malformed reply be exercised exactly as the model would deliver it."""
+
+    name = "RAW"
+    requires_api_key = False
+    models: ClassVar[dict[ModelRole, str]] = {ModelRole.KEYWORD_DEDUP: "raw"}
+
+    def __init__(self, response: str) -> None:
+        super().__init__("")
+        self._response = response
+
+    def _complete(
+        self, prompt: str, model: str, *, schema: dict | None = None, temp: float = 0
+    ) -> tuple[str, Usage]:
+        return self._response, Usage()
 
 
 def _recipe_zero(session: Session) -> Recipe:
@@ -87,7 +113,7 @@ def test_pre_deduplicate_leaves_distinct_terms_alone() -> None:
 def test_propose_merges_resolves_a_transitive_chain() -> None:
     provider = _MapProvider({"Veggie": "Veg", "Veg": "Vegetarian"})
 
-    merges = propose_merges(provider, ["Veggie", "Veg", "Vegetarian"])
+    merges, _stats = propose_merges(provider, ["Veggie", "Veg", "Vegetarian"])
 
     # A->B->C collapses so both duplicates point straight at the terminal canonical.
     assert merges == {"Veggie": "Vegetarian", "Veg": "Vegetarian"}
@@ -96,7 +122,7 @@ def test_propose_merges_resolves_a_transitive_chain() -> None:
 def test_propose_merges_drops_self_maps_and_cycles() -> None:
     provider = _MapProvider({"Keep": "Keep", "A": "B", "B": "A"})
 
-    assert propose_merges(provider, ["Keep", "A", "B"]) == {}
+    assert propose_merges(provider, ["Keep", "A", "B"])[0] == {}
 
 
 # --- Applying merges to the database -------------------------------------------------
@@ -207,3 +233,151 @@ def test_deduplicate_keywords_with_stub_provider_merges_nothing(
     assert result.keywords_in == before
     assert result.merges_applied == 0
     assert session.scalar(select(func.count()).select_from(Keyword)) == before
+
+
+# --- Salvaging a truncated reply -----------------------------------------------------
+
+
+def test_propose_merges_salvages_a_truncated_reply() -> None:
+    # Cut off mid-pair, exactly as Gemini leaves it when it hits the output cap.
+    provider = _RawProvider('{\n "Shrimp": "Prawn",\n "Eggplant": "Aubergine",\n "Zuc')
+
+    merges, stats = propose_merges(provider, ["Shrimp", "Prawn", "Eggplant", "Aubergine"])
+
+    assert merges == {"Shrimp": "Prawn", "Eggplant": "Aubergine"}
+    assert stats.ai_merges == 2
+    assert stats.ai_truncated is True
+
+
+def test_propose_merges_yields_nothing_from_an_unsalvageable_reply() -> None:
+    provider = _RawProvider("I'm sorry, I can't help with that.")
+
+    merges, stats = propose_merges(provider, ["Pasta", "Quick"])
+
+    assert merges == {}
+    assert stats.ai_merges == 0
+    # A refusal is not a truncation: nothing was salvaged, so the run must not claim one.
+    assert stats.ai_truncated is False
+
+
+def test_propose_merges_drops_a_key_outside_the_candidate_window(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("app.services.keyword_dedup.DEDUP_CANDIDATE_WINDOW", 1)
+    # Sorted, the window is ["Aubergine"], so the Shrimp entry names a keyword the model
+    # was only given as context — it must not be merged away.
+    provider = _MapProvider({"Aubergine": "Brinjal", "Shrimp": "Prawn"})
+
+    merges, stats = propose_merges(provider, ["Shrimp", "Prawn", "Aubergine"])
+
+    assert merges == {"Aubergine": "Brinjal"}
+    assert stats.candidates == 1
+
+
+# --- The rotating candidate window ---------------------------------------------------
+
+
+def test_select_candidates_rotates_without_repeats_and_wraps(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("app.services.keyword_dedup.DEDUP_CANDIDATE_WINDOW", 2)
+    names = ["Egg", "Fish", "Grain", "Herb", "Ice"]
+
+    first, cursor = select_candidates(names, None)
+    second, cursor = select_candidates(names, cursor)
+    third, cursor = select_candidates(names, cursor)
+
+    assert first == ["Egg", "Fish"]
+    assert second == ["Grain", "Herb"]
+    # The tail is short, so the window wraps to the start of the vocabulary.
+    assert third == ["Ice", "Egg"]
+    assert cursor == "Egg"
+
+
+def test_select_candidates_resumes_past_a_removed_cursor(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("app.services.keyword_dedup.DEDUP_CANDIDATE_WINDOW", 2)
+
+    # "Fish" was merged away since the last run; the window simply starts at the next name.
+    window, _cursor = select_candidates(["Egg", "Grain", "Herb", "Ice"], "Fish")
+
+    assert window == ["Grain", "Herb"]
+
+
+def test_select_candidates_on_an_empty_vocabulary() -> None:
+    assert select_candidates([], None) == ([], None)
+
+
+def test_deduplicate_keywords_reports_both_stages(
+    session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    recipe = _recipe_zero(session)
+    recipe.keywords.append(Keyword(name="Pastas"))
+    session.commit()
+    monkeypatch.setattr(
+        "app.services.keyword_dedup.get_ai_provider",
+        lambda _session: _MapProvider({"Quick": "Fast"}),
+    )
+
+    result = deduplicate_keywords(session)
+    session.commit()
+
+    # "Pastas" folds into "Pasta" deterministically; "Quick" -> "Fast" is the AI's.
+    assert result.pre_merges == 1
+    assert result.ai_merges == 1
+    assert result.merges_applied == result.pre_merges + result.ai_merges
+    assert result.keywords_removed == result.merges_applied
+    assert result.cursor_to is not None
+
+
+# --- Carrying the cursor between runs ------------------------------------------------
+
+
+@pytest.fixture
+def task_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[sessionmaker[Session]]:
+    """A throwaway DB the task's own SessionLocal is patched onto, so the cursor lookup
+    is exercised against real TaskRun rows."""
+    engine = create_engine(
+        f"sqlite:///{tmp_path / 'dedup.sqlite3'}", connect_args={"check_same_thread": False}
+    )
+    Base.metadata.create_all(engine)
+    factory = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+    monkeypatch.setattr("app.tasks.keyword_dedup.SessionLocal", factory)
+    yield factory
+    engine.dispose()
+
+
+def _done_run(
+    factory: sessionmaker[Session], completed: datetime, detail: dict[str, object]
+) -> None:
+    with factory() as session:
+        session.add(
+            TaskRun(
+                task_type=TaskType.KEYWORD_DEDUP,
+                status=TaskStatus.DONE,
+                completed_at=completed,
+                detail=detail,
+            )
+        )
+        session.commit()
+
+
+def test_last_cursor_is_none_before_any_run(task_db: sessionmaker[Session]) -> None:
+    assert _last_cursor() is None
+
+
+def test_last_cursor_takes_the_newest_run(task_db: sessionmaker[Session]) -> None:
+    _done_run(task_db, datetime(2026, 8, 1, tzinfo=UTC), {"cursor_to": "Grain"})
+    _done_run(task_db, datetime(2026, 8, 8, tzinfo=UTC), {"cursor_to": "Mango"})
+
+    assert _last_cursor() == "Mango"
+
+
+def test_last_cursor_skips_a_run_that_recorded_none(task_db: sessionmaker[Session]) -> None:
+    _done_run(task_db, datetime(2026, 8, 1, tzinfo=UTC), {"cursor_to": "Mango"})
+    # A pass with no provider configured finishes DONE having swept nothing; letting it
+    # reset the cursor would restart the sweep and never reach the vocabulary's tail.
+    _done_run(task_db, datetime(2026, 8, 8, tzinfo=UTC), {"cursor_to": None})
+
+    assert _last_cursor() == "Mango"
