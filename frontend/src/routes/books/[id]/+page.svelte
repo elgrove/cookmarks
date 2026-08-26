@@ -54,6 +54,7 @@
 				recipeCount: b.recipe_count,
 				hasCover: b.has_cover,
 				hasEpub: b.has_epub,
+				hasPdf: b.has_pdf,
 				added: b.added,
 				keywords: b.keywords,
 				recipes: b.recipes.map((r) => ({

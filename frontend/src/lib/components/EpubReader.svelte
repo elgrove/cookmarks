@@ -8,7 +8,7 @@
 		type FoliateView
 	} from '$lib/reader/foliate';
 	import {
-		epubUrl,
+		bookFileUrl,
 		fetchRecipeIndex,
 		reportReading,
 		type ReadingState,
@@ -338,14 +338,15 @@
 						console.warn('recipe index unavailable; matching disabled', e);
 						return null;
 					});
-				const res = await fetch(epubUrl(bookId));
-				if (!res.ok) throw new Error(`GET epub → ${res.status}`);
+				const res = await fetch(bookFileUrl(bookId));
+				if (!res.ok) throw new Error(`GET book file → ${res.status}`);
 				const blob = await res.blob();
 				if (cancelled || !host) return;
 
 				// foliate's loader sniffs the filename (e.g. .cbz), so a named File is required —
-				// a bare Blob would throw in makeBook.
-				const file = new File([blob], 'book.epub', { type: 'application/epub+zip' });
+				// a bare Blob would throw in makeBook. The engine picks itself off the bytes, so
+				// the name and type carry no format claim of their own.
+				const file = new File([blob], 'book', { type: blob.type });
 				const el = document.createElement('foliate-view') as unknown as FoliateView;
 				host.append(el);
 				view = el;

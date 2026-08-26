@@ -46,6 +46,25 @@ const unit: VerifiableUnit<Props> = {
 			}
 		},
 		{
+			id: 'unavailable',
+			description: 'a book with no EPUB: the control stays, disabled, and says why',
+			props: { recipeCount: 0, unavailable: true }
+		},
+		{
+			id: 'unavailable-click',
+			description: 'probe: clicking the disabled control must not dispatch anything',
+			probe: true,
+			props: {
+				recipeCount: 0,
+				unavailable: true,
+				onExtract: () => Promise.reject(new Error('must never be called'))
+			},
+			act: async ({ click, wait }) => {
+				click(BTN);
+				await wait(0);
+			}
+		},
+		{
 			id: 'huge-count',
 			description: 'probe: an absurd recipe count still yields one labelled Re-extract control',
 			probe: true,
@@ -89,6 +108,21 @@ const unit: VerifiableUnit<Props> = {
 			description: 'a rejected dispatch lands on the error state (never a false queued)',
 			onlyFixtures: ['reject'],
 			check: ({ contract }) => contract.state === 'error' || `state=${contract.state}`
+		},
+		{
+			id: 'unavailable-explains-itself',
+			description: 'the disabled control names the reason, in its label and on the page',
+			onlyFixtures: ['unavailable', 'unavailable-click'],
+			check: ({ contract, root }) => {
+				if (contract.state !== 'unavailable') return `state=${contract.state}`;
+				const btn = root.querySelector<HTMLButtonElement>(BTN);
+				if (!btn?.disabled) return 'the control is not disabled';
+				if (!ariaLabel(root).includes('needs an EPUB')) return `label=${ariaLabel(root)}`;
+				return (
+					(btn.textContent ?? '').includes('needs an EPUB') ||
+					`no visible reason: "${btn.textContent}"`
+				);
+			}
 		},
 		{
 			id: 'huge-labelled',

@@ -53,6 +53,9 @@
 	let replacing = $state<string | null>(null);
 
 	let canSubmit = $derived(title.trim().length > 0 && author.trim().length > 0);
+	// A PDF stays a PDF in the library, and extraction reads the EPUB spine — so there
+	// is nothing for it to walk. Say so instead of offering a checkbox that does nothing.
+	let noExtraction = $derived(staged?.format === 'pdf');
 	let offers = $derived(runs.filter((r) => duplicateOf(r) !== null).length);
 
 	function accept(book: StagedBook) {
@@ -111,7 +114,7 @@
 				staging_id: staged.staging_id,
 				title: title.trim(),
 				author: author.trim(),
-				extract
+				extract: extract && !noExtraction
 			});
 			reset();
 		} catch (err) {
@@ -148,13 +151,16 @@
 	data-verify-can-submit={canSubmit ? 'true' : 'false'}
 	data-verify-duplicate-offers={offers}
 	data-verify-error={error}
+	data-verify-staged-format={staged?.format ?? ''}
+	data-verify-no-extraction={noExtraction ? 'true' : 'false'}
 >
 	<header class="masthead">
 		<p class="eyebrow">Library</p>
 		<h1>Add a book</h1>
 		<p class="standfirst">
-			Upload a cookbook or paste a download link. Anything Calibre can convert becomes an EPUB
-			in the library; its cover and details are looked up for you.
+			Upload a cookbook or paste a download link. EPUBs and PDFs are kept as they are;
+			anything else Calibre can convert becomes an EPUB. Its cover and details come from
+			the file itself.
 		</p>
 	</header>
 
@@ -174,9 +180,16 @@
 			</label>
 
 			<label class="check">
-				<input type="checkbox" bind:checked={extract} disabled={stage === 'submitting'} />
+				<input
+					type="checkbox"
+					bind:checked={extract}
+					disabled={stage === 'submitting' || noExtraction}
+				/>
 				Extract recipes once it is added
 			</label>
+			{#if noExtraction}
+				<p class="note">Recipe extraction needs an EPUB.</p>
+			{/if}
 
 			<div class="actions">
 				<button class="btn primary" type="submit" disabled={!canSubmit || stage === 'submitting'}>
@@ -428,6 +441,12 @@
 		font-family: var(--f-sans);
 		font-size: 0.85rem;
 		color: var(--muted);
+	}
+	.note {
+		font-family: var(--f-sans);
+		font-size: 0.75rem;
+		color: var(--muted);
+		margin: -0.5rem 0 0 1.6rem;
 	}
 	.check input {
 		accent-color: var(--clay);

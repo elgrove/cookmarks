@@ -80,6 +80,7 @@ export const bookDetailSchema = z.object({
 	recipe_count: z.number().int().nonnegative(),
 	has_cover: z.boolean(),
 	has_epub: z.boolean(),
+	has_pdf: z.boolean(),
 	added: z.string().nullable(),
 	keywords: z.array(z.string()),
 	recipes: z.array(recipeRowSchema),
@@ -166,8 +167,9 @@ export async function deleteBook(
 	if (!res.ok) throw new Error(`DELETE /api/books/${id} → ${res.status}`);
 }
 
-/** URL of the raw EPUB stream for a book (served by GET /api/books/{id}/epub). */
-export const epubUrl = (id: string): string => `/api/books/${id}/epub`;
+/** URL of a book's own file — EPUB or PDF, whichever the library holds (served by
+ *  GET /api/books/{id}/file). The reader sniffs the bytes, so the caller needn't care. */
+export const bookFileUrl = (id: string): string => `/api/books/${id}/file`;
 
 // Mirrors RecipeIndexEntry from GET /api/books/{id}/recipe-index (snake_case): every recipe in
 // the book (id · name · favourite state), used by the in-book reader to match headings to recipes.
