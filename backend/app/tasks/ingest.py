@@ -76,8 +76,14 @@ def ingest_book_task(run_id: str) -> dict:
         raise
 
     extraction_queued = False
+    skipped: str | None = None
     if params.get("extract"):
-        extraction_queued = _queue_extraction(outcome.calibre_id)
+        # Extraction reads the EPUB spine, so a PDF has nothing to walk. Say so on the
+        # run rather than reporting a queue that never happened.
+        if outcome.format == "pdf":
+            skipped = "recipe extraction needs an EPUB"
+        else:
+            extraction_queued = _queue_extraction(outcome.calibre_id)
 
     detail = {
         "title": outcome.title,
@@ -89,6 +95,7 @@ def ingest_book_task(run_id: str) -> dict:
         "replaced_calibre_id": outcome.replaced_calibre_id,
         "sync": {key: len(value) for key, value in sync.items()},
         "extraction_queued": extraction_queued,
+        "extraction_skipped": skipped,
     }
     complete_run(run_id, detail)
     return detail

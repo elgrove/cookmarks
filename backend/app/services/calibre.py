@@ -1,7 +1,8 @@
 """Read books live from a Calibre library and reconcile them into the v2 DB.
 
 Calibre keeps its catalogue in `<library>/metadata.db`. We read it (never write),
-select the cookbooks (a configurable tag + format, defaulting to v1's "Food"/EPUB)
+select the cookbooks (a configurable tag + format list, defaulting to "Food" and
+EPUB or PDF)
 and upsert `Book` rows by `calibre_id`. `path` is treated as a refreshable pointer.
 Recipe identity and organisation (favourites, lists, AI keywords) hang off stable
 recipe UUIDs and are never touched for a book that is still in the library. A book
@@ -49,7 +50,7 @@ _SELECT_BOOKS = """
     JOIN books_tags_link btl ON b.id = btl.book
     JOIN tags t ON btl.tag = t.id
     JOIN data d ON b.id = d.book
-    WHERE t.name = ? AND d.format = ?
+    WHERE t.name = ? AND d.format IN ({formats})
     ORDER BY b.title
 """
 
@@ -114,9 +115,11 @@ def open_calibre_db(library_path: Path) -> sqlite3.Connection:
     return conn
 
 
-def read_books(conn: sqlite3.Connection, *, tag: str, book_format: str) -> list[CalibreBook]:
-    """Run the selection query over an open Calibre connection."""
-    rows = conn.execute(_SELECT_BOOKS, (tag, book_format)).fetchall()
+def read_books(conn: sqlite3.Connection, *, tag: str, book_formats: list[str]) -> list[CalibreBook]:
+    """Run the selection query over an open Calibre connection. A book holding several
+    of the wanted formats still yields one row — the query selects distinct books."""
+    query = _SELECT_BOOKS.format(formats=", ".join("?" * len(book_formats)))
+    rows = conn.execute(query, (tag, *book_formats)).fetchall()
     books = [
         CalibreBook(
             calibre_id=row["id"],
@@ -130,15 +133,17 @@ def read_books(conn: sqlite3.Connection, *, tag: str, book_format: str) -> list[
         )
         for row in rows
     ]
-    logger.info("Read %d book(s) from Calibre (tag=%r, format=%r)", len(books), tag, book_format)
+    logger.info("Read %d book(s) from Calibre (tag=%r, formats=%r)", len(books), tag, book_formats)
     return books
 
 
-def read_calibre_books(library_path: Path, *, tag: str, book_format: str) -> list[CalibreBook]:
+def read_calibre_books(
+    library_path: Path, *, tag: str, book_formats: list[str]
+) -> list[CalibreBook]:
     """Open the library's metadata.db read-only and read the selected books."""
     conn = open_calibre_db(library_path)
     try:
-        return read_books(conn, tag=tag, book_format=book_format)
+        return read_books(conn, tag=tag, book_formats=book_formats)
     finally:
         conn.close()
 

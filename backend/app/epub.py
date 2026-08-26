@@ -23,6 +23,16 @@ def has_epub(book: Book) -> bool:
     return epub_path(book) is not None
 
 
+def pdf_path(book: Book) -> Path | None:
+    """First *.pdf in the book's Calibre directory, or None if there isn't one."""
+    matches = sorted((settings.calibre_library_path / book.path).glob("*.pdf"))
+    return matches[0] if matches else None
+
+
+def has_pdf(book: Book) -> bool:
+    return pdf_path(book) is not None
+
+
 def read_epub_image(book: Book, member: str) -> tuple[bytes, str] | None:
     """Read the image stored at `member` inside a book's EPUB, returning its bytes
     and media type, or None when the EPUB or the member is missing.

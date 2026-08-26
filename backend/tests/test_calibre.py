@@ -13,7 +13,8 @@ from app.services.vector_store import EMBEDDING_DIMENSIONS, VectorStore
 
 FIXTURE_SQL = Path(__file__).parent / "fixtures" / "calibre_metadata.sql"
 FOOD = "Food"
-EPUB = "EPUB"
+EPUB = ["EPUB"]
+EPUB_PDF = ["EPUB", "PDF"]
 
 
 @pytest.fixture
@@ -43,13 +44,13 @@ def _make_book(calibre_id: int, title: str, **overrides: object) -> CalibreBook:
 
 
 def test_read_books_selects_only_matching_tag_and_format(calibre_conn: sqlite3.Connection) -> None:
-    books = read_books(calibre_conn, tag=FOOD, book_format=EPUB)
+    books = read_books(calibre_conn, tag=FOOD, book_formats=EPUB)
     # 300 is tagged Fiction; 400 has only a PDF format — both excluded.
-    assert {b.calibre_id for b in books} == {100, 200, 500}
+    assert {b.calibre_id for b in books} == {100, 200, 500, 600}
 
 
 def test_read_books_parses_full_metadata(calibre_conn: sqlite3.Connection) -> None:
-    by_id = {b.calibre_id: b for b in read_books(calibre_conn, tag=FOOD, book_format=EPUB)}
+    by_id = {b.calibre_id: b for b in read_books(calibre_conn, tag=FOOD, book_formats=EPUB)}
     book = by_id[100]
     assert book.title == "Salt, Fat, Acid, Heat"
     assert book.author == "Samin Nosrat"
@@ -63,7 +64,7 @@ def test_read_books_parses_full_metadata(calibre_conn: sqlite3.Connection) -> No
 def test_read_books_joins_multiple_authors_and_defaults_blanks(
     calibre_conn: sqlite3.Connection,
 ) -> None:
-    by_id = {b.calibre_id: b for b in read_books(calibre_conn, tag=FOOD, book_format=EPUB)}
+    by_id = {b.calibre_id: b for b in read_books(calibre_conn, tag=FOOD, book_formats=EPUB)}
     book = by_id[200]
     assert book.author == "Neelam Batra & Jeyashri Suresh"
     assert book.isbn == ""  # no isbn identifier
@@ -72,14 +73,25 @@ def test_read_books_joins_multiple_authors_and_defaults_blanks(
 
 
 def test_read_books_tolerates_unparsable_pubdate(calibre_conn: sqlite3.Connection) -> None:
-    by_id = {b.calibre_id: b for b in read_books(calibre_conn, tag=FOOD, book_format=EPUB)}
+    by_id = {b.calibre_id: b for b in read_books(calibre_conn, tag=FOOD, book_formats=EPUB)}
     assert by_id[500].pubdate is None  # 'not-a-real-date' degrades to None, not a crash
 
 
 def test_read_books_filter_is_configurable(calibre_conn: sqlite3.Connection) -> None:
-    fiction = read_books(calibre_conn, tag="Fiction", book_format=EPUB)
+    fiction = read_books(calibre_conn, tag="Fiction", book_formats=EPUB)
     assert {b.calibre_id for b in fiction} == {300}
-    assert read_books(calibre_conn, tag=FOOD, book_format="MOBI") == []
+    assert read_books(calibre_conn, tag=FOOD, book_formats=["MOBI"]) == []
+
+
+def test_read_books_selects_every_wanted_format(calibre_conn: sqlite3.Connection) -> None:
+    books = read_books(calibre_conn, tag=FOOD, book_formats=EPUB_PDF)
+    # 400 is PDF-only and 600 holds both; 300 is still Fiction.
+    assert {b.calibre_id for b in books} == {100, 200, 400, 500, 600}
+
+
+def test_a_book_in_several_formats_is_read_once(calibre_conn: sqlite3.Connection) -> None:
+    ids = [b.calibre_id for b in read_books(calibre_conn, tag=FOOD, book_formats=EPUB_PDF)]
+    assert ids.count(600) == 1
 
 
 def test_read_calibre_books_from_file(tmp_path: Path) -> None:
@@ -87,13 +99,13 @@ def test_read_calibre_books_from_file(tmp_path: Path) -> None:
     conn.executescript(FIXTURE_SQL.read_text())
     conn.commit()
     conn.close()
-    books = read_calibre_books(tmp_path, tag=FOOD, book_format=EPUB)
-    assert {b.calibre_id for b in books} == {100, 200, 500}
+    books = read_calibre_books(tmp_path, tag=FOOD, book_formats=EPUB)
+    assert {b.calibre_id for b in books} == {100, 200, 500, 600}
 
 
 def test_read_calibre_books_missing_db_raises(tmp_path: Path) -> None:
     with pytest.raises(FileNotFoundError):
-        read_calibre_books(tmp_path, tag=FOOD, book_format=EPUB)
+        read_calibre_books(tmp_path, tag=FOOD, book_formats=EPUB)
 
 
 # --- reconcile layer (seeded session has books calibre_id 1 and 2) ---------------
@@ -180,12 +192,13 @@ def test_sync_is_idempotent(session: Session) -> None:
 
 
 def test_read_then_sync_end_to_end(calibre_conn: sqlite3.Connection, session: Session) -> None:
-    books = read_books(calibre_conn, tag=FOOD, book_format=EPUB)
+    books = read_books(calibre_conn, tag=FOOD, book_formats=EPUB)
     result = sync_calibre(session, books)
     assert set(result.created) == {
         "Salt, Fat, Acid, Heat",
         "1,000 Indian Recipes",
         "Cooking With Bad Dates",
+        "Cookbook (Both Formats)",
     }
     assert set(result.orphaned) == {"With Recipes", "No Recipes Yet"}
     assert len(session.scalars(select(Book).where(Book.calibre_id == 1)).one().recipes) == 3

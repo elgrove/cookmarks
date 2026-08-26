@@ -44,8 +44,17 @@ def test_upload_is_staged_with_its_metadata_read(client: TestClient, staging: Pa
     assert (staging / f"{body['staging_id']}.epub").exists()
 
 
-def test_an_unconvertible_format_is_refused(client: TestClient) -> None:
-    res = _upload(client, "scan.pdf", b"%PDF-1.4")
+def test_a_pdf_is_staged_as_a_pdf(client: TestClient, staging: Path) -> None:
+    res = _upload(client, "Scanned Cookbook.pdf", b"%PDF-1.7" + b"\x00" * 64)
+
+    assert res.status_code == 200
+    body = res.json()
+    assert body["format"] == "pdf"
+    assert (staging / f"{body['staging_id']}.pdf").exists()
+
+
+def test_a_format_the_library_cannot_hold_is_refused(client: TestClient) -> None:
+    res = _upload(client, "notes.docx", b"PK\x03\x04")
 
     assert res.status_code == 422
 

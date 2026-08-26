@@ -30,9 +30,11 @@ from app.services.ingest import (
     run_cli,
     run_ingest,
     stage_file,
+    staged_path,
 )
 
 EPUB_BYTES = b"PK\x03\x04" + b"\x00" * 64
+PDF_BYTES = b"%PDF-1.7" + b"\x00" * 64
 
 
 class FakeCalibre:
@@ -156,9 +158,22 @@ def _stage_epub(name: str = "The_Curry_Guy.epub") -> str:
 # --- Staging: what gets onto disk at all.
 
 
-def test_rejects_a_format_calibre_cannot_convert(library: Path, calibre: FakeCalibre) -> None:
+def test_rejects_a_format_the_library_cannot_hold(library: Path, calibre: FakeCalibre) -> None:
     with pytest.raises(UnsupportedFormatError):
-        stage_file("scan.pdf", BytesIO(b"%PDF-1.4"))
+        stage_file("notes.docx", BytesIO(b"PK\x03\x04"))
+
+
+def test_a_pdf_stages_and_keeps_its_extension(library: Path, calibre: FakeCalibre) -> None:
+    staged = stage_file("Scanned Cookbook.pdf", BytesIO(PDF_BYTES))
+
+    assert staged.format == "pdf"
+    assert (library.parent / "staging" / f"{staged.staging_id}.pdf").is_file()
+
+
+def test_rejects_a_pdf_whose_bytes_belie_its_name(library: Path, calibre: FakeCalibre) -> None:
+    with pytest.raises(UnsupportedFormatError):
+        stage_file("scan.pdf", BytesIO(b"not a pdf at all"))
+    assert list((library.parent / "staging").iterdir()) == []
 
 
 def test_rejects_a_file_whose_bytes_belie_its_name(library: Path, calibre: FakeCalibre) -> None:
@@ -195,9 +210,7 @@ def test_falls_back_to_a_tidied_filename_when_the_file_knows_nothing(
     assert (staged.title, staged.author) == ("The Curry Guy", "")
 
 
-def test_the_staging_id_is_never_offered_as_a_title(
-    library: Path, calibre: FakeCalibre
-) -> None:
+def test_the_staging_id_is_never_offered_as_a_title(library: Path, calibre: FakeCalibre) -> None:
     # A file with no embedded title makes ebook-meta echo the filename stem, and ours is
     # the staging uuid — the user's own filename is the only useful answer.
     calibre.echo_filename_as_title = True
@@ -272,9 +285,7 @@ def test_the_book_keeps_its_own_cover(library: Path, calibre: FakeCalibre) -> No
     assert outcome.cover is True
 
 
-def test_a_book_with_no_cover_anywhere_is_still_added(
-    library: Path, calibre: FakeCalibre
-) -> None:
+def test_a_book_with_no_cover_anywhere_is_still_added(library: Path, calibre: FakeCalibre) -> None:
     calibre.epub_has_cover = False
     staging_id = _stage_epub()
 
@@ -283,9 +294,7 @@ def test_a_book_with_no_cover_anywhere_is_still_added(
     assert (outcome.calibre_id, outcome.cover) == (42, False)
 
 
-def test_a_finished_ingest_leaves_nothing_in_staging(
-    library: Path, calibre: FakeCalibre
-) -> None:
+def test_a_finished_ingest_leaves_nothing_in_staging(library: Path, calibre: FakeCalibre) -> None:
     staging_id = _stage_epub()
 
     run_ingest(staging_id, "The Curry Guy", "Dan Toombs")
@@ -304,6 +313,25 @@ def test_a_non_epub_is_converted_first(library: Path, calibre: FakeCalibre) -> N
     assert any(call[0] == "ebook-convert" for call in calibre.calls)
     # Only the EPUB goes to Calibre — the original is discarded.
     assert calibre.command("add")[-1].endswith(".epub")
+
+
+def test_a_pdf_goes_into_the_library_unconverted(library: Path, calibre: FakeCalibre) -> None:
+    staging_id = stage_file("Scanned Cookbook.pdf", BytesIO(PDF_BYTES)).staging_id
+
+    outcome = run_ingest(staging_id, "Scanned Cookbook", "A Chef")
+
+    # A fixed-layout cookbook does not survive ebook-convert, so it is never called.
+    assert outcome.converted is False
+    assert outcome.format == "pdf"
+    assert not any(call[0] == "ebook-convert" for call in calibre.calls)
+    assert calibre.command("add")[-1].endswith(".pdf")
+
+
+def test_a_staged_pdf_resolves_to_itself(library: Path, calibre: FakeCalibre) -> None:
+    # staged_path prefers a .epub sibling; a PDF is never converted, so it has none.
+    staging_id = stage_file("Scanned Cookbook.pdf", BytesIO(PDF_BYTES)).staging_id
+
+    assert staged_path(staging_id).suffix == ".pdf"
 
 
 def test_failure_after_the_add_takes_the_new_entry_back_out(

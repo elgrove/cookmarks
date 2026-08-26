@@ -62,6 +62,7 @@ class BookDetail(BaseModel):
     recipe_count: int
     has_cover: bool
     has_epub: bool
+    has_pdf: bool
     added: datetime | None
     keywords: list[str]
     recipes: list[RecipeRow]

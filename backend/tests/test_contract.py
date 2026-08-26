@@ -262,14 +262,16 @@ def test_task_run_model_matches_contract() -> None:
     assert dumped == example
 
 
-def test_extract_endpoint_keys_match_contract(client: TestClient) -> None:
+def test_extract_endpoint_keys_match_contract(client: TestClient, seeded_epubs: Path) -> None:
     example = _example("taskrun.example.json")
     book = next(b for b in client.get("/api/books").json() if b["title"] == "No Recipes Yet")
     body = client.post(f"/api/books/{book['id']}/extract").json()
     assert set(body.keys()) == set(example.keys())
 
 
-def test_task_runs_index_endpoint_keys_match_contract(client: TestClient) -> None:
+def test_task_runs_index_endpoint_keys_match_contract(
+    client: TestClient, seeded_epubs: Path
+) -> None:
     example = _example("taskrun.example.json")
     book = next(b for b in client.get("/api/books").json() if b["title"] == "No Recipes Yet")
     client.post(f"/api/books/{book['id']}/extract")

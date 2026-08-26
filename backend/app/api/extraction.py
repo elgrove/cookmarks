@@ -5,6 +5,7 @@ from sqlalchemy import select
 
 from app.api.deps import require_admin
 from app.db import SessionDep
+from app.epub import has_epub
 from app.models.book import Book
 from app.models.enums import TaskStatus, TaskType
 from app.models.task_run import TaskRun
@@ -30,6 +31,9 @@ def trigger_extraction(book_id: uuid.UUID, session: SessionDep) -> TaskRunRead:
     book = session.get(Book, book_id)
     if book is None:
         raise HTTPException(status_code=404, detail="book not found")
+    # The pipeline walks the EPUB spine, so a PDF-only book has nothing to read.
+    if not has_epub(book):
+        raise HTTPException(status_code=422, detail="recipe extraction needs an EPUB")
 
     return TaskRunRead.from_run(queue_extraction(session, book))
 

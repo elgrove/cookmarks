@@ -1,10 +1,10 @@
 """Book ingestion — add a cookbook to the Calibre library by driving the Calibre CLI.
 
 Cookmarks owns its library (it is the single writer), so adding a book is a sequence of
-Calibre commands rather than a GUI session: convert to EPUB if the upload isn't one,
-`calibredb add`, tag it and force the confirmed title and author on, then let the normal
-Calibre sync pull the result into the app. Calibre stays the library engine — nothing
-about its catalogue is reimplemented here.
+Calibre commands rather than a GUI session: convert to EPUB unless the upload is already
+a format the library holds (EPUB or PDF), `calibredb add`, tag it and force the confirmed
+title and author on, then let the normal Calibre sync pull the result into the app.
+Calibre stays the library engine — nothing about its catalogue is reimplemented here.
 
 **No metadata is fetched over the network.** Everything the app displays — publisher,
 ISBN, publication date, description — is embedded in the book file, and `calibredb add`
@@ -44,11 +44,13 @@ from app.services.calibre import open_calibre_db
 
 logger = logging.getLogger(__name__)
 
-# What ebook-convert can turn into an EPUB, with the signature that proves the bytes
-# match the extension. None means the format has no usable magic (plain text shapes),
-# so the extension is the only check available.
+# What the library accepts, with the signature that proves the bytes match the
+# extension. None means the format has no usable magic (plain text shapes), so the
+# extension is the only check available. Everything outside LIBRARY_FORMATS is
+# converted to EPUB on the way in.
 ACCEPTED_FORMATS: dict[str, tuple[int, bytes] | None] = {
     "epub": (0, b"PK\x03\x04"),
+    "pdf": (0, b"%PDF-"),
     "htmlz": (0, b"PK\x03\x04"),
     "mobi": (60, b"BOOKMOBI"),
     "prc": (60, b"BOOKMOBI"),
@@ -60,6 +62,10 @@ ACCEPTED_FORMATS: dict[str, tuple[int, bytes] | None] = {
     "fb2": None,
     "txt": None,
 }
+
+# Formats that go into the library as they are. A cookbook PDF is fixed-layout, often
+# page images: ebook-convert would destroy it, so it is held and read as a PDF.
+LIBRARY_FORMATS = {"epub", "pdf"}
 
 STAGING_MAX_AGE_SECONDS = 24 * 60 * 60
 _CLI_TIMEOUT = 300
@@ -191,7 +197,7 @@ def _extension(filename: str) -> str:
     ext = Path(filename).suffix.lstrip(".").lower()
     if ext not in ACCEPTED_FORMATS:
         supported = ", ".join(sorted(ACCEPTED_FORMATS))
-        raise UnsupportedFormatError(f"{ext or 'that file'} can't be converted. Try: {supported}")
+        raise UnsupportedFormatError(f"{ext or 'that file'} can't be added. Try: {supported}")
     return ext
 
 
@@ -337,16 +343,16 @@ def remove_from_library(calibre_id: int) -> None:
     logger.info("Cleared book directory Calibre left behind: %s", directory.name)
 
 
-def _cover_from_epub(epub: Path, staging_id: str) -> Path | None:
+def _cover_from_file(book: Path, staging_id: str) -> Path | None:
     """The cover the book carries itself — the only cover source we use, since Calibre's
     all go through its embedded browser. Applying a fetched OPF also clears the cover
     Calibre extracts on add, so without this a successful metadata lookup would leave a
     book worse off than a failed one."""
-    path = staging_dir() / f"{staging_id}.epubcover.jpg"
+    path = staging_dir() / f"{staging_id}.filecover.jpg"
     try:
-        run_cli(["ebook-meta", str(epub), "--get-cover", str(path)], timeout=_METADATA_TIMEOUT)
+        run_cli(["ebook-meta", str(book), "--get-cover", str(path)], timeout=_METADATA_TIMEOUT)
     except CalibreCLIError:
-        logger.warning("Could not read a cover out of %s", epub.name)
+        logger.warning("Could not read a cover out of %s", book.name)
         return None
     return path if path.exists() else None
 
@@ -423,16 +429,16 @@ def run_ingest(
         if duplicate is not None:
             raise DuplicateBookError(*duplicate)
 
-    epub = source
+    library_file = source
     converted = False
-    if fmt != "epub":
-        epub = staging_dir() / f"{staging_id}.epub"
-        run_cli(["ebook-convert", str(source), str(epub)])
+    if fmt not in LIBRARY_FORMATS:
+        library_file = staging_dir() / f"{staging_id}.epub"
+        run_cli(["ebook-convert", str(source), str(library_file)])
         source.unlink(missing_ok=True)
         converted = True
 
-    cover = _cover_from_epub(epub, staging_id)
-    calibre_id = _added_id(_calibredb("add", "--duplicates", str(epub)))
+    cover = _cover_from_file(library_file, staging_id)
+    calibre_id = _added_id(_calibredb("add", "--duplicates", str(library_file)))
 
     replaced: int | None = None
     try:
