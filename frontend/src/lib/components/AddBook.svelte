@@ -466,8 +466,8 @@
 		color: var(--ink);
 	}
 	.btn.danger {
-		border-color: var(--accent);
-		background: var(--accent);
+		border-color: var(--danger);
+		background: var(--danger);
 		color: var(--bg);
 	}
 	.btn:disabled {
@@ -481,7 +481,7 @@
 
 	.error {
 		font-family: var(--f-serif);
-		color: var(--accent);
+		color: var(--danger);
 		margin: 0 0 2rem;
 	}
 
@@ -523,7 +523,7 @@
 	.run-error {
 		font-family: var(--f-sans);
 		font-size: 0.8rem;
-		color: var(--accent);
+		color: var(--danger);
 	}
 
 	.duplicate {

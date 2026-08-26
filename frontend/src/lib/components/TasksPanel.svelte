@@ -271,7 +271,7 @@
 	.regen-check:checked {
 		border-color: var(--accent);
 		background-color: var(--accent);
-		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='8' viewBox='0 0 10 8'%3E%3Cpath d='M1 4l3 3 5-6' fill='none' stroke='%23faf9f5' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='8' viewBox='0 0 10 8'%3E%3Cpath d='M1 4l3 3 5-6' fill='none' stroke='%23fafaf5' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 		background-repeat: no-repeat;
 		background-position: center;
 	}
@@ -326,8 +326,8 @@
 	}
 	.run.error {
 		background: transparent;
-		color: var(--accent-deep);
-		border-color: var(--accent-deep);
+		color: var(--danger);
+		border-color: var(--danger);
 	}
 
 	.note {
@@ -338,7 +338,7 @@
 		margin: 0;
 	}
 	.note.err {
-		color: var(--accent-deep);
+		color: var(--danger);
 	}
 
 	@media (max-width: 560px) {

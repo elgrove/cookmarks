@@ -309,7 +309,7 @@
 		color: var(--accent-deep);
 	}
 	.btn.danger {
-		background: #b3402a;
+		background: var(--danger);
 		color: var(--bg);
 	}
 	.btn.danger:hover {

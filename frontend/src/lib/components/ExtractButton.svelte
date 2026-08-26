@@ -101,8 +101,8 @@
 		border-color: var(--accent);
 	}
 	.extract.error {
-		color: var(--accent-deep);
-		border-color: var(--accent-deep);
+		color: var(--danger);
+		border-color: var(--danger);
 	}
 	.mark {
 		font-weight: 400;

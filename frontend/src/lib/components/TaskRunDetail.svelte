@@ -311,7 +311,7 @@
 		font-size: 0.62rem;
 		letter-spacing: 0.12em;
 		text-transform: uppercase;
-		color: var(--accent-deep);
+		color: var(--danger);
 		margin: 0 0 0.5rem;
 	}
 	.error-list {
@@ -328,7 +328,7 @@
 		line-height: 1.5;
 		color: var(--ink);
 		background: var(--bg-warm);
-		border-left: 3px solid var(--accent-deep);
+		border-left: 3px solid var(--danger);
 		border-radius: 3px;
 		padding: 0.55rem 0.8rem;
 		overflow-wrap: anywhere;

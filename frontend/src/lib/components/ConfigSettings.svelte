@@ -302,8 +302,8 @@
 	}
 	.save.error {
 		background: transparent;
-		color: var(--accent-deep);
-		border-color: var(--accent-deep);
+		color: var(--danger);
+		border-color: var(--danger);
 	}
 	@media (max-width: 760px) {
 		.field {

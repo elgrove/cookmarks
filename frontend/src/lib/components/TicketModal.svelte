@@ -212,7 +212,7 @@
 	}
 	.error {
 		margin: 0;
-		color: var(--accent-deep);
+		color: var(--danger);
 		font-size: 0.9rem;
 	}
 	.confirm {

@@ -231,10 +231,10 @@
 	.chip-green {
 		color: var(--chip-accent-c);
 	}
-	.chips li + li .chip::before {
+	.chips li + li::before {
 		content: '·';
 		color: var(--faint);
-		margin-right: 0.55rem;
+		margin-right: 0.15rem;
 	}
 
 	@media (max-width: 560px) {

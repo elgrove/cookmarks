@@ -49,6 +49,6 @@
 	}
 	.failed {
 		color: var(--bg);
-		background: var(--accent-deep);
+		background: var(--danger);
 	}
 </style>

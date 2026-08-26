@@ -134,7 +134,7 @@
 	.error {
 		font-family: var(--f-serif);
 		font-size: 1rem;
-		color: var(--accent-deep);
+		color: var(--danger);
 		margin: 1rem 0 0;
 	}
 	.submit {

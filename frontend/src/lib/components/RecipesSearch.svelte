@@ -380,8 +380,8 @@
 		<button
 			class="iconbtn ib-ai"
 			type="button"
-			aria-label="AI search"
-			title="AI search — describe a dish"
+			aria-label="Ask the library"
+			title="Ask the library — describe a dish"
 			onclick={runSemantic}
 		>
 			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3-1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3L12 3Z" /></svg>
@@ -628,9 +628,8 @@
 		appearance: none;
 	}
 
-	.search-input:focus {
-		outline: none;
-		border-bottom-color: var(--accent);
+	.search-input:focus-visible {
+		border-color: var(--accent);
 	}
 
 	.clear {
@@ -676,7 +675,7 @@
 
 	.ib-search {
 		background: var(--accent);
-		color: #fff;
+		color: var(--bg);
 		border: 1px solid var(--accent);
 	}
 
@@ -824,7 +823,7 @@
 	.chip.on {
 		background: var(--accent);
 		border-color: var(--accent);
-		color: #fff;
+		color: var(--bg);
 	}
 
 	.chip-count {
@@ -833,7 +832,7 @@
 	}
 
 	.chip.on .chip-count {
-		color: #fff;
+		color: var(--bg);
 		opacity: 0.8;
 	}
 
@@ -873,7 +872,7 @@
 	.select-toggle[aria-pressed='true'] {
 		background: var(--accent);
 		border-color: var(--accent);
-		color: #fff;
+		color: var(--bg);
 	}
 
 	.rows {

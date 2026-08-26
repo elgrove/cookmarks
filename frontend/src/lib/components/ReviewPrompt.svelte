@@ -136,7 +136,7 @@
 	.err {
 		font-family: var(--f-grotesk);
 		font-size: 0.8rem;
-		color: var(--accent-deep);
+		color: var(--danger);
 		margin: 0.7rem 0 0;
 	}
 </style>
