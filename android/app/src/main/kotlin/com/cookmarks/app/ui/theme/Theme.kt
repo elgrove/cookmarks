@@ -6,6 +6,8 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
@@ -55,10 +57,13 @@ object CmTheme {
 }
 
 @Composable
-fun CookmarksTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    content: @Composable () -> Unit,
-) {
+fun CookmarksTheme(content: @Composable () -> Unit) {
+    val mode by ThemePref.mode.collectAsState()
+    val darkTheme = when (mode) {
+        ThemeMode.System -> isSystemInDarkTheme()
+        ThemeMode.Light -> false
+        ThemeMode.Dark -> true
+    }
     val cm = if (darkTheme) MidnightColors else IvoryColors
     val scheme = if (darkTheme) {
         darkColorScheme(

@@ -18,6 +18,9 @@ interface CookmarksService {
     @GET("api/auth/me")
     suspend fun me(): AuthMe
 
+    @GET("api/task-runs")
+    suspend fun taskRuns(): List<TaskRun>
+
     @GET("api/books")
     suspend fun books(): List<BookSummary>
 
