@@ -63,9 +63,9 @@ ACCEPTED_FORMATS: dict[str, tuple[int, bytes] | None] = {
     "txt": None,
 }
 
-# Formats that go into the library as they are. A cookbook PDF is fixed-layout, often
-# page images: ebook-convert would destroy it, so it is held and read as a PDF.
-LIBRARY_FORMATS = {"epub", "pdf"}
+# Derived from the sync selection, so a format the library keeps is always one the sync
+# mirrors. A cookbook PDF is fixed-layout: ebook-convert would destroy it.
+LIBRARY_FORMATS = {fmt.lower() for fmt in settings.calibre_sync_formats}
 
 STAGING_MAX_AGE_SECONDS = 24 * 60 * 60
 _CLI_TIMEOUT = 300

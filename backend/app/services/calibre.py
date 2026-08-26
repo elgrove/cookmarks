@@ -1,9 +1,9 @@
 """Read books live from a Calibre library and reconcile them into the v2 DB.
 
 Calibre keeps its catalogue in `<library>/metadata.db`. We read it (never write),
-select the cookbooks (a configurable tag + format list, defaulting to "Food" and
-EPUB or PDF)
-and upsert `Book` rows by `calibre_id`. `path` is treated as a refreshable pointer.
+select the cookbooks (a configurable tag plus a list of formats, defaulting to "Food"
+and EPUB or PDF) and upsert `Book` rows by `calibre_id`. `path` is treated as a
+refreshable pointer.
 Recipe identity and organisation (favourites, lists, AI keywords) hang off stable
 recipe UUIDs and are never touched for a book that is still in the library. A book
 whose `calibre_id` has left the library altogether is deleted, cascading to its
@@ -118,6 +118,9 @@ def open_calibre_db(library_path: Path) -> sqlite3.Connection:
 def read_books(conn: sqlite3.Connection, *, tag: str, book_formats: list[str]) -> list[CalibreBook]:
     """Run the selection query over an open Calibre connection. A book holding several
     of the wanted formats still yields one row — the query selects distinct books."""
+    if not book_formats:
+        # `IN ()` is false for every row, which would report the whole library orphaned.
+        raise ValueError("at least one book format must be selected")
     query = _SELECT_BOOKS.format(formats=", ".join("?" * len(book_formats)))
     rows = conn.execute(query, (tag, *book_formats)).fetchall()
     books = [

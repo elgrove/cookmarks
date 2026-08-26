@@ -99,6 +99,8 @@ export interface BookIngestDetail {
 	cover: boolean;
 	replaced_calibre_id: number | null;
 	extraction_queued: boolean;
+	// Why extract-after-add did nothing, when it was asked for and did not happen.
+	extraction_skipped?: string | null;
 	// Set on a run that failed because the library already holds this book — the id of
 	// the Cookmarks book it clashed with, which is what makes the replace offer possible.
 	duplicate_of_book_id?: string;

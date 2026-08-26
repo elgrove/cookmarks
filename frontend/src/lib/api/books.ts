@@ -168,7 +168,7 @@ export async function deleteBook(
 }
 
 /** URL of a book's own file — EPUB or PDF, whichever the library holds (served by
- *  GET /api/books/{id}/file). The reader sniffs the bytes, so the caller needn't care. */
+ *  GET /api/books/{id}/file). */
 export const bookFileUrl = (id: string): string => `/api/books/${id}/file`;
 
 // Mirrors RecipeIndexEntry from GET /api/books/{id}/recipe-index (snake_case): every recipe in

@@ -53,8 +53,7 @@
 	let replacing = $state<string | null>(null);
 
 	let canSubmit = $derived(title.trim().length > 0 && author.trim().length > 0);
-	// A PDF stays a PDF in the library, and extraction reads the EPUB spine — so there
-	// is nothing for it to walk. Say so instead of offering a checkbox that does nothing.
+	// Extraction reads the EPUB spine, and a PDF stays a PDF in the library.
 	let noExtraction = $derived(staged?.format === 'pdf');
 	let offers = $derived(runs.filter((r) => duplicateOf(r) !== null).length);
 
@@ -62,6 +61,7 @@
 		staged = book;
 		title = book.title;
 		author = book.author;
+		extract = false;
 		stage = 'staged';
 	}
 
@@ -184,11 +184,12 @@
 					type="checkbox"
 					bind:checked={extract}
 					disabled={stage === 'submitting' || noExtraction}
+					aria-describedby={noExtraction ? 'extract-note' : undefined}
 				/>
 				Extract recipes once it is added
 			</label>
 			{#if noExtraction}
-				<p class="note">Recipe extraction needs an EPUB.</p>
+				<p class="note" id="extract-note">Recipe extraction needs an EPUB.</p>
 			{/if}
 
 			<div class="actions">
@@ -438,12 +439,12 @@
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
-		font-family: var(--f-sans);
+		font-family: var(--f-grotesk);
 		font-size: 0.85rem;
 		color: var(--muted);
 	}
 	.note {
-		font-family: var(--f-sans);
+		font-family: var(--f-grotesk);
 		font-size: 0.75rem;
 		color: var(--muted);
 		margin: -0.5rem 0 0 1.6rem;
@@ -459,7 +460,7 @@
 	}
 
 	.btn {
-		font-family: var(--f-sans);
+		font-family: var(--f-grotesk);
 		font-weight: 600;
 		font-size: 0.8rem;
 		padding: 0.55rem 1.1rem;
@@ -540,7 +541,7 @@
 		color: var(--muted);
 	}
 	.run-error {
-		font-family: var(--f-sans);
+		font-family: var(--f-grotesk);
 		font-size: 0.8rem;
 		color: var(--clay);
 	}

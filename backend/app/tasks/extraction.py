@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.covers import epub_path
 from app.db import SessionLocal
+from app.epub import has_epub
 from app.models.book import Book
 from app.models.enums import TaskStatus, TaskType
 from app.models.recipe import Recipe
@@ -30,9 +31,21 @@ def enqueue_extract_recipes(book_id: str, run_id: str) -> None:
     extract_recipes_from_book_task.delay(book_id, run_id)
 
 
+EXTRACTION_NEEDS_EPUB = "recipe extraction needs an EPUB"
+
+
+class NotExtractableError(Exception):
+    """The book holds nothing the pipeline can read."""
+
+
 def queue_extraction(session: Session, book: Book) -> TaskRun:
     """Record a QUEUED extraction run for a book and dispatch it. Shared by the manual
-    trigger and the ingest task's extract-after-add, so both leave the same record."""
+    trigger and the ingest task's extract-after-add, so both leave the same record.
+
+    Raises NotExtractableError for a book with no EPUB: the pipeline walks the EPUB
+    spine, so a PDF-only book would queue a run that could only fail."""
+    if not has_epub(book):
+        raise NotExtractableError(EXTRACTION_NEEDS_EPUB)
     run = TaskRun(
         task_type=TaskType.EXTRACTION,
         book_id=book.id,

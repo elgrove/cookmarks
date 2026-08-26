@@ -5,8 +5,7 @@
 		/** Injected so the component stays network-free and verifiable in isolation;
 		 *  the page wires this to the POST. Awaited to drive posting → queued. */
 		onExtract?: () => Promise<void> | void;
-		/** The book has no EPUB, so there is nothing to extract from. The control stays
-		 *  on the page, disabled and saying why, rather than vanishing. */
+		/** The book has no EPUB, so there is nothing to extract from. */
 		unavailable?: boolean;
 	};
 
@@ -38,7 +37,7 @@
 	);
 
 	async function extract() {
-		if (shown !== 'idle') return;
+		if (shown === 'posting' || shown === 'unavailable') return;
 		clearTimeout(timer);
 		state = 'posting';
 		try {

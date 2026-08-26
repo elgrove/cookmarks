@@ -140,7 +140,15 @@
 					{ label: 'Converted', value: d.converted ? 'Yes' : 'No' },
 					{ label: 'Calibre id', value: count(d.calibre_id) },
 					{ label: 'Cover', value: d.cover ? 'From the book' : 'None' },
-					{ label: 'Extraction', value: d.extraction_queued ? 'Queued' : 'Not queued' }
+					{
+						label: 'Extraction',
+						value: d.extraction_queued
+							? 'Queued'
+							: d.extraction_skipped
+								? `Skipped — ${d.extraction_skipped}`
+								: 'Not queued',
+						wrap: true
+					}
 				];
 			}
 		}

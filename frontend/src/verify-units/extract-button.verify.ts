@@ -46,6 +46,24 @@ const unit: VerifiableUnit<Props> = {
 			}
 		},
 		{
+			id: 'retry',
+			description: 'probe: the control offers a retry after a failure, and the retry dispatches',
+			probe: true,
+			props: {
+				recipeCount: 0,
+				onExtract: (() => {
+					let calls = 0;
+					return () => (++calls === 1 ? Promise.reject(new Error('broker down')) : Promise.resolve());
+				})()
+			},
+			act: async ({ click, wait }) => {
+				click(BTN);
+				await wait(0);
+				click(BTN);
+				await wait(0);
+			}
+		},
+		{
 			id: 'unavailable',
 			description: 'a book with no EPUB: the control stays, disabled, and says why',
 			props: { recipeCount: 0, unavailable: true }
@@ -108,6 +126,12 @@ const unit: VerifiableUnit<Props> = {
 			description: 'a rejected dispatch lands on the error state (never a false queued)',
 			onlyFixtures: ['reject'],
 			check: ({ contract }) => contract.state === 'error' || `state=${contract.state}`
+		},
+		{
+			id: 'retry-dispatches',
+			description: 'a click on the error state queues rather than falling on the floor',
+			onlyFixtures: ['retry'],
+			check: ({ contract }) => contract.state === 'queued' || `state=${contract.state}`
 		},
 		{
 			id: 'unavailable-explains-itself',

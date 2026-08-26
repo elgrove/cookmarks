@@ -119,7 +119,6 @@
 	let mode = $derived(book.reading?.mode ?? null);
 	let started = $derived(!!book.reading && !book.reading.finished && book.reading.fraction > 0);
 	let readPct = $derived(book.reading ? Math.round(book.reading.fraction * 100) : null);
-	// Either format opens in the reader; only an EPUB can be walked for recipes.
 	let readable = $derived(book.hasEpub || book.hasPdf);
 </script>
 

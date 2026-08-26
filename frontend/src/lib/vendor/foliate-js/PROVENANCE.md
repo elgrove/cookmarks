@@ -5,7 +5,8 @@ EPUBs in the browser (`$lib/components/EpubReader.svelte`).
 
 - **Source:** https://github.com/johnfactotum/foliate-js
 - **Commit:** `78914aef4466eb960965702401634c2cb348e9b1`
-- **Licence:** MIT (see `LICENSE`). Vendored sub-libs: zip.js (BSD-3-Clause), fflate (MIT).
+- **Licence:** MIT (see `LICENSE`). Vendored sub-libs: zip.js (BSD-3-Clause), fflate (MIT),
+  pdf.js (Apache-2.0, Mozilla — shipped from `frontend/static/pdfjs/`).
 
 ## Why vendored (not a submodule)
 
@@ -26,7 +27,8 @@ upstream commit and bump the SHA above.
   session never fetches a byte of it.
 - **The pdfjs `*.map` source maps are not vendored** (7.7 MB of debug artefacts for a minified
   dependency we do not debug). `pdf.mjs` and `pdf.worker.mjs` still carry their
-  `sourceMappingURL` comment; devtools simply finds no map.
+  `sourceMappingURL` comment, and the SPA catch-all answers the missing map with `index.html`,
+  so devtools logs a parse error rather than a clean 404.
 - **`build.target` is raised to `es2022`** in `vite.config.ts` — upstream `pdf.js` uses top-level
   await, which Vite's default target predates.
 - The demo (`reader.js`, `reader.html`, `ui/`) and build tooling (`rollup*`, `eslint.config.js`,
