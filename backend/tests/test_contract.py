@@ -11,6 +11,7 @@ from typing import Any
 
 from fastapi.testclient import TestClient
 
+from app.schemas.assistant import ConversationDetail, ConversationSummary
 from app.schemas.auth import AuthMe, UserRead
 from app.schemas.book import BookDetail, BookFilter, BookReadState, BookSummary, RecipeIndexEntry
 from app.schemas.config import ConfigRead
@@ -360,3 +361,31 @@ def test_dismiss_endpoint_keys_match_contract(client: TestClient) -> None:
     example = _example("dismissstate.example.json")
     body = client.put(f"/api/game/dismissals/{_a_recipe_id(client)}").json()
     assert set(body.keys()) == set(example.keys())
+
+
+def test_assistant_conversation_summary_model_matches_contract() -> None:
+    example = _example("assistantconversations.example.json")
+    dumped = ConversationSummary.model_validate(example).model_dump(mode="json")
+    assert dumped == example
+
+
+def test_assistant_conversation_detail_model_matches_contract() -> None:
+    example = _example("assistantconversation.example.json")
+    dumped = ConversationDetail.model_validate(example).model_dump(mode="json")
+    assert dumped == example
+
+
+def test_assistant_conversations_endpoint_keys_match_contract(client: TestClient) -> None:
+    example = _example("assistantconversations.example.json")
+    created = client.post("/api/assistant/conversations")
+    assert created.status_code == 201
+    assert created.json().keys() == example.keys()
+    listed = client.get("/api/assistant/conversations").json()
+    assert listed[0].keys() == example.keys()
+
+
+def test_assistant_conversation_endpoint_keys_match_contract(client: TestClient) -> None:
+    example = _example("assistantconversation.example.json")
+    conversation_id = client.post("/api/assistant/conversations").json()["id"]
+    body = client.get(f"/api/assistant/conversations/{conversation_id}").json()
+    assert body.keys() == example.keys()
