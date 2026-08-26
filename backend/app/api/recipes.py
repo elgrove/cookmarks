@@ -4,7 +4,7 @@ from collections import OrderedDict
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, HTTPException, Query, Response, status
-from sqlalchemy import String, case, cast, func, literal_column, or_, select
+from sqlalchemy import String, case, cast, func, literal_column, or_, over, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.api.deps import CurrentUser
@@ -76,8 +76,20 @@ def _relevance_score(terms: list[str]):
         (Recipe.name_folded == whole, 4),
         (Recipe.name_folded.startswith(whole), 3),
         (or_(*[Recipe.name_folded.contains(term) for term in terms]), 2),
-        (Recipe.keywords.any(Keyword.name.ilike(f"%{whole}%")), 1),
+        (_keyword_match(Keyword.name.ilike(f"%{whole}%")), 1),
         else_=0,
+    )
+
+
+def _keyword_match(criterion):
+    """Recipes carrying a keyword matching `criterion`, as a non-correlated IN.
+    `Recipe.keywords.any(...)` renders a correlated EXISTS, which SQLite re-runs
+    per candidate row; resolving the keyword ids once is dramatically cheaper."""
+    keyword_ids = select(Keyword.id).where(criterion).scalar_subquery()
+    return Recipe.id.in_(
+        select(recipe_keywords.c.recipe_id).where(
+            recipe_keywords.c.keyword_id.in_(keyword_ids)
+        )
     )
 
 
@@ -133,12 +145,12 @@ def _search_conditions(
                 Book.title_folded.contains(term),
                 Book.author_folded.contains(term),
                 cast(Recipe.ingredients, String).ilike(like),
-                Recipe.keywords.any(Keyword.name.ilike(like)),
+                _keyword_match(Keyword.name.ilike(like)),
             )
         )
     # Each chosen chip must be present (AND-narrowing).
     for kw in keywords:
-        conditions.append(Recipe.keywords.any(Keyword.name == kw))
+        conditions.append(_keyword_match(Keyword.name == kw))
     if book_id is not None:
         conditions.append(Recipe.book_id == book_id)
     if author is not None:
@@ -172,10 +184,11 @@ def search_recipes(
     conditions = _search_conditions(q, keywords, book_id, author)
 
     filtered = select(Recipe.id).join(Book, Recipe.book_id == Book.id).where(*conditions)
-    total = session.scalar(select(func.count()).select_from(filtered.subquery())) or 0
 
+    # `count(*) OVER ()` is evaluated before LIMIT, so each row carries the true
+    # total and the page query answers both questions in one scan.
     rows = session.execute(
-        select(Recipe, Book)
+        select(Recipe, Book, over(func.count()).label("total"))
         .join(Book, Recipe.book_id == Book.id)
         .where(*conditions)
         .order_by(*_search_order(q, sort, seed), Recipe.id)
@@ -184,7 +197,13 @@ def search_recipes(
         .options(selectinload(Recipe.keywords))
     ).all()
 
-    items = [_summary(recipe, book) for recipe, book in rows]
+    # An offset past the end returns no rows, and so no total — count separately.
+    total = (
+        rows[0].total
+        if rows
+        else session.scalar(select(func.count()).select_from(filtered.subquery())) or 0
+    )
+    items = [_summary(recipe, book) for recipe, book, _ in rows]
 
     # Facets: the keywords most common among the matching recipes, so the chips
     # can re-rank to what narrows further. Already-selected keywords are dropped
