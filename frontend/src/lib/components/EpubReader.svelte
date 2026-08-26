@@ -521,7 +521,6 @@
 	}
 	.msg {
 		font-family: var(--f-serif);
-		font-style: italic;
 		font-size: 1.3rem;
 		color: var(--muted);
 		margin: 0;
@@ -533,11 +532,11 @@
 		font-family: var(--f-grotesk);
 		font-weight: 600;
 		font-size: 0.85rem;
-		color: var(--clay-deep);
+		color: var(--accent-deep);
 		text-decoration: none;
 		border-bottom: 1px solid transparent;
 	}
 	.back:hover {
-		border-bottom-color: var(--clay);
+		border-bottom-color: var(--accent);
 	}
 </style>

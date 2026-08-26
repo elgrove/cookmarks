@@ -310,7 +310,6 @@
 	.display {
 		font-family: var(--f-serif);
 		font-weight: 400;
-		font-style: italic;
 		font-size: clamp(2.2rem, 5vw, 3.2rem);
 		line-height: 1.05;
 		letter-spacing: -0.01em;
@@ -357,7 +356,7 @@
 	}
 
 	.clear-kw:hover {
-		color: var(--clay-deep);
+		color: var(--accent-deep);
 	}
 
 	.chips {
@@ -395,18 +394,18 @@
 	}
 
 	.chip:hover {
-		border-color: var(--clay);
+		border-color: var(--accent);
 		color: var(--ink);
 	}
 
 	.chip.on {
-		background: var(--clay);
-		border-color: var(--clay);
+		background: var(--accent);
+		border-color: var(--accent);
 		color: var(--bg);
 	}
 
 	.chip:focus-visible {
-		outline: 2px solid var(--clay);
+		outline: 2px solid var(--accent);
 		outline-offset: 1px;
 	}
 
@@ -445,7 +444,7 @@
 	}
 
 	.search-input:focus {
-		border-bottom-color: var(--clay);
+		border-bottom-color: var(--accent);
 	}
 
 	.clear {
@@ -462,7 +461,7 @@
 	}
 
 	.clear:hover {
-		color: var(--clay-deep);
+		color: var(--accent-deep);
 	}
 
 	.sort {
@@ -509,15 +508,15 @@
 	}
 
 	.extracted-checkbox:checked {
-		border-color: var(--clay);
-		background-color: var(--clay);
+		border-color: var(--accent);
+		background-color: var(--accent);
 		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='8' viewBox='0 0 10 8'%3E%3Cpath d='M1 4l3 3 5-6' fill='none' stroke='%23faf9f5' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 		background-repeat: no-repeat;
 		background-position: center;
 	}
 
 	.extracted-checkbox:focus-visible {
-		outline: 2px solid var(--clay);
+		outline: 2px solid var(--accent);
 		outline-offset: 2px;
 	}
 
@@ -541,7 +540,6 @@
 
 	.empty {
 		font-family: var(--f-serif);
-		font-style: italic;
 		font-size: 1.3rem;
 		color: var(--muted);
 		padding: 2rem 0;

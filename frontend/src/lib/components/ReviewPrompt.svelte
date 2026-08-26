@@ -73,8 +73,8 @@
 
 <style>
 	.review {
-		border: 1px solid var(--clay);
-		border-left: 3px solid var(--clay);
+		border: 1px solid var(--accent);
+		border-left: 3px solid var(--accent);
 		border-radius: 3px;
 		background: var(--bg-warm);
 		padding: 1.1rem 1.3rem;
@@ -88,7 +88,7 @@
 		font-size: 0.62rem;
 		letter-spacing: 0.12em;
 		text-transform: uppercase;
-		color: var(--clay-deep);
+		color: var(--accent-deep);
 		margin: 0 0 0.4rem;
 	}
 	.question {
@@ -110,15 +110,15 @@
 		padding: 0.55rem 1rem;
 		border-radius: 3px;
 		background: transparent;
-		color: var(--clay-deep);
-		border: 1px solid var(--clay);
+		color: var(--accent-deep);
+		border: 1px solid var(--accent);
 		cursor: pointer;
 		transition:
 			background 0.18s var(--ease-out),
 			color 0.18s var(--ease-out);
 	}
 	.choice:hover:not(:disabled) {
-		background: var(--clay);
+		background: var(--accent);
 		color: var(--bg);
 	}
 	.choice:disabled {
@@ -130,13 +130,13 @@
 		font-family: var(--f-grotesk);
 		font-size: 0.85rem;
 		font-weight: 600;
-		color: var(--clay-deep);
+		color: var(--accent-deep);
 		margin: 0;
 	}
 	.err {
 		font-family: var(--f-grotesk);
 		font-size: 0.8rem;
-		color: var(--clay-deep);
+		color: var(--accent-deep);
 		margin: 0.7rem 0 0;
 	}
 </style>

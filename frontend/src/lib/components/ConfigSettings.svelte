@@ -252,13 +252,12 @@
 	.hint {
 		margin: 0;
 		font-family: var(--f-serif);
-		font-style: italic;
 		color: var(--muted);
 	}
 	.link {
 		font-family: var(--f-grotesk);
 		font-size: 0.8rem;
-		color: var(--clay-deep);
+		color: var(--accent-deep);
 		background: none;
 		border: none;
 		padding: 0;
@@ -297,14 +296,14 @@
 		border-color: var(--line-strong);
 	}
 	.save.saved {
-		background: var(--clay);
-		border-color: var(--clay);
+		background: var(--accent);
+		border-color: var(--accent);
 		color: var(--bg);
 	}
 	.save.error {
 		background: transparent;
-		color: var(--clay-deep);
-		border-color: var(--clay-deep);
+		color: var(--accent-deep);
+		border-color: var(--accent-deep);
 	}
 	@media (max-width: 760px) {
 		.field {

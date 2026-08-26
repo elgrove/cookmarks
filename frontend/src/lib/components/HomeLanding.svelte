@@ -217,12 +217,11 @@
 	/* Continue reading leads the page: a masthead and a cover grid, the same card
 	   language as the library so a part-read book reads as the book it is. */
 	.display {
-		font-family: var(--f-serif);
-		font-weight: 400;
-		font-style: italic;
-		font-size: clamp(2.2rem, 5vw, 3.2rem);
+		font-family: var(--f-grotesk);
+		font-weight: 700;
+		font-size: clamp(1.8rem, 4vw, 2.4rem);
 		line-height: 1.05;
-		letter-spacing: -0.01em;
+		letter-spacing: -0.02em;
 		margin: 0 0 1.9rem;
 	}
 
@@ -273,7 +272,7 @@
 	}
 
 	.feature-plate:hover .plate {
-		border-color: var(--clay);
+		border-color: var(--accent);
 	}
 
 	.cover {
@@ -284,10 +283,9 @@
 	}
 
 	.plate-title {
-		font-family: var(--f-serif);
-		font-style: italic;
-		font-weight: 300;
-		font-size: 1.5rem;
+		font-family: var(--f-grotesk);
+		font-weight: 600;
+		font-size: 1.3rem;
 		line-height: 1.3;
 		text-align: center;
 		padding: 1.6rem 1.4rem;
@@ -299,12 +297,11 @@
 	}
 
 	.feature-title {
-		font-family: var(--f-serif);
-		font-weight: 400;
-		font-style: italic;
-		font-size: clamp(2.2rem, 4.5vw, 3.4rem);
+		font-family: var(--f-grotesk);
+		font-weight: 700;
+		font-size: clamp(2rem, 4vw, 2.9rem);
 		line-height: 1.08;
-		letter-spacing: -0.01em;
+		letter-spacing: -0.02em;
 		margin: 0.6rem 0 0.4rem;
 		overflow-wrap: break-word;
 	}
@@ -315,21 +312,23 @@
 	}
 
 	.feature-title a:hover {
-		color: var(--clay-deep);
+		color: var(--accent-deep);
 	}
 
 	.feature-author {
-		font-family: var(--f-grotesk);
-		font-size: 1.02rem;
+		font-family: var(--f-mono);
+		font-size: 0.74rem;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
 		color: var(--muted);
-		margin: 0;
+		margin: 0.2rem 0 0;
 	}
 
 	.feature-desc {
-		font-family: var(--f-serif);
-		font-size: 1.12rem;
+		font-family: var(--f-grotesk);
+		font-size: 1.02rem;
 		line-height: 1.6;
-		color: var(--ink);
+		color: var(--muted);
 		max-width: 36rem;
 		margin: 1.4rem 0 0;
 		display: -webkit-box;
@@ -348,24 +347,24 @@
 	.cta {
 		display: inline-block;
 		margin-top: 2rem;
-		font-family: var(--f-grotesk);
-		font-weight: 600;
-		font-size: 0.92rem;
-		color: var(--ink);
+		font-family: var(--f-mono);
+		font-size: 0.72rem;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: #fff;
+		background: var(--accent);
+		padding: 0.7rem 1.2rem;
 		text-decoration: none;
-		border-bottom: 2px solid var(--clay);
-		padding-bottom: 2px;
-		transition: color 0.18s var(--ease-out);
+		transition: background 0.18s var(--ease-out);
 	}
 
 	.cta:hover {
-		color: var(--clay-deep);
+		background: var(--accent-deep);
 	}
 
 	.empty {
-		font-family: var(--f-serif);
-		font-style: italic;
-		font-size: 1.4rem;
+		font-family: var(--f-grotesk);
+		font-size: 1.2rem;
 		color: var(--muted);
 	}
 
@@ -373,8 +372,8 @@
 	   mono label — a plan for later, not the page's headline. */
 	.upnext {
 		margin-top: 3.5rem;
-		padding-top: 1.5rem;
-		border-top: var(--border);
+		padding-top: 1.2rem;
+		border-top: var(--rule);
 	}
 	.upnext h2 {
 		margin: 0 0 1.1rem;
@@ -385,8 +384,8 @@
 	   its book trailing in the quieter grotesque. */
 	.recent {
 		margin-top: 3.5rem;
-		padding-top: 1.5rem;
-		border-top: var(--border);
+		padding-top: 1.2rem;
+		border-top: var(--rule);
 	}
 	.recent h2 {
 		margin: 0 0 0.6rem;
@@ -408,22 +407,25 @@
 	}
 	.recent-index .num {
 		font-size: 0.72rem;
-		color: var(--clay);
+		color: var(--accent);
 	}
 	.rtitle {
-		font-family: var(--f-serif);
-		font-size: 1.05rem;
+		font-family: var(--f-grotesk);
+		font-weight: 600;
+		font-size: 0.98rem;
 		line-height: 1.3;
 		color: var(--ink);
 		text-decoration: none;
 		transition: color 0.18s var(--ease-out);
 	}
 	.rtitle:hover {
-		color: var(--clay-deep);
+		color: var(--accent-deep);
 	}
 	.rbook {
-		font-family: var(--f-grotesk);
-		font-size: 0.8rem;
+		font-family: var(--f-mono);
+		font-size: 0.66rem;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
 		color: var(--muted);
 		text-decoration: none;
 		text-align: right;
@@ -435,8 +437,8 @@
 	/* The library-wide figure closes the page — a ledger line, not a headline. */
 	.progress-block {
 		margin-top: 4rem;
-		padding-top: 1.5rem;
-		border-top: var(--border);
+		padding-top: 1.2rem;
+		border-top: var(--rule);
 		max-width: 26rem;
 	}
 
@@ -453,7 +455,8 @@
 	}
 
 	.pct {
-		font-family: var(--f-serif);
+		font-family: var(--f-grotesk);
+		font-weight: 700;
 		font-size: 1.7rem;
 		line-height: 1;
 		letter-spacing: -0.01em;
@@ -471,7 +474,7 @@
 	.rule-fill {
 		display: block;
 		height: 100%;
-		background: var(--clay);
+		background: var(--accent);
 	}
 
 	.strip {

@@ -237,7 +237,7 @@
 		color: var(--muted);
 	}
 	.crumb a:hover {
-		color: var(--clay-deep);
+		color: var(--accent-deep);
 	}
 	.crumb .sep {
 		color: var(--faint);
@@ -262,7 +262,6 @@
 	.display {
 		font-family: var(--f-serif);
 		font-weight: 400;
-		font-style: italic;
 		font-size: clamp(2.2rem, 5vw, 3.4rem);
 		line-height: 1.04;
 		letter-spacing: -0.015em;
@@ -306,8 +305,8 @@
 		border-color: var(--line-strong);
 	}
 	.btn.ghost:hover {
-		border-color: var(--clay);
-		color: var(--clay-deep);
+		border-color: var(--accent);
+		color: var(--accent-deep);
 	}
 	.btn.danger {
 		background: #b3402a;
@@ -325,7 +324,6 @@
 	}
 	.rename-input {
 		font-family: var(--f-serif);
-		font-style: italic;
 		font-size: clamp(2rem, 4.5vw, 3rem);
 		color: var(--ink);
 		background: transparent;
@@ -336,7 +334,7 @@
 	}
 	.rename-input:focus {
 		outline: none;
-		border-bottom-color: var(--clay);
+		border-bottom-color: var(--accent);
 	}
 	.prompt {
 		font-family: var(--f-serif);
@@ -353,7 +351,6 @@
 
 	.empty {
 		font-family: var(--f-serif);
-		font-style: italic;
 		font-size: 1.3rem;
 		color: var(--muted);
 		padding: 2rem 0;

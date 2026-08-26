@@ -184,7 +184,6 @@
 	.display {
 		font-family: var(--f-serif);
 		font-weight: 400;
-		font-style: italic;
 		font-size: clamp(2.2rem, 5vw, 3.2rem);
 		line-height: 1.05;
 		letter-spacing: -0.01em;
@@ -222,7 +221,7 @@
 		color: var(--faint);
 	}
 	.search-input:focus {
-		border-bottom-color: var(--clay);
+		border-bottom-color: var(--accent);
 	}
 	.clear {
 		position: absolute;
@@ -237,7 +236,7 @@
 		padding: 0.15rem 0.25rem;
 	}
 	.clear:hover {
-		color: var(--clay-deep);
+		color: var(--accent-deep);
 	}
 
 	.new-list-btn {
@@ -296,7 +295,6 @@
 	}
 	.modal-title {
 		font-family: var(--f-serif);
-		font-style: italic;
 		font-size: 1.6rem;
 		font-weight: 400;
 		color: var(--ink);
@@ -314,7 +312,7 @@
 	}
 	.modal-input:focus {
 		outline: none;
-		border-bottom-color: var(--clay);
+		border-bottom-color: var(--accent);
 	}
 	.modal-input::placeholder {
 		color: var(--faint);
@@ -351,8 +349,8 @@
 		border-color: var(--line-strong);
 	}
 	.btn.ghost:hover {
-		border-color: var(--clay);
-		color: var(--clay-deep);
+		border-color: var(--accent);
+		color: var(--accent-deep);
 	}
 
 	@keyframes fadeIn {
@@ -394,7 +392,7 @@
 		background: var(--bg-warm);
 		/* Clay outline at the same weight the default Favourites card carries. */
 		border: var(--border);
-		border-color: var(--clay);
+		border-color: var(--accent);
 		border-radius: 4px;
 		text-decoration: none;
 	}
@@ -418,15 +416,15 @@
 	}
 	.spines i:nth-child(1) {
 		height: 18px;
-		background: var(--clay);
+		background: var(--accent);
 	}
 	.spines i:nth-child(2) {
 		height: 14px;
-		background: color-mix(in srgb, var(--clay) 55%, var(--bg-warm));
+		background: color-mix(in srgb, var(--accent) 55%, var(--bg-warm));
 	}
 	.spines i:nth-child(3) {
 		height: 16px;
-		background: color-mix(in srgb, var(--clay) 30%, var(--bg-warm));
+		background: color-mix(in srgb, var(--accent) 30%, var(--bg-warm));
 	}
 	.queue-name {
 		font-family: var(--f-serif);
@@ -436,7 +434,7 @@
 		transition: color 0.18s var(--ease-out);
 	}
 	.queue-card:hover .queue-name {
-		color: var(--clay-deep);
+		color: var(--accent-deep);
 	}
 	.queue-count {
 		font-size: 0.72rem;
@@ -483,7 +481,6 @@
 
 	.empty {
 		font-family: var(--f-serif);
-		font-style: italic;
 		font-size: 1.3rem;
 		color: var(--muted);
 		padding: 2rem 0;

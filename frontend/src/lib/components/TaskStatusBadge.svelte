@@ -40,8 +40,8 @@
 		background: var(--chip-blue);
 	}
 	.review {
-		color: var(--clay-deep);
-		background: var(--chip-clay);
+		color: var(--accent-deep);
+		background: var(--chip-accent);
 	}
 	.done {
 		color: var(--chip-green-c);
@@ -49,6 +49,6 @@
 	}
 	.failed {
 		color: var(--bg);
-		background: var(--clay-deep);
+		background: var(--accent-deep);
 	}
 </style>

@@ -121,7 +121,7 @@
 	}
 
 	.card:hover .plate {
-		border-color: var(--clay);
+		border-color: var(--accent);
 	}
 
 	.cover {
@@ -133,7 +133,6 @@
 
 	.plate-title {
 		font-family: var(--f-serif);
-		font-style: italic;
 		font-weight: 300;
 		font-size: 1.15rem;
 		line-height: 1.3;
@@ -154,7 +153,7 @@
 		align-items: center;
 		justify-content: center;
 		border-radius: 999px;
-		background: var(--clay);
+		background: var(--accent);
 		color: var(--bg);
 		font-family: var(--f-grotesk);
 		font-weight: 600;
@@ -177,7 +176,7 @@
 	.progress-fill {
 		display: block;
 		height: 100%;
-		background: var(--clay);
+		background: var(--accent);
 	}
 
 	.meta {
@@ -196,7 +195,7 @@
 	}
 
 	.card:hover .title {
-		color: var(--clay-deep);
+		color: var(--accent-deep);
 	}
 
 	.author {

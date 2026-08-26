@@ -135,7 +135,7 @@
 		width: 1rem;
 		height: 1rem;
 		margin: 0;
-		accent-color: var(--clay);
+		accent-color: var(--accent);
 		cursor: pointer;
 	}
 
@@ -147,8 +147,9 @@
 	}
 
 	.name {
-		font-family: var(--f-serif);
-		font-size: 1.2rem;
+		font-family: var(--f-grotesk);
+		font-weight: 600;
+		font-size: 1.05rem;
 		line-height: 1.3;
 		color: var(--ink);
 		text-decoration: none;
@@ -156,12 +157,14 @@
 	}
 
 	.name:hover {
-		color: var(--clay-deep);
+		color: var(--accent-deep);
 	}
 	.source {
 		margin-left: auto;
-		font-family: var(--f-grotesk);
-		font-size: 0.82rem;
+		font-family: var(--f-mono);
+		font-size: 0.68rem;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
 		color: var(--muted);
 		text-decoration: none;
 		white-space: nowrap;
@@ -191,8 +194,8 @@
 		transition: color 0.18s var(--ease-out);
 	}
 	.remove:hover {
-		color: var(--clay-deep);
-		border-bottom-color: var(--clay);
+		color: var(--accent-deep);
+		border-bottom-color: var(--accent);
 	}
 
 	.chips {
@@ -207,10 +210,9 @@
 	.chip {
 		display: inline-block;
 		font-family: var(--f-mono);
-		font-size: 0.66rem;
-		letter-spacing: 0.03em;
-		padding: 0.15rem 0.5rem;
-		border-radius: 3px;
+		font-size: 0.62rem;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
 		text-decoration: none;
 	}
 
@@ -220,21 +222,19 @@
 		text-underline-offset: 2px;
 	}
 	.chip:focus-visible {
-		outline: 2px solid var(--clay);
+		outline: 2px solid var(--accent);
 		outline-offset: 1px;
 	}
 
-	.chip-clay {
-		background: var(--chip-clay);
-		color: var(--chip-clay-c);
-	}
-	.chip-blue {
-		background: var(--chip-blue);
-		color: var(--chip-blue-c);
-	}
+	.chip-clay,
+	.chip-blue,
 	.chip-green {
-		background: var(--chip-green);
-		color: var(--chip-green-c);
+		color: var(--chip-accent-c);
+	}
+	.chips li + li .chip::before {
+		content: '·';
+		color: var(--faint);
+		margin-right: 0.55rem;
 	}
 
 	@media (max-width: 560px) {

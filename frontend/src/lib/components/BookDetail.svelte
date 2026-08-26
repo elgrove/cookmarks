@@ -405,7 +405,7 @@
 		color: var(--muted);
 	}
 	.crumb a:hover {
-		color: var(--clay-deep);
+		color: var(--accent-deep);
 	}
 	.crumb .sep {
 		color: var(--faint);
@@ -426,7 +426,6 @@
 	.display {
 		font-family: var(--f-serif);
 		font-weight: 400;
-		font-style: italic;
 		font-size: clamp(2.6rem, 6vw, 4.4rem);
 		line-height: 1;
 		letter-spacing: -0.015em;
@@ -497,7 +496,7 @@
 	.readmore {
 		font-family: var(--f-grotesk);
 		font-size: 0.85rem;
-		color: var(--clay-deep);
+		color: var(--accent-deep);
 		background: none;
 		border: none;
 		border-bottom: 1px solid transparent;
@@ -506,7 +505,7 @@
 		cursor: pointer;
 	}
 	.readmore:hover {
-		border-bottom-color: var(--clay);
+		border-bottom-color: var(--accent);
 	}
 
 	.rlabel {
@@ -543,7 +542,7 @@
 		transition: color 0.18s var(--ease-out);
 	}
 	.rname a:hover {
-		color: var(--clay-deep);
+		color: var(--accent-deep);
 	}
 	/* Keep tags to a single line: extra chips wrap, then the second row clips away. */
 	.chips {
@@ -565,8 +564,8 @@
 		border-radius: 3px;
 		white-space: nowrap;
 		text-decoration: none;
-		background: var(--chip-clay);
-		color: var(--chip-clay-c);
+		background: var(--chip-accent);
+		color: var(--chip-accent-c);
 	}
 	.chip.b {
 		background: var(--chip-blue);
@@ -582,7 +581,7 @@
 		text-underline-offset: 2px;
 	}
 	.chip:focus-visible {
-		outline: 2px solid var(--clay);
+		outline: 2px solid var(--accent);
 		outline-offset: 1px;
 	}
 
@@ -598,7 +597,6 @@
 
 	.empty {
 		font-family: var(--f-serif);
-		font-style: italic;
 		font-size: 1.3rem;
 		color: var(--muted);
 		margin: 1.1rem 0 0;
@@ -631,7 +629,6 @@
 	}
 	.plate-title {
 		font-family: var(--f-serif);
-		font-style: italic;
 		font-weight: 300;
 		font-size: 1.5rem;
 		line-height: 1.3;
@@ -649,7 +646,7 @@
 		align-items: center;
 		justify-content: center;
 		border-radius: 999px;
-		background: var(--clay);
+		background: var(--accent);
 		color: var(--bg);
 		font-family: var(--f-grotesk);
 		font-weight: 600;
@@ -705,8 +702,8 @@
 		border-color: var(--line-strong);
 	}
 	.btn.ghost:hover {
-		border-color: var(--clay);
-		color: var(--clay-deep);
+		border-color: var(--accent);
+		color: var(--accent-deep);
 	}
 	.btn.danger {
 		background: #b3402a;
@@ -758,7 +755,7 @@
 		cursor: pointer;
 	}
 	.exclude input {
-		accent-color: var(--clay);
+		accent-color: var(--accent);
 		margin-top: 0.15rem;
 	}
 
@@ -791,7 +788,7 @@
 	/* Read progress: the percentage leads, the fraction sits behind it as the
 	   quieter half of the figure. */
 	dd.read .pct {
-		color: var(--clay-deep);
+		color: var(--accent-deep);
 	}
 	dd.read .of {
 		color: var(--muted);

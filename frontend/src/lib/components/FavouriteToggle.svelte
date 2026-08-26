@@ -60,16 +60,16 @@
 			color 0.18s var(--ease-out);
 	}
 	.fav:hover {
-		border-color: var(--clay);
-		color: var(--clay-deep);
+		border-color: var(--accent);
+		color: var(--accent-deep);
 	}
 	.fav.on {
-		border-color: var(--clay);
-		color: var(--clay-deep);
+		border-color: var(--accent);
+		color: var(--accent-deep);
 	}
 	.star {
 		font-size: 1rem;
 		line-height: 1;
-		color: var(--clay);
+		color: var(--accent);
 	}
 </style>

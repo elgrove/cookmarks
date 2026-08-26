@@ -1,12 +1,11 @@
 <script lang="ts">
-	import '@fontsource-variable/source-serif-4';
-	import '@fontsource-variable/source-serif-4/wght-italic.css';
-	import '@fontsource/schibsted-grotesk/400.css';
-	import '@fontsource/schibsted-grotesk/500.css';
-	import '@fontsource/schibsted-grotesk/600.css';
-	import '@fontsource/schibsted-grotesk/700.css';
-	import '@fontsource/ibm-plex-mono/300.css';
+	import '@fontsource/space-grotesk/400.css';
+	import '@fontsource/space-grotesk/500.css';
+	import '@fontsource/space-grotesk/600.css';
+	import '@fontsource/space-grotesk/700.css';
 	import '@fontsource/ibm-plex-mono/400.css';
+	import '@fontsource/ibm-plex-mono/500.css';
+	import '@fontsource/ibm-plex-mono/600.css';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
