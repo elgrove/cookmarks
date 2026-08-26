@@ -46,14 +46,14 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 0.45rem;
-		font-family: var(--f-grotesk);
-		font-weight: 600;
-		font-size: 0.9rem;
+		font-family: var(--f-mono);
+		font-size: 0.72rem;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
 		padding: 0.7rem 1rem;
-		border-radius: 3px;
-		background: transparent;
+		background: var(--card);
 		color: var(--ink);
-		border: 1px solid var(--line-strong);
+		border: 1px solid var(--ink);
 		cursor: pointer;
 		transition:
 			border-color 0.18s var(--ease-out),

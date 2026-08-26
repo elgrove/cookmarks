@@ -113,22 +113,23 @@
 		justify-content: space-between;
 		gap: 0.5rem;
 		width: 100%;
-		font-family: var(--f-grotesk);
-		font-weight: 600;
-		font-size: 0.9rem;
+		font-family: var(--f-mono);
+		font-size: 0.72rem;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
 		padding: 0.7rem 1rem;
-		border-radius: 3px;
-		background: var(--ink);
-		color: var(--bg);
-		border: 1px solid transparent;
+		background: var(--card);
+		color: var(--ink);
+		border: 1px solid var(--ink);
 		cursor: pointer;
 		transition: background 0.18s var(--ease-out);
 	}
 	.trigger:hover {
-		background: var(--ink-deep);
+		border-color: var(--accent);
+		color: var(--accent-deep);
 	}
 	.trigger .ar {
-		color: var(--bg);
+		color: var(--accent);
 		font-weight: 400;
 	}
 
