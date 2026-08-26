@@ -59,7 +59,10 @@
 		listPicker
 	}: RecipesSearchProps = $props();
 
+	const isShuffled = (key: SortKey) => key === 'random' || key === 'relevance';
+
 	const sortOptions: { key: SortKey; label: string }[] = [
+		{ key: 'relevance', label: 'Best match' },
 		{ key: 'random', label: 'Random' },
 		{ key: 'name', label: 'Name A–Z' },
 		{ key: 'recent', label: 'Recently added' },
@@ -76,7 +79,7 @@
 	let selected = $state<string[]>(seed.keywords ?? []);
 	let bookId = $state(seed.bookId ?? '');
 	let author = $state(seed.author ?? '');
-	let sort = $state<SortKey>(seed.sort ?? 'random');
+	let sort = $state<SortKey>(seed.sort ?? 'relevance');
 	let offset = $state(seed.offset ?? 0);
 	// The active search mode is live in the box (a button press flips it); seeded
 	// from the prop so a restored ?mode=idea URL opens in semantic mode.
@@ -138,7 +141,7 @@
 			bookId: bookId || undefined,
 			author: author || undefined,
 			sort,
-			seed: sort === 'random' ? randomSeed : undefined
+			seed: isShuffled(sort) ? randomSeed : undefined
 		})
 	);
 
@@ -249,7 +252,7 @@
 			offset = 0;
 			// New search → reshuffle. Pagination (resetOffset=false) keeps the seed
 			// so the user pages through one stable random ordering.
-			if (sort === 'random') randomSeed = Math.floor(Math.random() * 2_000_000_000) + 1;
+			if (isShuffled(sort)) randomSeed = Math.floor(Math.random() * 2_000_000_000) + 1;
 		}
 		onSearch?.({
 			q: query,
@@ -257,7 +260,7 @@
 			bookId: bookId || undefined,
 			author: author || undefined,
 			sort,
-			seed: sort === 'random' ? randomSeed : undefined,
+			seed: isShuffled(sort) ? randomSeed : undefined,
 			limit,
 			offset
 		});

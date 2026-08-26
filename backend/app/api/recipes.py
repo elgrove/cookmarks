@@ -4,7 +4,7 @@ from collections import OrderedDict
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, HTTPException, Query, Response, status
-from sqlalchemy import String, cast, func, literal_column, or_, select
+from sqlalchemy import String, case, cast, func, literal_column, or_, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.api.deps import CurrentUser
@@ -33,10 +33,11 @@ from app.services import embeddings
 from app.services.reading import touch_reading
 from app.services.vector_store import VectorStore
 from app.services.views import forget_view, record_view
+from app.text import fold, stem
 
 router = APIRouter(tags=["recipes"])
 
-Sort = Literal["random", "name", "recent", "book"]
+Sort = Literal["relevance", "random", "name", "recent", "book"]
 
 # How many co-occurrence facets to return. The client renders these (plus any
 # pinned selected chips) and clamps the block to a few lines by measurement, so
@@ -67,9 +68,26 @@ def _summary(recipe: Recipe, book: Book) -> RecipeSummary:
     )
 
 
-def _search_order(sort: Sort, seed: int) -> list:
+def _relevance_score(terms: list[str]):
+    """How well a row answers the query: a name hit beats a keyword hit, which beats
+    a hit only in the book or the ingredients. Ties fall through to the shuffle."""
+    whole = " ".join(terms)
+    return case(
+        (Recipe.name_folded == whole, 4),
+        (Recipe.name_folded.startswith(whole), 3),
+        (or_(*[Recipe.name_folded.contains(term) for term in terms]), 2),
+        (Recipe.keywords.any(Keyword.name.ilike(f"%{whole}%")), 1),
+        else_=0,
+    )
+
+
+def _search_order(q: str, sort: Sort, seed: int) -> list:
     """The ORDER BY clauses for a search, shared by the result page and prev/next
     so a recipe's neighbours match exactly what the search showed."""
+    if sort == "relevance":
+        terms = _search_terms(q)
+        scored = [_relevance_score(terms).desc()] if terms else []
+        return [*scored, *_shuffle_order(seed)]
     if sort == "name":
         return [func.lower(Recipe.name).asc()]
     if sort == "recent":
@@ -78,9 +96,13 @@ def _search_order(sort: Sort, seed: int) -> list:
         # The book's own sequence. Filtered to one book this is exactly its stored
         # order; across books (unfiltered) it groups by book, title-ordered.
         return [Book.title.asc(), Recipe.order.asc()]
-    # Seeded shuffle: a fixed permutation of the rows for a given seed, so the
-    # ordering is stable across pagination but varies between searches. The
-    # multiplier is coprime to the prime modulus, making it a bijection.
+    return _shuffle_order(seed)
+
+
+def _shuffle_order(seed: int) -> list:
+    """A fixed permutation of the rows for a given seed, so the ordering is stable
+    across pagination but varies between searches. The multiplier is coprime to the
+    prime modulus, making it a bijection."""
     multiplier = 1 + (seed * _SHUFFLE_HASH) % (_SHUFFLE_MODULUS - 1)
     return [((literal_column("recipes.rowid") * multiplier) % _SHUFFLE_MODULUS).asc()]
 
@@ -89,9 +111,10 @@ def _search_terms(q: str) -> list[str]:
     """Every term must appear somewhere, so "white curry" finds a curry with white
     pepper rather than only the literal phrase; double quotes ask for the phrase."""
     try:
-        return [term for term in shlex.split(q) if term]
+        raw = shlex.split(q)
     except ValueError:
-        return q.replace('"', " ").split()
+        raw = q.replace('"', " ").split()
+    return [stem(fold(term)) for term in raw if term]
 
 
 def _search_conditions(
@@ -106,9 +129,9 @@ def _search_conditions(
         like = f"%{term}%"
         conditions.append(
             or_(
-                Recipe.name.ilike(like),
-                Book.title.ilike(like),
-                Book.author.ilike(like),
+                Recipe.name_folded.contains(term),
+                Book.title_folded.contains(term),
+                Book.author_folded.contains(term),
                 cast(Recipe.ingredients, String).ilike(like),
                 Recipe.keywords.any(Keyword.name.ilike(like)),
             )
@@ -131,7 +154,7 @@ def search_recipes(
     keyword: Annotated[list[str] | None, Query()] = None,
     book_id: uuid.UUID | None = None,
     author: Annotated[str | None, Query()] = None,
-    sort: Sort = "random",
+    sort: Sort = "relevance",
     seed: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=100)] = 30,
     offset: Annotated[int, Query(ge=0)] = 0,
@@ -155,7 +178,7 @@ def search_recipes(
         select(Recipe, Book)
         .join(Book, Recipe.book_id == Book.id)
         .where(*conditions)
-        .order_by(*_search_order(sort, seed), Recipe.id)
+        .order_by(*_search_order(q, sort, seed), Recipe.id)
         .offset(offset)
         .limit(limit)
         .options(selectinload(Recipe.keywords))
@@ -365,7 +388,7 @@ def _ordered_search_ids(
             select(Recipe.id)
             .join(Book, Recipe.book_id == Book.id)
             .where(*conditions)
-            .order_by(*_search_order(sort, seed), Recipe.id)
+            .order_by(*_search_order(q, sort, seed), Recipe.id)
         ).all()
     )
     _SEARCH_ORDER_CACHE[key] = ids
@@ -432,7 +455,7 @@ def get_recipe(
     keyword: Annotated[list[str] | None, Query()] = None,
     book_id: uuid.UUID | None = None,
     author: Annotated[str | None, Query()] = None,
-    sort: Sort = "random",
+    sort: Sort = "relevance",
     seed: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=100)] = 30,
 ) -> RecipeDetail:
@@ -521,9 +544,7 @@ def mark_recipe_seen(
 
 
 @router.delete("/recipes/{recipe_id}/seen", status_code=status.HTTP_204_NO_CONTENT)
-def unmark_recipe_seen(
-    recipe_id: uuid.UUID, session: SessionDep, user: CurrentUser
-) -> Response:
+def unmark_recipe_seen(recipe_id: uuid.UUID, session: SessionDep, user: CurrentUser) -> Response:
     """Forget that the caller read this recipe. Views are recorded automatically on
     open, so without this an accidental tap is permanent. Idempotent: unmarking one
     that was never read is a no-op."""
