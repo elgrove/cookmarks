@@ -89,7 +89,9 @@
 <style>
 	.assistant {
 		display: grid;
-		grid-template-columns: 15rem 1fr;
+		/* minmax(0, …) rather than 1fr: an auto-sized track is floored by its widest
+		   content, and one unbreakable id in a tool trace would push the page sideways. */
+		grid-template-columns: 15rem minmax(0, 1fr);
 		gap: var(--col-gap);
 		max-width: var(--max-w);
 		margin: 0 auto;
@@ -108,7 +110,7 @@
 
 	@media (max-width: 900px) {
 		.assistant {
-			grid-template-columns: 1fr;
+			grid-template-columns: minmax(0, 1fr);
 			gap: 2rem;
 		}
 		.rail {

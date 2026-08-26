@@ -201,12 +201,14 @@
 		font-size: 1.15rem;
 		margin: 0;
 		max-width: 60ch;
+		overflow-wrap: anywhere;
 	}
 
 	.reply {
 		font-family: var(--f-serif);
 		max-width: 66ch;
 		line-height: 1.6;
+		overflow-wrap: anywhere;
 	}
 
 	.reply :global(p) {
@@ -252,6 +254,8 @@
 
 	.trace-args {
 		font-style: italic;
+		min-width: 0;
+		overflow-wrap: anywhere;
 	}
 
 	.trace-result {

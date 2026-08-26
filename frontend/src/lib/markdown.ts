@@ -20,12 +20,25 @@ function escape(text: string): string {
  *  is escaped rather than trusted. */
 export function renderMarkdown(text: string): string {
 	if (!DOMPurify.isSupported) return escape(text);
-	return DOMPurify.sanitize(marked.parse(text, { async: false, breaks: true }), {
-		FORBID_TAGS: ['img', 'style']
-	});
+	return internalise(
+		DOMPurify.sanitize(marked.parse(text, { async: false, breaks: true }), {
+			FORBID_TAGS: ['img', 'style']
+		})
+	);
 }
 
-/** Whether a link points inside the app, so the UI can route it rather than leave. */
-export function isInternalLink(href: string): boolean {
-	return href.startsWith('/recipes/') || href.startsWith('/books/') || href.startsWith('/lists/');
+const INTERNAL_PATH = /^\/?(recipes|books|lists)\/[^/?#]+$/;
+
+/** Pull app links back inside the app. Told to write `/recipes/{id}`, a model will
+ *  sometimes put a hostname of its own invention in front of it, and sometimes drop the
+ *  leading slash — one link leaves the app, the other resolves against whatever page it
+ *  happens to be read on. Both are repaired here, where the shape of an app link is known. */
+function internalise(html: string): string {
+	const doc = new DOMParser().parseFromString(html, 'text/html');
+	for (const link of doc.querySelectorAll('a[href]')) {
+		const path = (link.getAttribute('href') ?? '').replace(/^https?:\/\/[^/]+/i, '');
+		if (INTERNAL_PATH.test(path))
+			link.setAttribute('href', path.startsWith('/') ? path : `/${path}`);
+	}
+	return doc.body.innerHTML;
 }

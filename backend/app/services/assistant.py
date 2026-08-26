@@ -50,10 +50,13 @@ class AssistantDeps:
 
 
 def _recipe_row(recipe: Recipe, book: Book) -> dict:
+    # `book_id` rides along on every row: without it the model has no real id to link a
+    # book by, and it will cheerfully invent one out of the recipe's.
     return {
         "id": str(recipe.id),
         "name": recipe.name,
         "book": book.title,
+        "book_id": str(book.id),
         "author": book.author,
         "keywords": sorted(k.name for k in recipe.keywords),
     }
@@ -113,7 +116,6 @@ async def get_recipe(ctx: RunContext[AssistantDeps], recipe_id: str) -> dict:
         return {"error": "no recipe with that id"}
     return {
         **_recipe_row(recipe, recipe.book),
-        "book_id": str(recipe.book_id),
         "description": recipe.description,
         "yields": recipe.yields,
         "ingredients": list(recipe.ingredients),

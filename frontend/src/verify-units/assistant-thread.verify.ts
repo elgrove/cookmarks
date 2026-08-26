@@ -49,7 +49,8 @@ const HOSTILE = [
 	'<script>window.__pwned = true;<\/script>',
 	'<img src="x" onerror="window.__pwned = true">',
 	'<a href="javascript:window.__pwned = true">click me</a>',
-	'Still [a real link](/recipes/' + RECIPE_ID + ').'
+	'Still [a real link](/recipes/' + RECIPE_ID + ').',
+	`And an invented host on [one it made up](https://cookmarks.example/recipes/${RECIPE_ID}).`
 ].join('\n\n');
 
 const DRAFT = '.draft';
@@ -233,7 +234,11 @@ const unit: VerifiableUnit<Props> = {
 				if (hrefs.some((h) => h.toLowerCase().startsWith('javascript:')))
 					return 'a javascript: link survived';
 				if (!root.querySelector('.reply h1')) return 'the Markdown heading did not render';
-				return hrefs.includes(`/recipes/${RECIPE_ID}`) || 'the real link was stripped too';
+				if (!hrefs.includes(`/recipes/${RECIPE_ID}`)) return 'the real link was stripped too';
+				return (
+					hrefs.every((h) => !h.includes('cookmarks.example')) ||
+					'an invented hostname survived on an app link'
+				);
 			}
 		},
 		{
