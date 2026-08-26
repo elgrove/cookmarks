@@ -1,6 +1,7 @@
 import logging
 
 from celery import Celery
+from celery.schedules import crontab
 from celery.signals import worker_ready
 
 from app.config import settings
@@ -22,6 +23,16 @@ celery_app = Celery(
         "app.tasks.ingest",
     ],
 )
+
+# The vocabulary only drifts as books are ingested, and each run sweeps one candidate
+# window, so a weekly beat keeps it tidy without a person remembering to press the button.
+celery_app.conf.timezone = "UTC"
+celery_app.conf.beat_schedule = {
+    "weekly-keyword-dedup": {
+        "task": "scheduled_dedup_keywords",
+        "schedule": crontab(day_of_week="sun", hour=4, minute=0),
+    }
+}
 
 
 @worker_ready.connect
