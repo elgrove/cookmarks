@@ -42,7 +42,7 @@ _KEY_ENV_VAR = {
 }
 
 
-def _make_engine(db_path: Path) -> Any:
+def make_engine(db_path: Path) -> Any:
     engine = create_engine(
         f"sqlite:///{db_path}", connect_args={"check_same_thread": False, "timeout": 30}
     )
@@ -112,7 +112,7 @@ def build_eval_database(calibre_ids: list[int], *, reset: bool = True) -> sessio
         EVAL_DB_PATH.unlink()
     EVAL_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
-    engine = _make_engine(EVAL_DB_PATH)
+    engine = make_engine(EVAL_DB_PATH)
     Base.metadata.create_all(engine)
     factory = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
