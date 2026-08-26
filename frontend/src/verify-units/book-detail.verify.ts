@@ -261,7 +261,15 @@ const unit: VerifiableUnit<Props> = {
 			description:
 				'a PDF cookbook reads in-app like any other, but has no spine to extract recipes from',
 			props: {
-				book: { ...pastaGrannies, hasEpub: false, hasPdf: true, recipeCount: 0, recipes: [] },
+				book: {
+					...pastaGrannies,
+					hasEpub: false,
+					hasPdf: true,
+					recipeCount: 0,
+					recipes: [],
+					reading: null,
+					resumeRecipe: null
+				},
 				onExtract: () => Promise.resolve()
 			}
 		},

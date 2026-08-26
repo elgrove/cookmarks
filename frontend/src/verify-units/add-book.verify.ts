@@ -17,6 +17,14 @@ const STAGED: StagedBook = {
 	author: 'Dan Toombs'
 };
 
+const STAGED_PDF: StagedBook = {
+	staging_id: 'staged-2',
+	filename: 'Scanned Cookbook.pdf',
+	format: 'pdf',
+	title: 'Scanned Cookbook',
+	author: 'A Chef'
+};
+
 function run(id: string, status: TaskStatus, detail: Record<string, unknown>): TaskRun {
 	return {
 		id,
@@ -65,6 +73,12 @@ const unit: VerifiableUnit<Props> = {
 			id: 'staged',
 			description: 'a fetched book waiting for confirmation, title and author pre-filled',
 			props: { runs: [], onStageUrl: () => Promise.resolve(STAGED) },
+			act: stageByUrl
+		},
+		{
+			id: 'staged-pdf',
+			description: 'a staged PDF: addable, but with nothing for extraction to read',
+			props: { runs: [], onStageUrl: () => Promise.resolve(STAGED_PDF) },
 			act: stageByUrl
 		},
 		{
@@ -123,6 +137,31 @@ const unit: VerifiableUnit<Props> = {
 		}
 	],
 	invariants: [
+		{
+			id: 'pdf-cannot-extract',
+			description: 'a staged PDF disables extract-after-add and says why',
+			onlyFixtures: ['staged-pdf'],
+			check: ({ root, contract }) => {
+				if (contract['staged-format'] !== 'pdf') return `format=${contract['staged-format']}`;
+				if (contract['no-extraction'] !== 'true') return `no-extraction=${contract['no-extraction']}`;
+				const box = root.querySelector<HTMLInputElement>('.check input');
+				if (!box?.disabled) return 'extract-after-add offered on a PDF';
+				return (
+					(root.querySelector('.note')?.textContent ?? '').includes('needs an EPUB') ||
+					'no note explains why extraction is unavailable'
+				);
+			}
+		},
+		{
+			id: 'epub-can-extract',
+			description: 'an EPUB still offers extract-after-add',
+			onlyFixtures: ['staged'],
+			check: ({ root, contract }) => {
+				if (contract['no-extraction'] !== 'false') return `no-extraction=${contract['no-extraction']}`;
+				const box = root.querySelector<HTMLInputElement>('.check input');
+				return !box?.disabled || 'extract-after-add disabled on an EPUB';
+			}
+		},
 		{
 			id: 'idle-rests-empty',
 			description: 'nothing staged, nothing submittable, no runs',
