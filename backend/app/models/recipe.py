@@ -3,9 +3,10 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import JSON, Column, DateTime, ForeignKey, String, Table, Text
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
 from app.models.base import Base, UUIDAuditBase
+from app.text import fold
 
 if TYPE_CHECKING:
     from app.models.book import Book
@@ -60,6 +61,9 @@ class Recipe(UUIDAuditBase):
     )
     order: Mapped[int]
     name: Mapped[str] = mapped_column(String(500))
+    # Accent-stripped, lower-cased name. Stored because folding 21k rows per query
+    # costs ~300ms against ~55ms for a plain scan of a stored column.
+    name_folded: Mapped[str] = mapped_column(String(500), default="")
     description: Mapped[str | None] = mapped_column(Text)
     ingredients: Mapped[list[str]] = mapped_column(JSON, default=list)
     instructions: Mapped[list[str]] = mapped_column(JSON, default=list)
@@ -70,6 +74,11 @@ class Recipe(UUIDAuditBase):
     # (both set) · checked and genuinely absent from the book's text (checked, no CFI).
     epub_cfi: Mapped[str | None] = mapped_column(Text)
     epub_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    @validates("name")
+    def _fold_name(self, key: str, value: str) -> str:
+        self.name_folded = fold(value)
+        return value
 
     book: Mapped["Book"] = relationship(back_populates="recipes")
     extraction_run: Mapped["TaskRun | None"] = relationship(back_populates="recipes")

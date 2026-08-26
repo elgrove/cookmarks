@@ -84,6 +84,32 @@ def test_search_quoted_phrase_is_one_term(client: TestClient) -> None:
     assert client.get("/api/recipes", params={"q": '"anchovy'}).json()["total"] == 1
 
 
+def test_search_folds_accents(client: TestClient, session: Session) -> None:
+    recipe = session.scalars(select(Recipe).where(Recipe.name == "Recipe 0")).one()
+    recipe.name = "Cheese Soufflé"
+    session.commit()
+    body = client.get("/api/recipes", params={"q": "souffle"}).json()
+    assert [r["name"] for r in body["items"]] == ["Cheese Soufflé"]
+
+
+def test_search_stems_plurals(client: TestClient, session: Session) -> None:
+    recipe = session.scalars(select(Recipe).where(Recipe.name == "Recipe 0")).one()
+    recipe.name = "Tomato Salad"
+    session.commit()
+    body = client.get("/api/recipes", params={"q": "tomatoes"}).json()
+    assert [r["name"] for r in body["items"]] == ["Tomato Salad"]
+
+
+def test_relevance_puts_name_matches_first(client: TestClient, session: Session) -> None:
+    # "anchovy" is in Recipe 1's name and only in Recipe 0's ingredient list.
+    recipe = session.scalars(select(Recipe).where(Recipe.name == "Recipe 1")).one()
+    recipe.name = "Anchovy Butter"
+    session.commit()
+    params = {"q": "anchovy", "sort": "relevance"}
+    names = [r["name"] for r in client.get("/api/recipes", params=params).json()["items"]]
+    assert names == ["Anchovy Butter", "Recipe 0"]
+
+
 def test_search_matches_book_author(client: TestClient) -> None:
     body = client.get("/api/recipes", params={"q": "author one"}).json()
     assert body["total"] == 3
@@ -329,7 +355,9 @@ def test_recipe_nav_search_order(client: TestClient) -> None:
     # context=search re-runs the search ordering; q=recipe + sort=name gives
     # Recipe 0,1,2, so the middle recipe's neighbours are 0 and 2.
     rid = _recipe_id(client, "Recipe 1")
-    body = client.get(f"/api/recipes/{rid}", params={"context": "search", "q": "recipe", "sort": "name"}).json()
+    body = client.get(
+        f"/api/recipes/{rid}", params={"context": "search", "q": "recipe", "sort": "name"}
+    ).json()
     assert body["context"] == "search"
     assert body["previous"]["name"] == "Recipe 0"
     assert body["next"]["name"] == "Recipe 2"
@@ -341,7 +369,9 @@ def test_recipe_nav_search_respects_filters(client: TestClient) -> None:
     rid = _recipe_id(client, "Recipe 0")
     book = client.get(f"/api/recipes/{rid}", params={"context": "book"}).json()
     assert book["next"]["name"] == "Recipe 1"
-    search = client.get(f"/api/recipes/{rid}", params={"context": "search", "keyword": "Pasta"}).json()
+    search = client.get(
+        f"/api/recipes/{rid}", params={"context": "search", "keyword": "Pasta"}
+    ).json()
     assert search["context"] == "search"
     assert search["previous"] is None
     assert search["next"] is None

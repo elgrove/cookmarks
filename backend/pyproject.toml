@@ -53,6 +53,8 @@ known-first-party = ["app"]
 # The deduplication prompt deliberately includes a non-breaking hyphen as an
 # example of a keyword variant to be normalised; keep the proven prompt verbatim.
 "app/services/prompts.py" = ["RUF001"]
+# The fold map exists to translate ambiguous characters; naming them is the point.
+"app/text.py" = ["RUF001"]
 
 [tool.ty.environment]
 python-version = "3.11"
