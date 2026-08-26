@@ -98,9 +98,21 @@
 			</div>
 		{/if}
 
-		{#each messages as message (message.id)}
-			<article class="msg" class:from-cook={message.role === 'user'} data-verify-role={message.role}>
-				<p class="label">{message.role === 'user' ? 'You' : 'Assistant'}</p>
+		{#each messages as message, index (message.id)}
+			<!-- One answer arrives as several messages (the tool calls, then the text), so
+			     only the first of a run is named — otherwise the speaker is announced
+			     three times for a single reply. -->
+			{@const opensRun = index === 0 || messages[index - 1].role !== message.role}
+			<article
+				class="msg"
+				class:from-cook={message.role === 'user'}
+				class:continues={!opensRun}
+				data-verify-role={message.role}
+				data-verify-opens-run={opensRun ? 'true' : 'false'}
+			>
+				{#if opensRun}
+					<p class="label">{message.role === 'user' ? 'You' : 'Assistant'}</p>
+				{/if}
 				{#each message.parts as part, i (i)}
 					{#if part.type === 'text'}
 						{#if message.role === 'user'}
@@ -159,6 +171,11 @@
 		flex-direction: column;
 		gap: 2.25rem;
 		padding-bottom: 1rem;
+	}
+
+	/* A continuation of the same speaker sits close to what it continues. */
+	.transcript .continues {
+		margin-top: -1.5rem;
 	}
 
 	.opening {

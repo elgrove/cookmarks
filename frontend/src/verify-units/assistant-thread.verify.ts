@@ -18,6 +18,8 @@ function answer(text: string, id = 'a1'): ThreadMessage {
 
 const discovery: ThreadMessage[] = [
 	ask('Something warming with lentils?'),
+	// One answer arrives as two assistant messages — the searches, then the reply —
+	// which is exactly what the server replays out of a stored turn.
 	{
 		id: 'a1',
 		role: 'assistant',
@@ -35,7 +37,13 @@ const discovery: ThreadMessage[] = [
 				state: 'output-available',
 				input: { query: 'warming winter bowl' },
 				output: [{ id: RECIPE_ID, name: 'Lentil and squash soup' }]
-			},
+			}
+		]
+	},
+	{
+		id: 'a2',
+		role: 'assistant',
+		parts: [
 			{
 				type: 'text',
 				text: `Try [Lentil and squash soup](/recipes/${RECIPE_ID}) — it is the most warming thing the library has.`
@@ -152,7 +160,7 @@ const unit: VerifiableUnit<Props> = {
 				const rendered = root.querySelectorAll('.msg');
 				if (rendered.length !== props.messages.length)
 					return `expected ${props.messages.length} messages, saw ${rendered.length}`;
-				return contract.roles === 'user,assistant' || `roles=${contract.roles}`;
+				return contract.roles === 'user,assistant,assistant' || `roles=${contract.roles}`;
 			}
 		},
 		{
@@ -166,6 +174,20 @@ const unit: VerifiableUnit<Props> = {
 				const text = traces[0].textContent ?? '';
 				if (!text.includes('search recipes')) return `first trace does not name its tool: ${text}`;
 				return text.includes('lentil') || `first trace does not show its query: ${text}`;
+			}
+		},
+		{
+			id: 'one-label-per-run',
+			description: 'an answer that spans several messages names its speaker once',
+			onlyFixtures: ['discovery'],
+			check: ({ root }) => {
+				const labels = [...root.querySelectorAll('.msg > .label')].map(
+					(l) => l.textContent?.trim() ?? ''
+				);
+				return (
+					JSON.stringify(labels) === JSON.stringify(['You', 'Assistant']) ||
+					`labels=${labels.join('|')}`
+				);
 			}
 		},
 		{
