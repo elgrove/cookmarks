@@ -2,9 +2,10 @@ from datetime import date, datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import Column, DateTime, ForeignKey, String, Table, Text
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
 from app.models.base import Base, UUIDAuditBase
+from app.text import fold
 
 if TYPE_CHECKING:
     from app.models.recipe import Keyword, Recipe
@@ -34,6 +35,9 @@ class Book(UUIDAuditBase):
     calibre_id: Mapped[int] = mapped_column(unique=True, index=True)
     title: Mapped[str] = mapped_column(String(500))
     author: Mapped[str] = mapped_column(String(500), index=True)
+    # Accent-stripped, lower-cased copies for search — see Recipe.name_folded.
+    title_folded: Mapped[str] = mapped_column(String(500), default="")
+    author_folded: Mapped[str] = mapped_column(String(500), default="")
     isbn: Mapped[str | None] = mapped_column(String(50))
     pubdate: Mapped[date | None]
     description: Mapped[str] = mapped_column(Text, default="")
@@ -41,6 +45,11 @@ class Book(UUIDAuditBase):
     # "Neelam Batra/1,000 Indian Recipes (141)") — never an absolute path.
     path: Mapped[str] = mapped_column(String(1000))
     calibre_added_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    @validates("title", "author")
+    def _fold_text(self, key: str, value: str) -> str:
+        setattr(self, f"{key}_folded", fold(value))
+        return value
 
     recipes: Mapped[list["Recipe"]] = relationship(
         back_populates="book", cascade="all, delete-orphan"

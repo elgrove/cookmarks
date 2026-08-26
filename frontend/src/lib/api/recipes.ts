@@ -151,7 +151,7 @@ export const semanticSearchResultsSchema = z.object({
 export type SemanticResult = z.infer<typeof semanticResultSchema>;
 export type SemanticSearchResults = z.infer<typeof semanticSearchResultsSchema>;
 
-export type SortKey = 'random' | 'name' | 'recent' | 'book';
+export type SortKey = 'relevance' | 'random' | 'name' | 'recent' | 'book';
 
 export type SearchCriteria = {
 	q?: string;
@@ -159,7 +159,8 @@ export type SearchCriteria = {
 	bookId?: string;
 	author?: string;
 	sort?: SortKey;
-	// Stable shuffle seed for `sort: 'random'`, so pagination keeps one ordering.
+	// Stable shuffle seed for the shuffled sorts, so pagination keeps one ordering.
+	// 'relevance' needs it too: it breaks score ties with the same shuffle.
 	seed?: number;
 	limit?: number;
 	offset?: number;
@@ -213,7 +214,8 @@ export function criteriaFromParams(p: URLSearchParams): SearchCriteria {
 	const author = p.get('author');
 	if (author) c.author = author;
 	const sort = p.get('sort');
-	if (sort === 'name' || sort === 'recent' || sort === 'random' || sort === 'book') c.sort = sort;
+	if (sort === 'relevance' || sort === 'name' || sort === 'recent' || sort === 'random' || sort === 'book')
+		c.sort = sort;
 	const seed = p.get('seed');
 	if (seed) c.seed = Number(seed);
 	const offset = p.get('offset');
