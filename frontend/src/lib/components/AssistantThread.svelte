@@ -55,6 +55,7 @@
 	}
 
 	function toolResult(part: ThreadPart): string {
+		if (part.state === 'output-error') return 'failed';
 		if (part.state !== 'output-available') return 'running…';
 		const output = part.output;
 		if (Array.isArray(output)) return `${output.length} result${output.length === 1 ? '' : 's'}`;

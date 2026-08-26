@@ -49,11 +49,19 @@
 				chat = new Chat({
 					id,
 					messages: conversation.messages as never[],
-					transport: new DefaultChatTransport({ api: chatUrl(id) }),
+					transport: new DefaultChatTransport({
+						api: chatUrl(id),
+						// A failed response reaches `onError` as its body text and nothing else,
+						// so the 409 that means "no provider configured" is read here or not at all.
+						fetch: async (input, init) => {
+							const response = await fetch(input, init);
+							unavailable = response.status === 409;
+							return response;
+						}
+					}),
 					onError: (err) => {
-						// The chat endpoint answers 409 when no provider is configured; that is a
-						// setup state to explain, not a failure to apologise for.
-						unavailable = /409/.test(err.message);
+						console.error('the assistant turn failed', err);
+						// No provider is a setup state to explain, not a failure to apologise for.
 						error = unavailable ? null : 'The assistant could not finish that answer.';
 					},
 					onFinish: () => onTurnComplete?.()
@@ -73,6 +81,7 @@
 
 	function send(text: string) {
 		error = null;
+		unavailable = false;
 		chat?.sendMessage({ text });
 	}
 </script>

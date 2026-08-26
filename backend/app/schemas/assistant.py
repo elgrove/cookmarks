@@ -1,7 +1,9 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
+
+from app.models.base import as_utc
 
 
 class ConversationSummary(BaseModel):
@@ -13,6 +15,13 @@ class ConversationSummary(BaseModel):
     title: str | None
     created_at: datetime
     updated_at: datetime
+
+    # SQLite hands back a naive datetime on a re-read and an aware one on a row just
+    # written, which would emit two timestamp formats for the same field.
+    @field_validator("created_at", "updated_at")
+    @classmethod
+    def _utc(cls, value: datetime) -> datetime:
+        return as_utc(value)
 
 
 class ConversationDetail(ConversationSummary):

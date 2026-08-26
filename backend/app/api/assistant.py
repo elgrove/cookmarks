@@ -9,6 +9,7 @@ import uuid
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, Response, status
+from pydantic import ValidationError
 from pydantic_ai.agent import AgentRunResult
 from pydantic_ai.messages import ModelMessage, ModelMessagesTypeAdapter
 from pydantic_ai.ui.vercel_ai import VercelAIAdapter
@@ -59,6 +60,18 @@ def _history(conversation: AssistantConversation) -> list[ModelMessage]:
 
 def _first_text(message: UIMessage) -> str:
     return " ".join(part.text for part in message.parts if isinstance(part, TextUIPart)).strip()
+
+
+def _only_new_question(messages: list[UIMessage]) -> list[UIMessage]:
+    """The one message the client is trusted for: its newest, which must be a question
+    from the user, carrying text and nothing else."""
+    newest = messages[-1] if messages else None
+    if newest is None or newest.role != "user":
+        raise HTTPException(status_code=422, detail="a chat turn needs a user message")
+    text = [part for part in newest.parts if isinstance(part, TextUIPart)]
+    if not text:
+        raise HTTPException(status_code=422, detail="a chat turn needs some text")
+    return [newest.model_copy(update={"parts": text})]
 
 
 @router.post(
@@ -121,14 +134,20 @@ async def chat(
             status_code=409,
             detail="no AI provider is configured — set one up in Admin Settings",
         )
-    adapter = await VercelAIAdapter[AssistantDeps, str].from_request(
-        request, agent=agent, sdk_version=SDK_VERSION
-    )
-    # Server-side history is authoritative: everything but the newest message is
-    # dropped on the floor and replaced by what we stored.
-    adapter.run_input.messages = adapter.run_input.messages[-1:]
+    try:
+        adapter = await VercelAIAdapter[AssistantDeps, str].from_request(
+            request, agent=agent, sdk_version=SDK_VERSION
+        )
+    except ValidationError as exc:
+        raise HTTPException(status_code=422, detail="malformed chat request") from exc
+
+    # Server-side history is authoritative: the client contributes one new question and
+    # nothing else. Everything before it is replaced by what we stored, and the question
+    # is reduced to its text — a client-supplied tool part would otherwise enter the
+    # model's context as a tool result it never actually called.
+    adapter.run_input.messages = _only_new_question(adapter.run_input.messages)
     history = _history(conversation)
-    if conversation.title is None and adapter.run_input.messages:
+    if conversation.title is None:
         conversation.title = _first_text(adapter.run_input.messages[0])[:TITLE_LIMIT] or None
         session.commit()
 

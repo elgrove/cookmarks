@@ -127,6 +127,7 @@ const unit: VerifiableUnit<Props> = {
 						role: 'assistant',
 						parts: [
 							{ type: 'tool-search_recipes', state: 'input-streaming' },
+							{ type: 'tool-get_recipe', state: 'output-error', errorText: 'boom' },
 							{ type: 'tool-', state: 'output-available', output: 'not a list' },
 							{ type: 'unheard-of-part', payload: { deep: [1, 2, 3] } }
 						]
@@ -270,8 +271,13 @@ const unit: VerifiableUnit<Props> = {
 			check: ({ root }) => {
 				if (!root.querySelector('.msg')) return 'the message did not render';
 				const traces = [...root.querySelectorAll('.trace')];
-				if (traces.length !== 2) return `expected 2 trace lines, saw ${traces.length}`;
-				return (traces[0].textContent ?? '').includes('running') || 'an in-flight call is not marked';
+				if (traces.length !== 3) return `expected 3 trace lines, saw ${traces.length}`;
+				if (!(traces[0].textContent ?? '').includes('running'))
+					return 'an in-flight call is not marked';
+				return (
+					(traces[1].textContent ?? '').includes('failed') ||
+					'a failed call still reads as running'
+				);
 			}
 		},
 		{

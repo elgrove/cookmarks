@@ -17,7 +17,6 @@
 		status = 'loading';
 		try {
 			conversations = await fetchConversations();
-			// Land in the most recent conversation, or open a fresh one on a first visit.
 			if (conversations.length === 0) {
 				await start();
 			} else if (!activeId || !conversations.some((c) => c.id === activeId)) {

@@ -29,7 +29,6 @@ export type ConversationDetail = z.infer<typeof conversationDetailSchema>;
 /** The chat stream endpoint the `Chat` transport posts to. */
 export const chatUrl = (id: string) => `/api/assistant/conversations/${id}/chat`;
 
-/** The cook's conversations, newest first. */
 export async function fetchConversations(
 	fetchFn: typeof fetch = fetch
 ): Promise<ConversationSummary[]> {
@@ -38,7 +37,6 @@ export async function fetchConversations(
 	return conversationsResponseSchema.parse(await res.json());
 }
 
-/** Start a new, empty conversation. */
 export async function createConversation(
 	fetchFn: typeof fetch = fetch
 ): Promise<ConversationSummary> {

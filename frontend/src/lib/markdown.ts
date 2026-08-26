@@ -13,16 +13,28 @@ function escape(text: string): string {
 	return text.replace(/[&<>"']/g, (c) => ESCAPES[c]);
 }
 
+// What a reply is allowed to be: the Markdown subset, and nothing else. An allow-list
+// rather than a deny-list because the reply is rendered as HTML inside the app's own
+// chrome — subtracting the tags that look dangerous still leaves <form>, style
+// attributes and the rest, which is a phishing surface even without script execution.
+// Images are out too: the assistant deals in prose and links, and a model-supplied
+// <img> is an alt-less remote fetch nobody asked for.
+const ALLOWED_TAGS = [
+	'p', 'br', 'hr', 'em', 'strong', 'del', 'code', 'pre', 'blockquote',
+	'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+	'a', 'table', 'thead', 'tbody', 'tr', 'th', 'td'
+];
+const ALLOWED_ATTR = ['href', 'title'];
+
 /** Render an assistant reply. The text comes from a model, so it is Markdown at best
- *  and hostile HTML at worst: parse it, then strip anything that can execute. Images go
- *  too — the assistant deals in prose and links, and a model-supplied <img> is an
- *  alt-less remote fetch nobody asked for. Without a DOM to sanitise against, the text
- *  is escaped rather than trusted. */
+ *  and hostile HTML at worst. Without a DOM to sanitise against, it is escaped rather
+ *  than trusted. */
 export function renderMarkdown(text: string): string {
 	if (!DOMPurify.isSupported) return escape(text);
 	return internalise(
 		DOMPurify.sanitize(marked.parse(text, { async: false, breaks: true }), {
-			FORBID_TAGS: ['img', 'style']
+			ALLOWED_TAGS,
+			ALLOWED_ATTR
 		})
 	);
 }
