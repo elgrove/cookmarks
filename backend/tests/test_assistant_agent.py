@@ -21,8 +21,8 @@ from app.services.users import create_user
 
 def _configure(session: Session, provider: AIProvider | None) -> None:
     config = session.get(Config, 1) or Config(id=1)
-    config.ai_provider = provider
-    config.api_key = "k" if provider is AIProvider.GEMINI else None
+    config.assistant_provider = provider
+    config.assistant_api_key = "k" if provider is AIProvider.GEMINI else None
     session.add(config)
     session.commit()
 
@@ -69,8 +69,8 @@ def test_no_agent_without_a_provider(session: Session) -> None:
 
 def test_no_agent_when_the_key_is_missing(session: Session) -> None:
     config = session.get(Config, 1) or Config(id=1)
-    config.ai_provider = AIProvider.GEMINI
-    config.api_key = None
+    config.assistant_provider = AIProvider.GEMINI
+    config.assistant_api_key = None
     session.add(config)
     session.commit()
     assert build_agent(session) is None

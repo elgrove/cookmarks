@@ -70,7 +70,7 @@ def _tool_then_answer(tool: str, args: dict) -> FunctionModel:
 @pytest.fixture
 def configured(session: Session) -> None:
     config = session.get(Config, 1) or Config(id=1)
-    config.ai_provider = AIProvider.STUB
+    config.assistant_provider = AIProvider.STUB
     session.add(config)
     session.commit()
 

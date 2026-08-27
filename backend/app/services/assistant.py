@@ -35,7 +35,7 @@ from app.services.ai.anthropic import AnthropicProvider
 from app.services.ai.base import AIProvider, ModelRole
 from app.services.ai.gemini import GeminiProvider
 from app.services.ai.openrouter import OpenRouterProvider
-from app.services.ai.registry import get_ai_provider
+from app.services.ai.registry import get_assistant_provider
 from app.services.ai.stub import StubProvider
 from app.services.prompts import ASSISTANT_SYSTEM_PROMPT
 
@@ -354,7 +354,7 @@ def _model(provider: AIProvider) -> Model | None:
 def build_agent(session: Session) -> Agent[AssistantDeps, str] | None:
     """The assistant agent for the configured provider, or None when none is usable —
     same rules as `get_ai_provider`, plus the providers this has no Pydantic AI model for."""
-    provider = get_ai_provider(session)
+    provider = get_assistant_provider(session)
     if provider is None:
         return None
     model = _model(provider)

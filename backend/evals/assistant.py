@@ -36,7 +36,7 @@ from app.config import settings
 from app.models.user import User
 from app.services.assistant import AssistantDeps, build_agent
 from evals.config import DEFAULT_CONFIG_PATH, EVALS_DIR, RUNS_DIR, git_sha
-from evals.environment import make_engine, resolve_api_key, set_provider
+from evals.environment import make_engine, resolve_api_key, set_assistant_provider
 from evals.models import CandidateModel
 from evals.report import _table
 
@@ -354,7 +354,7 @@ def run_assistant_eval(
         except RuntimeError as exc:
             logger.warning(f"Skipping {candidate.id}: {exc}")
             continue
-        set_provider(factory, candidate.provider, key, {"assistant": candidate.model})
+        set_assistant_provider(factory, candidate.provider, key, candidate.model)
         for spec in prompts:
             logger.info(f"Running {spec.id} / {candidate.id}")
             try:

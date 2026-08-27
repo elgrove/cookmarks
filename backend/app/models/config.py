@@ -17,6 +17,10 @@ class Config(Base):
         Enum(AIProvider, values_callable=enum_values)
     )
     api_key: Mapped[str | None] = mapped_column(String(200))
+    assistant_provider: Mapped[AIProvider | None] = mapped_column(
+        Enum(AIProvider, values_callable=enum_values)
+    )
+    assistant_api_key: Mapped[str | None] = mapped_column(String(200))
     # Shared per-minute request budget for extraction across all worker threads.
     extraction_rate_limit_per_minute: Mapped[int] = mapped_column(default=256)
     # Optional per-role model overrides ({ModelRole value: model name}); a role left

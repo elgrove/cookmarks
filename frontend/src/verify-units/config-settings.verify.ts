@@ -7,14 +7,16 @@ import type { VerifiableUnit } from '$lib/verify/types';
 type Props = ConfigSettingsProps;
 
 const PROVIDERS: ConfigSettingsConfig['providers'] = [
+	{ name: 'ANTHROPIC', requiresApiKey: true },
 	{ name: 'GEMINI', requiresApiKey: true },
-	{ name: 'OPENROUTER', requiresApiKey: true },
-	{ name: 'STUB', requiresApiKey: false }
+	{ name: 'OPENROUTER', requiresApiKey: true }
 ];
 
 const config = (over: Partial<ConfigSettingsConfig> = {}): ConfigSettingsConfig => ({
-	aiProvider: null,
-	apiKeySet: false,
+	extractionProvider: null,
+	extractionApiKeySet: false,
+	assistantProvider: null,
+	assistantApiKeySet: false,
 	rateLimit: 256,
 	providers: PROVIDERS,
 	...over
@@ -42,18 +44,18 @@ const unit: VerifiableUnit<Props> = {
 		{
 			id: 'gemini-set',
 			description: 'provider Gemini with a key already stored — the key reads "set", not its value',
-			props: { config: config({ aiProvider: 'GEMINI', apiKeySet: true }) }
+			props: { config: config({ extractionProvider: 'GEMINI', extractionApiKeySet: true }) }
 		},
 		{
-			id: 'stub-nokey',
-			description: 'a keyless provider (Stub) hides the API-key field entirely',
-			props: { config: config({ aiProvider: 'STUB' }) }
+			id: 'assistant-set',
+			description: 'assistant Anthropic with a key already stored',
+			props: { config: config({ assistantProvider: 'ANTHROPIC', assistantApiKeySet: true }) }
 		},
 		{
 			id: 'edit-save',
 			description: 'changing the rate limit and saving settles on the saved confirmation',
 			props: {
-				config: config({ aiProvider: 'GEMINI', apiKeySet: true }),
+				config: config({ extractionProvider: 'GEMINI', extractionApiKeySet: true }),
 				onSave: () => Promise.resolve()
 			},
 			act: async ({ type, click, wait }) => {
@@ -67,7 +69,7 @@ const unit: VerifiableUnit<Props> = {
 			description: 'probe: a rejected PATCH surfaces an error state, never a false "saved"',
 			probe: true,
 			props: {
-				config: config({ aiProvider: 'GEMINI', apiKeySet: true }),
+				config: config({ extractionProvider: 'GEMINI', extractionApiKeySet: true }),
 				onSave: () => Promise.reject(new Error('save failed'))
 			},
 			act: async ({ type, click, wait }) => {
@@ -80,9 +82,9 @@ const unit: VerifiableUnit<Props> = {
 			id: 'clear-key',
 			description: 'probe: clearing a stored key marks the form dirty with a pending clear',
 			probe: true,
-			props: { config: config({ aiProvider: 'GEMINI', apiKeySet: true }) },
+			props: { config: config({ extractionProvider: 'GEMINI', extractionApiKeySet: true }) },
 			act: async ({ click, wait }) => {
-				click('.key-clear');
+				click('.extraction-key-clear');
 				await wait(0);
 			}
 		},
@@ -90,13 +92,15 @@ const unit: VerifiableUnit<Props> = {
 			id: 'huge-rate',
 			description: 'probe: an absurd rate limit still renders one labelled numeric control',
 			probe: true,
-			props: { config: config({ aiProvider: 'GEMINI', apiKeySet: true, rateLimit: 999999999 }) }
+			props: {
+				config: config({ extractionProvider: 'GEMINI', extractionApiKeySet: true, rateLimit: 999999999 })
+			}
 		},
 		{
 			id: 'contract-lie',
 			description: 'sentinel: a deliberately-failing invariant proves the harness reports truthfully',
 			expectFail: true,
-			props: { config: config({ aiProvider: 'GEMINI', apiKeySet: true }) }
+			props: { config: config({ extractionProvider: 'GEMINI', extractionApiKeySet: true }) }
 		}
 	],
 	invariants: [
@@ -105,8 +109,9 @@ const unit: VerifiableUnit<Props> = {
 			description: 'no provider, no key, not dirty, idle',
 			onlyFixtures: ['unset'],
 			check: ({ contract }) => {
-				if (contract.provider !== 'none') return `provider=${contract.provider}`;
-				if (contract['key-set'] !== 'false') return `key-set=${contract['key-set']}`;
+				if (contract['extraction-provider'] !== 'none') return `provider=${contract['extraction-provider']}`;
+				if (contract['extraction-key-set'] !== 'false') return `key-set=${contract['extraction-key-set']}`;
+				if (contract['assistant-provider'] !== 'none') return `assistant=${contract['assistant-provider']}`;
 				if (contract.dirty !== 'false') return `dirty=${contract.dirty}`;
 				return contract.state === 'idle' || `state=${contract.state}`;
 			}
@@ -116,19 +121,20 @@ const unit: VerifiableUnit<Props> = {
 			description: 'a stored key reads as set (keep action), and never appears as text',
 			onlyFixtures: ['gemini-set'],
 			check: ({ contract, root }) => {
-				if (contract['key-set'] !== 'true') return `key-set=${contract['key-set']}`;
-				if (contract['key-action'] !== 'keep') return `key-action=${contract['key-action']}`;
+				if (contract['extraction-key-set'] !== 'true') return `key-set=${contract['extraction-key-set']}`;
+				if (contract['extraction-key-action'] !== 'keep') return `key-action=${contract['extraction-key-action']}`;
 				// The password value is never rendered; only the masked "set" affordance shows.
 				return root.querySelector('input[type="password"]') === null || 'key input exposed';
 			}
 		},
 		{
-			id: 'stub-hides-key',
-			description: 'a keyless provider renders no API-key input',
-			onlyFixtures: ['stub-nokey'],
+			id: 'assistant-key-set',
+			description: 'the assistant key reads as set and is not shown',
+			onlyFixtures: ['assistant-set'],
 			check: ({ contract, root }) => {
-				if (contract['key-action'] !== 'na') return `key-action=${contract['key-action']}`;
-				return root.querySelector('input[type="password"]') === null || 'key field shown for Stub';
+				if (contract['assistant-key-set'] !== 'true') return `key-set=${contract['assistant-key-set']}`;
+				if (contract['assistant-key-action'] !== 'keep') return `key-action=${contract['assistant-key-action']}`;
+				return root.querySelector('#assistant-api-key') === null || 'assistant key input exposed';
 			}
 		},
 		{
@@ -148,7 +154,7 @@ const unit: VerifiableUnit<Props> = {
 			description: 'clearing a stored key sets a pending clear and marks the form dirty',
 			onlyFixtures: ['clear-key'],
 			check: ({ contract }) => {
-				if (contract['key-action'] !== 'clear') return `key-action=${contract['key-action']}`;
+				if (contract['extraction-key-action'] !== 'clear') return `key-action=${contract['extraction-key-action']}`;
 				return contract.dirty === 'true' || `dirty=${contract.dirty}`;
 			}
 		},

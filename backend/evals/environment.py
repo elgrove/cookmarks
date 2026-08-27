@@ -150,6 +150,17 @@ def set_provider(
         session.commit()
 
 
+def set_assistant_provider(
+    factory: sessionmaker[Session], provider: str, api_key: str, model: str
+) -> None:
+    with factory() as session:
+        config = get_config(session)
+        config.assistant_provider = AIProvider(provider)
+        config.assistant_api_key = api_key
+        config.model_overrides = {"assistant": model}
+        session.commit()
+
+
 def bind_pipeline(factory: sessionmaker[Session]) -> None:
     """Rebind the extraction pipeline (graph nodes + LangGraph checkpointer) onto the
     eval DB. Call once, after building the DB, before invoking the graph."""

@@ -22,6 +22,8 @@ class ConfigRead(BaseModel):
 
     ai_provider: AIProvider | None
     api_key_set: bool
+    assistant_provider: AIProvider | None
+    assistant_api_key_set: bool
     extraction_rate_limit_per_minute: int
     providers: list[ProviderInfo]
 
@@ -30,6 +32,8 @@ class ConfigRead(BaseModel):
         return cls(
             ai_provider=config.ai_provider,
             api_key_set=bool(config.api_key),
+            assistant_provider=config.assistant_provider,
+            assistant_api_key_set=bool(config.assistant_api_key),
             extraction_rate_limit_per_minute=config.extraction_rate_limit_per_minute,
             providers=providers,
         )
@@ -45,4 +49,6 @@ class ConfigUpdate(BaseModel):
 
     ai_provider: AIProvider | None = None
     api_key: str | None = None
+    assistant_provider: AIProvider | None = None
+    assistant_api_key: str | None = None
     extraction_rate_limit_per_minute: int | None = Field(default=None, ge=1)
