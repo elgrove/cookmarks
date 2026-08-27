@@ -53,3 +53,34 @@ ingredients = 0.30
 instructions = 0.30
 yields = 0.05
 image = 0.10
+
+# Assistant eval. Each prompt runs the real agent, with all its tools, against a
+# throwaway copy of the app database, and is scored on deterministic checks over the
+# transcript. `grounded` (every id the answer links was returned by a tool) is checked
+# for every prompt and needs no declaring.
+[assistant]
+models = [
+  "ANTHROPIC:claude-sonnet-5",
+  "ANTHROPIC:claude-haiku-4-5-20251001",
+  "GEMINI:gemini-2.5-flash",
+  "GEMINI:gemini-2.5-flash-lite",
+  "OPENROUTER:google/gemini-2.5-flash",
+]
+
+# Discovery: two ingredients, no dish named. A good answer tries more than one search
+# and comes back with real recipes from the library, linked.
+[[assistant.prompts]]
+id = "discovery"
+prompt = "I have a glut of fennel and some pork. What should I cook tonight?"
+expect_tools = ["search_recipes"]
+min_searches = 2
+min_recipe_links = 2
+
+# Substitution: the model has to find the recipe first, then read its method before it
+# can say anything true about swapping an ingredient out of it.
+[[assistant.prompts]]
+id = "substitution"
+prompt = "I want to make a dal but I have no tamarind. Find me one in my library and tell me what to use instead."
+expect_tools = ["get_recipe"]
+min_searches = 1
+min_recipe_links = 1

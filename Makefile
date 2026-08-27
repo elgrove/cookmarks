@@ -1,4 +1,4 @@
-.PHONY: install dev dev-auto migrate build verify check test fmt eval
+.PHONY: install dev dev-auto migrate build verify check test fmt eval eval-assistant
 
 install:
 	cd backend && uv sync
@@ -43,3 +43,8 @@ fmt:
 # Summarise past runs without re-running: `uv run python -m evals report leaderboard`.
 eval:
 	cd backend && uv run python -m evals run $(ARGS)
+
+# Score assistant models on tool use and answer quality (real AI; see backend/evals).
+# Scope with ARGS, e.g. `make eval-assistant ARGS="--prompt discovery"`.
+eval-assistant:
+	cd backend && uv run python -m evals assistant $(ARGS)

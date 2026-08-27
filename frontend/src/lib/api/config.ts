@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 // The AI providers the backend knows about (mirrors app.models.enums.AIProvider).
-export const aiProviderSchema = z.enum(['GEMINI', 'OPENROUTER', 'STUB']);
+export const aiProviderSchema = z.enum(['ANTHROPIC', 'GEMINI', 'OPENROUTER']);
 export type AiProvider = z.infer<typeof aiProviderSchema>;
 
 const providerInfoSchema = z.object({
@@ -14,6 +14,8 @@ const providerInfoSchema = z.object({
 export const configSchema = z.object({
 	ai_provider: aiProviderSchema.nullable(),
 	api_key_set: z.boolean(),
+	assistant_provider: aiProviderSchema.nullable(),
+	assistant_api_key_set: z.boolean(),
 	extraction_rate_limit_per_minute: z.number().int().positive(),
 	providers: z.array(providerInfoSchema)
 });
@@ -26,6 +28,8 @@ export type ProviderInfo = z.infer<typeof providerInfoSchema>;
 export type ConfigUpdate = {
 	ai_provider?: AiProvider | null;
 	api_key?: string | null;
+	assistant_provider?: AiProvider | null;
+	assistant_api_key?: string | null;
 	extraction_rate_limit_per_minute?: number;
 };
 

@@ -2,8 +2,10 @@
 	import type { AiProvider, ConfigUpdate } from '$lib/api/config';
 
 	export type ConfigSettingsConfig = {
-		aiProvider: AiProvider | null;
-		apiKeySet: boolean;
+		extractionProvider: AiProvider | null;
+		extractionApiKeySet: boolean;
+		assistantProvider: AiProvider | null;
+		assistantApiKeySet: boolean;
 		rateLimit: number;
 		providers: { name: AiProvider; requiresApiKey: boolean }[];
 	};
@@ -29,32 +31,62 @@
 	let saveState = $state<State>('idle');
 	// '' means no provider selected (maps to null on the wire). Seeded from the config
 	// by the effect below — on mount and again after a save re-reads it.
-	let providerValue = $state('');
+	let extractionProviderValue = $state('');
+	let assistantProviderValue = $state('');
 	let rateLimit = $state(0);
-	let keyMode = $state<KeyMode>('keep');
-	let keyInput = $state('');
+	let extractionKeyMode = $state<KeyMode>('keep');
+	let assistantKeyMode = $state<KeyMode>('keep');
+	let extractionKeyInput = $state('');
+	let assistantKeyInput = $state('');
 	let timer: ReturnType<typeof setTimeout> | undefined;
 
 	// Seed (and re-seed) the editable fields from the persisted config — on mount and
 	// again after a successful save, when the route passes the refreshed config back in.
 	$effect(() => {
-		providerValue = config.aiProvider ?? '';
+		extractionProviderValue = config.extractionProvider ?? '';
+		assistantProviderValue = config.assistantProvider ?? '';
 		rateLimit = config.rateLimit;
-		keyMode = config.apiKeySet ? 'keep' : 'set';
-		keyInput = '';
+		extractionKeyMode = config.extractionApiKeySet ? 'keep' : 'set';
+		assistantKeyMode = config.assistantApiKeySet ? 'keep' : 'set';
+		extractionKeyInput = '';
+		assistantKeyInput = '';
 	});
 
-	let selectedProvider = $derived(config.providers.find((p) => p.name === providerValue));
-	// The key field only matters for a provider that needs a key (STUB / none don't).
-	let showKeyField = $derived(!!selectedProvider && selectedProvider.requiresApiKey);
-	let keyAction = $derived(showKeyField ? keyMode : 'na');
-
-	let providerChanged = $derived((providerValue || null) !== config.aiProvider);
-	let rateChanged = $derived(Number.isFinite(rateLimit) && rateLimit !== config.rateLimit);
-	let keyChanged = $derived(
-		showKeyField && ((keyMode === 'set' && keyInput.length > 0) || keyMode === 'clear')
+	let extractionSelectedProvider = $derived(
+		config.providers.find((p) => p.name === extractionProviderValue)
 	);
-	let dirty = $derived(providerChanged || rateChanged || keyChanged);
+	let assistantSelectedProvider = $derived(
+		config.providers.find((p) => p.name === assistantProviderValue)
+	);
+	let showExtractionKeyField = $derived(
+		!!extractionSelectedProvider && extractionSelectedProvider.requiresApiKey
+	);
+	let showAssistantKeyField = $derived(
+		!!assistantSelectedProvider && assistantSelectedProvider.requiresApiKey
+	);
+	let extractionKeyAction = $derived(showExtractionKeyField ? extractionKeyMode : 'na');
+	let assistantKeyAction = $derived(showAssistantKeyField ? assistantKeyMode : 'na');
+
+	let extractionProviderChanged = $derived(
+		(extractionProviderValue || null) !== config.extractionProvider
+	);
+	let assistantProviderChanged = $derived((assistantProviderValue || null) !== config.assistantProvider);
+	let rateChanged = $derived(Number.isFinite(rateLimit) && rateLimit !== config.rateLimit);
+	let extractionKeyChanged = $derived(
+		showExtractionKeyField &&
+			((extractionKeyMode === 'set' && extractionKeyInput.length > 0) || extractionKeyMode === 'clear')
+	);
+	let assistantKeyChanged = $derived(
+		showAssistantKeyField &&
+			((assistantKeyMode === 'set' && assistantKeyInput.length > 0) || assistantKeyMode === 'clear')
+	);
+	let dirty = $derived(
+		extractionProviderChanged ||
+			assistantProviderChanged ||
+			rateChanged ||
+			extractionKeyChanged ||
+			assistantKeyChanged
+	);
 
 	let saveLabel = $derived(
 		saveState === 'saving'
@@ -68,11 +100,22 @@
 
 	function buildPatch(): ConfigUpdate {
 		const patch: ConfigUpdate = {};
-		if (providerChanged) patch.ai_provider = (providerValue || null) as AiProvider | null;
+		if (extractionProviderChanged) {
+			patch.ai_provider = (extractionProviderValue || null) as AiProvider | null;
+		}
+		if (assistantProviderChanged) {
+			patch.assistant_provider = (assistantProviderValue || null) as AiProvider | null;
+		}
 		if (rateChanged) patch.extraction_rate_limit_per_minute = rateLimit;
-		if (showKeyField) {
-			if (keyMode === 'set' && keyInput.length > 0) patch.api_key = keyInput;
-			else if (keyMode === 'clear') patch.api_key = '';
+		if (showExtractionKeyField) {
+			if (extractionKeyMode === 'set' && extractionKeyInput.length > 0) {
+				patch.api_key = extractionKeyInput;
+			} else if (extractionKeyMode === 'clear') patch.api_key = '';
+		}
+		if (showAssistantKeyField) {
+			if (assistantKeyMode === 'set' && assistantKeyInput.length > 0) {
+				patch.assistant_api_key = assistantKeyInput;
+			} else if (assistantKeyMode === 'clear') patch.assistant_api_key = '';
 		}
 		return patch;
 	}
@@ -98,9 +141,12 @@
 	class="settings"
 	data-verify-unit="config-settings"
 	data-verify-state={saveState}
-	data-verify-provider={providerValue || 'none'}
-	data-verify-key-set={String(config.apiKeySet)}
-	data-verify-key-action={keyAction}
+	data-verify-extraction-provider={extractionProviderValue || 'none'}
+	data-verify-extraction-key-set={String(config.extractionApiKeySet)}
+	data-verify-extraction-key-action={extractionKeyAction}
+	data-verify-assistant-provider={assistantProviderValue || 'none'}
+	data-verify-assistant-key-set={String(config.assistantApiKeySet)}
+	data-verify-assistant-key-action={assistantKeyAction}
 	data-verify-dirty={String(dirty)}
 	onsubmit={(e) => {
 		e.preventDefault();
@@ -108,9 +154,9 @@
 	}}
 >
 	<div class="field">
-		<label class="label" for="ai-provider">AI provider</label>
+		<label class="label" for="extraction-provider">Extraction provider</label>
 		<div class="control">
-			<select id="ai-provider" bind:value={providerValue}>
+			<select id="extraction-provider" bind:value={extractionProviderValue}>
 				<option value="">— None —</option>
 				{#each config.providers as provider (provider.name)}
 					<option value={provider.name}>{provider.name}</option>
@@ -120,40 +166,94 @@
 	</div>
 
 	<div class="field">
-		<label class="label" for="api-key">API key</label>
+		<label class="label" for="extraction-api-key">Extraction API key</label>
 		<div class="control">
-			{#if !showKeyField}
+			{#if !showExtractionKeyField}
 				<p class="hint">
-					{providerValue
-						? `${providerValue} needs no API key.`
+					{extractionProviderValue
+						? `${extractionProviderValue} needs no API key.`
 						: 'Select a provider to configure its API key.'}
 				</p>
-			{:else if config.apiKeySet && keyMode === 'keep'}
+			{:else if config.extractionApiKeySet && extractionKeyMode === 'keep'}
 				<span class="key-status">•••• set</span>
-				<button class="link key-replace" type="button" onclick={() => (keyMode = 'set')}>
+				<button class="link extraction-key-replace" type="button" onclick={() => (extractionKeyMode = 'set')}>
 					Replace
 				</button>
-				<button class="link key-clear" type="button" onclick={() => (keyMode = 'clear')}>
+				<button class="link extraction-key-clear" type="button" onclick={() => (extractionKeyMode = 'clear')}>
 					Clear
 				</button>
-			{:else if keyMode === 'clear'}
+			{:else if extractionKeyMode === 'clear'}
 				<span class="key-status">Will be cleared on save</span>
-				<button class="link key-undo" type="button" onclick={() => (keyMode = 'keep')}>Undo</button>
+				<button class="link extraction-key-undo" type="button" onclick={() => (extractionKeyMode = 'keep')}>Undo</button>
 			{:else}
 				<input
-					id="api-key"
+					id="extraction-api-key"
 					type="password"
 					autocomplete="off"
 					placeholder="Paste API key"
-					bind:value={keyInput}
+					bind:value={extractionKeyInput}
 				/>
-				{#if config.apiKeySet}
+				{#if config.extractionApiKeySet}
 					<button
-						class="link key-cancel"
+						class="link extraction-key-cancel"
 						type="button"
 						onclick={() => {
-							keyMode = 'keep';
-							keyInput = '';
+							extractionKeyMode = 'keep';
+							extractionKeyInput = '';
+						}}>Cancel</button
+					>
+				{/if}
+			{/if}
+		</div>
+	</div>
+
+	<div class="field">
+		<label class="label" for="assistant-provider">Assistant provider</label>
+		<div class="control">
+			<select id="assistant-provider" bind:value={assistantProviderValue}>
+				<option value="">— None —</option>
+				{#each config.providers as provider (provider.name)}
+					<option value={provider.name}>{provider.name}</option>
+				{/each}
+			</select>
+		</div>
+	</div>
+
+	<div class="field">
+		<label class="label" for="assistant-api-key">Assistant API key</label>
+		<div class="control">
+			{#if !showAssistantKeyField}
+				<p class="hint">
+					{assistantProviderValue
+						? `${assistantProviderValue} needs no API key.`
+						: 'Select a provider to configure its API key.'}
+				</p>
+			{:else if config.assistantApiKeySet && assistantKeyMode === 'keep'}
+				<span class="key-status">•••• set</span>
+				<button class="link assistant-key-replace" type="button" onclick={() => (assistantKeyMode = 'set')}>
+					Replace
+				</button>
+				<button class="link assistant-key-clear" type="button" onclick={() => (assistantKeyMode = 'clear')}>
+					Clear
+				</button>
+			{:else if assistantKeyMode === 'clear'}
+				<span class="key-status">Will be cleared on save</span>
+				<button class="link assistant-key-undo" type="button" onclick={() => (assistantKeyMode = 'keep')}>Undo</button>
+			{:else}
+				<input
+					id="assistant-api-key"
+					type="password"
+					autocomplete="off"
+					placeholder="Paste API key"
+					bind:value={assistantKeyInput}
+				/>
+				{#if config.assistantApiKeySet}
+					<button
+						class="link assistant-key-cancel"
+						type="button"
+						onclick={() => {
+							assistantKeyMode = 'keep';
+							assistantKeyInput = '';
 						}}>Cancel</button
 					>
 				{/if}

@@ -2,6 +2,7 @@ from enum import StrEnum
 
 
 class AIProvider(StrEnum):
+    ANTHROPIC = "ANTHROPIC"
     GEMINI = "GEMINI"
     OPENROUTER = "OPENROUTER"
     STUB = "STUB"

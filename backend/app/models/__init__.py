@@ -1,3 +1,4 @@
+from app.models.assistant import AssistantConversation, AssistantTurn
 from app.models.base import Base
 from app.models.book import Book, book_keywords
 from app.models.book_reading import BookReading
@@ -14,6 +15,8 @@ from app.models.user import User, UserSession
 
 __all__ = [
     "AIProvider",
+    "AssistantConversation",
+    "AssistantTurn",
     "Base",
     "Book",
     "BookReading",
