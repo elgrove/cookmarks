@@ -19,6 +19,7 @@
 </script>
 
 <script lang="ts">
+	import { tick } from 'svelte';
 	import { renderMarkdown } from '$lib/markdown';
 
 	let {
@@ -30,6 +31,7 @@
 	}: AssistantThreadProps = $props();
 
 	let draft = $state('');
+	let draftElement = $state<HTMLTextAreaElement>();
 
 	let busy = $derived(status === 'submitted' || status === 'streaming');
 	let toolParts = $derived(
@@ -62,12 +64,31 @@
 		return 'done';
 	}
 
-	function send(event: SubmitEvent) {
-		event.preventDefault();
+	function resizeDraft() {
+		if (!draftElement) return;
+		draftElement.style.height = 'auto';
+		draftElement.style.height = `${draftElement.scrollHeight}px`;
+	}
+
+	async function send() {
 		const question = draft.trim();
 		if (!question || busy || unavailable) return;
 		draft = '';
+		await tick();
+		resizeDraft();
 		onSend?.(question);
+	}
+
+	function submit(event: SubmitEvent) {
+		event.preventDefault();
+		send();
+	}
+
+	function onDraftKeydown(event: KeyboardEvent) {
+		if (event.metaKey && event.key === 'Enter') {
+			event.preventDefault();
+			send();
+		}
 	}
 </script>
 
@@ -142,19 +163,31 @@
 		{/if}
 	</div>
 
-	<form class="composer" onsubmit={send}>
+	<form class="composer" onsubmit={submit}>
 		<label class="sr-only" for="assistant-draft">Ask the assistant</label>
 		<textarea
 			id="assistant-draft"
 			class="draft"
-			rows="2"
+			rows="1"
 			placeholder="Ask for something to cook…"
 			disabled={unavailable}
 			value={draft}
-			oninput={(e) => (draft = e.currentTarget.value)}
+			bind:this={draftElement}
+			oninput={(event) => {
+				draft = event.currentTarget.value;
+				resizeDraft();
+			}}
+			onkeydown={onDraftKeydown}
 		></textarea>
-		<button class="send" type="submit" disabled={busy || unavailable || draft.trim() === ''}>
-			{busy ? 'Working' : 'Ask'}
+		<button
+			class="send"
+			type="submit"
+			aria-label={busy ? 'Sending message' : 'Send message'}
+			disabled={busy || unavailable || draft.trim() === ''}
+		>
+			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+				<path d="M12 19V5M6 11l6-6 6 6" />
+			</svg>
 		</button>
 	</form>
 </section>
@@ -318,12 +351,15 @@
 		align-items: flex-end;
 		background: var(--bg);
 		border-top: var(--border-strong);
-		padding-top: 1rem;
+		padding: 1rem 0 max(1rem, env(safe-area-inset-bottom));
 	}
 
 	.draft {
 		flex: 1;
-		resize: vertical;
+		box-sizing: border-box;
+		max-height: calc(100vh - 12rem);
+		resize: none;
+		overflow-y: auto;
 		font-family: var(--f-serif);
 		font-size: 1rem;
 		color: var(--ink);
@@ -338,16 +374,22 @@
 	}
 
 	.send {
-		font-family: var(--f-grotesk);
-		font-weight: 600;
-		font-size: 0.85rem;
+		display: grid;
+		place-items: center;
+		flex: 0 0 2.8rem;
+		height: 2.8rem;
 		background: var(--ink);
 		color: var(--bg);
 		border: none;
 		border-radius: 3px;
-		padding: 0.75rem 1.4rem;
+		padding: 0;
 		cursor: pointer;
 		transition: background 0.18s var(--ease-out);
+	}
+
+	.send svg {
+		width: 1.1rem;
+		height: 1.1rem;
 	}
 
 	.send:hover:not(:disabled) {
