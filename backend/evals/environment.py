@@ -37,6 +37,7 @@ EVAL_DB_PATH = EVALS_DIR / "eval.sqlite3"
 _CONFIG_DB_PATH = settings.db_path
 
 _KEY_ENV_VAR = {
+    "ANTHROPIC": "ANTHROPIC_API_KEY",
     "GEMINI": "GEMINI_API_KEY",
     "OPENROUTER": "OPENROUTER_API_KEY",
 }
@@ -88,7 +89,7 @@ def _read_config_provider() -> tuple[str | None, str | None]:
 
 
 def resolve_api_key(provider: str) -> str:
-    """Find the provider's key: environment first (GEMINI_API_KEY / OPENROUTER_API_KEY),
+    """Find the provider's key: environment first (ANTHROPIC_API_KEY / GEMINI_API_KEY / OPENROUTER_API_KEY),
     then the app DB's Config if it holds a key for this same provider. Keyless providers
     (e.g. the offline stub) need nothing, so return an empty string."""
     if not provider_requires_api_key(provider):

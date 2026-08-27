@@ -3,6 +3,7 @@ import logging
 from sqlalchemy.orm import Session
 
 from app.models.config import Config
+from app.services.ai.anthropic import AnthropicProvider
 from app.services.ai.base import AIProvider
 from app.services.ai.gemini import GeminiProvider
 from app.services.ai.openrouter import OpenRouterProvider
@@ -11,6 +12,7 @@ from app.services.ai.stub import StubProvider
 logger = logging.getLogger(__name__)
 
 _PROVIDERS: dict[str, type[AIProvider]] = {
+    AnthropicProvider.name: AnthropicProvider,
     GeminiProvider.name: GeminiProvider,
     OpenRouterProvider.name: OpenRouterProvider,
     StubProvider.name: StubProvider,

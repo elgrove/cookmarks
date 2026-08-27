@@ -23,7 +23,7 @@ def test_read_config_returns_defaults_and_provider_catalogue(client: TestClient)
     assert body["extraction_rate_limit_per_minute"] == 256
 
     providers = {p["name"]: p["requires_api_key"] for p in body["providers"]}
-    assert providers == {"GEMINI": True, "OPENROUTER": True, "STUB": False}
+    assert providers == {"ANTHROPIC": True, "GEMINI": True, "OPENROUTER": True, "STUB": False}
 
 
 def test_update_provider_and_rate_limit(client: TestClient) -> None:

@@ -15,9 +15,11 @@ from dataclasses import dataclass
 
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.models import Model
+from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.models.google import GoogleModel
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.models.test import TestModel
+from pydantic_ai.providers.anthropic import AnthropicProvider as PydanticAnthropicProvider
 from pydantic_ai.providers.google import GoogleProvider as PydanticGoogleProvider
 from pydantic_ai.providers.openrouter import OpenRouterProvider as PydanticOpenRouterProvider
 from sqlalchemy import delete, func, select
@@ -29,6 +31,7 @@ from app.models.book import Book
 from app.models.recipe import Recipe
 from app.models.recipe_list import RecipeList, RecipeListItem
 from app.services import embeddings
+from app.services.ai.anthropic import AnthropicProvider
 from app.services.ai.base import AIProvider, ModelRole
 from app.services.ai.gemini import GeminiProvider
 from app.services.ai.openrouter import OpenRouterProvider
@@ -333,6 +336,8 @@ def _list_size(session: Session, list_id: uuid.UUID) -> int:
 def _model(provider: AIProvider) -> Model | None:
     """The Pydantic AI model for the configured provider's assistant role."""
     name = provider.model_for(ModelRole.ASSISTANT)
+    if provider.name == AnthropicProvider.name:
+        return AnthropicModel(name, provider=PydanticAnthropicProvider(api_key=provider.api_key))
     if provider.name == GeminiProvider.name:
         return GoogleModel(name, provider=PydanticGoogleProvider(api_key=provider.api_key))
     if provider.name == OpenRouterProvider.name:
