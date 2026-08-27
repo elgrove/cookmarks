@@ -62,7 +62,9 @@ export const taskRunsSchema = z.array(taskRunSchema);
 // The type-specific `detail` payloads, by task_type. The wire keeps `detail` a loose
 // record; these describe what each type fills in, so the reporting UI can read it safely.
 export interface ExtractionDetail {
-	extraction_method: 'file' | 'block' | null;
+	extraction_method: 'file' | 'block' | 'pdf_ocr' | null;
+	ocr_model?: string;
+	extraction_model?: string;
 	total_chapters: number;
 	chapters_processed: number;
 	recipes_found: number;

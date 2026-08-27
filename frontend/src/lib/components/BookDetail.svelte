@@ -312,7 +312,11 @@
 					{/if}
 				{/if}
 				{#if onExtract}
-					<ExtractButton recipeCount={book.recipeCount} {onExtract} unavailable={!book.hasEpub} />
+					<ExtractButton
+						recipeCount={book.recipeCount}
+						{onExtract}
+						unavailable={!book.hasEpub && !book.hasPdf}
+					/>
 				{/if}
 				{#if onDelete}
 					{#if deleteMode === 'confirm'}

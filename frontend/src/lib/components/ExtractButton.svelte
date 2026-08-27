@@ -5,13 +5,18 @@
 		/** Injected so the component stays network-free and verifiable in isolation;
 		 *  the page wires this to the POST. Awaited to drive posting → queued. */
 		onExtract?: () => Promise<void> | void;
-		/** The book has no EPUB, so there is nothing to extract from. */
 		unavailable?: boolean;
 	};
 
 	type State = 'idle' | 'posting' | 'queued' | 'error' | 'unavailable';
 
-	const UNAVAILABLE_NOTE = 'Recipe extraction needs an EPUB';
+	function stateLabel(state: State, idleLabel: string): string {
+		if (state === 'unavailable') return 'Recipe extraction needs an EPUB or PDF';
+		if (state === 'posting') return 'Queuing…';
+		if (state === 'queued') return 'Queued';
+		if (state === 'error') return "Couldn't queue — try again";
+		return idleLabel;
+	}
 </script>
 
 <script lang="ts">
@@ -24,17 +29,7 @@
 
 	let shown = $derived<State>(unavailable ? 'unavailable' : state);
 	let idleLabel = $derived(recipeCount > 0 ? 'Re-extract recipes' : 'Extract recipes');
-	let label = $derived(
-		shown === 'unavailable'
-			? UNAVAILABLE_NOTE
-			: shown === 'posting'
-				? 'Queuing…'
-				: shown === 'queued'
-					? 'Queued'
-					: shown === 'error'
-						? "Couldn't queue — try again"
-						: idleLabel
-	);
+	let label = $derived(stateLabel(shown, idleLabel));
 
 	async function extract() {
 		if (shown === 'posting' || shown === 'unavailable') return;

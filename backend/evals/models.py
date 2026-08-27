@@ -5,6 +5,8 @@ under ``runs/``. `LedgerRecord` is the flat, one-line-per-(run, model, book) row
 appended to ``index.jsonl`` for cross-run comparison.
 """
 
+from typing import Literal
+
 from pydantic import BaseModel
 
 
@@ -41,6 +43,8 @@ class BookSpec(BaseModel):
     calibre_id: int
     gold: str
     has_photos: bool = True
+    format: Literal["epub", "pdf"] = "epub"
+    pages: tuple[int, int] | None = None
 
 
 class FieldScores(BaseModel):

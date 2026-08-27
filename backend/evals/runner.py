@@ -19,12 +19,13 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.covers import epub_path
+from app.epub import epub_path, pdf_path
 from app.models.book import Book
-from app.models.enums import TaskStatus, TaskType
+from app.models.enums import ExtractionMethod, TaskStatus, TaskType
 from app.models.task_run import TaskRun
 from app.services.ai import ModelRole
 from app.services.extraction.graph import get_extraction_graph
+from app.services.extraction.state import ExtractionState
 from evals.config import LEDGER_PATH, RUNS_DIR, EvalConfig, git_sha
 from evals.data import from_predicted, load_gold
 from evals.environment import bind_pipeline, build_eval_database, resolve_api_key, set_provider
@@ -98,22 +99,31 @@ def extract_book(
         if book_row is None:
             raise RuntimeError(f"Book {book.calibre_id} not seeded")
         book_id = book_row.id
-        epub = str(epub_path(book_row))
+        source = pdf_path(book_row) if book.format == "pdf" else epub_path(book_row)
+        if source is None:
+            raise RuntimeError(f"Book {book.calibre_id} has no {book.format.upper()} file")
 
     run_id = _create_run(factory, book_id, candidate.provider, force_block=force_block)
     graph = get_extraction_graph()
     gconf = {"configurable": {"thread_id": f"eval_{run_id}"}}
 
     started = time.monotonic()
-    state = {
+    state: ExtractionState = {
         "book_id": str(book_id),
-        "epub_path": epub,
         "report_id": str(run_id),
         "already_tried": [],
     }
+    if book.format == "pdf":
+        state["pdf_path"] = str(source)
+    else:
+        state["epub_path"] = str(source)
+    if book.pages is not None:
+        state["page_range"] = list(book.pages)
+    if book.format == "pdf":
+        state["force_ocr"] = True
     result = graph.invoke(state, gconf)
 
-    if _run_status(factory, run_id) == TaskStatus.REVIEW:
+    if book.format == "epub" and _run_status(factory, run_id) == TaskStatus.REVIEW:
         answer = _RESUME_ANSWER[book.has_photos]
         logger.info(f"Review pause on {book.slug}: answering {answer!r}")
         graph.update_state(gconf, {"human_response": answer}, as_node="await_human")
@@ -261,7 +271,9 @@ def run_eval(
 
     records: list[LedgerRecord] = []
     for task in tasks:
-        ModelRole(task.role)  # validate the role exists before pinning
+        model_role = (
+            ModelRole.OCR if task.role == ExtractionMethod.PDF_OCR.value else ModelRole(task.role)
+        )
         force_block = task.role == ModelRole.BLOCKS_OF_FILES.value
         candidates = [c for c in task.models if not model_ids or c.id in model_ids]
         slugs = [s for s in task.books if not book_slugs or s in book_slugs]
@@ -271,7 +283,7 @@ def run_eval(
             except RuntimeError as exc:
                 logger.warning(f"Skipping {candidate.id}: {exc}")
                 continue
-            set_provider(factory, candidate.provider, key, {task.role: candidate.model})
+            set_provider(factory, candidate.provider, key, {model_role.value: candidate.model})
             for slug in slugs:
                 book = config.book(slug)
                 logger.info(f"Running {task.role} / {candidate.id} / {slug}")

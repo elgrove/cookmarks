@@ -138,18 +138,14 @@ const unit: VerifiableUnit<Props> = {
 	],
 	invariants: [
 		{
-			id: 'pdf-cannot-extract',
-			description: 'a staged PDF disables extract-after-add and says why',
+			id: 'pdf-can-extract',
+			description: 'a staged PDF offers extract-after-add',
 			onlyFixtures: ['staged-pdf'],
 			check: ({ root, contract }) => {
 				if (contract['staged-format'] !== 'pdf') return `format=${contract['staged-format']}`;
-				if (contract['no-extraction'] !== 'true') return `no-extraction=${contract['no-extraction']}`;
+				if (contract['no-extraction'] !== 'false') return `no-extraction=${contract['no-extraction']}`;
 				const box = root.querySelector<HTMLInputElement>('.check input');
-				if (!box?.disabled) return 'extract-after-add offered on a PDF';
-				return (
-					(root.querySelector('.note')?.textContent ?? '').includes('needs an EPUB') ||
-					'no note explains why extraction is unavailable'
-				);
+				return !box?.disabled || 'extract-after-add disabled on a PDF';
 			}
 		},
 		{

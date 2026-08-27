@@ -48,6 +48,7 @@ class TaskRunRead(BaseModel):
         extraction is paused at REVIEW."""
         if run.task_type == TaskType.EXTRACTION:
             detail: dict = {
+                **run.detail,
                 "extraction_method": run.extraction_method,
                 "total_chapters": run.total_chapters,
                 "chapters_processed": len(run.chapters_processed),

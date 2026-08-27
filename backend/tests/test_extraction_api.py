@@ -207,14 +207,12 @@ def test_resume_run_from_other_book_404(
     assert resume_dispatched == []
 
 
-def test_a_pdf_only_book_cannot_be_extracted(
+def test_a_pdf_only_book_can_be_extracted(
     client: TestClient,
     dispatched: list[tuple[Any, ...]],
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Extraction walks the EPUB spine, so a book the library holds only as a PDF is
-    refused at the door rather than queueing a run that could only fail."""
     book_dir = tmp_path / "Author One" / "With Recipes (1)"
     book_dir.mkdir(parents=True)
     (book_dir / "book.pdf").write_bytes(b"%PDF-1.7 not a real pdf, just bytes")
@@ -223,6 +221,19 @@ def test_a_pdf_only_book_cannot_be_extracted(
 
     res = client.post(f"/api/books/{book_id}/extract")
 
+    assert res.status_code == 202
+    assert dispatched == [(book_id, res.json()["id"])]
+
+
+def test_a_book_without_epub_or_pdf_cannot_be_extracted(
+    client: TestClient,
+    dispatched: list[tuple[Any, ...]],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "calibre_library_path", tmp_path)
+    book_id = _book_id(client, "With Recipes")
+    res = client.post(f"/api/books/{book_id}/extract")
     assert res.status_code == 422
-    assert "EPUB" in res.json()["detail"]
+    assert "EPUB or PDF" in res.json()["detail"]
     assert dispatched == []
