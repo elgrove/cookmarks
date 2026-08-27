@@ -103,7 +103,7 @@ const unit: VerifiableUnit<Props> = {
 		},
 		{
 			id: 'compose',
-			description: 'typing a question and pressing Ask fires the send handler',
+			description: 'typing a question and pressing send fires the send handler',
 			props: { messages: [] },
 			act: ({ type, click }) => {
 				type(DRAFT, 'what should I cook tonight');
@@ -204,13 +204,13 @@ const unit: VerifiableUnit<Props> = {
 		},
 		{
 			id: 'streaming-holds-the-composer',
-			description: 'while a reply streams the thinking indicator shows and Ask is disabled',
+			description: 'while a reply streams the thinking indicator shows and send is disabled',
 			onlyFixtures: ['streaming'],
 			check: ({ contract, root }) => {
 				if (contract.streaming !== 'true') return `streaming=${contract.streaming}`;
 				if (!root.querySelector('.working')) return 'no thinking indicator';
 				const send = root.querySelector('.send') as HTMLButtonElement | null;
-				return send?.disabled === true || 'Ask is not disabled mid-stream';
+				return send?.disabled === true || 'send is not disabled mid-stream';
 			}
 		},
 		{
@@ -235,7 +235,7 @@ const unit: VerifiableUnit<Props> = {
 		},
 		{
 			id: 'compose-wires',
-			description: 'pressing Ask sends the typed question and clears the field',
+			description: 'pressing send sends the typed question and clears the field',
 			onlyFixtures: ['compose'],
 			check: ({ root }) => {
 				const draft = root.querySelector('.draft') as HTMLTextAreaElement | null;
