@@ -42,6 +42,7 @@ class ModelRole(Enum):
     BLOCKS_OF_FILES = "blocks_of_files"
     BOOK_KEYWORDS = "book_keywords"
     KEYWORD_DEDUP = "keyword_dedup"
+    ASSISTANT = "assistant"
 
 
 class EmbedTask(Enum):

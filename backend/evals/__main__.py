@@ -5,7 +5,7 @@ import logging
 import sys
 from pathlib import Path
 
-from evals import report
+from evals import assistant, report
 from evals.config import DEFAULT_CONFIG_PATH, load_config
 from evals.runner import run_eval
 
@@ -24,8 +24,17 @@ def _build_parser() -> argparse.ArgumentParser:
     run_p.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH,
                        help="path to eval.toml")
 
+    asst_p = sub.add_parser("assistant", help="run the assistant eval per prompt")
+    asst_p.add_argument("--model", action="append", dest="models", metavar="PROVIDER:MODEL",
+                        help="candidate model id (repeatable; default: all)")
+    asst_p.add_argument("--prompt", action="append", dest="prompts", metavar="ID",
+                        help="prompt id from eval.toml (repeatable; default: all)")
+    asst_p.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH,
+                        help="path to eval.toml")
+
     rep_p = sub.add_parser("report", help="summarise the ledger (no run)")
-    rep_p.add_argument("view", choices=["leaderboard", "task"], help="which view to render")
+    rep_p.add_argument("view", choices=["leaderboard", "task", "assistant"],
+                       help="which view to render")
     rep_p.add_argument("role", nargs="?", help="task role (required for 'task')")
 
     return parser
@@ -43,7 +52,15 @@ def main(argv: list[str] | None = None) -> int:
         print("\n" + report.leaderboard(report.load_ledger()))
         return 0
 
+    if args.command == "assistant":
+        assistant.run_assistant_eval(args.config, args.models, args.prompts)
+        print("\n" + assistant.leaderboard(assistant.load_ledger()))
+        return 0
+
     if args.command == "report":
+        if args.view == "assistant":
+            print(assistant.leaderboard(assistant.load_ledger()))
+            return 0
         records = report.load_ledger()
         if args.view == "leaderboard":
             print(report.leaderboard(records))

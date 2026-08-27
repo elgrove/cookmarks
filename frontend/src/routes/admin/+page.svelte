@@ -40,8 +40,10 @@
 	let settingsConfig = $derived<ConfigSettingsConfig | null>(
 		config
 			? {
-					aiProvider: config.ai_provider,
-					apiKeySet: config.api_key_set,
+					extractionProvider: config.ai_provider,
+					extractionApiKeySet: config.api_key_set,
+					assistantProvider: config.assistant_provider,
+					assistantApiKeySet: config.assistant_api_key_set,
 					rateLimit: config.extraction_rate_limit_per_minute,
 					providers: config.providers.map((p) => ({
 						name: p.name,

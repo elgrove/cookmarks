@@ -42,6 +42,7 @@ class StubProvider(AIProvider):
         ModelRole.BLOCKS_OF_FILES: "stub-extract",
         ModelRole.BOOK_KEYWORDS: "stub-keywords",
         ModelRole.KEYWORD_DEDUP: "stub-dedup",
+        ModelRole.ASSISTANT: "stub-assistant",
     }
     # Matches the production (Gemini) width so stub vectors share the vec0 table.
     embedding_dimensions: ClassVar[int] = 3072

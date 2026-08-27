@@ -10,7 +10,6 @@ one flat row per (run, task, model, book) is appended to the ledger.
 
 import json
 import logging
-import subprocess
 import time
 import uuid
 from dataclasses import dataclass
@@ -20,14 +19,13 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.config import BACKEND_ROOT
 from app.covers import epub_path
 from app.models.book import Book
 from app.models.enums import TaskStatus, TaskType
 from app.models.task_run import TaskRun
 from app.services.ai import ModelRole
 from app.services.extraction.graph import get_extraction_graph
-from evals.config import LEDGER_PATH, RUNS_DIR, EvalConfig
+from evals.config import LEDGER_PATH, RUNS_DIR, EvalConfig, git_sha
 from evals.data import from_predicted, load_gold
 from evals.environment import bind_pipeline, build_eval_database, resolve_api_key, set_provider
 from evals.matching import match_recipes
@@ -47,20 +45,6 @@ class RunMeta:
     input_tokens: int | None
     output_tokens: int | None
     duration_s: float
-
-
-def _git_sha() -> str | None:
-    try:
-        out = subprocess.run(
-            ["git", "rev-parse", "--short", "HEAD"],
-            capture_output=True,
-            text=True,
-            cwd=BACKEND_ROOT,
-            check=False,
-        )
-    except OSError:
-        return None
-    return out.stdout.strip() or None
 
 
 def _run_status(factory: sessionmaker[Session], run_id: uuid.UUID) -> TaskStatus | None:
@@ -271,7 +255,7 @@ def run_eval(
 
     run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     timestamp = datetime.now(UTC).isoformat()
-    git_sha = _git_sha()
+    sha = git_sha()
     run_dir = RUNS_DIR / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
 
@@ -294,7 +278,7 @@ def run_eval(
                 raw_recipes, meta = extract_book(factory, candidate, book, force_block=force_block)
                 br = score_book(config, book, raw_recipes, meta)
                 _write_artefacts(run_dir, task.role, candidate.id, br, raw_recipes)
-                records.append(_to_ledger(run_id, timestamp, git_sha, task.role, candidate, br))
+                records.append(_to_ledger(run_id, timestamp, sha, task.role, candidate, br))
                 print(_book_line(task.role, candidate.id, br))
 
     _append_ledger(records)
@@ -303,7 +287,7 @@ def run_eval(
             {
                 "run_id": run_id,
                 "timestamp": timestamp,
-                "git_sha": git_sha,
+                "git_sha": sha,
                 "tasks": [t.role for t in tasks],
             },
             indent=2,

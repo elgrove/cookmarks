@@ -1,5 +1,6 @@
 """Load and resolve the eval configuration (``eval.toml``)."""
 
+import subprocess
 import tomllib
 from pathlib import Path
 
@@ -13,6 +14,21 @@ DEFAULT_CONFIG_PATH = EVALS_DIR / "eval.toml"
 # Append-only ledger of every (run, model, book) result, and the per-run artefact dir.
 LEDGER_PATH = EVALS_DIR / "index.jsonl"
 RUNS_DIR = EVALS_DIR / "runs"
+
+
+def git_sha() -> str | None:
+    """The commit a run was made at, so a ledger row is attributable to code."""
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            capture_output=True,
+            text=True,
+            cwd=EVALS_DIR,
+            check=False,
+        )
+    except OSError:
+        return None
+    return out.stdout.strip() or None
 
 
 class Weights(BaseModel):

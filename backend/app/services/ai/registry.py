@@ -3,6 +3,7 @@ import logging
 from sqlalchemy.orm import Session
 
 from app.models.config import Config
+from app.services.ai.anthropic import AnthropicProvider
 from app.services.ai.base import AIProvider
 from app.services.ai.gemini import GeminiProvider
 from app.services.ai.openrouter import OpenRouterProvider
@@ -11,6 +12,7 @@ from app.services.ai.stub import StubProvider
 logger = logging.getLogger(__name__)
 
 _PROVIDERS: dict[str, type[AIProvider]] = {
+    AnthropicProvider.name: AnthropicProvider,
     GeminiProvider.name: GeminiProvider,
     OpenRouterProvider.name: OpenRouterProvider,
     StubProvider.name: StubProvider,
@@ -26,7 +28,11 @@ def provider_requires_api_key(name: str) -> bool:
 def provider_catalogue() -> list[tuple[str, bool]]:
     """The selectable providers as (name, requires_api_key) pairs — what the settings UI
     needs to render its provider dropdown and decide whether to show the API key field."""
-    return [(name, cls.requires_api_key) for name, cls in _PROVIDERS.items()]
+    return [
+        (name, cls.requires_api_key)
+        for name, cls in _PROVIDERS.items()
+        if name != StubProvider.name
+    ]
 
 
 def get_config(session: Session) -> Config:
@@ -56,3 +62,20 @@ def get_ai_provider(session: Session) -> AIProvider | None:
         return None
 
     return provider_cls(config.api_key or "", config.model_overrides)
+
+
+def get_assistant_provider(session: Session) -> AIProvider | None:
+    config = get_config(session)
+    if config.assistant_provider is None:
+        return None
+
+    provider_cls = _PROVIDERS.get(config.assistant_provider)
+    if provider_cls is None:
+        logger.warning(f"Unknown assistant provider configured: {config.assistant_provider}")
+        return None
+
+    if provider_cls.requires_api_key and not config.assistant_api_key:
+        logger.warning(f"Assistant provider {config.assistant_provider} configured without an API key")
+        return None
+
+    return provider_cls(config.assistant_api_key or "", config.model_overrides)

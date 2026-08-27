@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends
 
 from app.api import (
+    assistant,
     auth,
     books,
     config,
@@ -29,6 +30,7 @@ _ADMIN = [Depends(require_admin)]
 api_router = APIRouter(prefix="/api")
 api_router.include_router(health.router)
 api_router.include_router(auth.router)
+api_router.include_router(assistant.router, dependencies=_USER)
 api_router.include_router(books.router, dependencies=_USER)
 api_router.include_router(extraction.router, dependencies=_USER)
 api_router.include_router(game.router, dependencies=_USER)
