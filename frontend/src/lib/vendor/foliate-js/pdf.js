@@ -126,6 +126,7 @@ export const makePDF = async file => {
         range: transport,
         cMapUrl: pdfjsPath('cmaps/'),
         standardFontDataUrl: pdfjsPath('standard_fonts/'),
+        wasmUrl: pdfjsPath(''),
         isEvalSupported: false,
     }).promise
 
