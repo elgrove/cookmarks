@@ -53,6 +53,27 @@ def test_read_page_retries_token_limit() -> None:
     assert result == "complete"
 
 
+def test_read_page_retries_recitation() -> None:
+    provider = _provider_with_response("complete", "STOP")
+    generate = cast(MagicMock, provider.client.models.generate_content)
+    complete = generate.return_value
+    recitation = SimpleNamespace(
+        candidates=[SimpleNamespace(finish_reason=SimpleNamespace(name="RECITATION"))],
+        text="partial",
+        usage_metadata=None,
+    )
+    generate.side_effect = [recitation, complete]
+    result, _usage = provider.read_page(b"jpeg", "image/jpeg")
+    assert result == "complete"
+
+
+def test_read_page_falls_back_on_repeated_recitation() -> None:
+    provider = _provider_with_response("partial text", "RECITATION")
+    result, _usage = provider.read_page(b"jpeg", "image/jpeg")
+    assert result == "partial text"
+
+
+
 def test_read_page_rejects_missing_candidate() -> None:
     provider = _provider_with_response("", None)
     with pytest.raises(RuntimeError, match="no OCR candidate"):
