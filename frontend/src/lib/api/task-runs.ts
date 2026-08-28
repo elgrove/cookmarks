@@ -77,6 +77,14 @@ export interface KeywordDedupDetail {
 	keywords_in: number;
 	merges_applied: number;
 	keywords_removed: number;
+	// The rotating candidate window and the two merge stages counted apart. Optional:
+	// older runs may omit them.
+	candidates?: number;
+	pre_merges?: number;
+	ai_merges?: number;
+	ai_truncated?: boolean;
+	cursor_from?: string | null;
+	cursor_to?: string | null;
 }
 export interface BookIngestDetail {
 	// The job as submitted — kept on the run so the worker reads it from its own row,

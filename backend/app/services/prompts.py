@@ -74,9 +74,9 @@ Cookbook:
 
 Return ONLY a JSON array of keyword strings. No other text."""
 
-DEDUPLICATE_KEYWORDS_PROMPT = """You are tasked with deduplicating a list of keywords. These are keywords/tags of recipes extracted from cookbooks.
+DEDUPLICATE_KEYWORDS_PROMPT = """You are tasked with deduplicating keywords. These are keywords/tags of recipes extracted from cookbooks.
 We already have the ability to search through ingredients in our application. We want to make searching/filtering with keywords effective.
-Analyse the provided list and identify keywords that are variations of each other (e.g., different capitalisation, pluralisation, or hyphenation), or are very similar and serve the same purpose as tags/keywords.
+Analyse the candidate keywords below and identify those that are variations of each other (e.g., different capitalisation, pluralisation, or hyphenation), or are very similar and serve the same purpose as tags/keywords.
 
 Respond with a JSON object where:
 - The keys are the duplicate keywords.
@@ -106,8 +106,13 @@ Merged 'Vietnamese' into 'Asian' -- Asian is too broad, national and subnational
 Merged 'Scone' into 'Biscuit' -- replaced Britishism with Americanism
 Merged 'Wasabi' into 'Spice' -- doesn't even make sense
 
-Here is the list of keywords:
+Here is the whole keyword vocabulary. Any of these may be used as a canonical keyword to merge into:
 {keywords}
+
+Here are the candidate keywords. Propose merges ONLY for these:
+{candidates}
+
+Every key in the returned object MUST be one of the candidate keywords. A value may be any keyword in the vocabulary above.
 
 Return ONLY a valid JSON object. No other text.
 """

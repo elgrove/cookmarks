@@ -1,0 +1,5 @@
+#!/command/with-contenv sh
+# Celery beat: fires the periodic tasks (the weekly keyword dedup).
+cd /app
+exec uv run celery -A app.tasks.celery_app:celery_app beat \
+    --loglevel=info --schedule /data/celerybeat-schedule
