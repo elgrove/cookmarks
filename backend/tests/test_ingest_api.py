@@ -1,6 +1,7 @@
 """The Add-book endpoints: staging a file, and confirming it into a queued run."""
 
 import uuid
+from contextlib import nullcontext
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.models.enums import TaskStatus, TaskType
 from app.models.task_run import TaskRun
+from app.tasks.ingest import _queue_extraction
 
 EPUB_BYTES = b"PK\x03\x04" + b"\x00" * 64
 
@@ -44,8 +46,17 @@ def test_upload_is_staged_with_its_metadata_read(client: TestClient, staging: Pa
     assert (staging / f"{body['staging_id']}.epub").exists()
 
 
-def test_an_unconvertible_format_is_refused(client: TestClient) -> None:
-    res = _upload(client, "scan.pdf", b"%PDF-1.4")
+def test_a_pdf_is_staged_as_a_pdf(client: TestClient, staging: Path) -> None:
+    res = _upload(client, "Scanned Cookbook.pdf", b"%PDF-1.7" + b"\x00" * 64)
+
+    assert res.status_code == 200
+    body = res.json()
+    assert body["format"] == "pdf"
+    assert (staging / f"{body['staging_id']}.pdf").exists()
+
+
+def test_a_format_the_library_cannot_hold_is_refused(client: TestClient) -> None:
+    res = _upload(client, "notes.docx", b"PK\x03\x04")
 
     assert res.status_code == 422
 
@@ -117,3 +128,24 @@ def test_a_blank_title_is_not_a_book(client: TestClient) -> None:
     )
 
     assert res.status_code == 422
+
+
+def test_extract_after_add_is_skipped_for_a_pdf(
+    client: TestClient,
+    session: Session,
+    dispatched: list[tuple[Any, ...]],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A PDF-only book has no spine to walk, so extract-after-add records why it did
+    nothing rather than reporting a queue that never happened."""
+    book_dir = tmp_path / "Author One" / "With Recipes (1)"
+    book_dir.mkdir(parents=True)
+    (book_dir / "book.pdf").write_bytes(b"%PDF-1.7 not a real pdf, just bytes")
+    monkeypatch.setattr(settings, "calibre_library_path", tmp_path)
+    monkeypatch.setattr("app.tasks.ingest.SessionLocal", lambda: nullcontext(session))
+
+    queued, skipped = _queue_extraction(1)
+
+    assert (queued, skipped) == (False, "recipe extraction needs an EPUB")
+    assert dispatched == []

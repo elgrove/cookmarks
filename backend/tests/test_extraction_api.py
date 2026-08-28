@@ -1,11 +1,14 @@
 import uuid
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.models.enums import AIProvider, TaskStatus, TaskType
 from app.models.task_run import TaskRun
 from app.services.ai import get_config
@@ -54,7 +57,7 @@ def test_list_runs_newest_first_with_book_title(client: TestClient, session: Ses
 
 
 def test_trigger_creates_queued_run_and_dispatches(
-    client: TestClient, session: Session, dispatched: list[tuple[Any, ...]]
+    client: TestClient, session: Session, dispatched: list[tuple[Any, ...]], seeded_epubs: Path
 ) -> None:
     config = get_config(session)
     config.ai_provider = AIProvider.STUB
@@ -90,7 +93,9 @@ def test_trigger_unknown_book_404(client: TestClient, dispatched: list[tuple[Any
     assert dispatched == []
 
 
-def test_re_extract_label_path_keeps_recipes(client: TestClient, session: Session) -> None:
+def test_re_extract_label_path_keeps_recipes(
+    client: TestClient, session: Session, seeded_epubs: Path
+) -> None:
     """Triggering a book that already has recipes still queues a run; identity is
     reconciled by the task, so this just confirms the endpoint doesn't gate on count."""
     book_id = _book_id(client, "With Recipes")
@@ -200,3 +205,24 @@ def test_resume_run_from_other_book_404(
     )
     assert res.status_code == 404
     assert resume_dispatched == []
+
+
+def test_a_pdf_only_book_cannot_be_extracted(
+    client: TestClient,
+    dispatched: list[tuple[Any, ...]],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Extraction walks the EPUB spine, so a book the library holds only as a PDF is
+    refused at the door rather than queueing a run that could only fail."""
+    book_dir = tmp_path / "Author One" / "With Recipes (1)"
+    book_dir.mkdir(parents=True)
+    (book_dir / "book.pdf").write_bytes(b"%PDF-1.7 not a real pdf, just bytes")
+    monkeypatch.setattr(settings, "calibre_library_path", tmp_path)
+    book_id = _book_id(client, "With Recipes")
+
+    res = client.post(f"/api/books/{book_id}/extract")
+
+    assert res.status_code == 422
+    assert "EPUB" in res.json()["detail"]
+    assert dispatched == []

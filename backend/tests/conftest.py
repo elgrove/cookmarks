@@ -11,11 +11,28 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.api.deps import current_user
 from app.api.recipes import _clear_keyword_cache, _clear_search_order_cache
+from app.config import settings
 from app.db import get_session
 from app.main import app
 from app.models import Base, Book, Keyword, Recipe, User
 from app.services.auth import hash_password
 from app.services.embeddings import _clear_query_embed_cache
+
+# Where the two seeded books live inside a Calibre library root.
+SEEDED_BOOK_PATHS = ("Author One/With Recipes (1)", "Author Two/No Recipes Yet (2)")
+
+
+@pytest.fixture
+def seeded_epubs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """A temp Calibre root giving both seeded books an EPUB — what the endpoints that
+    gate on a readable EPUB (extraction) need before they will do anything."""
+    root = tmp_path / "library"
+    for book_path in SEEDED_BOOK_PATHS:
+        directory = root / book_path
+        directory.mkdir(parents=True)
+        (directory / "book.epub").write_bytes(b"PK\x03\x04 not a real epub, just bytes")
+    monkeypatch.setattr(settings, "calibre_library_path", root)
+    return root
 
 
 @pytest.fixture(autouse=True)

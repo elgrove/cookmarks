@@ -39,7 +39,7 @@ def main() -> None:
 
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     books = read_calibre_books(
-        args.library, tag=settings.calibre_sync_tag, book_format=settings.calibre_sync_format
+        args.library, tag=settings.calibre_sync_tag, book_formats=settings.calibre_sync_formats
     )
     library_ids = None if args.no_delete else read_library_book_ids(args.library)
     with SessionLocal() as session:

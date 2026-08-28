@@ -11,7 +11,11 @@ from app.models.task_run import TaskRun
 from app.schemas.extraction import ResumeRequest
 from app.schemas.task_run import TaskRunRead
 from app.services.extraction.review import VALID_HUMAN_RESPONSES
-from app.tasks.extraction import enqueue_resume_extraction, queue_extraction
+from app.tasks.extraction import (
+    NotExtractableError,
+    enqueue_resume_extraction,
+    queue_extraction,
+)
 
 router = APIRouter(tags=["extraction"])
 
@@ -31,7 +35,10 @@ def trigger_extraction(book_id: uuid.UUID, session: SessionDep) -> TaskRunRead:
     if book is None:
         raise HTTPException(status_code=404, detail="book not found")
 
-    return TaskRunRead.from_run(queue_extraction(session, book))
+    try:
+        return TaskRunRead.from_run(queue_extraction(session, book))
+    except NotExtractableError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @router.get("/books/{book_id}/extraction", response_model=TaskRunRead | None)

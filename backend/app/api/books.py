@@ -13,7 +13,7 @@ from app.api.reading_queue import is_queued
 from app.config import settings
 from app.covers import cover_path, has_cover
 from app.db import SessionDep
-from app.epub import epub_path, has_epub
+from app.epub import epub_path, has_epub, has_pdf, pdf_path
 from app.models.book import Book
 from app.models.book_reading import BookReading
 from app.models.calibre_exclusion import CalibreExclusion
@@ -131,6 +131,7 @@ def get_book(book_id: uuid.UUID, session: SessionDep, user: CurrentUser) -> Book
         recipe_count=total,
         has_cover=has_cover(book),
         has_epub=has_epub(book),
+        has_pdf=has_pdf(book),
         added=book.calibre_added_at,
         keywords=sorted(k.name for k in book.keywords),
         recipes=[
@@ -271,20 +272,26 @@ def book_cover(book_id: uuid.UUID, session: SessionDep) -> FileResponse:
     return FileResponse(cover, media_type="image/jpeg")
 
 
-@router.get("/books/{book_id}/epub")
-def book_epub(book_id: uuid.UUID, session: SessionDep) -> FileResponse:
+@router.get("/books/{book_id}/file")
+def book_file(book_id: uuid.UUID, session: SessionDep) -> FileResponse:
+    """The book's own file for the in-app reader, whichever format it is held in. A book
+    holding both reads as its EPUB — the richer of the two. The reader sniffs the bytes,
+    so the caller needs no say in the choice."""
     book = session.get(Book, book_id)
     if book is None:
         raise HTTPException(status_code=404, detail="book not found")
     epub = epub_path(book)
-    if epub is None:
-        raise HTTPException(status_code=404, detail="epub not found")
-    epub = epub.resolve()
+    path, media_type = (
+        (epub, "application/epub+zip") if epub else (pdf_path(book), "application/pdf")
+    )
+    if path is None:
+        raise HTTPException(status_code=404, detail="no readable file for this book")
+    path = path.resolve()
     library = settings.calibre_library_path.resolve()
     # Same traversal guard as the cover endpoint, before streaming bytes off disk.
-    if not epub.is_relative_to(library) or not epub.is_file():
-        raise HTTPException(status_code=404, detail="epub not found")
-    return FileResponse(epub, media_type="application/epub+zip")
+    if not path.is_relative_to(library) or not path.is_file():
+        raise HTTPException(status_code=404, detail="no readable file for this book")
+    return FileResponse(path, media_type=media_type)
 
 
 @router.get("/books/{book_id}/recipe-index", response_model=list[RecipeIndexEntry])
