@@ -86,7 +86,8 @@ loop, frontend screenshots); this skill owns everything before and after it.
 - **Never**: merge the PR, merge into the trunk, remove the worktree, deploy (the
   `deploy-prod` skill is the user's to invoke), or mark the ticket Done. Prod builds from
   whatever is checked out in `~/dev/cookmarks`, so a stray trunk change ships on the next
-  deploy. Done happens when the user merges.
+  deploy. Done happens when the user merges (always via squash merge).
+
 
 ## Failure honesty
 
