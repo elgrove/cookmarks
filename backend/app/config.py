@@ -41,6 +41,8 @@ class Settings(BaseSettings):
     # Worker threads per extraction node (chapters/blocks extracted concurrently).
     # The per-minute request budget is a user-tunable Config column, not a setting.
     extraction_threads: int = 16
+    ocr_dpi: int = 200
+    ocr_page_concurrency: int = 4
 
     # How long a run may sit QUEUED or RUNNING before startup treats it as abandoned.
     # Well above the slowest real extraction, so a genuinely in-flight run is never

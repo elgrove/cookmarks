@@ -65,12 +65,12 @@ const unit: VerifiableUnit<Props> = {
 		},
 		{
 			id: 'unavailable',
-			description: 'a book with no EPUB: the control stays, disabled, and says why',
+			description: 'a book with no EPUB or PDF stays disabled and says why',
 			props: { recipeCount: 0, unavailable: true }
 		},
 		{
 			id: 'unavailable-click',
-			description: 'probe: clicking the disabled control must not dispatch anything',
+			description: 'probe: clicking the disabled control does not dispatch',
 			probe: true,
 			props: {
 				recipeCount: 0,
@@ -135,15 +135,15 @@ const unit: VerifiableUnit<Props> = {
 		},
 		{
 			id: 'unavailable-explains-itself',
-			description: 'the disabled control names the reason, in its label and on the page',
+			description: 'the disabled control names the required file formats',
 			onlyFixtures: ['unavailable', 'unavailable-click'],
 			check: ({ contract, root }) => {
 				if (contract.state !== 'unavailable') return `state=${contract.state}`;
 				const btn = root.querySelector<HTMLButtonElement>(BTN);
 				if (!btn?.disabled) return 'the control is not disabled';
-				if (!ariaLabel(root).includes('needs an EPUB')) return `label=${ariaLabel(root)}`;
+				if (!ariaLabel(root).includes('EPUB or PDF')) return `label=${ariaLabel(root)}`;
 				return (
-					(btn.textContent ?? '').includes('needs an EPUB') ||
+					(btn.textContent ?? '').includes('EPUB or PDF') ||
 					`no visible reason: "${btn.textContent}"`
 				);
 			}

@@ -2,9 +2,11 @@ import io
 import uuid
 import zipfile
 from collections.abc import Iterator
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
+import pymupdf
 import pytest
 import sqlite_vec
 from langgraph.checkpoint.sqlite import SqliteSaver
@@ -20,11 +22,19 @@ from app.models.enums import ExtractionMethod, TaskStatus, TaskType
 from app.models.recipe import Recipe
 from app.models.task_run import TaskRun
 from app.schemas.extraction import RecipeData
-from app.services.ai import ModelRole, StubProvider, Usage, get_ai_provider, get_config
+from app.schemas.task_run import TaskRunRead
+from app.services.ai import (
+    ModelRole,
+    OpenRouterProvider,
+    StubProvider,
+    Usage,
+    get_ai_provider,
+    get_config,
+)
 from app.services.extraction import graph
 from app.services.extraction.graph import get_extraction_graph
 from app.services.extraction.state import ExtractionState
-from app.services.extraction.utils import find_decorative_images
+from app.services.extraction.utils import deduplicate_recipes_by_title, find_decorative_images
 from app.tasks.extraction import (
     extract_recipes_from_book,
     extract_recipes_from_book_task,
@@ -116,6 +126,15 @@ def _write_epub(path: Path) -> None:
         z.writestr("chapter2.xhtml", chapter.format("two"))
 
 
+def _write_pdf(path: Path) -> None:
+    document = pymupdf.open()
+    for number in range(1, 3):
+        page = document.new_page()
+        page.insert_text((72, 72), f"Recipe page {number}")
+    document.save(path)
+    document.close()
+
+
 # --------------------------------------------------------------------------- #
 # Pure: routing
 # --------------------------------------------------------------------------- #
@@ -126,12 +145,31 @@ def test_route_post_analyse() -> None:
     assert graph.route_post_analyse({"extraction_type": "file"}) == "extract_file"
 
 
+def test_route_on_format() -> None:
+    assert graph.route_on_format({"epub_path": "/book.epub"}) == "analyse_epub"
+    assert graph.route_on_format({"pdf_path": "/book.pdf"}) == "ocr_pdf"
+    assert (
+        graph.route_on_format({"epub_path": "/book.epub", "pdf_path": "/book.pdf"})
+        == "analyse_epub"
+    )
+    with pytest.raises(ValueError, match="no EPUB or PDF"):
+        graph.route_on_format({})
+
+
 def test_route_post_validate_with_images() -> None:
     state: ExtractionState = {
         "raw_recipes": [{"name": "R", "image": "img.jpg"}],
         "already_tried": [],
     }
     assert graph.route_post_validate(state) == "resolve_images"
+
+
+def test_route_post_validate_pdf_skips_images_and_review() -> None:
+    state: ExtractionState = {
+        "pdf_path": "/book.pdf",
+        "raw_recipes": [{"name": "R", "image": None}],
+    }
+    assert graph.route_post_validate(state) == "finalise"
 
 
 def test_route_post_validate_no_images_first_try() -> None:
@@ -206,8 +244,6 @@ def test_recipe_data_rejects_empty_ingredients() -> None:
 
 
 def test_usage_accumulation_preserves_none() -> None:
-    from decimal import Decimal
-
     total = Usage() + Usage(cost_usd=Decimal("0.01"), input_tokens=100)
     total = total + Usage(cost_usd=Decimal("0.02"), output_tokens=5)
     assert total.cost_usd == Decimal("0.03")
@@ -244,6 +280,31 @@ def test_stub_extract_unique_names_and_image_match() -> None:
     r2, _ = provider.extract_recipes("chapter two", model="stub-extract")
     assert len(r1) == len(r2) == 1
     assert r1[0].name != r2[0].name
+
+
+def test_provider_vision_capability() -> None:
+    stub = StubProvider(api_key="")
+    text, usage = stub.read_page(b"jpeg", "image/jpeg")
+    assert stub.supports_vision is True
+    assert text.startswith("Stub cookbook page")
+    assert usage.input_tokens == 0
+    openrouter = OpenRouterProvider(api_key="unused")
+    assert openrouter.supports_vision is False
+    with pytest.raises(NotImplementedError, match="cannot read images"):
+        openrouter.read_page(b"jpeg", "image/jpeg")
+
+
+def test_deduplicate_recipes_keeps_fullest_in_first_position() -> None:
+    short = RecipeData(name="Curry", recipeIngredients=["spice"], recipeInstructions=["Cook."])
+    other = RecipeData(name="Rice", recipeIngredients=["rice"], recipeInstructions=["Boil."])
+    full = RecipeData(
+        name=" curry ",
+        recipeIngredients=["spice", "onion"],
+        recipeInstructions=["Cook the onions until soft.", "Add the spice."],
+    )
+    result = deduplicate_recipes_by_title([short, other, full])
+    assert [recipe.name for recipe in result] == ["Curry", "Rice"]
+    assert result[0].ingredients == ["spice", "onion"]
 
 
 def test_check_if_can_match_images_model_override(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -543,6 +604,43 @@ def test_end_to_end_stub_review_then_resume(e2e: tuple[sessionmaker[Session], Pa
         assert run.recipes_found == 2
 
 
+def test_end_to_end_pdf_ocr_reuses_cache_and_reconciles(
+    e2e: tuple[sessionmaker[Session], Path],
+) -> None:
+    factory, library = e2e
+    with factory() as session:
+        config = get_config(session)
+        config.ai_provider = AIProviderEnum.STUB
+        session.commit()
+        book = Book(calibre_id=4, title="PDF Cookbook", author="Stub Author", path="Stub/PDF (4)")
+        session.add(book)
+        session.commit()
+        book_id = str(book.id)
+    book_dir = library / "Stub" / "PDF (4)"
+    book_dir.mkdir(parents=True)
+    _write_pdf(book_dir / "book.pdf")
+
+    assert "Extracted 1 recipes" in extract_recipes_from_book(book_id)
+    cache_path = book_dir / "cookmarks-ocr.json"
+    cache_before = cache_path.read_text()
+    assert "Extracted 1 recipes" in extract_recipes_from_book(book_id)
+    assert cache_path.read_text() == cache_before
+
+    with factory() as session:
+        recipes = session.scalars(select(Recipe)).all()
+        runs = session.scalars(select(TaskRun).order_by(TaskRun.created_at)).all()
+        assert len(recipes) == 1
+        assert len(runs) == 2
+        assert all(run.status == TaskStatus.DONE for run in runs)
+        assert all(run.extraction_method == ExtractionMethod.PDF_OCR for run in runs)
+        assert all(run.detail["ocr_model"] == "stub-vision" for run in runs)
+        assert all(run.detail["extraction_model"] == "stub-extract" for run in runs)
+        assert all(run.chapters_processed == ["pages 1-2"] for run in runs)
+        detail = TaskRunRead.from_run(runs[0]).detail
+        assert detail["ocr_model"] == "stub-vision"
+        assert detail["extraction_model"] == "stub-extract"
+
+
 def test_unreadable_epub_fails_the_run_instead_of_asking_for_review(
     e2e: tuple[sessionmaker[Session], Path],
 ) -> None:
@@ -639,7 +737,9 @@ _INK = (0, 0, 0)
 _PHOTO = (180, 90, 40)
 
 
-def _epub_with_images(path: Path, images: dict[str, tuple[tuple[int, int], tuple[int, int, int]]]) -> Path:
+def _epub_with_images(
+    path: Path, images: dict[str, tuple[tuple[int, int], tuple[int, int, int]]]
+) -> Path:
     epub = path / "book.epub"
     with zipfile.ZipFile(epub, "w") as archive:
         for member, (size, colour) in images.items():

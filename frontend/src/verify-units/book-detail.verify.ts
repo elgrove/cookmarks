@@ -254,12 +254,14 @@ const unit: VerifiableUnit<Props> = {
 		{
 			id: 'no-epub',
 			description: 'a book with no readable file at all offers no reader action',
-			props: { book: { ...pastaGrannies, hasEpub: false } }
+			props: {
+				book: { ...pastaGrannies, hasEpub: false },
+				onExtract: () => Promise.resolve()
+			}
 		},
 		{
 			id: 'pdf-only',
-			description:
-				'a PDF cookbook reads in-app like any other, but has no spine to extract recipes from',
+			description: 'a PDF cookbook supports reading and recipe extraction',
 			props: {
 				book: {
 					...pastaGrannies,
@@ -604,9 +606,9 @@ const unit: VerifiableUnit<Props> = {
 			}
 		},
 		{
-			id: 'pdf-reads-but-cannot-extract',
+			id: 'pdf-reads-and-extracts',
 			description:
-				'a PDF-only book still opens in the reader, and says why extraction is unavailable',
+				'a PDF-only book opens in the reader and offers recipe extraction',
 			onlyFixtures: ['pdf-only'],
 			check: ({ root, contract, props }) => {
 				if (contract['has-pdf'] !== 'true') return `has-pdf contract=${contract['has-pdf']}`;
@@ -615,11 +617,11 @@ const unit: VerifiableUnit<Props> = {
 				const want = `/books/${props.book.id}/read`;
 				if (href !== want) return `read href=${href} expected ${want}`;
 				const extract = root.querySelector<HTMLButtonElement>('.extract');
-				if (!extract) return 'the extract control vanished instead of explaining itself';
-				if (!extract.disabled) return 'extraction offered on a book with no EPUB';
+				if (!extract) return 'the extract control is missing';
+				if (extract.disabled) return 'extraction is disabled for the PDF';
 				return (
-					(extract.textContent ?? '').includes('needs an EPUB') ||
-					`the disabled control does not say why: "${extract.textContent}"`
+					(extract.textContent ?? '').includes('Extract recipes') ||
+					`unexpected extract label: "${extract.textContent}"`
 				);
 			}
 		},

@@ -5,9 +5,8 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.covers import epub_path
 from app.db import SessionLocal
-from app.epub import has_epub
+from app.epub import epub_path, has_epub, has_pdf, pdf_path
 from app.models.book import Book
 from app.models.enums import TaskStatus, TaskType
 from app.models.recipe import Recipe
@@ -31,7 +30,7 @@ def enqueue_extract_recipes(book_id: str, run_id: str) -> None:
     extract_recipes_from_book_task.delay(book_id, run_id)
 
 
-EXTRACTION_NEEDS_EPUB = "recipe extraction needs an EPUB"
+EXTRACTION_NEEDS_BOOK_FILE = "recipe extraction needs an EPUB or PDF"
 
 
 class NotExtractableError(Exception):
@@ -42,10 +41,9 @@ def queue_extraction(session: Session, book: Book) -> TaskRun:
     """Record a QUEUED extraction run for a book and dispatch it. Shared by the manual
     trigger and the ingest task's extract-after-add, so both leave the same record.
 
-    Raises NotExtractableError for a book with no EPUB: the pipeline walks the EPUB
-    spine, so a PDF-only book would queue a run that could only fail."""
-    if not has_epub(book):
-        raise NotExtractableError(EXTRACTION_NEEDS_EPUB)
+    Raises NotExtractableError for a book with no supported file."""
+    if not has_epub(book) and not has_pdf(book):
+        raise NotExtractableError(EXTRACTION_NEEDS_BOOK_FILE)
     run = TaskRun(
         task_type=TaskType.EXTRACTION,
         book_id=book.id,
@@ -201,16 +199,20 @@ def extract_recipes_from_book(book_id: str, extraction_id: str | None = None) ->
 
         run_id = str(run.id)
         book_uuid = str(book.id)
-        epub = str(epub_path(book))
+        epub = epub_path(book)
+        pdf = pdf_path(book)
 
     logger.info(f"Starting recipe extraction for book {book_uuid} (run {run_id})")
 
     initial_state = {
         "book_id": book_uuid,
-        "epub_path": epub,
         "report_id": run_id,
         "already_tried": [],
     }
+    if epub is not None:
+        initial_state["epub_path"] = str(epub)
+    elif pdf is not None:
+        initial_state["pdf_path"] = str(pdf)
     graph_config = {"configurable": {"thread_id": _thread_id(run_id)}}
 
     result = get_extraction_graph().invoke(initial_state, graph_config)

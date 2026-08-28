@@ -37,6 +37,7 @@ class ModelRole(Enum):
     method (file/block) and from any one provider's catalogue."""
 
     IMAGE_MATCH = "image_match"
+    OCR = "ocr"
     MANY_RECIPES_PER_FILE = "many_recipes_per_file"
     ONE_RECIPE_PER_FILE = "one_recipe_per_file"
     BLOCKS_OF_FILES = "blocks_of_files"
@@ -80,6 +81,12 @@ class Usage:
             input_tokens=_sum_optional(self.input_tokens, other.input_tokens),
             output_tokens=_sum_optional(self.output_tokens, other.output_tokens),
         )
+
+
+class AIResponseError(RuntimeError):
+    def __init__(self, message: str, usage: Usage) -> None:
+        super().__init__(message)
+        self.usage = usage
 
 
 def _strip_json_fence(text: str) -> str:
@@ -141,6 +148,7 @@ class AIProvider(abc.ABC):
     # the vec0 table's fixed width, so they must match what's already stored.
     embedding_model: ClassVar[str | None] = None
     embedding_dimensions: ClassVar[int | None] = None
+    vision_model: ClassVar[str | None] = None
 
     def __init__(self, api_key: str, model_overrides: dict[str, str] | None = None) -> None:
         self.api_key = api_key
@@ -150,6 +158,15 @@ class AIProvider(abc.ABC):
     @property
     def supports_embeddings(self) -> bool:
         return self.embedding_dimensions is not None
+
+    @property
+    def supports_vision(self) -> bool:
+        return self.vision_model is not None
+
+    def read_page(
+        self, image: bytes, media_type: str, model: str | None = None
+    ) -> tuple[str, Usage]:
+        raise NotImplementedError(f"{self.name} cannot read images")
 
     def embed(self, text: str, task: EmbedTask) -> list[float]:
         """Embed one text into a vector. Raises if the provider can't embed."""

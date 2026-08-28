@@ -130,15 +130,13 @@ def test_a_blank_title_is_not_a_book(client: TestClient) -> None:
     assert res.status_code == 422
 
 
-def test_extract_after_add_is_skipped_for_a_pdf(
+def test_extract_after_add_is_queued_for_a_pdf(
     client: TestClient,
     session: Session,
     dispatched: list[tuple[Any, ...]],
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A PDF-only book has no spine to walk, so extract-after-add records why it did
-    nothing rather than reporting a queue that never happened."""
     book_dir = tmp_path / "Author One" / "With Recipes (1)"
     book_dir.mkdir(parents=True)
     (book_dir / "book.pdf").write_bytes(b"%PDF-1.7 not a real pdf, just bytes")
@@ -147,5 +145,5 @@ def test_extract_after_add_is_skipped_for_a_pdf(
 
     queued, skipped = _queue_extraction(1)
 
-    assert (queued, skipped) == (False, "recipe extraction needs an EPUB")
-    assert dispatched == []
+    assert (queued, skipped) == (True, None)
+    assert len(dispatched) == 1

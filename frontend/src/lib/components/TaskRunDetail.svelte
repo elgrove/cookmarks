@@ -18,7 +18,11 @@
 
 	type Row = { label: string; value: string; wrap?: boolean };
 
-	const METHOD_LABELS: Record<string, string> = { file: 'File', block: 'Block' };
+	const METHOD_LABELS: Record<string, string> = {
+		file: 'File',
+		block: 'Block',
+		pdf_ocr: 'PDF OCR'
+	};
 
 	// Short eyebrow label + a serif title for the non-extraction types (extraction's
 	// title is the book it ran against).
@@ -88,10 +92,21 @@
 		switch (run.task_type) {
 			case 'extraction': {
 				const d = run.detail as unknown as ExtractionDetail;
+				const modelRows: Row[] =
+					d.ocr_model || d.extraction_model
+						? [
+								{ label: 'OCR model', value: d.ocr_model ?? '—', wrap: true },
+								{
+									label: 'Extraction model',
+									value: d.extraction_model ?? '—',
+									wrap: true
+								}
+							]
+						: [{ label: 'Model', value: run.model_name ?? '—', wrap: true }];
 				return [
 					{ label: 'Method', value: d.extraction_method ? METHOD_LABELS[d.extraction_method] : '—' },
 					{ label: 'Provider', value: run.provider_name ?? '—' },
-					{ label: 'Model', value: run.model_name ?? '—', wrap: true },
+					...modelRows,
 					{ label: 'Chapters', value: formatChapters(d.chapters_processed, d.total_chapters) },
 					{ label: 'Recipes found', value: count(d.recipes_found) },
 					{ label: 'Cost', value: formatCost(run.cost_usd) },

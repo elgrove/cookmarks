@@ -59,6 +59,12 @@ Cookbook Content:
 
 Return ONLY a JSON array of recipe objects. No other text."""
 
+READ_PAGE_PROMPT = """Read all useful text from this cookbook page in natural reading order.
+Keep recipe titles, ingredient lists, quantities, section headings, and method steps distinct.
+Preserve the original wording and measurements.
+Omit running heads, page numbers, decorative text, and publisher furniture.
+Return only the page text. Do not describe the page or use Markdown code fences."""
+
 BOOK_KEYWORDS_PROMPT = """You are tagging a whole cookbook with a short set of keywords that capture what the book as a whole is about — its cuisine(s), region(s), theme, style, occasion, dietary slant or defining technique.
 
 These are book-level keywords, not recipe-level: pick tags that describe the collection, not any single dish. Favour terms a browser would use to find this kind of book (e.g. 'Italian', 'Baking', 'Vegetarian', 'Weeknight', 'Middle Eastern', 'Fermentation'). A keyword is a single word or short phrase, in Title Case.

@@ -53,8 +53,6 @@
 	let replacing = $state<string | null>(null);
 
 	let canSubmit = $derived(title.trim().length > 0 && author.trim().length > 0);
-	// Extraction reads the EPUB spine, and a PDF stays a PDF in the library.
-	let noExtraction = $derived(staged?.format === 'pdf');
 	let offers = $derived(runs.filter((r) => duplicateOf(r) !== null).length);
 
 	function accept(book: StagedBook) {
@@ -114,7 +112,7 @@
 				staging_id: staged.staging_id,
 				title: title.trim(),
 				author: author.trim(),
-				extract: extract && !noExtraction
+				extract
 			});
 			reset();
 		} catch (err) {
@@ -152,7 +150,7 @@
 	data-verify-duplicate-offers={offers}
 	data-verify-error={error}
 	data-verify-staged-format={staged?.format ?? ''}
-	data-verify-no-extraction={noExtraction ? 'true' : 'false'}
+	data-verify-no-extraction="false"
 >
 	<header class="masthead">
 		<p class="eyebrow">Library</p>
@@ -183,14 +181,10 @@
 				<input
 					type="checkbox"
 					bind:checked={extract}
-					disabled={stage === 'submitting' || noExtraction}
-					aria-describedby={noExtraction ? 'extract-note' : undefined}
+					disabled={stage === 'submitting'}
 				/>
 				Extract recipes once it is added
 			</label>
-			{#if noExtraction}
-				<p class="note" id="extract-note">Recipe extraction needs an EPUB.</p>
-			{/if}
 
 			<div class="actions">
 				<button class="btn primary" type="submit" disabled={!canSubmit || stage === 'submitting'}>
@@ -442,12 +436,6 @@
 		font-family: var(--f-grotesk);
 		font-size: 0.85rem;
 		color: var(--muted);
-	}
-	.note {
-		font-family: var(--f-grotesk);
-		font-size: 0.75rem;
-		color: var(--muted);
-		margin: -0.5rem 0 0 1.6rem;
 	}
 	.check input {
 		accent-color: var(--clay);

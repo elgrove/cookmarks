@@ -39,6 +39,7 @@ class ReadingMode(StrEnum):
 class ExtractionMethod(StrEnum):
     FILE = "file"
     BLOCK = "block"
+    PDF_OCR = "pdf_ocr"
 
 
 def enum_values(enum_cls: type[StrEnum]) -> list[str]:

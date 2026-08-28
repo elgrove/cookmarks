@@ -123,13 +123,21 @@ def find_decorative_images(epub_path: Path, members: list[str]) -> set[str]:
 
 
 def deduplicate_recipes_by_title(recipes: list[RecipeData]) -> list[RecipeData]:
-    seen_titles: set[str] = set()
     unique_recipes: list[RecipeData] = []
+    title_indexes: dict[str, int] = {}
     for recipe in recipes:
-        title_key = recipe.name.lower().strip()
-        if title_key not in seen_titles:
-            seen_titles.add(title_key)
+        title_key = recipe.name.casefold().strip()
+        existing_index = title_indexes.get(title_key)
+        if existing_index is None:
+            title_indexes[title_key] = len(unique_recipes)
             unique_recipes.append(recipe)
-        else:
-            logger.debug(f"Deduplicating recipe: {recipe.name}")
+            continue
+        existing = unique_recipes[existing_index]
+        existing_score = len(existing.ingredients) + sum(
+            len(step) for step in existing.instructions
+        )
+        candidate_score = len(recipe.ingredients) + sum(len(step) for step in recipe.instructions)
+        if candidate_score > existing_score:
+            unique_recipes[existing_index] = recipe
+        logger.debug(f"Deduplicating recipe: {recipe.name}")
     return unique_recipes

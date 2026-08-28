@@ -19,6 +19,10 @@ models = ["GEMINI:gemini-2.5-flash-lite", "GEMINI:gemini-2.5-flash", "OPENROUTER
 books  = ["nothing-fancy"]
 models = ["GEMINI:gemini-2.5-flash", "GEMINI:gemini-2.5-flash-lite"]
 
+[tasks.pdf_ocr]
+books = ["izakaya"]
+models = ["GEMINI:gemini-2.5-flash"]
+
 # Gold books. `calibre_id` resolves the EPUB from the Calibre library; `gold` is the
 # hand-curated truth (relative to this file).
 [[books]]
@@ -38,6 +42,14 @@ slug = "nothing-fancy"
 calibre_id = 227
 gold = "gold/nothing-fancy/recipes.json"
 has_photos = true
+
+[[books]]
+slug = "izakaya"
+calibre_id = 685
+gold = "gold/izakaya/recipes.json"
+has_photos = false
+format = "pdf"
+pages = [21, 70]
 
 [matching]
 # rapidfuzz token_set_ratio (0-100): the minimum name similarity for a fuzzy match,

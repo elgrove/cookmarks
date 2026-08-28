@@ -37,6 +37,7 @@ class StubProvider(AIProvider):
     requires_api_key = False
     models: ClassVar[dict[ModelRole, str]] = {
         ModelRole.IMAGE_MATCH: "stub-vision",
+        ModelRole.OCR: "stub-vision",
         ModelRole.MANY_RECIPES_PER_FILE: "stub-extract",
         ModelRole.ONE_RECIPE_PER_FILE: "stub-extract",
         ModelRole.BLOCKS_OF_FILES: "stub-extract",
@@ -46,6 +47,7 @@ class StubProvider(AIProvider):
     }
     # Matches the production (Gemini) width so stub vectors share the vec0 table.
     embedding_dimensions: ClassVar[int] = 3072
+    vision_model: ClassVar[str] = "stub-vision"
 
     def _complete(
         self, prompt: str, model: str, *, schema: dict | None = None, temp: float = 0
@@ -80,6 +82,14 @@ class StubProvider(AIProvider):
 
     def embed(self, text: str, task: EmbedTask) -> list[float]:
         return _hash_vector(text, self.embedding_dimensions)
+
+    def read_page(
+        self, image: bytes, media_type: str, model: str | None = None
+    ) -> tuple[str, Usage]:
+        token = hashlib.blake2b(image, digest_size=4).hexdigest()
+        return f"Stub cookbook page {token}", Usage(
+            cost_usd=Decimal("0"), input_tokens=0, output_tokens=0
+        )
 
     def embed_batch(self, texts: list[str], task: EmbedTask) -> list[list[float]]:
         return [_hash_vector(text, self.embedding_dimensions) for text in texts]
