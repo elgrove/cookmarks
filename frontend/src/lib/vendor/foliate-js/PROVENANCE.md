@@ -25,6 +25,9 @@ upstream commit and bump the SHA above.
   rest of the module is upstream's. Consequence, and the reason for it: nothing of pdfjs is
   bundled at all — `view.js` imports `pdf.js` only for files that sniff as PDF, so an EPUB-only
   session never fetches a byte of it.
+- **`pdf.js` passes `wasmUrl` to `getDocument()`.** Upstream does not pass this parameter. Without
+  it, pdf.js cannot load the OpenJPEG WebAssembly decoder, and PDFs with JPEG 2000 images render
+  blank pages. The WASM files ship from `frontend/static/pdfjs/` alongside the main pdf.js modules.
 - **The pdfjs `*.map` source maps are not vendored** (7.7 MB of debug artefacts for a minified
   dependency we do not debug). `pdf.mjs` and `pdf.worker.mjs` still carry their
   `sourceMappingURL` comment, and the SPA catch-all answers the missing map with `index.html`,
