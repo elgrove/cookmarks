@@ -4,8 +4,9 @@ from collections import OrderedDict
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, HTTPException, Query, Response, status
-from sqlalchemy import String, case, cast, func, literal_column, or_, select
+from sqlalchemy import String, case, cast, func, literal_column, or_, over, select
 from sqlalchemy.orm import Session, joinedload, selectinload
+from sqlalchemy.sql.elements import ColumnElement
 
 from app.api.deps import CurrentUser
 from app.api.lists import favourite_list_id
@@ -68,6 +69,16 @@ def _summary(recipe: Recipe, book: Book) -> RecipeSummary:
     )
 
 
+def _keyword_match(criterion: ColumnElement[bool]) -> ColumnElement[bool]:
+    """Recipes carrying a matching keyword. `Recipe.keywords.any()` would render a
+    correlated EXISTS, which SQLite re-runs once per candidate row."""
+    keyword_ids = select(Keyword.id).where(criterion)
+    recipe_ids = select(recipe_keywords.c.recipe_id).where(
+        recipe_keywords.c.keyword_id.in_(keyword_ids)
+    )
+    return Recipe.id.in_(recipe_ids)
+
+
 def _relevance_score(terms: list[str]):
     """How well a row answers the query: a name hit beats a keyword hit, which beats
     a hit only in the book or the ingredients. Ties fall through to the shuffle."""
@@ -76,7 +87,7 @@ def _relevance_score(terms: list[str]):
         (Recipe.name_folded == whole, 4),
         (Recipe.name_folded.startswith(whole), 3),
         (or_(*[Recipe.name_folded.contains(term) for term in terms]), 2),
-        (Recipe.keywords.any(Keyword.name.ilike(f"%{whole}%")), 1),
+        (_keyword_match(Keyword.name.ilike(f"%{whole}%")), 1),
         else_=0,
     )
 
@@ -133,12 +144,12 @@ def _search_conditions(
                 Book.title_folded.contains(term),
                 Book.author_folded.contains(term),
                 cast(Recipe.ingredients, String).ilike(like),
-                Recipe.keywords.any(Keyword.name.ilike(like)),
+                _keyword_match(Keyword.name.ilike(like)),
             )
         )
     # Each chosen chip must be present (AND-narrowing).
     for kw in keywords:
-        conditions.append(Recipe.keywords.any(Keyword.name == kw))
+        conditions.append(_keyword_match(Keyword.name == kw))
     if book_id is not None:
         conditions.append(Recipe.book_id == book_id)
     if author is not None:
@@ -172,19 +183,36 @@ def search_recipes(
     conditions = _search_conditions(q, keywords, book_id, author)
 
     filtered = select(Recipe.id).join(Book, Recipe.book_id == Book.id).where(*conditions)
-    total = session.scalar(select(func.count()).select_from(filtered.subquery())) or 0
+    order = [*_search_order(q, sort, seed), Recipe.id]
 
-    rows = session.execute(
-        select(Recipe, Book)
+    # `count(*) OVER ()` sees the whole filtered set, so the page carries its own
+    # total and no second counting scan is needed. It is windowed over ids alone —
+    # widening it to the entities makes SQLite materialise every matching row.
+    page = (
+        select(Recipe.id.label("id"), over(func.count()).label("total"))
         .join(Book, Recipe.book_id == Book.id)
         .where(*conditions)
-        .order_by(*_search_order(q, sort, seed), Recipe.id)
+        .order_by(*order)
         .offset(offset)
         .limit(limit)
+        .subquery()
+    )
+    rows = session.execute(
+        select(Recipe, Book, page.c.total)
+        .join(page, Recipe.id == page.c.id)
+        .join(Book, Recipe.book_id == Book.id)
+        .order_by(*order)
         .options(selectinload(Recipe.keywords))
     ).all()
 
-    items = [_summary(recipe, book) for recipe, book in rows]
+    # An empty page carries no total, so a result set that ends before the offset
+    # (or matches nothing at all) still has to count.
+    total = (
+        rows[0].total
+        if rows
+        else session.scalar(select(func.count()).select_from(filtered.subquery())) or 0
+    )
+    items = [_summary(recipe, book) for recipe, book, _ in rows]
 
     # Facets: the keywords most common among the matching recipes, so the chips
     # can re-rank to what narrows further. Already-selected keywords are dropped

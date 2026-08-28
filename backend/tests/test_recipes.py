@@ -184,6 +184,16 @@ def test_pagination(client: TestClient) -> None:
     assert [r["name"] for r in second["items"]] == ["Recipe 2"]
 
 
+def test_pagination_past_the_end_keeps_the_total(client: TestClient) -> None:
+    # No rows means no windowed count to read off them, so the total falls back
+    # to its own query rather than collapsing to 0.
+    body = client.get(
+        "/api/recipes", params={"q": "recipe", "sort": "name", "limit": 2, "offset": 10}
+    ).json()
+    assert body["items"] == []
+    assert body["total"] == 3
+
+
 def test_facets_rank_cooccurring_keywords(client: TestClient) -> None:
     # "recipe" matches all three; only Recipe 0 carries keywords, so the facets
     # are its keywords, counted over the matching set.
