@@ -172,7 +172,11 @@ async def chat(
     return adapter.streaming_response(
         adapter.run_stream(
             message_history=history,
-            deps=AssistantDeps(session=session, user_id=user.id),
+            deps=AssistantDeps(
+                session=session,
+                user_id=user.id,
+                user_instructions=user.user_instructions,
+            ),
             on_complete=persist,
         )
     )

@@ -108,7 +108,7 @@
 		{#if unavailable}
 			<p class="notice">
 				No AI provider is set up yet, so the assistant has nothing to think with. Choose one in
-				<a href="/admin">Admin</a>.
+				<a href="/config">Configuration</a>.
 			</p>
 		{:else if messages.length === 0}
 			<div class="opening">

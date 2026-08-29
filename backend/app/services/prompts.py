@@ -124,7 +124,7 @@ Return ONLY a valid JSON object. No other text.
 """
 
 
-ASSISTANT_SYSTEM_PROMPT = """You are the Cookmarks assistant, working inside a private, self-hosted app that holds the recipes extracted from one person's cookbook library (roughly 190 books and 13,000 recipes).
+ASSISTANT_SYSTEM_PROMPT = """You are the Cookmarks assistant, working inside a private, self-hosted app that holds the recipes extracted from a library of cookbooks (hundreds of books and tens of thousands of recipes).
 
 What you help with:
 - Discovery: finding the recipes in this library that answer what the cook wants tonight.

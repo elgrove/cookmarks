@@ -199,31 +199,20 @@ a {
 	border-bottom-color: var(--accent);
 }
 
-/* Admin icon pins to the top-right of the nav (DESIGN §5 chrome). */
-.nav .admin-icon {
-	margin-left: auto;
-	flex: none;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	width: 2rem;
-	height: 2rem;
-	color: var(--muted);
-	transition: color 0.18s var(--ease-out);
-}
-.nav .admin-icon:hover,
-.nav .admin-icon.active {
-	color: var(--ink);
-}
-
-/* Account chrome, right of the admin icon. Absent entirely when the deployment runs
-   with COOKMARKS_AUTH_MODE=none. */
+/* Account chrome. Absent entirely when the deployment runs with COOKMARKS_AUTH_MODE=none. */
 .nav .who {
+	margin-left: auto;
 	font-family: var(--f-mono);
 	font-size: 0.72rem;
 	letter-spacing: 0.08em;
 	text-transform: uppercase;
 	color: var(--muted);
+	text-decoration: none;
+	transition: color 0.18s var(--ease-out);
+}
+.nav .who:hover,
+.nav .who.active {
+	color: var(--ink);
 }
 
 .nav .signout {
@@ -248,13 +237,7 @@ a {
 @media (max-width: 760px) {
 	.nav {
 		gap: 0.9rem;
-		/* Account chrome drops to a second line rather than being clipped off the
-		   right edge (DESIGN §8: no horizontal scroll). */
 		flex-wrap: wrap;
-	}
-	/* The username is redundant chrome on a phone; the sign-out control stays. */
-	.nav .who {
-		display: none;
 	}
 	.nav .signout {
 		margin-left: auto;

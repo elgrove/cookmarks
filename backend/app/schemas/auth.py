@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class LoginRequest(BaseModel):
@@ -11,14 +11,17 @@ class LoginRequest(BaseModel):
 
 
 class AuthMe(BaseModel):
-    """The signed-in user, plus the deployment's auth mode — the SPA hides all account
-    chrome (login, logout, the Users tab) when the mode is "none"."""
-
     id: uuid.UUID
     username: str
     is_admin: bool
     auth_mode: str
+    user_instructions: str | None = None
     book_grid_density: Literal["sparse", "standard", "compact"] = "standard"
+
+
+class UserUpdate(BaseModel):
+    user_instructions: str | None = Field(default=None, max_length=4000)
+    book_grid_density: Literal["sparse", "standard", "compact"] | None = None
 
 
 class UserPreferencesUpdate(BaseModel):

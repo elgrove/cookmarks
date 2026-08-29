@@ -222,3 +222,71 @@ def _members(session: Session, list_id: uuid.UUID) -> list[uuid.UUID]:
             select(RecipeListItem.recipe_id).where(RecipeListItem.recipe_list_id == list_id)
         ).all()
     )
+
+
+def test_user_instructions_reach_model_instructions(agent, session: Session) -> None:
+    seen_prompts: list[str] = []
+
+    def respond(_messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+        if info.instructions:
+            seen_prompts.append(info.instructions)
+        return ModelResponse(parts=[TextPart("Advice ready.")])
+
+    user = session.scalar(select(User).where(User.username == "tester"))
+    assert user is not None
+    deps = AssistantDeps(
+        session=session,
+        user_id=user.id,
+        user_instructions="Vegetarian only. Cooking with cast iron on induction.",
+    )
+    result = agent.run_sync("what to cook", deps=deps, model=FunctionModel(respond))
+    assert result.output == "Advice ready."
+    assert len(seen_prompts) == 1
+    assert "Vegetarian only. Cooking with cast iron on induction." in seen_prompts[0]
+    assert "User instructions for the user of this app:" in seen_prompts[0]
+
+
+def test_no_user_instructions_uses_base_prompt(agent, session: Session) -> None:
+    seen_prompts: list[str] = []
+
+    def respond(_messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+        if info.instructions:
+            seen_prompts.append(info.instructions)
+        return ModelResponse(parts=[TextPart("Base advice.")])
+
+    user = session.scalar(select(User).where(User.username == "tester"))
+    assert user is not None
+    deps = AssistantDeps(session=session, user_id=user.id, user_instructions=None)
+    result = agent.run_sync("what to cook", deps=deps, model=FunctionModel(respond))
+    assert result.output == "Base advice."
+    assert len(seen_prompts) == 1
+    assert "User instructions for the user of this app:" not in seen_prompts[0]
+
+
+def test_user_instructions_change_response_and_do_not_cross_accounts(
+    agent, session: Session
+) -> None:
+    user_a = create_user(session, "cook_a", "password123")
+    user_b = create_user(session, "cook_b", "password456")
+
+    def respond(_messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+        if info.instructions and "Nut allergy" in info.instructions:
+            return ModelResponse(parts=[TextPart("Filtered out nuts.")])
+        return ModelResponse(parts=[TextPart("Standard recommendation.")])
+
+    deps_a = AssistantDeps(
+        session=session,
+        user_id=user_a.id,
+        user_instructions="Nut allergy. Avoid peanuts and tree nuts.",
+    )
+    result_a = agent.run_sync("suggest dinner", deps=deps_a, model=FunctionModel(respond))
+    assert result_a.output == "Filtered out nuts."
+
+    deps_b = AssistantDeps(
+        session=session,
+        user_id=user_b.id,
+        user_instructions=None,
+    )
+    result_b = agent.run_sync("suggest dinner", deps=deps_b, model=FunctionModel(respond))
+    assert result_b.output == "Standard recommendation."
+

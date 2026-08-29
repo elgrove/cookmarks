@@ -11,10 +11,10 @@ export const authMeSchema = z.object({
 	username: z.string(),
 	is_admin: z.boolean(),
 	auth_mode: z.string(),
-	book_grid_density: bookGridDensitySchema
+	user_instructions: z.string().nullable().optional(),
+	book_grid_density: bookGridDensitySchema.optional().default('standard')
 });
 
-// Mirrors UserRead from the admin /api/users endpoints.
 export const userSchema = z.object({
 	id: z.string(),
 	username: z.string(),
@@ -25,12 +25,23 @@ export const userSchema = z.object({
 export type AuthMe = z.infer<typeof authMeSchema>;
 export type User = z.infer<typeof userSchema>;
 
-/** The current session, or null when nobody is signed in — a 401 is an expected
- *  answer here, not an error. `fetchFn` is injectable for SSR/tests. */
 export async function fetchMe(fetchFn: typeof fetch = fetch): Promise<AuthMe | null> {
 	const res = await fetchFn('/api/auth/me');
 	if (res.status === 401) return null;
 	if (!res.ok) throw new Error(`GET /api/auth/me → ${res.status}`);
+	return authMeSchema.parse(await res.json());
+}
+
+export async function updateMe(
+	input: { user_instructions?: string | null },
+	fetchFn: typeof fetch = fetch
+): Promise<AuthMe> {
+	const res = await fetchFn('/api/auth/me', {
+		method: 'PATCH',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(input)
+	});
+	if (!res.ok) throw new Error(await errorMessage(res, "Couldn't update your instructions."));
 	return authMeSchema.parse(await res.json());
 }
 
