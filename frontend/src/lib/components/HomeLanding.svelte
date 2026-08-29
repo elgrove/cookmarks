@@ -152,7 +152,7 @@
 	}
 
 	.feature + .continue {
-		margin-top: 4.5rem;
+		margin-top: 3.5rem;
 	}
 
 	.feature-plate {
@@ -332,7 +332,7 @@
 			margin-top: 0.2rem;
 		}
 		.feature + .continue {
-			margin-top: 3rem;
+			margin-top: 2.5rem;
 		}
 		/* The cards reshape into the library's text-first rows at this width, so the
 		   strip becomes a hairline list rather than a column of plates. */
