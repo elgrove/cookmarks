@@ -11,7 +11,7 @@ export const authMeSchema = z.object({
 	username: z.string(),
 	is_admin: z.boolean(),
 	auth_mode: z.string(),
-	book_grid_density: bookGridDensitySchema.default('standard')
+	book_grid_density: bookGridDensitySchema
 });
 
 // Mirrors UserRead from the admin /api/users endpoints.

@@ -27,15 +27,12 @@
 
 	let {
 		books,
-		density = 'standard',
+		density = $bindable('standard'),
 		onDensityChange
 	}: BooksLibraryProps = $props();
 
-	let localDensity = $state<BookGridDensity | null>(null);
-	let currentDensity = $derived(localDensity ?? density);
-
 	function setDensity(d: BookGridDensity) {
-		localDensity = d;
+		density = d;
 		onDensityChange?.(d);
 	}
 
@@ -213,7 +210,7 @@
 	data-verify-first={visible[0]?.title ?? ''}
 	data-verify-kw-selected={selectedKeywords.join('|')}
 	data-verify-kw-chips={chips.map((c) => c.name).join('|')}
-	data-verify-density={currentDensity}
+	data-verify-density={density}
 >
 	<header class="head">
 		<h1 class="display">Books</h1>
@@ -266,8 +263,8 @@
 					<button
 						type="button"
 						class="density-btn mono"
-						class:on={currentDensity === d}
-						aria-pressed={currentDensity === d}
+						class:on={density === d}
+						aria-pressed={density === d}
 						data-density={d}
 						onclick={() => setDensity(d)}
 					>
@@ -318,7 +315,7 @@
 			{#if books.length === 0}No books yet.{:else if query}No books match “{search.trim()}”.{:else}No extracted books yet.{/if}
 		</p>
 	{:else}
-		<ul class="grid" data-density={currentDensity}>
+		<ul class="grid" data-density={density}>
 			{#each visible as book, i (book.id)}
 				<li class="cell" style={`animation-delay: ${Math.min(i * 30, 600)}ms`}>
 					<BookCard

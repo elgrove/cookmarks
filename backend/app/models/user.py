@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from sqlalchemy import DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
@@ -15,7 +16,7 @@ class User(UUIDAuditBase):
     username: Mapped[str] = mapped_column(String(100), unique=True)
     password_hash: Mapped[str] = mapped_column(String(255))
     is_admin: Mapped[bool] = mapped_column(default=False)
-    book_grid_density: Mapped[str] = mapped_column(
+    book_grid_density: Mapped[Literal["sparse", "standard", "compact"]] = mapped_column(
         String(20), default="standard", server_default="standard"
     )
 

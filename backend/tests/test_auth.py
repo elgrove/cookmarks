@@ -48,6 +48,15 @@ def test_update_preferences(anon: TestClient) -> None:
     assert me.status_code == 200
     assert me.json()["book_grid_density"] == "compact"
 
+    # Invalid density is rejected with 422.
+    invalid = anon.patch("/api/auth/me/preferences", json={"book_grid_density": "ultra"})
+    assert invalid.status_code == 422
+
+
+def test_update_preferences_requires_auth(anon: TestClient) -> None:
+    res = anon.patch("/api/auth/me/preferences", json={"book_grid_density": "compact"})
+    assert res.status_code == 401
+
 
 def test_wrong_password_is_rejected_without_a_cookie(anon: TestClient) -> None:
     res = anon.post("/api/auth/login", json={"username": "tester", "password": "nope"})

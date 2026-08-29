@@ -18,7 +18,7 @@ class AuthMe(BaseModel):
     username: str
     is_admin: bool
     auth_mode: str
-    book_grid_density: str = "standard"
+    book_grid_density: Literal["sparse", "standard", "compact"] = "standard"
 
 
 class UserPreferencesUpdate(BaseModel):

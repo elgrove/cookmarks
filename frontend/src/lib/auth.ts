@@ -6,8 +6,12 @@ const isBrowser = typeof window !== 'undefined';
 
 function readStoredDensity(): BookGridDensity {
 	if (!isBrowser) return 'standard';
-	const val = localStorage.getItem(STORAGE_KEY);
-	return val === 'sparse' || val === 'compact' || val === 'standard' ? val : 'standard';
+	try {
+		const val = localStorage.getItem(STORAGE_KEY);
+		return val === 'sparse' || val === 'compact' || val === 'standard' ? val : 'standard';
+	} catch {
+		return 'standard';
+	}
 }
 
 /** The resolved session for this page load — set once by the layout guard, read by the
@@ -24,7 +28,11 @@ export function getBookGridDensity(): BookGridDensity {
 /** Update density optimistically in store, in backend profile if logged in, and localStorage. */
 export async function setBookGridDensity(density: BookGridDensity): Promise<void> {
 	if (isBrowser) {
-		localStorage.setItem(STORAGE_KEY, density);
+		try {
+			localStorage.setItem(STORAGE_KEY, density);
+		} catch {
+			/* ignore storage quota / access errors */
+		}
 	}
 	const user = get(currentUser);
 	if (user) {
