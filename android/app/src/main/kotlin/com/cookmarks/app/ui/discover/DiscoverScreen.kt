@@ -1,11 +1,11 @@
 package com.cookmarks.app.ui.discover
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -33,33 +35,37 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.cookmarks.app.api.Api
 import com.cookmarks.app.ui.components.MonoLabel
 import com.cookmarks.app.ui.components.rememberLoad
 import com.cookmarks.app.ui.theme.CmTheme
 
-private const val RESTING_CHIPS = 30
-private const val SEARCH_CHIPS = 60
+private const val INSPIRATION_POOL_SIZE = 100
+private const val INSPIRATION_KEYWORD_COUNT = 6
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun DiscoverScreen(onPlay: (GameSource) -> Unit) {
     val colors = CmTheme.colors
-    var selected by remember { mutableStateOf(listOf<String>()) }
-    var filter by remember { mutableStateOf("") }
+    var query by remember { mutableStateOf("") }
     val keywords by rememberLoad(Unit) { Api.service.keywords(limit = 500) }
 
-    val all = keywords?.getOrNull().orEmpty().map { it.name }.distinctBy(String::lowercase)
-    val query = filter.trim()
-    val matches = all.filter { it !in selected && it.contains(query, ignoreCase = true) }
-    val cap = if (query.isEmpty()) RESTING_CHIPS else SEARCH_CHIPS
-    val shown = selected + matches.take(cap)
+    val trimmedQuery = query.trim()
+    val inspiration = remember(keywords) {
+        keywords?.getOrNull()
+            .orEmpty()
+            .sortedByDescending { it.recipe_count }
+            .take(INSPIRATION_POOL_SIZE)
+            .shuffled()
+            .take(INSPIRATION_KEYWORD_COUNT)
+    }
+    val play = {
+        onPlay(
+            if (trimmedQuery.isEmpty()) GameSource.All else GameSource.Search(trimmedQuery, emptyList()),
+        )
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -74,23 +80,19 @@ fun DiscoverScreen(onPlay: (GameSource) -> Unit) {
                 color = colors.ink,
                 modifier = Modifier.padding(bottom = 4.dp),
             )
-            Text(
-                text = "A deck of recipes you haven't kept. Swipe right to favourite, left to dismiss.",
-                style = MaterialTheme.typography.bodyMedium.copy(fontStyle = FontStyle.Italic),
-                color = colors.muted,
-                modifier = Modifier.padding(bottom = 16.dp),
-            )
-            MonoLabel("Narrow the deck by keyword", colour = colors.faint, modifier = Modifier.padding(bottom = 8.dp))
             OutlinedTextField(
-                value = filter,
-                onValueChange = { filter = it },
-                placeholder = { Text("Find a keyword") },
+                value = query,
+                onValueChange = { query = it },
+                label = { Text("Search recipes") },
+                placeholder = { Text("Search recipes") },
                 singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { play() }),
                 leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, tint = colors.muted) },
                 trailingIcon = {
-                    if (filter.isNotEmpty()) {
-                        IconButton(onClick = { filter = "" }) {
-                            Icon(Icons.Filled.Close, contentDescription = "Clear keyword search", tint = colors.faint)
+                    if (query.isNotEmpty()) {
+                        IconButton(onClick = { query = "" }) {
+                            Icon(Icons.Filled.Close, contentDescription = "Clear recipe search", tint = colors.faint)
                         }
                     }
                 },
@@ -106,63 +108,36 @@ fun DiscoverScreen(onPlay: (GameSource) -> Unit) {
                     CircularProgressIndicator(color = colors.clay, modifier = Modifier.size(24.dp))
                 }
             }
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                shown.forEach { keyword ->
-                    val active = keyword in selected
-                    MonoLabel(
-                        keyword,
-                        colour = if (active) colors.bg else colors.muted,
-                        modifier = Modifier
-                            .border(1.dp, if (active) colors.clay else colors.lineStrong)
-                            .then(if (active) Modifier.background(colors.clay) else Modifier)
-                            .clickable(
-                                role = Role.Checkbox,
-                                onClickLabel = if (active) "Remove keyword $keyword" else "Select keyword $keyword",
-                            ) {
-                                selected = if (active) selected - keyword else selected + keyword
-                            }
-                            .semantics {
-                                this.selected = active
-                                this.stateDescription = if (active) "selected" else "not selected"
-                            }
-                            .padding(horizontal = 10.dp, vertical = 6.dp),
-                    )
+            if (inspiration.isNotEmpty()) {
+                MonoLabel("Start with an idea", colour = colors.faint, modifier = Modifier.padding(bottom = 8.dp))
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    inspiration.forEach { keyword ->
+                        MonoLabel(
+                            keyword.name,
+                            colour = colors.muted,
+                            modifier = Modifier
+                                .border(1.dp, colors.lineStrong)
+                                .defaultMinSize(minHeight = 48.dp)
+                                .clickable {
+                                    query = keyword.name
+                                }
+                                .padding(horizontal = 10.dp, vertical = 6.dp),
+                        )
+                    }
                 }
-            }
-            if (matches.size > cap) {
-                Text(
-                    text = "${matches.size - cap} more — search to narrow.",
-                    style = MaterialTheme.typography.bodySmall.copy(fontStyle = FontStyle.Italic),
-                    color = colors.faint,
-                    modifier = Modifier.padding(top = 12.dp),
-                )
-            }
-            if (all.isNotEmpty() && matches.isEmpty() && query.isNotEmpty()) {
-                Text(
-                    text = "No keyword matches “$query”.",
-                    style = MaterialTheme.typography.bodySmall.copy(fontStyle = FontStyle.Italic),
-                    color = colors.faint,
-                    modifier = Modifier.padding(top = 12.dp),
-                )
             }
         }
         HorizontalDivider(color = colors.line)
         Button(
-            onClick = {
-                onPlay(if (selected.isEmpty()) GameSource.All else GameSource.Search("", selected))
-            },
+            onClick = play,
             shape = MaterialTheme.shapes.extraSmall,
             colors = ButtonDefaults.buttonColors(containerColor = colors.clay),
             modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
         ) {
-            val label = when {
-                selected.isEmpty() -> "Play all recipes"
-                selected.size == 1 -> "Play ${selected.single()}"
-                else -> "Play ${selected.size} keywords"
-            }
+            val label = if (trimmedQuery.isEmpty()) "Play all recipes" else "Play “$trimmedQuery”"
             Text(text = label, style = MaterialTheme.typography.labelLarge)
         }
     }

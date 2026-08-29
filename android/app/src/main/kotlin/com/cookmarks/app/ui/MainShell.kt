@@ -108,51 +108,54 @@ fun MainShell() {
                 Column {
                     HorizontalDivider(color = colors.lineStrong)
                     Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(colors.bg)
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                    ) {
+                        Tabs.forEach { tab ->
+                            val active = route == tab.route || route.startsWith("${tab.route}/") ||
+                                (tab.route == "recipes" && route.startsWith("recipe/")) ||
+                                (tab.route == "books" && route.startsWith("read/")) ||
+                                (tab.route == "lists" && route.startsWith("read-list/"))
+                            Text(
+                                text = tab.label.uppercase(),
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 13.sp, lineHeight = 18.sp),
+                                color = if (active) colors.clay else colors.muted,
+                                maxLines = 1,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable(
+                                        role = Role.Tab,
+                                        onClickLabel = "Switch to ${tab.label}",
+                                    ) {
+                                        if (active) {
+                                            navController.popBackStack(tab.route, inclusive = false)
+                                        } else {
+                                            navController.navigate(tab.route) {
+                                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                                launchSingleTop = true
+                                                restoreState = true
+                                            }
+                                        }
+                                    }
+                                    .semantics {
+                                        selected = active
+                                    }
+                                    .padding(horizontal = 4.dp, vertical = 16.dp),
+                            )
+                        }
+                    }
+                    Row(
+                        horizontalArrangement = Arrangement.End,
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .fillMaxWidth()
                             .background(colors.bg)
-                            .padding(vertical = 4.dp)
-                            .padding(bottom = 8.dp),
+                            .padding(horizontal = 8.dp),
                     ) {
-                        Row(
-                            horizontalArrangement = Arrangement.SpaceEvenly,
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            Tabs.forEach { tab ->
-                                val active = route == tab.route || route.startsWith("${tab.route}/") ||
-                                    (tab.route == "recipes" && route.startsWith("recipe/")) ||
-                                    (tab.route == "books" && route.startsWith("read/")) ||
-                                    (tab.route == "lists" && route.startsWith("read-list/"))
-                                Text(
-                                    text = tab.label.uppercase(),
-                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 13.sp, lineHeight = 18.sp),
-                                    color = if (active) colors.clay else colors.muted,
-                                    modifier = Modifier
-                                        .clickable(
-                                            role = Role.Tab,
-                                            onClickLabel = "Switch to ${tab.label}",
-                                        ) {
-                                            if (active) {
-                                                navController.popBackStack(tab.route, inclusive = false)
-                                            } else {
-                                                navController.navigate(tab.route) {
-                                                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                                    launchSingleTop = true
-                                                    restoreState = true
-                                                }
-                                            }
-                                        }
-                                        .semantics {
-                                            selected = active
-                                        }
-                                        .padding(horizontal = 20.dp, vertical = 20.dp),
-                                )
-                            }
-                        }
                         IconButton(
                             onClick = { navController.navigate("admin") { launchSingleTop = true } },
-                            modifier = Modifier.padding(end = 4.dp),
                         ) {
                             Icon(
                                 Icons.Filled.Person,

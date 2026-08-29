@@ -51,6 +51,7 @@ import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
 import com.cookmarks.app.api.Api
 import com.cookmarks.app.api.RecipeDetail
+import com.cookmarks.app.ui.cleanTitle
 import com.cookmarks.app.ui.components.CentredState
 import com.cookmarks.app.ui.components.ErrorState
 import com.cookmarks.app.ui.components.MonoLabel
@@ -80,7 +81,7 @@ fun GameScreen(source: GameSource, onBack: () -> Unit) {
         HorizontalDivider(color = colors.line)
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
             when {
-                deck.cards.isNotEmpty() -> CardStack(deck)
+                deck.cards.isNotEmpty() -> CardStack(deck, source)
                 deck.error != null -> ErrorState(deck.error ?: "", onRetry = { deck.refill() })
                 deck.loading -> CentredState { CircularProgressIndicator(color = colors.clay) }
                 deck.exhausted -> CentredState {
@@ -114,7 +115,7 @@ private fun sourceLabel(source: GameSource): String = when (source) {
 }
 
 @Composable
-private fun CardStack(deck: DeckController) {
+private fun CardStack(deck: DeckController, source: GameSource) {
     BoxWithConstraints(modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 16.dp)) {
         val width = constraints.maxWidth.toFloat()
         val visible = deck.cards.take(3)
@@ -122,6 +123,7 @@ private fun CardStack(deck: DeckController) {
             key(card.id) {
                 PlayCard(
                     card = card,
+                    source = source,
                     width = width,
                     depth = visible.indexOf(card),
                     onSwipe = { favourite -> deck.swipe(card, favourite) },
@@ -132,7 +134,13 @@ private fun CardStack(deck: DeckController) {
 }
 
 @Composable
-private fun PlayCard(card: GameCard, width: Float, depth: Int, onSwipe: (Boolean) -> Unit) {
+private fun PlayCard(
+    card: GameCard,
+    source: GameSource,
+    width: Float,
+    depth: Int,
+    onSwipe: (Boolean) -> Unit,
+) {
     val colors = CmTheme.colors
     val onTop = depth == 0
     val scope = rememberCoroutineScope()
@@ -180,7 +188,7 @@ private fun PlayCard(card: GameCard, width: Float, depth: Int, onSwipe: (Boolean
             }
             .then(dragModifier),
     ) {
-        GameCardFace(card, flippable = onTop)
+        GameCardFace(card, source, flippable = onTop)
         if (onTop) {
             val pull = (abs(offsetX.value) / threshold).coerceIn(0f, 1f)
             if (pull > 0f) {
@@ -203,7 +211,7 @@ private fun PlayCard(card: GameCard, width: Float, depth: Int, onSwipe: (Boolean
 }
 
 @Composable
-private fun GameCardFace(card: GameCard, flippable: Boolean) {
+private fun GameCardFace(card: GameCard, source: GameSource, flippable: Boolean) {
     val colors = CmTheme.colors
     var flipped by remember { mutableStateOf(false) }
     val angle by animateFloatAsState(if (flipped) 180f else 0f, tween(350), label = "flip")
@@ -227,10 +235,10 @@ private fun GameCardFace(card: GameCard, flippable: Boolean) {
             ) { flipped = !flipped },
     ) {
         if (angle <= 90f) {
-            CardFront(card, state)
+            CardFront(card, source, state)
         } else {
             Box(modifier = Modifier.fillMaxSize().graphicsLayer { rotationY = 180f }) {
-                CardBack(state)
+                CardBack(source, state)
             }
         }
     }
@@ -238,8 +246,15 @@ private fun GameCardFace(card: GameCard, flippable: Boolean) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun CardHeading(recipe: RecipeDetail) {
+private fun CardHeading(recipe: RecipeDetail, source: GameSource) {
     val colors = CmTheme.colors
+    if (source !is GameSource.Book) {
+        MonoLabel(
+            "${cleanTitle(recipe.book_title)} — ${recipe.book_author}",
+            colour = colors.faint,
+            modifier = Modifier.padding(bottom = 6.dp),
+        )
+    }
     Text(
         text = recipe.name,
         style = MaterialTheme.typography.displaySmall,
@@ -250,6 +265,7 @@ private fun CardHeading(recipe: RecipeDetail) {
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
+            maxLines = 2,
             modifier = Modifier.padding(bottom = 16.dp),
         ) {
             recipe.keywords.forEach { keyword ->
@@ -266,19 +282,19 @@ private fun CardHeading(recipe: RecipeDetail) {
 }
 
 @Composable
-private fun CardBack(state: Result<RecipeDetail>?) {
+private fun CardBack(source: GameSource, state: Result<RecipeDetail>?) {
     val colors = CmTheme.colors
     val recipe = state?.getOrNull()
     when {
         recipe == null -> CentredState { CircularProgressIndicator(color = colors.clay) }
-        recipe.has_image -> RecipeContent(recipe, controls = false, header = { CardHeading(recipe) })
+        recipe.has_image -> RecipeContent(recipe, controls = false, header = { CardHeading(recipe, source) })
         else -> Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp, vertical = 24.dp),
         ) {
-            CardHeading(recipe)
+            CardHeading(recipe, source)
             Text(
                 text = recipe.description?.takeIf { it.isNotBlank() } ?: "No description for this recipe.",
                 style = MaterialTheme.typography.bodyLarge.copy(fontStyle = FontStyle.Italic),
@@ -289,11 +305,11 @@ private fun CardBack(state: Result<RecipeDetail>?) {
 }
 
 @Composable
-private fun CardFront(card: GameCard, state: Result<RecipeDetail>?) {
+private fun CardFront(card: GameCard, source: GameSource, state: Result<RecipeDetail>?) {
     val colors = CmTheme.colors
     val recipe = state?.getOrNull()
     if (recipe != null && !recipe.has_image) {
-        RecipeContent(recipe, controls = false, header = { CardHeading(recipe) })
+        RecipeContent(recipe, controls = false, header = { CardHeading(recipe, source) })
         return
     }
     Column(
@@ -316,7 +332,7 @@ private fun CardFront(card: GameCard, state: Result<RecipeDetail>?) {
             }
             return@Column
         }
-        CardHeading(recipe)
+        CardHeading(recipe, source)
         AsyncImage(
             model = Api.recipeImageUrl(recipe.id),
             contentDescription = "Image of ${recipe.name}",
