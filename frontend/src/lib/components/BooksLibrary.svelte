@@ -31,6 +31,27 @@
 		onDensityChange
 	}: BooksLibraryProps = $props();
 
+	let densityMenuOpen = $state(false);
+	let densityDropdownEl = $state<HTMLElement>();
+
+	$effect(() => {
+		if (!densityMenuOpen) return;
+		const onPointerDown = (e: Event) => {
+			if (densityDropdownEl && !densityDropdownEl.contains(e.target as Node)) {
+				densityMenuOpen = false;
+			}
+		};
+		const onKey = (e: KeyboardEvent) => {
+			if (e.key === 'Escape') densityMenuOpen = false;
+		};
+		window.addEventListener('pointerdown', onPointerDown);
+		window.addEventListener('keydown', onKey);
+		return () => {
+			window.removeEventListener('pointerdown', onPointerDown);
+			window.removeEventListener('keydown', onKey);
+		};
+	});
+
 	function setDensity(d: BookGridDensity) {
 		density = d;
 		onDensityChange?.(d);
@@ -256,21 +277,93 @@
 			<span class="label">Extracted only</span>
 		</label>
 
-		<div class="density" role="group" aria-label="Book grid density">
-			<div class="density-group">
-				{#each (['sparse', 'standard', 'compact'] as const) as d}
-					<button
-						type="button"
-						class="density-btn mono"
-						class:on={density === d}
-						aria-pressed={density === d}
-						data-density={d}
-						onclick={() => setDensity(d)}
-					>
-						{d}
-					</button>
-				{/each}
-			</div>
+		<div class="density-dropdown" bind:this={densityDropdownEl}>
+			<button
+				type="button"
+				class="density-trigger"
+				aria-label="Book grid density"
+				aria-haspopup="true"
+				aria-expanded={densityMenuOpen}
+				onclick={() => (densityMenuOpen = !densityMenuOpen)}
+			>
+				{#if density === 'sparse'}
+					<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true">
+						<rect x="1" y="2" width="6.2" height="5" rx="1" />
+						<rect x="8.8" y="2" width="6.2" height="5" rx="1" />
+						<rect x="1" y="9" width="6.2" height="5" rx="1" />
+						<rect x="8.8" y="9" width="6.2" height="5" rx="1" />
+					</svg>
+				{:else if density === 'compact'}
+					<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true">
+						<rect x="1" y="2" width="2.6" height="5" rx="0.5" />
+						<rect x="4.8" y="2" width="2.6" height="5" rx="0.5" />
+						<rect x="8.6" y="2" width="2.6" height="5" rx="0.5" />
+						<rect x="12.4" y="2" width="2.6" height="5" rx="0.5" />
+						<rect x="1" y="9" width="2.6" height="5" rx="0.5" />
+						<rect x="4.8" y="9" width="2.6" height="5" rx="0.5" />
+						<rect x="8.6" y="9" width="2.6" height="5" rx="0.5" />
+						<rect x="12.4" y="9" width="2.6" height="5" rx="0.5" />
+					</svg>
+				{:else}
+					<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true">
+						<rect x="1" y="2" width="3.8" height="5" rx="0.75" />
+						<rect x="6.1" y="2" width="3.8" height="5" rx="0.75" />
+						<rect x="11.2" y="2" width="3.8" height="5" rx="0.75" />
+						<rect x="1" y="9" width="3.8" height="5" rx="0.75" />
+						<rect x="6.1" y="9" width="3.8" height="5" rx="0.75" />
+						<rect x="11.2" y="9" width="3.8" height="5" rx="0.75" />
+					</svg>
+				{/if}
+			</button>
+
+			{#if densityMenuOpen}
+				<div class="density-menu" role="menu" aria-label="Book grid density options">
+					{#each (['sparse', 'standard', 'compact'] as const) as d}
+						<button
+							type="button"
+							class="density-option"
+							class:on={density === d}
+							aria-pressed={density === d}
+							data-density={d}
+							title={d.charAt(0).toUpperCase() + d.slice(1)}
+							aria-label={d.charAt(0).toUpperCase() + d.slice(1)}
+							onclick={() => {
+								setDensity(d);
+								densityMenuOpen = false;
+							}}
+						>
+							{#if d === 'sparse'}
+								<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true">
+									<rect x="1" y="2" width="6.2" height="5" rx="1" />
+									<rect x="8.8" y="2" width="6.2" height="5" rx="1" />
+									<rect x="1" y="9" width="6.2" height="5" rx="1" />
+									<rect x="8.8" y="9" width="6.2" height="5" rx="1" />
+								</svg>
+							{:else if d === 'compact'}
+								<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true">
+									<rect x="1" y="2" width="2.6" height="5" rx="0.5" />
+									<rect x="4.8" y="2" width="2.6" height="5" rx="0.5" />
+									<rect x="8.6" y="2" width="2.6" height="5" rx="0.5" />
+									<rect x="12.4" y="2" width="2.6" height="5" rx="0.5" />
+									<rect x="1" y="9" width="2.6" height="5" rx="0.5" />
+									<rect x="4.8" y="9" width="2.6" height="5" rx="0.5" />
+									<rect x="8.6" y="9" width="2.6" height="5" rx="0.5" />
+									<rect x="12.4" y="9" width="2.6" height="5" rx="0.5" />
+								</svg>
+							{:else}
+								<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true">
+									<rect x="1" y="2" width="3.8" height="5" rx="0.75" />
+									<rect x="6.1" y="2" width="3.8" height="5" rx="0.75" />
+									<rect x="11.2" y="2" width="3.8" height="5" rx="0.75" />
+									<rect x="1" y="9" width="3.8" height="5" rx="0.75" />
+									<rect x="6.1" y="9" width="3.8" height="5" rx="0.75" />
+									<rect x="11.2" y="9" width="3.8" height="5" rx="0.75" />
+								</svg>
+							{/if}
+						</button>
+					{/each}
+				</div>
+			{/if}
 		</div>
 
 		<p class="count mono">{countLabel} {books.length === 1 ? 'book' : 'books'}</p>
@@ -556,52 +649,86 @@
 		outline-offset: 2px;
 	}
 
-	.density {
+	.density-dropdown {
+		position: relative;
 		display: inline-flex;
 		align-items: center;
 	}
 
-	.density-group {
+	.density-trigger {
 		display: inline-flex;
-		border: 1px solid var(--line-strong);
-		border-radius: 2px;
-		overflow: hidden;
-		background-color: var(--bg);
-		line-height: 1;
-	}
-
-	.density-btn {
-		font-family: var(--f-mono);
-		font-size: 0.62rem;
-		letter-spacing: 0.04em;
-		text-transform: uppercase;
+		align-items: center;
+		justify-content: center;
+		width: 1.85rem;
+		height: 1.85rem;
+		padding: 0;
 		color: var(--muted);
-		background: transparent;
-		border: none;
-		border-right: 1px solid var(--line);
-		padding: 0.22rem 0.45rem;
-		line-height: 1;
+		background-color: var(--bg);
+		border: var(--border);
+		border-radius: 3px;
 		cursor: pointer;
 		transition:
-			background 0.16s var(--ease-out),
-			color 0.16s var(--ease-out);
+			color 0.16s var(--ease-out),
+			border-color 0.16s var(--ease-out),
+			background-color 0.16s var(--ease-out);
 	}
 
-	.density-btn:last-child {
-		border-right: none;
+	.density-trigger:hover,
+	.density-trigger[aria-expanded='true'] {
+		color: var(--ink);
+		border-color: var(--line-strong);
+		background-color: var(--bg-warm);
 	}
 
-	.density-btn:hover {
+	.density-trigger:focus-visible {
+		outline: 2px solid var(--clay);
+		outline-offset: 2px;
+	}
+
+	.density-menu {
+		position: absolute;
+		top: calc(100% + 0.35rem);
+		right: 0;
+		z-index: 30;
+		display: inline-flex;
+		gap: 2px;
+		padding: 3px;
+		background: var(--bg);
+		border: var(--border-strong);
+		border-radius: 4px;
+		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+	}
+
+	.density-option {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 1.75rem;
+		height: 1.75rem;
+		padding: 0;
+		color: var(--muted);
+		background: transparent;
+		border: 1px solid transparent;
+		border-radius: 3px;
+		cursor: pointer;
+		transition:
+			color 0.16s var(--ease-out),
+			background-color 0.16s var(--ease-out),
+			border-color 0.16s var(--ease-out);
+	}
+
+	.density-option:hover {
 		color: var(--ink);
 		background: var(--bg-warm);
 	}
 
-	.density-btn.on {
-		background: var(--clay);
+	.density-option.on {
 		color: var(--bg);
+		background: var(--clay);
+		border-color: var(--clay);
 	}
 
-	.density-btn:focus-visible {
+	.density-option:focus-visible {
 		outline: 2px solid var(--clay);
 		outline-offset: -1px;
 	}
@@ -665,7 +792,7 @@
 		.count {
 			display: none;
 		}
-		.density {
+		.density-dropdown {
 			display: none;
 		}
 		.grid {

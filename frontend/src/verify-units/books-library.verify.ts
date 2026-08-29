@@ -166,19 +166,28 @@ const unit: VerifiableUnit<Props> = {
 			props: { books: populated, density: 'compact' }
 		},
 		{
-			id: 'density-change',
-			description: 'clicking compact density button switches density',
+			id: 'density-menu-open',
+			description: 'clicking density trigger opens the SVG graphic options menu',
 			props: { books: populated, density: 'standard' },
-			act: ({ click }) => click('.density-btn[data-density="compact"]')
+			act: ({ click }) => click('.density-trigger')
+		},
+		{
+			id: 'density-change',
+			description: 'clicking compact density option switches density',
+			props: { books: populated, density: 'standard' },
+			act: async ({ click }) => {
+				await click('.density-trigger');
+				await click('.density-option[data-density="compact"]');
+			}
 		},
 		{
 			id: 'density-probe',
-			description: 'probe: switching density levels updates active class and attribute',
+			description: 'probe: opening dropdown and switching density updates active selection',
 			probe: true,
 			props: { books: populated, density: 'sparse' },
 			act: async ({ click }) => {
-				await click('.density-btn[data-density="standard"]');
-				await click('.density-btn[data-density="compact"]');
+				await click('.density-trigger');
+				await click('.density-option[data-density="compact"]');
 			}
 		}
 	],
@@ -443,12 +452,24 @@ const unit: VerifiableUnit<Props> = {
 		},
 		{
 			id: 'density-click-switches',
-			description: 'clicking compact button updates contract and button active state',
+			description: 'clicking compact option updates contract and applies compact grid layout',
 			onlyFixtures: ['density-change'],
 			check: ({ contract, root }) => {
 				if (contract.density !== 'compact') return `contract density=${contract.density}`;
-				const btn = root.querySelector('.density-btn[data-density="compact"]');
-				return btn?.classList.contains('on') || 'compact button missing .on class';
+				const grid = root.querySelector('.grid');
+				return (
+					grid?.getAttribute('data-density') === 'compact' ||
+					`grid data-density=${grid?.getAttribute('data-density')}`
+				);
+			}
+		},
+		{
+			id: 'density-menu-renders-options',
+			description: 'open density menu renders all 3 SVG options',
+			onlyFixtures: ['density-menu-open'],
+			check: ({ root }) => {
+				const options = root.querySelectorAll('.density-option');
+				return options.length === 3 || `expected 3 density options, saw ${options.length}`;
 			}
 		},
 		{
