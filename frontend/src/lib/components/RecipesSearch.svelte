@@ -375,15 +375,17 @@
 			onclick={() => emitKeyword()}
 		>
 			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7.5" /><line x1="16.8" y1="16.8" x2="21" y2="21" /></svg>
+			<span class="btn-text" aria-hidden="true">Search</span>
 		</button>
 		<button
 			class="iconbtn ib-ai"
 			type="button"
-			aria-label="AI search"
-			title="AI search — describe a dish"
+			aria-label="Ask the library"
+			title="Ask the library — describe a dish"
 			onclick={runSemantic}
 		>
 			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3-1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3L12 3Z" /></svg>
+			<span class="btn-text" aria-hidden="true">Ask the library</span>
 		</button>
 	</div>
 
@@ -588,20 +590,19 @@
 	}
 
 	.display {
-		font-family: var(--f-serif);
-		font-weight: 400;
-		font-style: italic;
-		font-size: clamp(2.2rem, 5vw, 3.2rem);
+		font-family: var(--f-grotesk);
+		font-weight: 700;
+		font-size: clamp(1.8rem, 4vw, 2.4rem);
 		line-height: 1.05;
-		letter-spacing: -0.01em;
+		letter-spacing: -0.02em;
 		margin: 0.2rem 0 0;
 	}
 
-	/* One box, two inline icon triggers — magnifier (keyword) + lightbulb (idea). */
+	/* One box, two labelled triggers — search (keyword) + ask-the-library (idea). */
 	.searchrow {
 		display: flex;
-		align-items: center;
-		gap: 0.55rem;
+		align-items: stretch;
+		gap: 0.65rem;
 		margin-bottom: 1.4rem;
 	}
 
@@ -609,12 +610,11 @@
 		flex: 1 1 auto;
 		min-width: 0;
 		font-family: var(--f-grotesk);
-		font-size: 1.05rem;
+		font-size: 1rem;
 		color: var(--ink);
-		background: transparent;
-		border: none;
-		border-bottom: 1px solid var(--line-strong);
-		padding: 0.6rem 0.25rem 0.6rem 0;
+		background: var(--card);
+		border: 1px solid var(--ink);
+		padding: 0.7rem 0.9rem;
 		transition: border-color 0.18s var(--ease-out);
 	}
 
@@ -628,9 +628,8 @@
 		appearance: none;
 	}
 
-	.search-input:focus {
-		outline: none;
-		border-bottom-color: var(--clay);
+	.search-input:focus-visible {
+		border-color: var(--accent);
 	}
 
 	.clear {
@@ -646,7 +645,7 @@
 	}
 
 	.clear:hover {
-		color: var(--clay-deep);
+		color: var(--accent-deep);
 	}
 
 	.iconbtn {
@@ -654,9 +653,12 @@
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		width: 2.65rem;
-		height: 2.65rem;
-		border-radius: 3px;
+		gap: 0.55rem;
+		padding: 0 1.1rem;
+		font-family: var(--f-mono);
+		font-size: 0.72rem;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
 		cursor: pointer;
 		transition:
 			background 0.18s var(--ease-out),
@@ -667,28 +669,29 @@
 
 	.iconbtn svg {
 		display: block;
-		width: 1.15rem;
-		height: 1.15rem;
+		width: 0.95rem;
+		height: 0.95rem;
 	}
 
 	.ib-search {
-		background: var(--ink);
+		background: var(--accent);
 		color: var(--bg);
-		border: 1px solid var(--ink);
+		border: 1px solid var(--accent);
 	}
 
 	.ib-search:hover {
-		opacity: 0.85;
+		background: var(--accent-deep);
+		border-color: var(--accent-deep);
 	}
 
 	.ib-ai {
-		background: none;
-		color: var(--clay-deep);
-		border: 1px solid var(--clay);
+		background: var(--card);
+		color: var(--ink);
+		border: 1px solid var(--ink);
 	}
 
 	.ib-ai:hover {
-		background: var(--chip-clay);
+		background: var(--chip-accent);
 	}
 
 	/* In semantic mode the keyword filters don't shape the results — fade them back
@@ -723,25 +726,25 @@
 	}
 
 	.select {
-		font-family: var(--f-grotesk);
-		font-size: 0.9rem;
+		font-family: var(--f-mono);
+		font-size: 0.76rem;
+		letter-spacing: 0.04em;
 		color: var(--ink);
-		background-color: var(--bg);
-		border: var(--border);
-		border-radius: 3px;
-		padding: 0.4rem 1.9rem 0.4rem 0.7rem;
+		background-color: var(--card);
+		border: 1px solid var(--ink);
+		padding: 0.45rem 1.9rem 0.45rem 0.7rem;
 		cursor: pointer;
 		max-width: 16rem;
 		appearance: none;
-		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M1 1.5l4 4 4-4' fill='none' stroke='%2386847b' stroke-width='1.5'/%3E%3C/svg%3E");
+		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M1 1.5l4 4 4-4' fill='none' stroke='%236f6d5c' stroke-width='1.5'/%3E%3C/svg%3E");
 		background-repeat: no-repeat;
 		background-position: right 0.65rem center;
 	}
 
 	.keywords {
 		margin: 0 0 2.5rem;
-		padding: 1.5rem 0 0;
-		border-top: 2px solid var(--line-strong);
+		padding: 1.1rem 0 0;
+		border-top: var(--rule);
 	}
 
 	.keywords-head {
@@ -775,7 +778,7 @@
 	}
 
 	.clear-kw:hover {
-		color: var(--clay-deep);
+		color: var(--accent-deep);
 	}
 
 	.chips {
@@ -796,15 +799,15 @@
 	.chip {
 		display: inline-flex;
 		align-items: center;
-		gap: 0.4rem;
+		gap: 0.45rem;
 		font-family: var(--f-mono);
-		font-size: 0.76rem;
-		letter-spacing: 0.02em;
+		font-size: 0.72rem;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
 		color: var(--ink);
-		background: var(--bg-warm);
-		border: var(--border);
-		border-radius: 999px;
-		padding: 0.3rem 0.78rem;
+		background: var(--card);
+		border: var(--border-strong);
+		padding: 0.28rem 0.7rem;
 		cursor: pointer;
 		transition:
 			border-color 0.16s var(--ease-out),
@@ -813,19 +816,19 @@
 	}
 
 	.chip:hover {
-		border-color: var(--clay);
+		border-color: var(--accent);
 		color: var(--ink);
 	}
 
 	.chip.on {
-		background: var(--clay);
-		border-color: var(--clay);
+		background: var(--accent);
+		border-color: var(--accent);
 		color: var(--bg);
 	}
 
 	.chip-count {
 		font-size: 0.64rem;
-		color: var(--faint);
+		color: var(--muted);
 	}
 
 	.chip.on .chip-count {
@@ -835,7 +838,8 @@
 
 	.count {
 		color: var(--muted);
-		margin: 0 0 0.5rem;
+		text-transform: uppercase;
+		margin: 0;
 	}
 
 	.results-head {
@@ -843,17 +847,19 @@
 		align-items: baseline;
 		justify-content: space-between;
 		gap: 1rem;
+		border-bottom: var(--rule);
+		padding-bottom: 0.55rem;
 	}
 
 	.select-toggle {
-		font-family: var(--f-grotesk);
-		font-weight: 600;
-		font-size: 0.8rem;
+		font-family: var(--f-mono);
+		font-size: 0.68rem;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
 		color: var(--ink);
-		background: none;
-		border: var(--border);
-		border-radius: 3px;
-		padding: 0.35rem 0.75rem;
+		background: var(--card);
+		border: var(--border-strong);
+		padding: 0.3rem 0.7rem;
 		cursor: pointer;
 		transition:
 			border-color 0.16s var(--ease-out),
@@ -861,11 +867,11 @@
 			color 0.16s var(--ease-out);
 	}
 	.select-toggle:hover {
-		border-color: var(--clay);
+		border-color: var(--accent);
 	}
 	.select-toggle[aria-pressed='true'] {
-		background: var(--clay);
-		border-color: var(--clay);
+		background: var(--accent);
+		border-color: var(--accent);
 		color: var(--bg);
 	}
 
@@ -873,13 +879,11 @@
 		list-style: none;
 		margin: 0;
 		padding: 0;
-		border-top: var(--border);
 	}
 
 	.state {
-		font-family: var(--f-serif);
-		font-style: italic;
-		font-size: 1.3rem;
+		font-family: var(--f-grotesk);
+		font-size: 1.1rem;
 		line-height: 1.5;
 		color: var(--muted);
 		max-width: 32rem;
@@ -909,20 +913,20 @@
 	}
 
 	.page-btn {
-		font-family: var(--f-grotesk);
-		font-weight: 600;
-		font-size: 0.85rem;
-		color: var(--ink);
+		font-family: var(--f-mono);
+		font-size: 0.72rem;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--accent);
 		background: none;
-		border: var(--border);
-		border-radius: 3px;
-		padding: 0.45rem 0.9rem;
+		border: none;
+		padding: 0.45rem 0;
 		cursor: pointer;
-		transition: border-color 0.16s var(--ease-out);
+		transition: color 0.16s var(--ease-out);
 	}
 
 	.page-btn:hover:not(:disabled) {
-		border-color: var(--clay);
+		color: var(--accent-deep);
 	}
 
 	.page-btn:disabled {
@@ -958,9 +962,12 @@
 		.searchrow {
 			gap: 0.4rem;
 		}
+		/* Icon-only triggers on a phone — the labels don't fit beside the box. */
 		.iconbtn {
-			width: 2.4rem;
-			height: 2.4rem;
+			padding: 0 0.75rem;
+		}
+		.iconbtn .btn-text {
+			display: none;
 		}
 
 		/* The filters disclosure. */
@@ -992,7 +999,7 @@
 			height: 1.25rem;
 			padding: 0 0.3rem;
 			border-radius: 999px;
-			background: var(--clay);
+			background: var(--accent);
 			color: var(--bg);
 			font-size: 0.66rem;
 			letter-spacing: 0;

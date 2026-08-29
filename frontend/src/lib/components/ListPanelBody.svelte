@@ -126,17 +126,17 @@
 	}
 	.list-toggle .tick {
 		width: 1rem;
-		color: var(--clay);
+		color: var(--accent);
 		font-size: 0.85rem;
 	}
 	.list-toggle.on .name {
-		color: var(--clay-deep);
+		color: var(--accent-deep);
 	}
 	.list-toggle .name {
 		flex: 1;
 	}
 	.list-toggle .star {
-		color: var(--clay);
+		color: var(--accent);
 		font-size: 0.8rem;
 	}
 
@@ -160,7 +160,7 @@
 	}
 	.create-input:focus {
 		outline: none;
-		border-bottom-color: var(--clay);
+		border-bottom-color: var(--accent);
 	}
 	.create-input::placeholder {
 		color: var(--faint);
@@ -178,7 +178,7 @@
 		transition: border-color 0.18s var(--ease-out);
 	}
 	.create-btn:hover {
-		border-color: var(--clay);
-		color: var(--clay-deep);
+		border-color: var(--accent);
+		color: var(--accent-deep);
 	}
 </style>

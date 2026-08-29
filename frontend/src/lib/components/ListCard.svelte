@@ -105,10 +105,10 @@
 		transition: border-color 0.18s var(--ease-out);
 	}
 	.card:hover {
-		border-color: var(--clay);
+		border-color: var(--accent);
 	}
 	.card.default {
-		border-color: var(--clay);
+		border-color: var(--accent);
 	}
 
 	.link {
@@ -134,7 +134,7 @@
 	}
 	.star {
 		flex: none;
-		color: var(--clay);
+		color: var(--accent);
 		font-size: 0.9rem;
 	}
 	.name {
@@ -145,7 +145,7 @@
 		transition: color 0.18s var(--ease-out);
 	}
 	.card:hover .name {
-		color: var(--clay-deep);
+		color: var(--accent-deep);
 	}
 	.count {
 		font-size: 0.72rem;
@@ -175,8 +175,8 @@
 		transition: color 0.18s var(--ease-out);
 	}
 	.act:hover {
-		color: var(--clay-deep);
-		border-bottom-color: var(--clay);
+		color: var(--accent-deep);
+		border-bottom-color: var(--accent);
 	}
 	.act.danger:hover {
 		color: #b3402a;
@@ -205,7 +205,7 @@
 	}
 	.rename-input:focus {
 		outline: none;
-		border-bottom-color: var(--clay);
+		border-bottom-color: var(--accent);
 	}
 	.prompt {
 		font-family: var(--f-serif);

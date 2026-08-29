@@ -5,7 +5,12 @@ from app.api.deps import CurrentUser
 from app.config import settings
 from app.db import SessionDep
 from app.models.user import User
-from app.schemas.auth import AuthMe, LoginRequest, UserUpdate
+from app.schemas.auth import (
+    AuthMe,
+    LoginRequest,
+    UserPreferencesUpdate,
+    UserUpdate,
+)
 from app.services.auth import (
     COOKIE_NAME,
     SESSION_TTL,
@@ -25,6 +30,7 @@ def _me(user: User) -> AuthMe:
         is_admin=user.is_admin,
         auth_mode=settings.auth_mode,
         user_instructions=user.user_instructions,
+        book_grid_density=user.book_grid_density,
     )
 
 
@@ -75,7 +81,19 @@ def update_me(body: UserUpdate, user: CurrentUser, session: SessionDep) -> AuthM
         user.user_instructions = (
             body.user_instructions.strip() if body.user_instructions else None
         )
+    if "book_grid_density" in body.model_fields_set and body.book_grid_density is not None:
+        user.book_grid_density = body.book_grid_density
     session.add(user)
+    session.commit()
+    session.refresh(user)
+    return _me(user)
+
+
+@router.patch("/auth/me/preferences", response_model=AuthMe)
+def update_preferences(
+    body: UserPreferencesUpdate, user: CurrentUser, session: SessionDep
+) -> AuthMe:
+    user.book_grid_density = body.book_grid_density
     session.commit()
     session.refresh(user)
     return _me(user)

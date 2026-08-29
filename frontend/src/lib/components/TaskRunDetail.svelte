@@ -276,7 +276,6 @@
 	.title {
 		font-family: var(--f-serif);
 		font-weight: 400;
-		font-style: italic;
 		font-size: 1.5rem;
 		line-height: 1.15;
 		color: var(--ink);
@@ -319,9 +318,9 @@
 		font-family: var(--f-grotesk);
 		font-size: 0.85rem;
 		line-height: 1.5;
-		color: var(--clay-deep);
-		background: var(--chip-clay);
-		border-left: 3px solid var(--clay);
+		color: var(--accent-deep);
+		background: var(--chip-accent);
+		border-left: 3px solid var(--accent);
 		border-radius: 3px;
 		padding: 0.7rem 0.9rem;
 		margin: 1.25rem 0 0;
@@ -335,7 +334,7 @@
 		font-size: 0.62rem;
 		letter-spacing: 0.12em;
 		text-transform: uppercase;
-		color: var(--clay-deep);
+		color: var(--danger);
 		margin: 0 0 0.5rem;
 	}
 	.error-list {
@@ -352,7 +351,7 @@
 		line-height: 1.5;
 		color: var(--ink);
 		background: var(--bg-warm);
-		border-left: 3px solid var(--clay-deep);
+		border-left: 3px solid var(--danger);
 		border-radius: 3px;
 		padding: 0.55rem 0.8rem;
 		overflow-wrap: anywhere;
@@ -360,7 +359,6 @@
 
 	.empty {
 		font-family: var(--f-serif);
-		font-style: italic;
 		font-size: 1.2rem;
 		color: var(--muted);
 		margin: 0;

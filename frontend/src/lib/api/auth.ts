@@ -1,5 +1,8 @@
 import { z } from 'zod';
 
+export const bookGridDensitySchema = z.enum(['sparse', 'standard', 'compact']);
+export type BookGridDensity = z.infer<typeof bookGridDensitySchema>;
+
 // Mirrors AuthMe from GET /api/auth/me — the signed-in user plus the deployment's
 // auth mode ("session" | "none"); "none" means the backend runs with no accounts and
 // the SPA hides all login chrome.
@@ -8,7 +11,8 @@ export const authMeSchema = z.object({
 	username: z.string(),
 	is_admin: z.boolean(),
 	auth_mode: z.string(),
-	user_instructions: z.string().nullable().optional()
+	user_instructions: z.string().nullable().optional(),
+	book_grid_density: bookGridDensitySchema.optional().default('standard')
 });
 
 export const userSchema = z.object({
@@ -96,6 +100,19 @@ export async function resetPassword(
 		body: JSON.stringify({ password })
 	});
 	if (!res.ok) throw new Error(await errorMessage(res, "Couldn't reset that password."));
+}
+
+export async function updatePreferences(
+	input: { book_grid_density: BookGridDensity },
+	fetchFn: typeof fetch = fetch
+): Promise<AuthMe> {
+	const res = await fetchFn('/api/auth/me/preferences', {
+		method: 'PATCH',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(input)
+	});
+	if (!res.ok) throw new Error(await errorMessage(res, "Couldn't update preferences."));
+	return authMeSchema.parse(await res.json());
 }
 
 /** The backend's `detail` when it sends one — these are user-facing messages

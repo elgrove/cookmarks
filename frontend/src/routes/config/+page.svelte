@@ -201,7 +201,6 @@
 	.head h1 {
 		font-family: var(--f-serif);
 		font-weight: 400;
-		font-style: italic;
 		font-size: clamp(2.2rem, 5vw, 3.2rem);
 		line-height: 1.05;
 		letter-spacing: -0.01em;
@@ -209,7 +208,6 @@
 	}
 	.msg {
 		font-family: var(--f-serif);
-		font-style: italic;
 		font-size: 1.3rem;
 		color: var(--muted);
 		margin: 0;
@@ -227,6 +225,6 @@
 		cursor: pointer;
 	}
 	.retry:hover {
-		background: var(--clay-deep);
+		background: var(--accent-deep);
 	}
 </style>

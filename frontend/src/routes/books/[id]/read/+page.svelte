@@ -74,7 +74,6 @@
 	}
 	.msg {
 		font-family: var(--f-serif);
-		font-style: italic;
 		font-size: 1.4rem;
 		color: var(--muted);
 		margin: 0;
@@ -83,12 +82,12 @@
 		font-family: var(--f-grotesk);
 		font-weight: 600;
 		font-size: 0.85rem;
-		color: var(--clay-deep);
+		color: var(--accent-deep);
 		text-decoration: none;
 		border-bottom: 1px solid transparent;
 	}
 	.link:hover {
-		border-bottom-color: var(--clay);
+		border-bottom-color: var(--accent);
 	}
 	.retry {
 		font-family: var(--f-grotesk);
@@ -103,6 +102,6 @@
 		transition: background 0.18s var(--ease-out);
 	}
 	.retry:hover {
-		background: var(--clay-deep);
+		background: var(--accent-deep);
 	}
 </style>

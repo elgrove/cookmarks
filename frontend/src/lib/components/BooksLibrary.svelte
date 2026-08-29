@@ -1,4 +1,6 @@
 <script module lang="ts">
+	import type { BookGridDensity } from '$lib/api/auth';
+
 	export type LibraryBook = {
 		id: string;
 		title: string;
@@ -11,13 +13,49 @@
 		queuePosition?: number | null;
 	};
 
+	export type BooksLibraryProps = {
+		books: LibraryBook[];
+		density?: BookGridDensity;
+		onDensityChange?: (density: BookGridDensity) => void;
+	};
+
 	type SortKey = 'recent' | 'title' | 'author' | 'recipes' | 'queue';
 </script>
 
 <script lang="ts">
 	import BookCard from './BookCard.svelte';
 
-	let { books }: { books: LibraryBook[] } = $props();
+	let {
+		books,
+		density = $bindable('standard'),
+		onDensityChange
+	}: BooksLibraryProps = $props();
+
+	let densityMenuOpen = $state(false);
+	let densityDropdownEl = $state<HTMLElement>();
+
+	$effect(() => {
+		if (!densityMenuOpen) return;
+		const onPointerDown = (e: Event) => {
+			if (densityDropdownEl && !densityDropdownEl.contains(e.target as Node)) {
+				densityMenuOpen = false;
+			}
+		};
+		const onKey = (e: KeyboardEvent) => {
+			if (e.key === 'Escape') densityMenuOpen = false;
+		};
+		window.addEventListener('pointerdown', onPointerDown);
+		window.addEventListener('keydown', onKey);
+		return () => {
+			window.removeEventListener('pointerdown', onPointerDown);
+			window.removeEventListener('keydown', onKey);
+		};
+	});
+
+	function setDensity(d: BookGridDensity) {
+		density = d;
+		onDensityChange?.(d);
+	}
 
 	let search = $state('');
 	let sort = $state<SortKey>('recent');
@@ -193,6 +231,7 @@
 	data-verify-first={visible[0]?.title ?? ''}
 	data-verify-kw-selected={selectedKeywords.join('|')}
 	data-verify-kw-chips={chips.map((c) => c.name).join('|')}
+	data-verify-density={density}
 >
 	<header class="head">
 		<h1 class="display">Books</h1>
@@ -238,6 +277,95 @@
 			<span class="label">Extracted only</span>
 		</label>
 
+		<div class="density-dropdown" bind:this={densityDropdownEl}>
+			<button
+				type="button"
+				class="density-trigger"
+				aria-label="Book grid density"
+				aria-haspopup="true"
+				aria-expanded={densityMenuOpen}
+				onclick={() => (densityMenuOpen = !densityMenuOpen)}
+			>
+				{#if density === 'sparse'}
+					<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true">
+						<rect x="1" y="2" width="6.2" height="5" rx="1" />
+						<rect x="8.8" y="2" width="6.2" height="5" rx="1" />
+						<rect x="1" y="9" width="6.2" height="5" rx="1" />
+						<rect x="8.8" y="9" width="6.2" height="5" rx="1" />
+					</svg>
+				{:else if density === 'compact'}
+					<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true">
+						<rect x="1" y="2" width="2.6" height="5" rx="0.5" />
+						<rect x="4.8" y="2" width="2.6" height="5" rx="0.5" />
+						<rect x="8.6" y="2" width="2.6" height="5" rx="0.5" />
+						<rect x="12.4" y="2" width="2.6" height="5" rx="0.5" />
+						<rect x="1" y="9" width="2.6" height="5" rx="0.5" />
+						<rect x="4.8" y="9" width="2.6" height="5" rx="0.5" />
+						<rect x="8.6" y="9" width="2.6" height="5" rx="0.5" />
+						<rect x="12.4" y="9" width="2.6" height="5" rx="0.5" />
+					</svg>
+				{:else}
+					<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true">
+						<rect x="1" y="2" width="3.8" height="5" rx="0.75" />
+						<rect x="6.1" y="2" width="3.8" height="5" rx="0.75" />
+						<rect x="11.2" y="2" width="3.8" height="5" rx="0.75" />
+						<rect x="1" y="9" width="3.8" height="5" rx="0.75" />
+						<rect x="6.1" y="9" width="3.8" height="5" rx="0.75" />
+						<rect x="11.2" y="9" width="3.8" height="5" rx="0.75" />
+					</svg>
+				{/if}
+			</button>
+
+			{#if densityMenuOpen}
+				<div class="density-menu" role="menu" aria-label="Book grid density options">
+					{#each (['sparse', 'standard', 'compact'] as const) as d}
+						<button
+							type="button"
+							class="density-option"
+							class:on={density === d}
+							aria-pressed={density === d}
+							data-density={d}
+							title={d.charAt(0).toUpperCase() + d.slice(1)}
+							aria-label={d.charAt(0).toUpperCase() + d.slice(1)}
+							onclick={() => {
+								setDensity(d);
+								densityMenuOpen = false;
+							}}
+						>
+							{#if d === 'sparse'}
+								<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true">
+									<rect x="1" y="2" width="6.2" height="5" rx="1" />
+									<rect x="8.8" y="2" width="6.2" height="5" rx="1" />
+									<rect x="1" y="9" width="6.2" height="5" rx="1" />
+									<rect x="8.8" y="9" width="6.2" height="5" rx="1" />
+								</svg>
+							{:else if d === 'compact'}
+								<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true">
+									<rect x="1" y="2" width="2.6" height="5" rx="0.5" />
+									<rect x="4.8" y="2" width="2.6" height="5" rx="0.5" />
+									<rect x="8.6" y="2" width="2.6" height="5" rx="0.5" />
+									<rect x="12.4" y="2" width="2.6" height="5" rx="0.5" />
+									<rect x="1" y="9" width="2.6" height="5" rx="0.5" />
+									<rect x="4.8" y="9" width="2.6" height="5" rx="0.5" />
+									<rect x="8.6" y="9" width="2.6" height="5" rx="0.5" />
+									<rect x="12.4" y="9" width="2.6" height="5" rx="0.5" />
+								</svg>
+							{:else}
+								<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true">
+									<rect x="1" y="2" width="3.8" height="5" rx="0.75" />
+									<rect x="6.1" y="2" width="3.8" height="5" rx="0.75" />
+									<rect x="11.2" y="2" width="3.8" height="5" rx="0.75" />
+									<rect x="1" y="9" width="3.8" height="5" rx="0.75" />
+									<rect x="6.1" y="9" width="3.8" height="5" rx="0.75" />
+									<rect x="11.2" y="9" width="3.8" height="5" rx="0.75" />
+								</svg>
+							{/if}
+						</button>
+					{/each}
+				</div>
+			{/if}
+		</div>
+
 		<p class="count mono">{countLabel} {books.length === 1 ? 'book' : 'books'}</p>
 	</div>
 
@@ -279,7 +407,7 @@
 			{#if books.length === 0}No books yet.{:else if query}No books match “{search.trim()}”.{:else}No extracted books yet.{/if}
 		</p>
 	{:else}
-		<ul class="grid">
+		<ul class="grid" data-density={density}>
 			{#each visible as book, i (book.id)}
 				<li class="cell" style={`animation-delay: ${Math.min(i * 30, 600)}ms`}>
 					<BookCard
@@ -310,7 +438,6 @@
 	.display {
 		font-family: var(--f-serif);
 		font-weight: 400;
-		font-style: italic;
 		font-size: clamp(2.2rem, 5vw, 3.2rem);
 		line-height: 1.05;
 		letter-spacing: -0.01em;
@@ -357,7 +484,7 @@
 	}
 
 	.clear-kw:hover {
-		color: var(--clay-deep);
+		color: var(--accent-deep);
 	}
 
 	.chips {
@@ -378,15 +505,15 @@
 	.chip {
 		display: inline-flex;
 		align-items: center;
-		gap: 0.4rem;
+		gap: 0.45rem;
 		font-family: var(--f-mono);
-		font-size: 0.74rem;
-		letter-spacing: 0.02em;
+		font-size: 0.72rem;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
 		color: var(--ink);
-		background: var(--bg-warm);
-		border: var(--border);
-		border-radius: 999px;
-		padding: 0.3rem 0.78rem;
+		background: var(--card);
+		border: var(--border-strong);
+		padding: 0.28rem 0.7rem;
 		cursor: pointer;
 		transition:
 			border-color 0.16s var(--ease-out),
@@ -395,24 +522,24 @@
 	}
 
 	.chip:hover {
-		border-color: var(--clay);
+		border-color: var(--accent);
 		color: var(--ink);
 	}
 
 	.chip.on {
-		background: var(--clay);
-		border-color: var(--clay);
+		background: var(--accent);
+		border-color: var(--accent);
 		color: var(--bg);
 	}
 
 	.chip:focus-visible {
-		outline: 2px solid var(--clay);
+		outline: 2px solid var(--accent);
 		outline-offset: 1px;
 	}
 
 	.chip-count {
 		font-size: 0.64rem;
-		color: var(--faint);
+		color: var(--muted);
 	}
 
 	.chip.on .chip-count {
@@ -445,7 +572,7 @@
 	}
 
 	.search-input:focus {
-		border-bottom-color: var(--clay);
+		border-bottom-color: var(--accent);
 	}
 
 	.clear {
@@ -462,7 +589,7 @@
 	}
 
 	.clear:hover {
-		color: var(--clay-deep);
+		color: var(--accent-deep);
 	}
 
 	.sort {
@@ -481,7 +608,7 @@
 		padding: 0.4rem 1.9rem 0.4rem 0.7rem;
 		cursor: pointer;
 		appearance: none;
-		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M1 1.5l4 4 4-4' fill='none' stroke='%2386847b' stroke-width='1.5'/%3E%3C/svg%3E");
+		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M1 1.5l4 4 4-4' fill='none' stroke='%236f6d5c' stroke-width='1.5'/%3E%3C/svg%3E");
 		background-repeat: no-repeat;
 		background-position: right 0.65rem center;
 	}
@@ -509,16 +636,100 @@
 	}
 
 	.extracted-checkbox:checked {
-		border-color: var(--clay);
-		background-color: var(--clay);
-		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='8' viewBox='0 0 10 8'%3E%3Cpath d='M1 4l3 3 5-6' fill='none' stroke='%23faf9f5' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+		border-color: var(--accent);
+		background-color: var(--accent);
+		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='8' viewBox='0 0 10 8'%3E%3Cpath d='M1 4l3 3 5-6' fill='none' stroke='%23fafaf5' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 		background-repeat: no-repeat;
 		background-position: center;
 	}
 
 	.extracted-checkbox:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 2px;
+	}
+
+	.density-dropdown {
+		position: relative;
+		display: inline-flex;
+		align-items: center;
+	}
+
+	.density-trigger {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 1.85rem;
+		height: 1.85rem;
+		padding: 0;
+		color: var(--muted);
+		background-color: var(--bg);
+		border: var(--border);
+		border-radius: 3px;
+		cursor: pointer;
+		transition:
+			color 0.16s var(--ease-out),
+			border-color 0.16s var(--ease-out),
+			background-color 0.16s var(--ease-out);
+	}
+
+	.density-trigger:hover,
+	.density-trigger[aria-expanded='true'] {
+		color: var(--ink);
+		border-color: var(--line-strong);
+		background-color: var(--bg-warm);
+	}
+
+	.density-trigger:focus-visible {
 		outline: 2px solid var(--clay);
 		outline-offset: 2px;
+	}
+
+	.density-menu {
+		position: absolute;
+		top: calc(100% + 0.35rem);
+		right: 0;
+		z-index: 30;
+		display: inline-flex;
+		gap: 2px;
+		padding: 3px;
+		background: var(--bg);
+		border: var(--border-strong);
+		border-radius: 4px;
+		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+	}
+
+	.density-option {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 1.75rem;
+		height: 1.75rem;
+		padding: 0;
+		color: var(--muted);
+		background: transparent;
+		border: 1px solid transparent;
+		border-radius: 3px;
+		cursor: pointer;
+		transition:
+			color 0.16s var(--ease-out),
+			background-color 0.16s var(--ease-out),
+			border-color 0.16s var(--ease-out);
+	}
+
+	.density-option:hover {
+		color: var(--ink);
+		background: var(--bg-warm);
+	}
+
+	.density-option.on {
+		color: var(--bg);
+		background: var(--clay);
+		border-color: var(--clay);
+	}
+
+	.density-option:focus-visible {
+		outline: 2px solid var(--clay);
+		outline-offset: -1px;
 	}
 
 	.count {
@@ -535,13 +746,20 @@
 		gap: 1.5rem var(--col-gap);
 	}
 
+	.grid[data-density='compact'] {
+		grid-template-columns: repeat(5, 1fr);
+	}
+
+	.grid[data-density='sparse'] {
+		grid-template-columns: repeat(3, 1fr);
+	}
+
 	.cell {
 		animation: fadeUp 0.6s var(--ease-out) both;
 	}
 
 	.empty {
 		font-family: var(--f-serif);
-		font-style: italic;
 		font-size: 1.3rem;
 		color: var(--muted);
 		padding: 2rem 0;
@@ -551,6 +769,12 @@
 	@media (max-width: 1280px) {
 		.grid {
 			grid-template-columns: repeat(3, 1fr);
+		}
+		.grid[data-density='compact'] {
+			grid-template-columns: repeat(4, 1fr);
+		}
+		.grid[data-density='sparse'] {
+			grid-template-columns: repeat(2, 1fr);
 		}
 	}
 
@@ -566,16 +790,27 @@
 		.count {
 			display: none;
 		}
+		.density-dropdown {
+			display: none;
+		}
 		.grid {
 			grid-template-columns: repeat(2, 1fr);
 			gap: 1.25rem 1.5rem;
+		}
+		.grid[data-density='compact'] {
+			grid-template-columns: repeat(3, 1fr);
+		}
+		.grid[data-density='sparse'] {
+			grid-template-columns: repeat(2, 1fr);
 		}
 	}
 
 	/* Mobile: text-first rows instead of a cover grid — a continuous hairline
 	   list (BookCard reshapes each cell into a row at the same breakpoint). */
 	@media (max-width: 560px) {
-		.grid {
+		.grid,
+		.grid[data-density='compact'],
+		.grid[data-density='sparse'] {
 			grid-template-columns: 1fr;
 			gap: 0;
 			border-top: var(--border);

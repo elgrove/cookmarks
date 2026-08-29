@@ -195,7 +195,6 @@
 	}
 	.name {
 		font-family: var(--f-serif);
-		font-style: italic;
 		font-size: 1rem;
 		color: var(--ink);
 		overflow: hidden;
@@ -221,7 +220,7 @@
 		font-family: var(--f-grotesk);
 		font-weight: 600;
 		font-size: 0.82rem;
-		color: var(--clay-deep);
+		color: var(--accent-deep);
 		text-decoration: none;
 		align-self: flex-start;
 	}

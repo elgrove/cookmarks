@@ -1,11 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Cookmarks">
   <style>
-    /* Clay accent on a transparent tab; ivory ground keeps it legible on dark tabs. */
+    /* Accent mark on a transparent tab; paper ground keeps it legible on dark tabs. */
     .ground { fill: none; }
-    .mark { fill: #d97757; }
+    .mark { fill: #1f6f50; }
     @media (prefers-color-scheme: dark) {
-      .ground { fill: #faf9f5; }
-      .mark { fill: #df8460; }
+      .ground { fill: #fafaf5; }
+      .mark { fill: #46a87d; }
     }
   </style>
   <rect class="ground" x="7" y="3" width="18" height="26" rx="4" />

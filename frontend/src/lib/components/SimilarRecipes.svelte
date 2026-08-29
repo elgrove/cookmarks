@@ -65,7 +65,6 @@
 
 	.empty {
 		font-family: var(--f-serif);
-		font-style: italic;
 		font-size: 1.1rem;
 		color: var(--muted);
 		margin: 0;
@@ -77,12 +76,12 @@
 		font-family: var(--f-grotesk);
 		font-size: 0.85rem;
 		font-weight: 600;
-		color: var(--clay-deep);
+		color: var(--accent-deep);
 		text-decoration: none;
 		border-bottom: 1px solid transparent;
 		transition: border-color 0.18s var(--ease-out);
 	}
 	.more:hover {
-		border-bottom-color: var(--clay);
+		border-bottom-color: var(--accent);
 	}
 </style>

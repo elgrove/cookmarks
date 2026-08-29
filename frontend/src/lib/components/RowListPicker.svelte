@@ -213,8 +213,8 @@
 	}
 	.add-trigger:hover,
 	.add-trigger[aria-expanded='true'] {
-		color: var(--clay-deep);
-		border-color: var(--clay);
+		color: var(--accent-deep);
+		border-color: var(--accent);
 	}
 	.add-trigger svg {
 		display: block;

@@ -51,6 +51,6 @@
 	}
 	.tab.active {
 		color: var(--ink);
-		border-bottom-color: var(--clay);
+		border-bottom-color: var(--accent);
 	}
 </style>

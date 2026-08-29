@@ -56,7 +56,6 @@
 	}
 	.msg {
 		font-family: var(--f-serif);
-		font-style: italic;
 		font-size: 1.3rem;
 		color: var(--ink);
 		margin: 0;
@@ -88,17 +87,17 @@
 		transition: background 0.18s var(--ease-out);
 	}
 	.start:hover {
-		background: var(--clay-deep);
+		background: var(--accent-deep);
 	}
 	.back {
 		font-family: var(--f-grotesk);
 		font-weight: 600;
 		font-size: 0.85rem;
-		color: var(--clay-deep);
+		color: var(--accent-deep);
 		text-decoration: none;
 		border-bottom: 1px solid transparent;
 	}
 	.back:hover {
-		border-bottom-color: var(--clay);
+		border-bottom-color: var(--accent);
 	}
 </style>

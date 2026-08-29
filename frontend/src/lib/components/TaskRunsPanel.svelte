@@ -196,7 +196,7 @@
 		border-color: var(--ink);
 	}
 	.chip:focus-visible {
-		outline: 2px solid var(--clay);
+		outline: 2px solid var(--accent);
 		outline-offset: 2px;
 	}
 
@@ -241,10 +241,10 @@
 	}
 	.run-row.selected {
 		background: var(--bg-warm);
-		border-left-color: var(--clay);
+		border-left-color: var(--accent);
 	}
 	.run-row:focus-visible {
-		outline: 2px solid var(--clay);
+		outline: 2px solid var(--accent);
 		outline-offset: -2px;
 	}
 
@@ -274,7 +274,6 @@
 
 	.empty {
 		font-family: var(--f-serif);
-		font-style: italic;
 		font-size: 1.3rem;
 		color: var(--muted);
 		margin: 0;

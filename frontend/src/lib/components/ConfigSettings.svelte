@@ -25,12 +25,19 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
 	import { preference, setPreference, type ThemePref } from '$lib/theme';
+	import { currentUser, getBookGridDensity, setBookGridDensity } from '$lib/auth';
+	import type { BookGridDensity } from '$lib/api/auth';
 
 	let { config, onSave, onSaveUserInstructions }: ConfigSettingsProps = $props();
 
 	let isAdmin = $derived(config.isAdmin ?? true);
 
 	let saveState = $state<State>('idle');
+	let density = $derived($currentUser?.book_grid_density ?? getBookGridDensity());
+
+	function handleDensityChange(d: BookGridDensity) {
+		void setBookGridDensity(d);
+	}
 	let extractionProviderValue = $state('');
 	let assistantProviderValue = $state('');
 	let rateLimit = $state(0);
@@ -181,6 +188,7 @@
 	data-verify-assistant-provider={assistantProviderValue || 'none'}
 	data-verify-assistant-key-set={String(config.assistantApiKeySet ?? false)}
 	data-verify-assistant-key-action={assistantKeyAction}
+	data-verify-book-grid-density={density}
 	data-verify-dirty={String(dirty)}
 	data-verify-over-limit={String(overLimit)}
 	onsubmit={(e) => {
@@ -218,6 +226,21 @@
 				<option value="light">Light</option>
 				<option value="dark">Dark</option>
 				<option value="system">System</option>
+			</select>
+		</div>
+	</div>
+
+	<div class="field">
+		<label class="label" for="book-grid-density">Book grid density</label>
+		<div class="control">
+			<select
+				id="book-grid-density"
+				value={density}
+				onchange={(e) => handleDensityChange((e.currentTarget as HTMLSelectElement).value as BookGridDensity)}
+			>
+				<option value="sparse">Sparse</option>
+				<option value="standard">Standard</option>
+				<option value="compact">Compact</option>
 			</select>
 		</div>
 	</div>
@@ -466,13 +489,12 @@
 	.hint {
 		margin: 0;
 		font-family: var(--f-serif);
-		font-style: italic;
 		color: var(--muted);
 	}
 	.link {
 		font-family: var(--f-grotesk);
 		font-size: 0.8rem;
-		color: var(--clay-deep);
+		color: var(--accent-deep);
 		background: none;
 		border: none;
 		padding: 0;
@@ -511,14 +533,14 @@
 		border-color: var(--line-strong);
 	}
 	.save.saved {
-		background: var(--clay);
-		border-color: var(--clay);
+		background: var(--accent);
+		border-color: var(--accent);
 		color: var(--bg);
 	}
 	.save.error {
 		background: transparent;
-		color: var(--clay-deep);
-		border-color: var(--clay-deep);
+		color: var(--danger);
+		border-color: var(--danger);
 	}
 	@media (max-width: 760px) {
 		.field {

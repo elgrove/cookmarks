@@ -353,13 +353,13 @@
 	}
 	.drop:hover,
 	.drop.dragging {
-		border-color: var(--clay);
+		border-color: var(--accent);
 	}
 	.drop.busy {
 		cursor: progress;
 	}
 	.drop:focus-within {
-		outline: 2px solid var(--clay);
+		outline: 2px solid var(--accent);
 		outline-offset: 2px;
 	}
 	.drop-title {
@@ -425,7 +425,7 @@
 		width: 100%;
 	}
 	.field input:focus-visible {
-		outline: 2px solid var(--clay);
+		outline: 2px solid var(--accent);
 		outline-offset: -1px;
 	}
 
@@ -438,7 +438,7 @@
 		color: var(--muted);
 	}
 	.check input {
-		accent-color: var(--clay);
+		accent-color: var(--accent);
 	}
 
 	.actions {
@@ -474,8 +474,8 @@
 		color: var(--ink);
 	}
 	.btn.danger {
-		border-color: var(--clay);
-		background: var(--clay);
+		border-color: var(--danger);
+		background: var(--danger);
 		color: var(--bg);
 	}
 	.btn:disabled {
@@ -483,13 +483,13 @@
 		cursor: not-allowed;
 	}
 	.btn:focus-visible {
-		outline: 2px solid var(--clay);
+		outline: 2px solid var(--accent);
 		outline-offset: 2px;
 	}
 
 	.error {
 		font-family: var(--f-serif);
-		color: var(--clay);
+		color: var(--danger);
 		margin: 0 0 2rem;
 	}
 
@@ -510,7 +510,7 @@
 	}
 	.index {
 		font-size: 0.7rem;
-		color: var(--clay);
+		color: var(--accent);
 	}
 	.run-main {
 		display: flex;
@@ -531,7 +531,7 @@
 	.run-error {
 		font-family: var(--f-grotesk);
 		font-size: 0.8rem;
-		color: var(--clay);
+		color: var(--danger);
 	}
 
 	.duplicate {
@@ -551,7 +551,6 @@
 
 	.empty {
 		font-family: var(--f-serif);
-		font-style: italic;
 		font-size: 1.3rem;
 		color: var(--muted);
 		margin: 0;

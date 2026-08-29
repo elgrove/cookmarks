@@ -191,7 +191,7 @@
 	}
 	.select-all:hover:not(:disabled),
 	.clear-sel:hover:not(:disabled) {
-		border-color: var(--clay);
+		border-color: var(--accent);
 	}
 
 	.add-btn {

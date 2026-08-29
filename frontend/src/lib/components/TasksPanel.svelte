@@ -269,14 +269,14 @@
 			background-color 0.18s var(--ease-out);
 	}
 	.regen-check:checked {
-		border-color: var(--clay);
-		background-color: var(--clay);
-		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='8' viewBox='0 0 10 8'%3E%3Cpath d='M1 4l3 3 5-6' fill='none' stroke='%23faf9f5' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+		border-color: var(--accent);
+		background-color: var(--accent);
+		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='8' viewBox='0 0 10 8'%3E%3Cpath d='M1 4l3 3 5-6' fill='none' stroke='%23fafaf5' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 		background-repeat: no-repeat;
 		background-position: center;
 	}
 	.regen-check:focus-visible {
-		outline: 2px solid var(--clay);
+		outline: 2px solid var(--accent);
 		outline-offset: 2px;
 	}
 
@@ -311,8 +311,8 @@
 			color 0.18s var(--ease-out);
 	}
 	.run:hover:not(:disabled) {
-		background: var(--clay-deep);
-		border-color: var(--clay-deep);
+		background: var(--accent-deep);
+		border-color: var(--accent-deep);
 	}
 	.run:disabled {
 		cursor: default;
@@ -321,13 +321,13 @@
 		border-color: var(--line-strong);
 	}
 	.run.done {
-		background: var(--clay);
-		border-color: var(--clay);
+		background: var(--accent);
+		border-color: var(--accent);
 	}
 	.run.error {
 		background: transparent;
-		color: var(--clay-deep);
-		border-color: var(--clay-deep);
+		color: var(--danger);
+		border-color: var(--danger);
 	}
 
 	.note {
@@ -338,7 +338,7 @@
 		margin: 0;
 	}
 	.note.err {
-		color: var(--clay-deep);
+		color: var(--danger);
 	}
 
 	@media (max-width: 560px) {

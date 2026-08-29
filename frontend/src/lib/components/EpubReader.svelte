@@ -60,8 +60,8 @@
 	// Page-ground / ink / link colours injected into the book's own (cross-document) iframe,
 	// since the app's CSS custom properties don't reach it. Values track DESIGN.md tokens.
 	const THEME_COLOURS = {
-		light: { bg: '#faf9f5', ink: '#141413', link: '#c2613f', clay: '#d97757', line: '#d8d4c6' },
-		dark: { bg: '#14181e', ink: '#eef1f6', link: '#ef9e7d', clay: '#df8460', line: '#354050' }
+		light: { bg: '#fafaf5', ink: '#1e2025', link: '#155239', clay: '#1f6f50', line: '#c9c6b8' },
+		dark: { bg: '#16181c', ink: '#eceee7', link: '#67c096', clay: '#46a87d', line: '#3c4148' }
 	} as const;
 
 	// Elements whose colour the book's own stylesheet typically sets explicitly — so in dark mode
@@ -521,7 +521,6 @@
 	}
 	.msg {
 		font-family: var(--f-serif);
-		font-style: italic;
 		font-size: 1.3rem;
 		color: var(--muted);
 		margin: 0;
@@ -533,11 +532,11 @@
 		font-family: var(--f-grotesk);
 		font-weight: 600;
 		font-size: 0.85rem;
-		color: var(--clay-deep);
+		color: var(--accent-deep);
 		text-decoration: none;
 		border-bottom: 1px solid transparent;
 	}
 	.back:hover {
-		border-bottom-color: var(--clay);
+		border-bottom-color: var(--accent);
 	}
 </style>

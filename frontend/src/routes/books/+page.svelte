@@ -4,12 +4,16 @@
 	import { fetchBooks } from '$lib/api/books';
 	import { fetchReadingQueue } from '$lib/api/reading-queue';
 	import { pageTitle } from '$lib/title';
+	import { getBookGridDensity, setBookGridDensity } from '$lib/auth';
+	import type { BookGridDensity } from '$lib/api/auth';
 
 	let status = $state<'loading' | 'error' | 'ready'>('loading');
 	let books = $state<LibraryBook[]>([]);
+	let density = $state<BookGridDensity>('standard');
 
 	async function load() {
 		status = 'loading';
+		density = getBookGridDensity();
 		try {
 			const data = await fetchBooks();
 			// Queue positions feed the "Queue order" sort; a failed fetch just means
@@ -37,6 +41,11 @@
 		}
 	}
 
+	function handleDensityChange(next: BookGridDensity) {
+		density = next;
+		void setBookGridDensity(next);
+	}
+
 	onMount(load);
 </script>
 
@@ -45,7 +54,7 @@
 </svelte:head>
 
 {#if status === 'ready'}
-	<BooksLibrary {books} />
+	<BooksLibrary {books} {density} onDensityChange={handleDensityChange} />
 {:else}
 	<div class="status">
 		{#if status === 'loading'}
@@ -66,7 +75,6 @@
 
 	.msg {
 		font-family: var(--f-serif);
-		font-style: italic;
 		font-size: 1.4rem;
 		color: var(--muted);
 		margin: 0.5rem 0 1.2rem;
@@ -86,6 +94,6 @@
 	}
 
 	.retry:hover {
-		background: var(--clay-deep);
+		background: var(--accent-deep);
 	}
 </style>
