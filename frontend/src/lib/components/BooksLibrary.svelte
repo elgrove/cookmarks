@@ -256,9 +256,8 @@
 			<span class="label">Extracted only</span>
 		</label>
 
-		<div class="density">
-			<span class="label">Density</span>
-			<div class="density-group" role="group" aria-label="Book grid density">
+		<div class="density" role="group" aria-label="Book grid density">
+			<div class="density-group">
 				{#each (['sparse', 'standard', 'compact'] as const) as d}
 					<button
 						type="button"
@@ -560,27 +559,28 @@
 	.density {
 		display: inline-flex;
 		align-items: center;
-		gap: 0.55rem;
 	}
 
 	.density-group {
 		display: inline-flex;
-		border: var(--border);
-		border-radius: 3px;
+		border: 1px solid var(--line-strong);
+		border-radius: 2px;
 		overflow: hidden;
 		background-color: var(--bg);
+		line-height: 1;
 	}
 
 	.density-btn {
 		font-family: var(--f-mono);
-		font-size: 0.72rem;
+		font-size: 0.62rem;
 		letter-spacing: 0.04em;
 		text-transform: uppercase;
 		color: var(--muted);
 		background: transparent;
 		border: none;
 		border-right: 1px solid var(--line);
-		padding: 0.35rem 0.65rem;
+		padding: 0.22rem 0.45rem;
+		line-height: 1;
 		cursor: pointer;
 		transition:
 			background 0.16s var(--ease-out),
