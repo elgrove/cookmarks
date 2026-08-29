@@ -1,4 +1,6 @@
 <script module lang="ts">
+	import type { BookGridDensity } from '$lib/api/auth';
+
 	export type LibraryBook = {
 		id: string;
 		title: string;
@@ -11,13 +13,31 @@
 		queuePosition?: number | null;
 	};
 
+	export type BooksLibraryProps = {
+		books: LibraryBook[];
+		density?: BookGridDensity;
+		onDensityChange?: (density: BookGridDensity) => void;
+	};
+
 	type SortKey = 'recent' | 'title' | 'author' | 'recipes' | 'queue';
 </script>
 
 <script lang="ts">
 	import BookCard from './BookCard.svelte';
 
-	let { books }: { books: LibraryBook[] } = $props();
+	let {
+		books,
+		density = 'standard',
+		onDensityChange
+	}: BooksLibraryProps = $props();
+
+	let localDensity = $state<BookGridDensity | null>(null);
+	let currentDensity = $derived(localDensity ?? density);
+
+	function setDensity(d: BookGridDensity) {
+		localDensity = d;
+		onDensityChange?.(d);
+	}
 
 	let search = $state('');
 	let sort = $state<SortKey>('recent');
@@ -193,6 +213,7 @@
 	data-verify-first={visible[0]?.title ?? ''}
 	data-verify-kw-selected={selectedKeywords.join('|')}
 	data-verify-kw-chips={chips.map((c) => c.name).join('|')}
+	data-verify-density={currentDensity}
 >
 	<header class="head">
 		<h1 class="display">Books</h1>
@@ -238,6 +259,24 @@
 			<span class="label">Extracted only</span>
 		</label>
 
+		<div class="density">
+			<span class="label">Density</span>
+			<div class="density-group" role="group" aria-label="Book grid density">
+				{#each (['sparse', 'standard', 'compact'] as const) as d}
+					<button
+						type="button"
+						class="density-btn mono"
+						class:on={currentDensity === d}
+						aria-pressed={currentDensity === d}
+						data-density={d}
+						onclick={() => setDensity(d)}
+					>
+						{d}
+					</button>
+				{/each}
+			</div>
+		</div>
+
 		<p class="count mono">{countLabel} {books.length === 1 ? 'book' : 'books'}</p>
 	</div>
 
@@ -279,7 +318,7 @@
 			{#if books.length === 0}No books yet.{:else if query}No books match “{search.trim()}”.{:else}No extracted books yet.{/if}
 		</p>
 	{:else}
-		<ul class="grid">
+		<ul class="grid" data-density={currentDensity}>
 			{#each visible as book, i (book.id)}
 				<li class="cell" style={`animation-delay: ${Math.min(i * 30, 600)}ms`}>
 					<BookCard
@@ -521,6 +560,55 @@
 		outline-offset: 2px;
 	}
 
+	.density {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.55rem;
+	}
+
+	.density-group {
+		display: inline-flex;
+		border: var(--border);
+		border-radius: 3px;
+		overflow: hidden;
+		background-color: var(--bg);
+	}
+
+	.density-btn {
+		font-family: var(--f-mono);
+		font-size: 0.72rem;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+		color: var(--muted);
+		background: transparent;
+		border: none;
+		border-right: 1px solid var(--line);
+		padding: 0.35rem 0.65rem;
+		cursor: pointer;
+		transition:
+			background 0.16s var(--ease-out),
+			color 0.16s var(--ease-out);
+	}
+
+	.density-btn:last-child {
+		border-right: none;
+	}
+
+	.density-btn:hover {
+		color: var(--ink);
+		background: var(--bg-warm);
+	}
+
+	.density-btn.on {
+		background: var(--clay);
+		color: var(--bg);
+	}
+
+	.density-btn:focus-visible {
+		outline: 2px solid var(--clay);
+		outline-offset: -1px;
+	}
+
 	.count {
 		margin: 0 0 0 auto;
 		color: var(--muted);
@@ -533,6 +621,14 @@
 		display: grid;
 		grid-template-columns: repeat(4, 1fr);
 		gap: 1.5rem var(--col-gap);
+	}
+
+	.grid[data-density='compact'] {
+		grid-template-columns: repeat(5, 1fr);
+	}
+
+	.grid[data-density='sparse'] {
+		grid-template-columns: repeat(3, 1fr);
 	}
 
 	.cell {
@@ -552,6 +648,12 @@
 		.grid {
 			grid-template-columns: repeat(3, 1fr);
 		}
+		.grid[data-density='compact'] {
+			grid-template-columns: repeat(4, 1fr);
+		}
+		.grid[data-density='sparse'] {
+			grid-template-columns: repeat(2, 1fr);
+		}
 	}
 
 	@media (max-width: 760px) {
@@ -566,16 +668,27 @@
 		.count {
 			display: none;
 		}
+		.density {
+			display: none;
+		}
 		.grid {
 			grid-template-columns: repeat(2, 1fr);
 			gap: 1.25rem 1.5rem;
+		}
+		.grid[data-density='compact'] {
+			grid-template-columns: repeat(3, 1fr);
+		}
+		.grid[data-density='sparse'] {
+			grid-template-columns: repeat(2, 1fr);
 		}
 	}
 
 	/* Mobile: text-first rows instead of a cover grid — a continuous hairline
 	   list (BookCard reshapes each cell into a row at the same breakpoint). */
 	@media (max-width: 560px) {
-		.grid {
+		.grid,
+		.grid[data-density='compact'],
+		.grid[data-density='sparse'] {
 			grid-template-columns: 1fr;
 			gap: 0;
 			border-top: var(--border);

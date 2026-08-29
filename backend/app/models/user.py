@@ -15,6 +15,9 @@ class User(UUIDAuditBase):
     username: Mapped[str] = mapped_column(String(100), unique=True)
     password_hash: Mapped[str] = mapped_column(String(255))
     is_admin: Mapped[bool] = mapped_column(default=False)
+    book_grid_density: Mapped[str] = mapped_column(
+        String(20), default="standard", server_default="standard"
+    )
 
 
 class UserSession(UUIDAuditBase):

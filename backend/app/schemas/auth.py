@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -17,6 +18,11 @@ class AuthMe(BaseModel):
     username: str
     is_admin: bool
     auth_mode: str
+    book_grid_density: str = "standard"
+
+
+class UserPreferencesUpdate(BaseModel):
+    book_grid_density: Literal["sparse", "standard", "compact"] = "standard"
 
 
 class UserRead(BaseModel):
