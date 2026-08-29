@@ -8,8 +8,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
@@ -32,8 +30,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -41,7 +37,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,6 +48,7 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -89,7 +85,6 @@ fun BookDetailScreen(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun BookDetailContent(
     detail: BookDetail,
@@ -103,13 +98,8 @@ private fun BookDetailContent(
     val description = remember(detail.description) {
         Html.fromHtml(detail.description, Html.FROM_HTML_MODE_COMPACT).toString().trim()
     }
-    var filter by rememberSaveable { mutableStateOf("") }
     val positions = remember(index) {
         index.withIndex().associate { (i, entry) -> entry.id to i + 1 }
-    }
-    val shown = remember(index, filter) {
-        val q = filter.trim().lowercase()
-        if (q.isEmpty()) index else index.filter { it.name.lowercase().contains(q) }
     }
 
     var isQueued by remember(detail.id, detail.queued) { mutableStateOf(detail.queued) }
@@ -261,9 +251,8 @@ private fun BookDetailContent(
             }
         }
         item {
-            FlowRow(
+            Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp, vertical = 6.dp),
@@ -300,14 +289,19 @@ private fun BookDetailContent(
                         contentColor = if (isQueued) colors.clayDeep else colors.ink,
                     ),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                    modifier = Modifier.semantics {
-                        selected = isQueued
-                        stateDescription = if (isQueued) "in queue" else "not in queue"
-                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .semantics {
+                            selected = isQueued
+                            stateDescription = if (isQueued) "in queue" else "not in queue"
+                        },
                 ) {
                     Text(
                         text = if (isQueued) "In queue" else "Queue to read",
                         style = MaterialTheme.typography.labelLarge.copy(fontSize = 13.sp),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
                     )
                 }
 
@@ -339,14 +333,19 @@ private fun BookDetailContent(
                         contentColor = colors.ink,
                     ),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                    modifier = Modifier.semantics {
-                        selected = isFinished
-                        stateDescription = if (isFinished) "finished" else "not finished"
-                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .semantics {
+                            selected = isFinished
+                            stateDescription = if (isFinished) "finished" else "not finished"
+                        },
                 ) {
                     Text(
                         text = if (isFinished) "Mark unread" else "Mark read",
                         style = MaterialTheme.typography.labelLarge.copy(fontSize = 13.sp),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
                     )
                 }
 
@@ -375,6 +374,7 @@ private fun BookDetailContent(
                         contentColor = colors.ink,
                     ),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                    modifier = Modifier.weight(1f),
                 ) {
                     Text(
                         text = when {
@@ -384,6 +384,9 @@ private fun BookDetailContent(
                             else -> "Extract recipes"
                         },
                         style = MaterialTheme.typography.labelLarge.copy(fontSize = 13.sp),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
                     )
                 }
             }
@@ -393,23 +396,9 @@ private fun BookDetailContent(
                 Column(modifier = Modifier.padding(horizontal = 20.dp)) {
                     HorizontalDivider(color = colors.lineStrong, modifier = Modifier.padding(top = 16.dp, bottom = 16.dp))
                     MonoLabel("Recipe index — ${index.size}")
-                    OutlinedTextField(
-                        value = filter,
-                        onValueChange = { filter = it },
-                        placeholder = { Text("Filter recipes") },
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = colors.clay,
-                            unfocusedBorderColor = colors.lineStrong,
-                            cursorColor = colors.clay,
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 12.dp, bottom = 8.dp),
-                    )
                 }
             }
-            itemsIndexed(shown, key = { _, entry -> entry.id }) { i, entry ->
+            itemsIndexed(index, key = { _, entry -> entry.id }) { i, entry ->
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
@@ -444,7 +433,7 @@ private fun BookDetailContent(
                         )
                     }
                 }
-                if (i < shown.lastIndex) {
+                if (i < index.lastIndex) {
                     HorizontalDivider(color = colors.line, modifier = Modifier.padding(horizontal = 20.dp))
                 }
             }

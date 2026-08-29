@@ -265,6 +265,7 @@ private fun CardHeading(recipe: RecipeDetail, source: GameSource) {
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
+            maxLines = 2,
             modifier = Modifier.padding(bottom = 16.dp),
         ) {
             recipe.keywords.forEach { keyword ->
