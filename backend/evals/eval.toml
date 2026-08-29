@@ -10,6 +10,7 @@ books  = ["craveable"]
 models = [
   "GEMINI:gemini-2.5-flash-lite",
   "GEMINI:gemini-2.5-flash",
+  "OPENROUTER:qwen/qwen3.8-flash",
   "ANTHROPIC:claude-sonnet-5",
   "ANTHROPIC:claude-haiku-4-5-20251001",
 ]
@@ -20,6 +21,7 @@ models = [
   "GEMINI:gemini-2.5-flash-lite",
   "GEMINI:gemini-2.5-flash",
   "OPENROUTER:openai/gpt-oss-120b",
+  "OPENROUTER:qwen/qwen3.8-flash",
   "ANTHROPIC:claude-sonnet-5",
   "ANTHROPIC:claude-haiku-4-5-20251001",
 ]
@@ -31,6 +33,7 @@ books  = ["nothing-fancy"]
 models = [
   "GEMINI:gemini-2.5-flash",
   "GEMINI:gemini-2.5-flash-lite",
+  "OPENROUTER:qwen/qwen3.8-flash",
   "ANTHROPIC:claude-sonnet-5",
   "ANTHROPIC:claude-haiku-4-5-20251001",
 ]
@@ -93,6 +96,7 @@ models = [
   "GEMINI:gemini-2.5-flash",
   "GEMINI:gemini-2.5-flash-lite",
   "OPENROUTER:google/gemini-2.5-flash",
+  "OPENROUTER:qwen/qwen3.8-flash",
 ]
 
 # Discovery: two ingredients, no dish named. A good answer tries more than one search
