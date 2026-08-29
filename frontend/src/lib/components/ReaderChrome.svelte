@@ -186,7 +186,7 @@
 		transition: color 0.18s var(--ease-out);
 	}
 	.back:hover {
-		color: var(--clay-deep);
+		color: var(--accent-deep);
 	}
 
 	.title {
@@ -200,7 +200,6 @@
 	}
 	.title .t {
 		font-family: var(--f-serif);
-		font-style: italic;
 		font-size: 1rem;
 		max-width: 100%;
 		overflow: hidden;
@@ -251,8 +250,8 @@
 		min-width: 2rem;
 	}
 	.ctl:hover {
-		border-color: var(--clay);
-		color: var(--clay-deep);
+		border-color: var(--accent);
+		color: var(--accent-deep);
 	}
 
 	.progress {
@@ -262,7 +261,7 @@
 	}
 	.progress .fill {
 		height: 100%;
-		background: var(--clay);
+		background: var(--accent);
 		transition: width 0.3s var(--ease-out);
 	}
 
@@ -332,15 +331,14 @@
 		border-top: none;
 	}
 	.toc-item:hover {
-		color: var(--clay-deep);
+		color: var(--accent-deep);
 	}
 	.toc-item.current {
-		color: var(--clay-deep);
-		font-style: italic;
+		color: var(--accent-deep);
+		font-weight: 600;
 	}
 	.toc-empty {
 		font-family: var(--f-serif);
-		font-style: italic;
 		color: var(--muted);
 		margin: 0;
 	}
@@ -357,7 +355,7 @@
 		transition: color 0.18s var(--ease-out);
 	}
 	.page:hover {
-		color: var(--clay-deep);
+		color: var(--accent-deep);
 	}
 	.loc {
 		display: flex;

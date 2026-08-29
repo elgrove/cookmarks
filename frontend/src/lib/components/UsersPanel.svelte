@@ -217,7 +217,6 @@
 	}
 	.empty {
 		font-family: var(--f-serif);
-		font-style: italic;
 		font-size: 1.2rem;
 		color: var(--muted);
 		margin: 0;
@@ -265,7 +264,7 @@
 	.link {
 		font-family: var(--f-grotesk);
 		font-size: 0.8rem;
-		color: var(--clay-deep);
+		color: var(--accent-deep);
 		background: none;
 		border: none;
 		padding: 0;
@@ -283,8 +282,7 @@
 	}
 	.error {
 		font-family: var(--f-serif);
-		font-style: italic;
-		color: var(--clay-deep);
+		color: var(--danger);
 		margin: 1rem 0 0;
 	}
 	.create {
@@ -323,7 +321,7 @@
 	}
 	input[type='checkbox'] {
 		justify-self: start;
-		accent-color: var(--clay);
+		accent-color: var(--accent);
 	}
 	.pw {
 		max-width: 11rem;

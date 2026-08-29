@@ -66,7 +66,6 @@
 
 	.msg {
 		font-family: var(--f-serif);
-		font-style: italic;
 		font-size: 1.4rem;
 		color: var(--muted);
 		margin: 0.5rem 0 1.2rem;
@@ -86,6 +85,6 @@
 	}
 
 	.retry:hover {
-		background: var(--clay-deep);
+		background: var(--accent-deep);
 	}
 </style>

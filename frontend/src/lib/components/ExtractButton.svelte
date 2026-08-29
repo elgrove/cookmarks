@@ -80,8 +80,8 @@
 		padding: 0.7rem 1rem;
 		border-radius: 3px;
 		background: transparent;
-		color: var(--clay-deep);
-		border: 1px solid var(--clay);
+		color: var(--accent-deep);
+		border: 1px solid var(--accent);
 		cursor: pointer;
 		transition:
 			background 0.18s var(--ease-out),
@@ -89,7 +89,7 @@
 			color 0.18s var(--ease-out);
 	}
 	.extract:hover:not(:disabled) {
-		background: var(--clay);
+		background: var(--accent);
 		color: var(--bg);
 	}
 	.extract:disabled {
@@ -98,13 +98,13 @@
 		border-color: var(--line-strong);
 	}
 	.extract.queued {
-		background: var(--clay);
+		background: var(--accent);
 		color: var(--bg);
-		border-color: var(--clay);
+		border-color: var(--accent);
 	}
 	.extract.error {
-		color: var(--clay-deep);
-		border-color: var(--clay-deep);
+		color: var(--danger);
+		border-color: var(--danger);
 	}
 	.mark {
 		font-weight: 400;

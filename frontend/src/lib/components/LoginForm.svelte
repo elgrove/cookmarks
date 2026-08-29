@@ -97,13 +97,12 @@
 		font-size: 0.72rem;
 		letter-spacing: 0.16em;
 		text-transform: uppercase;
-		color: var(--clay-deep);
+		color: var(--accent-deep);
 		margin: 0 0 0.6rem;
 	}
 	h1 {
 		font-family: var(--f-serif);
 		font-weight: 400;
-		font-style: italic;
 		font-size: clamp(2.2rem, 5vw, 3rem);
 		line-height: 1.05;
 		letter-spacing: -0.01em;
@@ -134,9 +133,8 @@
 	}
 	.error {
 		font-family: var(--f-serif);
-		font-style: italic;
 		font-size: 1rem;
-		color: var(--clay-deep);
+		color: var(--danger);
 		margin: 1rem 0 0;
 	}
 	.submit {

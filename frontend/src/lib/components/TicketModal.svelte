@@ -170,7 +170,6 @@
 	header h2 {
 		margin: 0.4rem 0 0;
 		font-family: var(--f-serif);
-		font-style: italic;
 		font-weight: 600;
 		font-size: 1.5rem;
 		letter-spacing: -0.01em;
@@ -213,7 +212,7 @@
 	}
 	.error {
 		margin: 0;
-		color: var(--clay-deep);
+		color: var(--danger);
 		font-size: 0.9rem;
 	}
 	.confirm {
@@ -223,7 +222,7 @@
 		color: var(--ink);
 	}
 	.confirm a {
-		color: var(--clay-deep);
+		color: var(--accent-deep);
 		text-decoration: underline;
 		text-underline-offset: 2px;
 	}

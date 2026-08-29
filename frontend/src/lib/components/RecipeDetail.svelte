@@ -221,7 +221,10 @@
 			{#if recipe.ingredients.length}
 				<ul class="ingredients">
 					{#each recipe.ingredients as ing, i (i)}
-						<li>{ing}</li>
+						<li>
+							<span class="ingno" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
+							<span class="ingtext">{ing}</span>
+						</li>
 					{/each}
 				</ul>
 			{:else}
@@ -290,8 +293,9 @@
 	}
 	.crumb {
 		font-family: var(--f-mono);
-		font-size: 0.7rem;
-		letter-spacing: 0.04em;
+		font-size: 0.68rem;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
 		color: var(--muted);
 		min-width: 0;
 		flex: 1 1 auto;
@@ -301,7 +305,7 @@
 		color: var(--muted);
 	}
 	.crumb a:hover {
-		color: var(--clay-deep);
+		color: var(--accent-deep);
 	}
 	.crumb .sep {
 		color: var(--faint);
@@ -320,19 +324,20 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 0.3rem;
-		font-family: var(--f-grotesk);
-		font-size: 0.8rem;
-		font-weight: 600;
-		color: var(--muted);
+		font-family: var(--f-mono);
+		font-size: 0.7rem;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--accent);
 		text-decoration: none;
 		white-space: nowrap;
 		transition: color 0.18s var(--ease-out);
 	}
 	.pg:hover {
-		color: var(--ink);
+		color: var(--accent-deep);
 	}
 	.pg .ar {
-		color: var(--clay);
+		color: var(--accent);
 		font-size: 0.95rem;
 		line-height: 1;
 	}
@@ -342,7 +347,7 @@
 	.masthead {
 		margin-bottom: 2.75rem;
 		padding-bottom: 2.25rem;
-		border-bottom: var(--border-strong);
+		border-bottom: var(--rule);
 	}
 	.head {
 		display: grid;
@@ -357,12 +362,11 @@
 		min-width: 0;
 	}
 	.display {
-		font-family: var(--f-serif);
-		font-weight: 400;
-		font-style: italic;
-		font-size: clamp(2.5rem, 5.2vw, 4.1rem);
-		line-height: 1.02;
-		letter-spacing: -0.015em;
+		font-family: var(--f-grotesk);
+		font-weight: 700;
+		font-size: clamp(2.2rem, 4.6vw, 3.4rem);
+		line-height: 1.05;
+		letter-spacing: -0.02em;
 		margin: 0;
 		overflow-wrap: break-word;
 	}
@@ -373,25 +377,25 @@
 		margin-top: 1.2rem;
 	}
 	.chip {
-		font-family: var(--f-grotesk);
-		font-size: 0.68rem;
-		font-weight: 500;
+		font-family: var(--f-mono);
+		font-size: 0.66rem;
 		line-height: 1.2;
-		letter-spacing: 0.01em;
-		padding: 0.2rem 0.55rem;
-		border-radius: 3px;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		padding: 0.28rem 0.6rem;
 		white-space: nowrap;
 		text-decoration: none;
-		background: var(--chip-clay);
-		color: var(--chip-clay-c);
+		background: var(--card);
+		border: var(--border-strong);
+		color: var(--ink);
 	}
-	.chip.b {
-		background: var(--chip-blue);
-		color: var(--chip-blue-c);
-	}
+	.chip.b,
 	.chip.g {
-		background: var(--chip-green);
-		color: var(--chip-green-c);
+		background: var(--card);
+		color: var(--ink);
+	}
+	.chip:hover {
+		border-color: var(--accent);
 	}
 	.chip:hover,
 	.chip:focus-visible {
@@ -399,23 +403,24 @@
 		text-underline-offset: 2px;
 	}
 	.chip:focus-visible {
-		outline: 2px solid var(--clay);
+		outline: 2px solid var(--accent);
 		outline-offset: 1px;
 	}
 	.yields {
 		font-family: var(--f-mono);
-		font-size: 0.78rem;
-		letter-spacing: 0.04em;
+		font-size: 0.74rem;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
 		color: var(--muted);
 		margin: 1.1rem 0 0;
 	}
 	.lede {
-		font-family: var(--f-serif);
-		font-size: 1.16rem;
-		line-height: 1.65;
-		color: var(--ink);
+		font-family: var(--f-grotesk);
+		font-size: 1.02rem;
+		line-height: 1.6;
+		color: var(--muted);
 		max-width: 50rem;
-		margin: 1.5rem 0 0;
+		margin: 1.4rem 0 0;
 	}
 	.lede p {
 		margin: 0;
@@ -430,7 +435,7 @@
 	.readmore {
 		font-family: var(--f-grotesk);
 		font-size: 0.85rem;
-		color: var(--clay-deep);
+		color: var(--accent-deep);
 		background: none;
 		border: none;
 		border-bottom: 1px solid transparent;
@@ -439,7 +444,7 @@
 		cursor: pointer;
 	}
 	.readmore:hover {
-		border-bottom-color: var(--clay);
+		border-bottom-color: var(--accent);
 	}
 
 	/* Favourite ★ + add-to-list. Stacked in the right rail for the no-image default;
@@ -458,25 +463,26 @@
 	.open-in-book {
 		display: inline-flex;
 		align-items: center;
-		gap: 0.45rem;
-		font-family: var(--f-grotesk);
-		font-weight: 600;
-		font-size: 0.9rem;
+		gap: 0.5rem;
+		font-family: var(--f-mono);
+		font-size: 0.72rem;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
 		padding: 0.7rem 1rem;
-		border-radius: 3px;
 		color: var(--ink);
-		border: 1px solid var(--line-strong);
+		background: var(--card);
+		border: 1px solid var(--ink);
 		text-decoration: none;
 		transition:
 			border-color 0.18s var(--ease-out),
 			color 0.18s var(--ease-out);
 	}
 	.open-in-book:hover {
-		border-color: var(--clay);
-		color: var(--clay-deep);
+		border-color: var(--accent);
+		color: var(--accent-deep);
 	}
 	.open-in-book .glyph {
-		color: var(--clay);
+		color: var(--accent);
 		font-size: 1rem;
 		line-height: 1;
 	}
@@ -533,16 +539,28 @@
 		list-style: none;
 		margin: 0;
 		padding: 0;
-		font-family: var(--f-serif);
-		font-size: 1.05rem;
-		line-height: 1.4;
 	}
 	.ingredients li {
-		padding: 0.65rem 0;
+		display: grid;
+		grid-template-columns: 1.9rem 1fr;
+		column-gap: 0.7rem;
+		align-items: baseline;
+		padding: 0.55rem 0;
 		border-top: var(--border);
 	}
 	.ingredients li:first-child {
-		border-top: var(--border-strong);
+		border-top: var(--rule);
+	}
+	.ingno {
+		font-family: var(--f-mono);
+		font-size: 0.68rem;
+		color: var(--muted);
+	}
+	.ingtext {
+		font-family: var(--f-grotesk);
+		font-size: 0.98rem;
+		line-height: 1.45;
+		color: var(--ink);
 	}
 
 	.method {
@@ -552,40 +570,46 @@
 	}
 	.method li {
 		display: grid;
-		grid-template-columns: 2.5rem 1fr;
-		gap: 0.75rem;
-		padding: 1rem 0;
+		grid-template-columns: 2.4rem 1fr;
+		gap: 1rem;
+		padding: 0.9rem 0;
 		border-top: var(--border);
 	}
 	.method li:first-child {
-		border-top: var(--border-strong);
+		border-top: var(--rule);
 	}
 	.stepno {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 1.9rem;
+		height: 1.9rem;
 		font-family: var(--f-mono);
-		font-size: 0.82rem;
-		font-weight: 400;
-		color: var(--clay);
-		padding-top: 0.3rem;
+		font-size: 0.72rem;
+		font-weight: 600;
+		color: var(--ink);
+		background: var(--card);
+		border: 1px solid var(--ink);
+		margin-top: 0.15rem;
 	}
 	.steptext {
-		font-family: var(--f-serif);
-		font-size: 1.12rem;
-		line-height: 1.65;
+		font-family: var(--f-grotesk);
+		font-size: 1.02rem;
+		line-height: 1.6;
 		color: var(--ink);
 		max-width: 44rem;
 	}
 
 	.empty {
-		font-family: var(--f-serif);
-		font-style: italic;
-		font-size: 1.15rem;
+		font-family: var(--f-grotesk);
+		font-size: 1rem;
 		color: var(--muted);
 		margin: 0;
 	}
 
 	/* Provenance — a quiet full-width footer linking back to the book. */
 	.prov {
-		border-top: var(--border-strong);
+		border-top: var(--rule);
 		margin-top: 3.5rem;
 		padding-top: 1.6rem;
 	}
@@ -593,6 +617,9 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 1rem;
+		padding: 0.8rem 1rem;
+		background: var(--card);
+		border: 1px solid var(--ink);
 		text-decoration: none;
 	}
 	.provplate {
@@ -614,10 +641,9 @@
 		display: block;
 	}
 	.provplate-title {
-		font-family: var(--f-serif);
-		font-style: italic;
-		font-weight: 300;
-		font-size: 0.62rem;
+		font-family: var(--f-grotesk);
+		font-weight: 500;
+		font-size: 0.6rem;
 		line-height: 1.2;
 		text-align: center;
 		padding: 0.3rem;
@@ -629,17 +655,20 @@
 		gap: 0.2rem;
 	}
 	.provtitle {
-		font-family: var(--f-serif);
-		font-size: 1.05rem;
+		font-family: var(--f-grotesk);
+		font-weight: 600;
+		font-size: 0.95rem;
 		color: var(--ink);
 		transition: color 0.18s var(--ease-out);
 	}
 	.provlink:hover .provtitle {
-		color: var(--clay-deep);
+		color: var(--accent-deep);
 	}
 	.provauthor {
-		font-family: var(--f-grotesk);
-		font-size: 0.82rem;
+		font-family: var(--f-mono);
+		font-size: 0.68rem;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
 		color: var(--muted);
 	}
 
