@@ -31,11 +31,12 @@ class AnthropicProvider(AIProvider):
     def _complete(
         self, prompt: str, model: str, *, schema: dict | None = None, temp: float = 0
     ) -> tuple[str, Usage]:
-        response = self.client.messages.create(
+        with self.client.messages.stream(
             model=model,
             max_tokens=32_000,
             messages=[{"role": "user", "content": prompt}],
-        )
+        ) as stream:
+            response = stream.get_final_message()
         input_tokens = response.usage.input_tokens
         output_tokens = response.usage.output_tokens
         input_rate, output_rate = _PRICING.get(model, (0.0, 0.0))
