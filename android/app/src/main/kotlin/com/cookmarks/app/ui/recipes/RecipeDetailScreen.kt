@@ -44,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.cookmarks.app.api.Api
@@ -103,23 +104,29 @@ fun RecipeDetailScreen(
                     ) { sheetOpen = true }
                     .padding(12.dp),
             )
-            IconButton(onClick = {
-                scope.launch {
-                    val previous = favourites[currentId] ?: false
-                    val optimistic = !previous
-                    favourites[currentId] = optimistic
-                    try {
-                        val updated = Api.service.toggleFavourite(currentId).is_favourite
-                        favourites[currentId] = updated
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        Log.w("RecipeDetail", "favourite toggle failed", e)
-                        favourites[currentId] = previous
-                        Feedback.show("Couldn't update favourite")
+            IconButton(
+                onClick = {
+                    scope.launch {
+                        val previous = favourites[currentId] ?: false
+                        val optimistic = !previous
+                        favourites[currentId] = optimistic
+                        try {
+                            val updated = Api.service.toggleFavourite(currentId).is_favourite
+                            favourites[currentId] = updated
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            Log.w("RecipeDetail", "favourite toggle failed", e)
+                            favourites[currentId] = previous
+                            Feedback.show("Couldn't update favourite")
+                        }
                     }
-                }
-            }) {
+                },
+                modifier = Modifier.semantics {
+                    selected = favourite
+                    stateDescription = if (favourite) "favourite" else "not favourite"
+                },
+            ) {
                 Icon(
                     if (favourite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                     contentDescription = if (favourite) "Remove from favourites" else "Add to favourites",
@@ -256,6 +263,7 @@ private fun ListsSheet(recipeId: String, onDismiss: () -> Unit) {
                                 }
                                 .semantics {
                                     selected = membership.contains
+                                    stateDescription = if (membership.contains) "checked" else "not checked"
                                 }
                                 .padding(vertical = 4.dp),
                         ) {

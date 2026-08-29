@@ -208,10 +208,10 @@ fun RecipesScreen(onOpenRecipe: (String, List<String>) -> Unit, onPlay: (GameSou
                                     }
                                 },
                                 modifier = Modifier.semantics {
-                                    role = Role.Checkbox
+                                    role = Role.Button
                                     selected = st.semantic
                                     stateDescription = if (st.semantic) "active" else "inactive"
-                                    contentDescription = if (st.semantic) "AI search, active" else "AI search"
+                                    contentDescription = "AI search"
                                 },
                             ) {
                                 Text(
@@ -255,7 +255,7 @@ fun RecipesScreen(onOpenRecipe: (String, List<String>) -> Unit, onPlay: (GameSou
                 }
             }
             st.semanticUnavailable -> item {
-                StateLine("No AI provider configured — st.semantic search is off.")
+                StateLine("No AI provider configured — semantic search is off.")
             }
             st.query.isBlank() && st.selected.isEmpty() -> item {
                 StateLine("Search, pick a keyword, or describe a dish and press \u2726.")

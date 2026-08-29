@@ -184,6 +184,7 @@ fun ListsScreen(onOpenList: (String) -> Unit, onOpenQueue: () -> Unit) {
                                     throw e
                                 } catch (e: Exception) {
                                     Log.w("Lists", "logout request failed", e)
+                                    Feedback.show("Couldn't sign out")
                                 }
                                 Api.cookieJar.clear()
                                 Api.loggedIn.value = false

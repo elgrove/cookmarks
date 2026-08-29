@@ -137,7 +137,7 @@ private fun BookCard(book: BookSummary, onClick: () -> Unit) {
             if (book.has_cover) {
                 AsyncImage(
                     model = Api.bookCoverUrl(book.id),
-                    contentDescription = "Cover of ${book.title}",
+                    contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
                 )

@@ -49,7 +49,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -298,6 +300,10 @@ private fun BookDetailContent(
                         contentColor = if (isQueued) colors.clayDeep else colors.ink,
                     ),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                    modifier = Modifier.semantics {
+                        selected = isQueued
+                        stateDescription = if (isQueued) "in queue" else "not in queue"
+                    },
                 ) {
                     Text(
                         text = if (isQueued) "In queue" else "Queue to read",
@@ -333,6 +339,10 @@ private fun BookDetailContent(
                         contentColor = colors.ink,
                     ),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                    modifier = Modifier.semantics {
+                        selected = isFinished
+                        stateDescription = if (isFinished) "finished" else "not finished"
+                    },
                 ) {
                     Text(
                         text = if (isFinished) "Mark unread" else "Mark read",

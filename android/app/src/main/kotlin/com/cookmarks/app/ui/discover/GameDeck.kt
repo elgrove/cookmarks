@@ -95,14 +95,8 @@ class DeckController(private val source: GameSource, private val scope: Coroutin
                     Log.w("DeckController", "favourite not saved", e)
                     Feedback.show("Couldn't favourite recipe")
                 } else {
-                    try {
-                        Api.service.dismissRecipe(card.id)
-                    } catch (e2: CancellationException) {
-                        throw e2
-                    } catch (e2: Exception) {
-                        Log.w("DeckController", "dismissal not saved", e2)
-                        Feedback.show("Couldn't dismiss recipe")
-                    }
+                    Log.w("DeckController", "dismissal not saved", e)
+                    Feedback.show("Couldn't dismiss recipe")
                 }
             }
         }
@@ -118,6 +112,7 @@ class DeckController(private val source: GameSource, private val scope: Coroutin
                 throw e
             } catch (e: Exception) {
                 Log.w("DeckController", "reading position not saved", e)
+                Feedback.show("Couldn't save reading position")
             }
         }
     }

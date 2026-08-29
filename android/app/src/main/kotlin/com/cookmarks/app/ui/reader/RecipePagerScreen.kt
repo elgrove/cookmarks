@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.cookmarks.app.api.Api
 import com.cookmarks.app.api.ReadingUpdate
+import com.cookmarks.app.ui.Feedback
 import com.cookmarks.app.ui.components.Loaded
 import com.cookmarks.app.ui.components.MonoLabel
 import com.cookmarks.app.ui.components.rememberLoad
@@ -81,6 +82,7 @@ private fun Pager(
                     throw e
                 } catch (e: Exception) {
                     Log.w("RecipePager", "reading position not saved", e)
+                    Feedback.show("Couldn't save reading position")
                 }
             }
         }
