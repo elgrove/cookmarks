@@ -111,27 +111,10 @@
 		{/if}
 		{#if showAccount}
 			<a
-				class="admin-icon"
-				class:active={$page.url.pathname.startsWith('/config')}
-				href="/config"
-				aria-label={$currentUser?.is_admin ? 'Configuration' : 'Settings'}
-				title={$currentUser?.is_admin ? 'Configuration' : 'Settings'}
-			>
-				<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
-					<circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="1.8" />
-					<path
-						d="M4 20c0-4 3.6-7 8-7s8 3 8 7"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="1.8"
-						stroke-linecap="round"
-					/>
-				</svg>
-			</a>
-			<a
 				class="who"
 				class:active={$page.url.pathname.startsWith('/config')}
 				href="/config"
+				title={$currentUser?.is_admin ? 'Configuration' : 'Settings'}
 				>{$currentUser?.username}</a
 			>
 			<button class="signout" type="button" onclick={signOut}>Sign out</button>
