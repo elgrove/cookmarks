@@ -3,6 +3,7 @@ package com.cookmarks.app
 import com.cookmarks.app.api.Api
 import com.cookmarks.app.api.AuthMe
 import com.cookmarks.app.api.BookDetail
+import com.cookmarks.app.api.BookReadState
 import com.cookmarks.app.api.BookSummary
 import com.cookmarks.app.api.DismissState
 import com.cookmarks.app.api.GameRecipeIds
@@ -107,10 +108,9 @@ class ContractTest {
 
     @Test
     fun reading_state() {
-        val wrapper = Api.json.parseToJsonElement(
-            File(contract, "bookreadstate.example.json").readText()
-        ).jsonObject
-        val reading = Api.json.decodeFromJsonElement<ReadingState>(wrapper["reading"]!!)
+        val state = pin<BookReadState>("bookreadstate")
+        assertEquals(100, state.recipe_count)
+        val reading = state.reading!!
         assertTrue(reading.finished)
         assertEquals("Buttermilk-Marinated Roast Chicken", reading.anchor!!.name)
     }

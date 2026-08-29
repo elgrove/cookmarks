@@ -36,8 +36,20 @@ interface CookmarksService {
     @GET("api/reading-queue")
     suspend fun readingQueue(): List<QueuedBook>
 
+    @PUT("api/books/{id}/queue")
+    suspend fun queueBook(@Path("id") id: String): QueueState
+
     @DELETE("api/books/{id}/queue")
     suspend fun unqueueBook(@Path("id") id: String): QueueState
+
+    @POST("api/books/{id}/seen")
+    suspend fun markBookRead(@Path("id") id: String): BookReadState
+
+    @DELETE("api/books/{id}/seen")
+    suspend fun resetBookProgress(@Path("id") id: String): BookReadState
+
+    @POST("api/books/{id}/extract")
+    suspend fun triggerExtraction(@Path("id") id: String): TaskRun
 
     @GET("api/recipes")
     suspend fun searchRecipes(

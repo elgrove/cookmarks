@@ -68,6 +68,12 @@ data class ReadingUpdate(
 )
 
 @Serializable
+data class BookReadState(
+    val recipe_count: Int,
+    val reading: ReadingState?,
+)
+
+@Serializable
 data class RecipeIndexEntry(
     val id: String,
     val name: String,
