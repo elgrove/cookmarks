@@ -9,6 +9,7 @@
 		hasCover,
 		showCount = true,
 		href = `/books/${id}`,
+		coverHref = null,
 		progress = null
 	}: {
 		id: string;
@@ -19,9 +20,10 @@
 		/** The count circle competes with the progress rule for the same clay, so
 		 *  surfaces that state the count in words (the home strip) turn it off. */
 		showCount?: boolean;
-		/** Where the card leads; the book page unless a surface has somewhere better
-		 *  (the continue strip goes straight back to where reading stopped). */
+		/** Where the card metadata leads; normally the book page. */
 		href?: string;
+		/** When set, only the cover leads here; the title and author keep leading to href. */
+		coverHref?: string | null;
 		/** How far through the book the reader is, 0 to 1; null for one never opened. */
 		progress?: number | null;
 	} = $props();
@@ -47,9 +49,14 @@
 </script>
 
 <article class="card">
-	<!-- A single stretched link covers the whole card surface (cover plate + meta),
-	     so a click anywhere navigates to the book. -->
-	<a class="card-link" {href} aria-label={linkLabel}>
+	<!-- The default card uses one stretched link for the whole surface; split cards
+	     keep the cover and metadata as separate navigation targets. -->
+	<a
+		class="card-link"
+		class:cover-link={coverHref !== null}
+		href={coverHref ?? href}
+		aria-label={coverHref ? `Resume ${linkLabel}` : linkLabel}
+	>
 		<div class="plate">
 			{#if showCover}
 				<img
@@ -74,8 +81,15 @@
 		</div>
 	</a>
 	<div class="meta">
-		<h3 class="title">{displayTitle}</h3>
-		<p class="author">{author}</p>
+		{#if coverHref}
+			<a class="meta-link" {href}>
+				<h3 class="title">{displayTitle}</h3>
+				<p class="author">{author}</p>
+			</a>
+		{:else}
+			<h3 class="title">{displayTitle}</h3>
+			<p class="author">{author}</p>
+		{/if}
 	</div>
 	<!-- Mobile rows only (hidden on the desktop cover grid): recipe count + chevron. -->
 	<span class="row-aside" aria-hidden="true">
@@ -100,8 +114,8 @@
 		text-decoration: none;
 	}
 	/* Stretched link: the anchor's ::after covers the whole card (plate + meta),
-	   so a click anywhere navigates to the book. */
-	.card-link::after {
+	   unless a surface gives the cover and metadata separate destinations. */
+	.card-link:not(.cover-link)::after {
 		content: '';
 		position: absolute;
 		inset: 0;
@@ -183,6 +197,11 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.1rem;
+	}
+
+	.meta-link {
+		display: block;
+		text-decoration: none;
 	}
 
 	.title {

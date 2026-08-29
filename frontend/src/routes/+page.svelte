@@ -2,20 +2,14 @@
 	import { onMount } from 'svelte';
 	import HomeLanding, {
 		type BookOfTheDay,
-		type ContinueBook,
-		type ReadProgress,
-		type RecentRecipe,
-		type UpNextBook
+		type ContinueBook
 	} from '$lib/components/HomeLanding.svelte';
 	import { fetchHome } from '$lib/api/home';
 	import { pageTitle } from '$lib/title';
 
 	let status = $state<'loading' | 'error' | 'ready'>('loading');
 	let bookOfTheDay = $state<BookOfTheDay | null>(null);
-	let progress = $state<ReadProgress>({ books: 0, booksRead: 0 });
 	let continueReading = $state<ContinueBook[]>([]);
-	let upNext = $state<UpNextBook[]>([]);
-	let recentlyRead = $state<RecentRecipe[]>([]);
 
 	async function load() {
 		status = 'loading';
@@ -32,7 +26,6 @@
 						hasCover: b.has_cover
 					}
 				: null;
-			progress = { books: home.stats.books, booksRead: home.stats.books_read };
 			continueReading = home.continue_reading.map((c) => ({
 				id: c.id,
 				title: c.title,
@@ -41,19 +34,6 @@
 				fraction: c.fraction,
 				resumeRecipeId: c.resume_recipe_id,
 				hasCover: c.has_cover
-			}));
-			upNext = home.up_next.map((b) => ({
-				id: b.id,
-				title: b.title,
-				author: b.author,
-				hasCover: b.has_cover,
-				recipeCount: b.recipe_count
-			}));
-			recentlyRead = home.recently_read.map((r) => ({
-				id: r.id,
-				name: r.name,
-				bookId: r.book_id,
-				bookTitle: r.book_title
 			}));
 			status = 'ready';
 		} catch (err) {
@@ -70,7 +50,7 @@
 </svelte:head>
 
 {#if status === 'ready'}
-	<HomeLanding {bookOfTheDay} {progress} {continueReading} {upNext} {recentlyRead} />
+	<HomeLanding {bookOfTheDay} {continueReading} />
 {:else}
 	<div class="status">
 		{#if status === 'loading'}

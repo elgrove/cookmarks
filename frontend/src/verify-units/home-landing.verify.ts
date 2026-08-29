@@ -1,19 +1,13 @@
 import HomeLanding, {
 	type BookOfTheDay,
-	type ContinueBook,
-	type ReadProgress,
-	type RecentRecipe,
-	type UpNextBook
+	type ContinueBook
 } from '$lib/components/HomeLanding.svelte';
 import type { VerifiableUnit } from '$lib/verify/types';
 import { z } from 'zod';
 
 type Props = {
 	bookOfTheDay: BookOfTheDay | null;
-	progress?: ReadProgress;
 	continueReading?: ContinueBook[];
-	upNext?: UpNextBook[];
-	recentlyRead?: RecentRecipe[];
 };
 
 const bookSchema = z.object({
@@ -33,26 +27,6 @@ const continueSchema = z.object({
 	fraction: z.number().min(0).max(1),
 	resumeRecipeId: z.string().nullable(),
 	hasCover: z.boolean()
-});
-
-const recentSchema = z.object({
-	id: z.string(),
-	name: z.string(),
-	bookId: z.string(),
-	bookTitle: z.string()
-});
-
-const upNextSchema = z.object({
-	id: z.string(),
-	title: z.string(),
-	author: z.string(),
-	hasCover: z.boolean(),
-	recipeCount: z.number().int().nonnegative()
-});
-
-const progressSchema = z.object({
-	books: z.number().int().nonnegative(),
-	booksRead: z.number().int().nonnegative()
 });
 
 const feature: BookOfTheDay = {
@@ -86,119 +60,31 @@ const started: ContinueBook[] = [
 	}
 ];
 
-const queued: UpNextBook[] = [
-	{
-		id: 'q1',
-		title: 'An Everlasting Meal',
-		author: 'Tamar Adler',
-		hasCover: true,
-		recipeCount: 87
-	},
-	{
-		id: 'q2',
-		title: 'The Nordic Baking Book',
-		author: 'Magnus Nilsson',
-		hasCover: false,
-		recipeCount: 450
-	}
-];
-
-const recent: RecentRecipe[] = [
-	{
-		id: 'r1',
-		name: 'Buttermilk-Marinated Roast Chicken',
-		bookId: 'c1',
-		bookTitle: 'Salt, Fat, Acid, Heat: Mastering the Elements of Good Cooking'
-	},
-	{ id: 'r2', name: 'Shirazi Salad', bookId: 'c2', bookTitle: 'Persiana' },
-	{ id: 'r3', name: 'Tahdig', bookId: 'c2', bookTitle: 'Persiana' }
-];
-
 const unit: VerifiableUnit<Props> = {
 	id: 'home-landing',
 	title: 'Home landing',
 	description:
-		'The quiet landing, led by the books you are part-way through; the book-of-the-day feature and the library read figure follow it.',
+		'The quiet landing, led by the book of the day, with the Continue Reading shelf beneath it.',
 	kind: 'component',
 	component: HomeLanding,
 	propsSchema: z.object({
 		bookOfTheDay: bookSchema.nullable(),
-		progress: progressSchema.optional(),
-		continueReading: z.array(continueSchema).optional(),
-		upNext: z.array(upNextSchema).optional(),
-		recentlyRead: z.array(recentSchema).optional()
+		continueReading: z.array(continueSchema).optional()
 	}),
 	fixtures: [
 		{
 			id: 'populated',
-			description: 'books part-read lead the page; the feature and read figure follow',
+			description: 'the book of the day leads, followed by the Continue Reading shelf',
 			props: {
 				bookOfTheDay: feature,
-				progress: { books: 192, booksRead: 24 },
-				continueReading: started,
-				recentlyRead: recent
-			}
-		},
-		{
-			id: 'recent-only',
-			description:
-				'probe: recipes read across finished books — a recent index with no strip to lead',
-			probe: true,
-			props: {
-				bookOfTheDay: feature,
-				progress: { books: 192, booksRead: 24 },
-				continueReading: [],
-				recentlyRead: recent
-			}
-		},
-		{
-			id: 'long-recent-name',
-			description: 'probe: an overlong recipe and book title in the recent index must not break',
-			probe: true,
-			props: {
-				bookOfTheDay: feature,
-				progress: { books: 192, booksRead: 24 },
-				continueReading: [],
-				recentlyRead: [
-					{
-						id: 'rx',
-						name: 'Grand-mère’s Slow-Braised Bourguignon with Crème Fraîche, Sauté Mushrooms & Rather More Title Than Any One Line Will Hold',
-						bookId: 'c1',
-						bookTitle:
-							'An Unreasonably Long Cookbook Title: With A Subtitle That Also Refuses To Stop'
-					}
-				]
-			}
-		},
-		{
-			id: 'up-next',
-			description: 'queued books shelve below whatever leads, in the same card language',
-			props: {
-				bookOfTheDay: feature,
-				progress: { books: 192, booksRead: 24 },
-				continueReading: started,
-				upNext: queued,
-				recentlyRead: recent
-			}
-		},
-		{
-			id: 'up-next-without-continue',
-			description:
-				'probe: a queue with nothing part-read — the feature keeps the lead slot, the shelf stays below it',
-			probe: true,
-			props: {
-				bookOfTheDay: feature,
-				progress: { books: 192, booksRead: 24 },
-				continueReading: [],
-				upNext: queued
+				continueReading: started
 			}
 		},
 		{
 			id: 'single-continue',
-			description: 'one part-read book still leads, without stretching across the page',
+			description: 'one part-read book follows the feature without stretching across the page',
 			props: {
 				bookOfTheDay: feature,
-				progress: { books: 192, booksRead: 1 },
 				continueReading: [started[0]]
 			}
 		},
@@ -214,7 +100,6 @@ const unit: VerifiableUnit<Props> = {
 			probe: true,
 			props: {
 				bookOfTheDay: feature,
-				progress: { books: 192, booksRead: 24 },
 				continueReading: [
 					started[0],
 					started[1],
@@ -229,7 +114,6 @@ const unit: VerifiableUnit<Props> = {
 			probe: true,
 			props: {
 				bookOfTheDay: feature,
-				progress: { books: 192, booksRead: 0 },
 				continueReading: []
 			}
 		},
@@ -239,7 +123,6 @@ const unit: VerifiableUnit<Props> = {
 			probe: true,
 			props: {
 				bookOfTheDay: feature,
-				progress: { books: 192, booksRead: 0 },
 				continueReading: [{ ...started[0], fraction: 0 }]
 			}
 		},
@@ -249,39 +132,11 @@ const unit: VerifiableUnit<Props> = {
 			probe: true,
 			props: {
 				bookOfTheDay: feature,
-				progress: { books: 12, booksRead: 12 },
 				continueReading: [{ ...started[0], fraction: 1 }]
 			}
 		}
 	],
 	invariants: [
-		{
-			id: 'recent-index',
-			description:
-				'the recent index lists each recipe read, numbered, linking to the recipe and its book',
-			check: ({ contract, root, props }) => {
-				const items = props.recentlyRead ?? [];
-				if (Number(contract['recent-count']) !== items.length)
-					return `recent-count=${contract['recent-count']} expected ${items.length}`;
-				const rows = [...root.querySelectorAll('.recent-index li')];
-				if (rows.length !== items.length) return `${rows.length} rows for ${items.length} recipes`;
-				if (!items.length)
-					return root.querySelector('.recent') === null || 'a recent section with nothing in it';
-				for (const [i, row] of rows.entries()) {
-					const recipe = row.querySelector('.rtitle');
-					const want = `/recipes/${items[i].id}`;
-					if (recipe?.getAttribute('href') !== want)
-						return `row ${i} recipe href=${recipe?.getAttribute('href')} expected ${want}`;
-					if ((recipe.textContent ?? '').trim() !== items[i].name)
-						return `row ${i} name="${(recipe.textContent ?? '').trim()}"`;
-					const book = row.querySelector('.rbook');
-					const wantBook = `/books/${items[i].bookId}`;
-					if (book?.getAttribute('href') !== wantBook)
-						return `row ${i} book href=${book?.getAttribute('href')} expected ${wantBook}`;
-				}
-				return true;
-			}
-		},
 		{
 			id: 'feature-consistency',
 			description: 'the feature renders exactly when a book of the day is supplied',
@@ -296,21 +151,19 @@ const unit: VerifiableUnit<Props> = {
 		{
 			id: 'continue-leads',
 			description:
-				'books part-read lead the page and own the h1; the feature and the library figure come after them, in that order',
+				'the book of the day leads the page, with Continue Reading beneath it',
 			check: ({ contract, root, props }) => {
 				const books = props.continueReading ?? [];
-				const want = books.length ? 'continue' : props.bookOfTheDay ? 'feature' : 'empty';
+				const want = props.bookOfTheDay ? 'feature' : books.length ? 'continue' : 'empty';
 				if (contract.lead !== want) return `lead=${contract.lead} expected ${want}`;
 
-				const order = [...root.querySelectorAll('.continue, .feature, .progress-block')].map(
+				const order = [...root.querySelectorAll('.feature, .continue')].map(
 					(el) => el.className.split(' ')[0]
 				);
-				const expected = ['continue', 'feature', 'progress-block'].filter((cls) =>
+				const expected = ['feature', 'continue'].filter((cls) =>
 					cls === 'continue'
 						? books.length > 0
-						: cls === 'feature'
-							? props.bookOfTheDay !== null
-							: (props.progress?.books ?? 0) > 0
+						: props.bookOfTheDay !== null
 				);
 				if (order.join('|') !== expected.join('|'))
 					return `section order=${order.join('|')} expected ${expected.join('|')}`;
@@ -321,7 +174,7 @@ const unit: VerifiableUnit<Props> = {
 						root.querySelector('h1') === null || 'an h1 is rendered with nothing to show'
 					);
 
-				// Otherwise exactly one h1, on whichever section leads.
+				// Otherwise exactly one h1, on the leading section.
 				const h1s = [...root.querySelectorAll('h1')];
 				if (h1s.length !== 1) return `${h1s.length} h1 elements, expected 1`;
 				const heading = (h1s[0].textContent ?? '').trim();
@@ -334,29 +187,11 @@ const unit: VerifiableUnit<Props> = {
 			}
 		},
 		{
-			id: 'up-next-shelf',
-			description:
-				'the shelf renders one card per queued book, each leading to its book page, and never sits above the section that leads the page',
-			check: ({ contract, root, props }) => {
-				const books = props.upNext ?? [];
-				if (Number(contract['upnext-count']) !== books.length)
-					return `upnext-count=${contract['upnext-count']} expected ${books.length}`;
-				const shelf = root.querySelector('.upnext');
-				if (!books.length)
-					return shelf === null || 'an Up next section is rendered with nothing queued';
-				if (!shelf) return 'no Up next section rendered';
-				const cells = [...shelf.querySelectorAll('.cell')];
-				if (cells.length !== books.length)
-					return `rendered ${cells.length} shelf cards, expected ${books.length}`;
-				for (let i = 0; i < books.length; i++) {
-					const href = cells[i].querySelector('a[href]')?.getAttribute('href') ?? '';
-					// A queued book is not being read yet: its card goes to the book page.
-					if (href !== `/books/${books[i].id}`)
-						return `card ${i} href=${href} expected /books/${books[i].id}`;
-				}
-				const lead = root.querySelector('.continue') ?? root.querySelector('.feature');
-				if (lead && lead.compareDocumentPosition(shelf) & Node.DOCUMENT_POSITION_PRECEDING)
-					return 'the Up next shelf sits above the lead section';
+			id: 'home-surface-sections',
+			description: 'the home surface omits the removed Up next, Recently opened, and Read so far sections',
+			check: ({ root }) => {
+				if (!['.upnext', '.recent', '.progress-block'].every((selector) => !root.querySelector(selector)))
+					return 'the home surface renders a removed secondary section';
 				return true;
 			}
 		},
@@ -370,29 +205,9 @@ const unit: VerifiableUnit<Props> = {
 				'book title not rendered'
 		},
 		{
-			id: 'read-percentage',
-			description:
-				'the library read figure is the share of books read through, rounded and clamped, and absent for an empty library',
-			check: ({ contract, root, props }) => {
-				const { books = 0, booksRead = 0 } = props.progress ?? {};
-				const shown = contract['read-pct'] ?? '';
-				if (books === 0) {
-					if (shown !== '') return `read-pct=${shown} with an empty library`;
-					return (
-						root.querySelector('.progress-block') === null ||
-						'a read figure is rendered with no books'
-					);
-				}
-				const want = Math.max(0, Math.min(100, Math.round((100 * booksRead) / books)));
-				if (Number(shown) !== want) return `read-pct=${shown} expected ${want}`;
-				const pct = root.querySelector('.progress-block .pct')?.textContent?.trim();
-				return pct === `${want}%` || `figure="${pct}" expected ${want}%`;
-			}
-		},
-		{
 			id: 'continue-strip',
 			description:
-				'the strip renders one book card per supplied book, each leading back into the reader and stating how far through it is',
+				'the strip renders one book card per supplied book, with separate resume and book-page links',
 			check: ({ contract, root, props }) => {
 				const books = props.continueReading ?? [];
 				if (Number(contract['continue-count']) !== books.length)
@@ -404,16 +219,20 @@ const unit: VerifiableUnit<Props> = {
 				for (let i = 0; i < books.length; i++) {
 					const book = books[i];
 					const want = Math.round(book.fraction * 100);
-					// One nav link per card — the card's own stretched link, no second focus stop.
+					// The cover resumes reading while the metadata opens the book page.
 					const links = cells[i].querySelectorAll('a[href]');
-					if (links.length !== 1) return `card ${i} has ${links.length} nav links, expected 1`;
-					// Continuing resumes the mode the book was left in, never the book page.
+					if (links.length !== 2) return `card ${i} has ${links.length} nav links, expected 2`;
 					const wantHref =
 						book.mode === 'recipes' && book.resumeRecipeId
 							? `/recipes/${book.resumeRecipeId}?context=book`
 							: `/books/${book.id}/read`;
-					if (links[0].getAttribute('href') !== wantHref)
-						return `card ${i} href=${links[0].getAttribute('href')} expected ${wantHref}`;
+					const cover = cells[i].querySelector('.cover-link');
+					if (cover?.getAttribute('href') !== wantHref)
+						return `card ${i} cover href=${cover?.getAttribute('href')} expected ${wantHref}`;
+					const meta = cells[i].querySelector('.meta-link');
+					const bookHref = `/books/${book.id}`;
+					if (meta?.getAttribute('href') !== bookHref)
+						return `card ${i} metadata href=${meta?.getAttribute('href')} expected ${bookHref}`;
 					const text = cells[i].textContent ?? '';
 					if (!text.includes(`${want}% through`))
 						return `card ${i} omits how far through it is: "${text.trim()}"`;
