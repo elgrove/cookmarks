@@ -352,8 +352,8 @@ def _model(provider: AIProvider) -> Model | None:
 
 def _assistant_instructions(ctx: RunContext[AssistantDeps]) -> str:
     prompt = ASSISTANT_SYSTEM_PROMPT
-    if ctx.deps.cooking_instructions:
-        prompt = f"{prompt}\n\nPersonal cooking instructions for this cook:\n{ctx.deps.cooking_instructions}"
+    if ctx.deps.cooking_instructions and ctx.deps.cooking_instructions.strip():
+        prompt = f"{prompt}\n\nPersonal cooking instructions for this cook:\n{ctx.deps.cooking_instructions.strip()}"
     return prompt
 
 

@@ -246,13 +246,7 @@ a {
 @media (max-width: 760px) {
 	.nav {
 		gap: 0.9rem;
-		/* Account chrome drops to a second line rather than being clipped off the
-		   right edge (DESIGN §8: no horizontal scroll). */
 		flex-wrap: wrap;
-	}
-	/* The username is redundant chrome on a phone; the sign-out control stays. */
-	.nav .who {
-		display: none;
 	}
 	.nav .signout {
 		margin-left: auto;

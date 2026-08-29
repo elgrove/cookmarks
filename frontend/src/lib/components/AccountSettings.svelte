@@ -22,8 +22,8 @@
 		instructionsInput = instructions ?? '';
 	});
 
-	let normalized = $derived(instructionsInput.trim() || null);
-	let dirty = $derived(normalized !== (instructions ?? null));
+	let normalised = $derived(instructionsInput.trim() || null);
+	let dirty = $derived(normalised !== (instructions ?? null));
 	let overLimit = $derived(instructionsInput.length > 4000);
 
 	let saveLabel = $derived(
@@ -45,7 +45,7 @@
 		errorMessage = '';
 
 		try {
-			await onSave?.(normalized);
+			await onSave?.(normalised);
 			saveState = 'saved';
 			timer = setTimeout(() => {
 				if (saveState === 'saved') saveState = 'idle';
@@ -226,7 +226,7 @@
 	}
 
 	.char-count.limit-reached {
-		color: #b91c1c;
+		color: var(--clay-deep, #b91c1c);
 		font-weight: 600;
 	}
 
@@ -252,7 +252,7 @@
 	.error-text {
 		font-family: var(--f-mono);
 		font-size: 0.78rem;
-		color: #b91c1c;
+		color: var(--clay-deep, #b91c1c);
 		margin: 0;
 	}
 

@@ -71,7 +71,10 @@ def me(user: CurrentUser) -> AuthMe:
 
 @router.patch("/auth/me", response_model=AuthMe)
 def update_me(body: UserUpdate, user: CurrentUser, session: SessionDep) -> AuthMe:
-    user.cooking_instructions = body.cooking_instructions
+    if "cooking_instructions" in body.model_fields_set:
+        user.cooking_instructions = (
+            body.cooking_instructions.strip() if body.cooking_instructions else None
+        )
     session.add(user)
     session.commit()
     session.refresh(user)

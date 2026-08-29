@@ -6,7 +6,7 @@ import type { VerifiableUnit } from '$lib/verify/types';
 type Props = AccountSettingsProps;
 
 const NORMAL_INSTRUCTIONS =
-	'Vegetarian. Gas hob, cast iron pan, no microwave. Dislikes cilantro.';
+	'Vegetarian. Gas hob, cast iron pan, no microwave. Dislikes coriander.';
 const MAX_INSTRUCTIONS = 'x'.repeat(4000);
 const OVER_LIMIT_INSTRUCTIONS = 'x'.repeat(4001);
 
