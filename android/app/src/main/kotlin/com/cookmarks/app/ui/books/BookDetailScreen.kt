@@ -253,6 +253,7 @@ private fun BookDetailContent(
         item {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp, vertical = 6.dp),
@@ -288,7 +289,7 @@ private fun BookDetailContent(
                         containerColor = if (isQueued) colors.bgWarm else Color.Transparent,
                         contentColor = if (isQueued) colors.clayDeep else colors.ink,
                     ),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp),
                     modifier = Modifier
                         .weight(1f)
                         .semantics {
@@ -298,8 +299,8 @@ private fun BookDetailContent(
                 ) {
                     Text(
                         text = if (isQueued) "In queue" else "Queue to read",
-                        style = MaterialTheme.typography.labelLarge.copy(fontSize = 13.sp),
-                        maxLines = 2,
+                        style = MaterialTheme.typography.labelLarge.copy(fontSize = 12.sp),
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         textAlign = TextAlign.Center,
                     )
@@ -332,7 +333,7 @@ private fun BookDetailContent(
                     colors = ButtonDefaults.outlinedButtonColors(
                         contentColor = colors.ink,
                     ),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp),
                     modifier = Modifier
                         .weight(1f)
                         .semantics {
@@ -342,8 +343,8 @@ private fun BookDetailContent(
                 ) {
                     Text(
                         text = if (isFinished) "Mark unread" else "Mark read",
-                        style = MaterialTheme.typography.labelLarge.copy(fontSize = 13.sp),
-                        maxLines = 2,
+                        style = MaterialTheme.typography.labelLarge.copy(fontSize = 12.sp),
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         textAlign = TextAlign.Center,
                     )
@@ -373,18 +374,18 @@ private fun BookDetailContent(
                     colors = ButtonDefaults.outlinedButtonColors(
                         contentColor = colors.ink,
                     ),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp),
                     modifier = Modifier.weight(1f),
                 ) {
                     Text(
                         text = when {
                             extractBusy -> "Extracting…"
-                            extractQueued -> "Extraction queued"
-                            detail.recipe_count > 0 -> "Re-extract recipes"
-                            else -> "Extract recipes"
+                            extractQueued -> "Queued"
+                            detail.recipe_count > 0 -> "Re-extract"
+                            else -> "Extract"
                         },
-                        style = MaterialTheme.typography.labelLarge.copy(fontSize = 13.sp),
-                        maxLines = 2,
+                        style = MaterialTheme.typography.labelLarge.copy(fontSize = 12.sp),
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         textAlign = TextAlign.Center,
                     )
