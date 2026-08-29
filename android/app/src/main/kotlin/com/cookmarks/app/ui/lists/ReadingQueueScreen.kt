@@ -26,10 +26,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.cookmarks.app.api.Api
+import com.cookmarks.app.ui.Feedback
 import com.cookmarks.app.ui.cleanTitle
 import com.cookmarks.app.ui.components.Loaded
 import com.cookmarks.app.ui.components.MonoLabel
@@ -86,7 +88,10 @@ fun ReadingQueueScreen(onBack: () -> Unit, onOpenBook: (String) -> Unit) {
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { onOpenBook(book.id) }
+                        .clickable(
+                            role = Role.Button,
+                            onClickLabel = "Open ${cleanTitle(book.title)}",
+                        ) { onOpenBook(book.id) }
                         .padding(start = 20.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
                 ) {
                     MonoLabel((i + 1).toString().padStart(2, '0'), colour = colors.clay)
@@ -116,6 +121,7 @@ fun ReadingQueueScreen(onBack: () -> Unit, onOpenBook: (String) -> Unit) {
                                 throw e
                             } catch (e: Exception) {
                                 Log.w("ReadingQueue", "unqueue failed", e)
+                                Feedback.show("Couldn't remove from queue")
                             }
                         }
                     }) {

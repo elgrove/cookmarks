@@ -33,6 +33,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import com.cookmarks.app.api.Api
@@ -114,8 +118,15 @@ fun DiscoverScreen(onPlay: (GameSource) -> Unit) {
                         modifier = Modifier
                             .border(1.dp, if (active) colors.clay else colors.lineStrong)
                             .then(if (active) Modifier.background(colors.clay) else Modifier)
-                            .clickable {
+                            .clickable(
+                                role = Role.Checkbox,
+                                onClickLabel = if (active) "Remove keyword $keyword" else "Select keyword $keyword",
+                            ) {
                                 selected = if (active) selected - keyword else selected + keyword
+                            }
+                            .semantics {
+                                this.selected = active
+                                this.stateDescription = if (active) "selected" else "not selected"
                             }
                             .padding(horizontal = 10.dp, vertical = 6.dp),
                     )

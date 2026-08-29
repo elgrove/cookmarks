@@ -28,6 +28,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -86,10 +89,18 @@ fun BooksScreen(onOpenBook: (String) -> Unit) {
                         modifier = Modifier.padding(top = 12.dp),
                     ) {
                         BookSort.entries.forEach { option ->
+                            val isSelected = option == sort
                             MonoLabel(
                                 text = option.label,
-                                colour = if (option == sort) colors.clay else colors.faint,
-                                modifier = Modifier.clickable { sort = option },
+                                colour = if (isSelected) colors.clay else colors.faint,
+                                modifier = Modifier
+                                    .clickable(
+                                        role = Role.RadioButton,
+                                        onClickLabel = "Sort by ${option.label}",
+                                    ) { sort = option }
+                                    .semantics {
+                                        selected = isSelected
+                                    },
                             )
                         }
                     }
@@ -115,7 +126,13 @@ fun BooksScreen(onOpenBook: (String) -> Unit) {
 @Composable
 private fun BookCard(book: BookSummary, onClick: () -> Unit) {
     val colors = CmTheme.colors
-    Column(modifier = Modifier.clickable(onClick = onClick)) {
+    Column(
+        modifier = Modifier.clickable(
+            role = Role.Button,
+            onClickLabel = "Open ${cleanTitle(book.title)}",
+            onClick = onClick,
+        ),
+    ) {
         Box(modifier = Modifier.fillMaxWidth().aspectRatio(0.72f)) {
             if (book.has_cover) {
                 AsyncImage(

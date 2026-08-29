@@ -41,11 +41,15 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.cookmarks.app.api.Api
 import com.cookmarks.app.api.ListRecipeRef
 import com.cookmarks.app.api.RecipeDetail
+import com.cookmarks.app.ui.Feedback
 import com.cookmarks.app.ui.cleanTitle
 import com.cookmarks.app.ui.components.Loaded
 import com.cookmarks.app.ui.components.MonoLabel
@@ -92,16 +96,27 @@ fun RecipeDetailScreen(
             MonoLabel(
                 "Lists",
                 colour = colors.muted,
-                modifier = Modifier.clickable { sheetOpen = true }.padding(12.dp),
+                modifier = Modifier
+                    .clickable(
+                        role = Role.Button,
+                        onClickLabel = "Open lists sheet",
+                    ) { sheetOpen = true }
+                    .padding(12.dp),
             )
             IconButton(onClick = {
                 scope.launch {
+                    val previous = favourites[currentId] ?: false
+                    val optimistic = !previous
+                    favourites[currentId] = optimistic
                     try {
-                        favourites[currentId] = Api.service.toggleFavourite(currentId).is_favourite
+                        val updated = Api.service.toggleFavourite(currentId).is_favourite
+                        favourites[currentId] = updated
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {
                         Log.w("RecipeDetail", "favourite toggle failed", e)
+                        favourites[currentId] = previous
+                        Feedback.show("Couldn't update favourite")
                     }
                 }
             }) {
@@ -161,7 +176,10 @@ private fun SimilarRail(recipeId: String, onOpenRecipe: (String, List<String>) -
                     modifier = Modifier
                         .width(180.dp)
                         .border(1.dp, colors.line)
-                        .clickable { onOpenRecipe(recipe.id, similar.items.map { it.id }) }
+                        .clickable(
+                            role = Role.Button,
+                            onClickLabel = "Open ${recipe.name}",
+                        ) { onOpenRecipe(recipe.id, similar.items.map { it.id }) }
                         .padding(14.dp),
                 ) {
                     Text(
@@ -212,7 +230,10 @@ private fun ListsSheet(recipeId: String, onDismiss: () -> Unit) {
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable {
+                                .clickable(
+                                    role = Role.Checkbox,
+                                    onClickLabel = if (membership.contains) "Remove from ${membership.name}" else "Add to ${membership.name}",
+                                ) {
                                     scope.launch {
                                         try {
                                             if (membership.contains) {
@@ -229,8 +250,12 @@ private fun ListsSheet(recipeId: String, onDismiss: () -> Unit) {
                                             throw e
                                         } catch (e: Exception) {
                                             Log.w("RecipeDetail", "list toggle failed", e)
+                                            Feedback.show(if (membership.contains) "Couldn't remove from list" else "Couldn't add to list")
                                         }
                                     }
+                                }
+                                .semantics {
+                                    selected = membership.contains
                                 }
                                 .padding(vertical = 4.dp),
                         ) {

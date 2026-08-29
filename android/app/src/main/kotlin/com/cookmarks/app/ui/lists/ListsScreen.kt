@@ -25,10 +25,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.cookmarks.app.api.Api
 import com.cookmarks.app.api.ListCreate
+import com.cookmarks.app.ui.Feedback
 import com.cookmarks.app.ui.components.Loaded
 import com.cookmarks.app.ui.components.MonoLabel
 import com.cookmarks.app.ui.components.rememberLoad
@@ -57,6 +59,7 @@ fun ListsScreen(onOpenList: (String) -> Unit, onOpenQueue: () -> Unit) {
                 throw e
             } catch (e: Exception) {
                 Log.w("Lists", "create list failed", e)
+                Feedback.show("Couldn't create list")
             }
         }
     }
@@ -90,7 +93,13 @@ fun ListsScreen(onOpenList: (String) -> Unit, onOpenQueue: () -> Unit) {
                         MonoLabel(
                             "Create",
                             colour = if (newName.isBlank()) colors.faint else colors.clay,
-                            modifier = Modifier.clickable { create() }.padding(12.dp),
+                            modifier = Modifier
+                                .clickable(
+                                    enabled = newName.isNotBlank(),
+                                    role = Role.Button,
+                                    onClickLabel = "Create list",
+                                ) { create() }
+                                .padding(12.dp),
                         )
                     }
                 }
@@ -101,7 +110,10 @@ fun ListsScreen(onOpenList: (String) -> Unit, onOpenQueue: () -> Unit) {
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { onOpenQueue() }
+                        .clickable(
+                            role = Role.Button,
+                            onClickLabel = "Open reading queue",
+                        ) { onOpenQueue() }
                         .padding(horizontal = 20.dp, vertical = 16.dp),
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
@@ -125,7 +137,10 @@ fun ListsScreen(onOpenList: (String) -> Unit, onOpenQueue: () -> Unit) {
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { onOpenList(list.id) }
+                        .clickable(
+                            role = Role.Button,
+                            onClickLabel = "Open ${list.name}",
+                        ) { onOpenList(list.id) }
                         .padding(horizontal = 20.dp, vertical = 16.dp),
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
@@ -158,7 +173,10 @@ fun ListsScreen(onOpenList: (String) -> Unit, onOpenQueue: () -> Unit) {
                     "Sign out",
                     colour = colors.faint,
                     modifier = Modifier
-                        .clickable {
+                        .clickable(
+                            role = Role.Button,
+                            onClickLabel = "Sign out",
+                        ) {
                             scope.launch {
                                 try {
                                     Api.service.logout()

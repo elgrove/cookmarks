@@ -7,6 +7,7 @@ import androidx.compose.runtime.setValue
 import com.cookmarks.app.api.Api
 import com.cookmarks.app.api.GameRecipeIds
 import com.cookmarks.app.api.ReadingUpdate
+import com.cookmarks.app.ui.Feedback
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.random.Random
 import kotlinx.coroutines.CoroutineScope
@@ -92,6 +93,7 @@ class DeckController(private val source: GameSource, private val scope: Coroutin
             } catch (e: Exception) {
                 if (favourite) {
                     Log.w("DeckController", "favourite not saved", e)
+                    Feedback.show("Couldn't favourite recipe")
                 } else {
                     try {
                         Api.service.dismissRecipe(card.id)
@@ -99,6 +101,7 @@ class DeckController(private val source: GameSource, private val scope: Coroutin
                         throw e2
                     } catch (e2: Exception) {
                         Log.w("DeckController", "dismissal not saved", e2)
+                        Feedback.show("Couldn't dismiss recipe")
                     }
                 }
             }

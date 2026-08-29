@@ -20,11 +20,19 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -72,9 +80,29 @@ fun MainShell() {
     val route = backStackEntry?.destination?.route ?: "books"
     val immersive = route.startsWith("read/") || route.startsWith("read-list/") ||
         route.startsWith("discover/play")
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(Unit) {
+        Feedback.messages.collect { message ->
+            snackbarHostState.showSnackbar(message)
+        }
+    }
 
     Scaffold(
         containerColor = colors.bg,
+        snackbarHost = {
+            SnackbarHost(
+                hostState = snackbarHostState,
+                snackbar = { data ->
+                    Snackbar(
+                        snackbarData = data,
+                        containerColor = colors.bgWarm,
+                        contentColor = colors.ink,
+                        shape = MaterialTheme.shapes.extraSmall,
+                    )
+                },
+            )
+        },
         bottomBar = {
             if (!immersive) {
                 Column {
@@ -101,7 +129,10 @@ fun MainShell() {
                                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 13.sp, lineHeight = 18.sp),
                                     color = if (active) colors.clay else colors.muted,
                                     modifier = Modifier
-                                        .clickable {
+                                        .clickable(
+                                            role = Role.Tab,
+                                            onClickLabel = "Switch to ${tab.label}",
+                                        ) {
                                             if (active) {
                                                 navController.popBackStack(tab.route, inclusive = false)
                                             } else {
@@ -111,6 +142,9 @@ fun MainShell() {
                                                     restoreState = true
                                                 }
                                             }
+                                        }
+                                        .semantics {
+                                            selected = active
                                         }
                                         .padding(horizontal = 20.dp, vertical = 20.dp),
                                 )
