@@ -275,9 +275,7 @@
 		margin: 0;
 		padding: 0;
 		display: grid;
-		/* Cards keep a sane width whatever the strip holds — one part-read book must
-		   not stretch to a quarter of the page, nor fill it. */
-		grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+		grid-template-columns: repeat(auto-fill, 190px);
 		gap: 1.5rem var(--col-gap);
 	}
 
@@ -300,7 +298,7 @@
 			padding: 3rem var(--page-h);
 		}
 		.strip {
-			grid-template-columns: repeat(2, 1fr);
+			grid-template-columns: repeat(2, 190px);
 			gap: 1.75rem 1.5rem;
 		}
 		.feature {
