@@ -5,7 +5,7 @@ from app.api.deps import CurrentUser
 from app.config import settings
 from app.db import SessionDep
 from app.models.user import User
-from app.schemas.auth import AuthMe, LoginRequest
+from app.schemas.auth import AuthMe, LoginRequest, UserUpdate
 from app.services.auth import (
     COOKIE_NAME,
     SESSION_TTL,
@@ -17,9 +17,14 @@ from app.services.auth import (
 
 router = APIRouter(tags=["auth"])
 
+
 def _me(user: User) -> AuthMe:
     return AuthMe(
-        id=user.id, username=user.username, is_admin=user.is_admin, auth_mode=settings.auth_mode
+        id=user.id,
+        username=user.username,
+        is_admin=user.is_admin,
+        auth_mode=settings.auth_mode,
+        cooking_instructions=user.cooking_instructions,
     )
 
 
@@ -62,3 +67,13 @@ def logout(request: Request, session: SessionDep) -> Response:
 @router.get("/auth/me", response_model=AuthMe)
 def me(user: CurrentUser) -> AuthMe:
     return _me(user)
+
+
+@router.patch("/auth/me", response_model=AuthMe)
+def update_me(body: UserUpdate, user: CurrentUser, session: SessionDep) -> AuthMe:
+    user.cooking_instructions = body.cooking_instructions
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    return _me(user)
+

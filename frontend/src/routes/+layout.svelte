@@ -129,7 +129,12 @@
 			</a>
 		{/if}
 		{#if showAccount}
-			<span class="who">{$currentUser?.username}</span>
+			<a
+				class="who"
+				class:active={$page.url.pathname.startsWith('/account')}
+				href="/account"
+				>{$currentUser?.username}</a
+			>
 			<button class="signout" type="button" onclick={signOut}>Sign out</button>
 		{/if}
 	</nav>

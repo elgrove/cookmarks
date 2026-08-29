@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class LoginRequest(BaseModel):
@@ -10,13 +10,15 @@ class LoginRequest(BaseModel):
 
 
 class AuthMe(BaseModel):
-    """The signed-in user, plus the deployment's auth mode — the SPA hides all account
-    chrome (login, logout, the Users tab) when the mode is "none"."""
-
     id: uuid.UUID
     username: str
     is_admin: bool
     auth_mode: str
+    cooking_instructions: str | None = None
+
+
+class UserUpdate(BaseModel):
+    cooking_instructions: str | None = Field(default=None, max_length=4000)
 
 
 class UserRead(BaseModel):

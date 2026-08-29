@@ -35,6 +35,7 @@ def test_login_sets_a_cookie_and_me_succeeds(anon: TestClient) -> None:
         "username": "tester",
         "is_admin": True,
         "auth_mode": "session",
+        "cooking_instructions": None,
     }
 
 
@@ -130,3 +131,39 @@ def test_session_survives_a_second_request(anon: TestClient, session: Session) -
     assert session.scalar(select(User).where(User.username == "tester")) is not None
     assert anon.get("/api/lists").status_code == 200
     assert anon.get("/api/lists").status_code == 200
+
+
+def test_update_cooking_instructions(anon: TestClient) -> None:
+    anon.post("/api/auth/login", json={"username": "tester", "password": TESTER_PASSWORD})
+    res = anon.patch("/api/auth/me", json={"cooking_instructions": "No coriander."})
+    assert res.status_code == 200
+    assert res.json()["cooking_instructions"] == "No coriander."
+    me = anon.get("/api/auth/me")
+    assert me.json()["cooking_instructions"] == "No coriander."
+
+
+def test_update_cooking_instructions_length_limit(anon: TestClient) -> None:
+    anon.post("/api/auth/login", json={"username": "tester", "password": TESTER_PASSWORD})
+    res = anon.patch("/api/auth/me", json={"cooking_instructions": "x" * 4001})
+    assert res.status_code == 422
+
+
+def test_cooking_instructions_are_private_between_users(
+    anon: TestClient, session: Session
+) -> None:
+    create_user(session, "user1", "password123")
+    create_user(session, "user2", "password456")
+    anon.post("/api/auth/login", json={"username": "user1", "password": "password123"})
+    anon.patch("/api/auth/me", json={"cooking_instructions": "Diet: vegan."})
+    anon.post("/api/auth/logout")
+
+    anon.post("/api/auth/login", json={"username": "user2", "password": "password456"})
+    me2 = anon.get("/api/auth/me").json()
+    assert me2["cooking_instructions"] is None
+
+    anon.post("/api/auth/logout")
+    anon.post("/api/auth/login", json={"username": "tester", "password": TESTER_PASSWORD})
+    users = anon.get("/api/users").json()
+    for u in users:
+        assert "cooking_instructions" not in u
+

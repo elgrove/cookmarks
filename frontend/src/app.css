@@ -216,6 +216,12 @@ a {
 	font-size: 0.72rem;
 	letter-spacing: 0.08em;
 	color: var(--muted);
+	text-decoration: none;
+	transition: color 0.18s var(--ease-out);
+}
+.nav .who:hover,
+.nav .who.active {
+	color: var(--ink);
 }
 
 .nav .signout {

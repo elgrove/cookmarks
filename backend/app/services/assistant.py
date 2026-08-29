@@ -46,10 +46,9 @@ MAX_RESULTS = 20
 
 @dataclass
 class AssistantDeps:
-    """What every tool needs: the request's session and the account to act as."""
-
     session: Session
     user_id: uuid.UUID
+    cooking_instructions: str | None = None
 
 
 def _recipe_row(recipe: Recipe, book: Book) -> dict:
@@ -351,9 +350,14 @@ def _model(provider: AIProvider) -> Model | None:
     return None
 
 
+def _assistant_instructions(ctx: RunContext[AssistantDeps]) -> str:
+    prompt = ASSISTANT_SYSTEM_PROMPT
+    if ctx.deps.cooking_instructions:
+        prompt = f"{prompt}\n\nPersonal cooking instructions for this cook:\n{ctx.deps.cooking_instructions}"
+    return prompt
+
+
 def build_agent(session: Session) -> Agent[AssistantDeps, str] | None:
-    """The assistant agent for the configured provider, or None when none is usable —
-    same rules as `get_ai_provider`, plus the providers this has no Pydantic AI model for."""
     provider = get_assistant_provider(session)
     if provider is None:
         return None
@@ -363,6 +367,7 @@ def build_agent(session: Session) -> Agent[AssistantDeps, str] | None:
     return Agent(
         model,
         deps_type=AssistantDeps,
-        instructions=ASSISTANT_SYSTEM_PROMPT,
+        instructions=_assistant_instructions,
         tools=TOOLS,
     )
+

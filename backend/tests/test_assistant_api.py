@@ -295,3 +295,40 @@ def test_title_is_only_set_once(
     conversation = session.get(AssistantConversation, uuid.UUID(conversation_id))
     assert conversation is not None
     assert conversation.title == "first"
+
+
+def test_chat_uses_user_cooking_instructions_and_does_not_persist_them_to_messages(
+    client: TestClient,
+    session: Session,
+    configured: None,
+    scripted: Callable[[FunctionModel], None],
+) -> None:
+    user = session.scalar(select(User).where(User.username == "tester"))
+    assert user is not None
+    user.cooking_instructions = "No dairy or shellfish."
+    session.add(user)
+    session.commit()
+
+    seen_instructions: list[str] = []
+
+    async def stream(_messages: list[ModelMessage], info: AgentInfo) -> AsyncIterator[str]:
+        if info.instructions:
+            seen_instructions.append(info.instructions)
+        yield "noted"
+
+    scripted(FunctionModel(stream_function=stream))
+    conversation_id = _create(client)
+    res = client.post(
+        f"/api/assistant/conversations/{conversation_id}/chat",
+        json=_submit("what should I make?"),
+    )
+    assert res.status_code == 200
+    assert len(seen_instructions) == 1
+    assert "No dairy or shellfish." in seen_instructions[0]
+
+    detail = client.get(f"/api/assistant/conversations/{conversation_id}").json()
+    for msg in detail["messages"]:
+        for part in msg.get("parts", []):
+            if part.get("type") == "text":
+                assert "No dairy or shellfish." not in part.get("text", "")
+

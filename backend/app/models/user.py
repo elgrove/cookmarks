@@ -15,6 +15,9 @@ class User(UUIDAuditBase):
     username: Mapped[str] = mapped_column(String(100), unique=True)
     password_hash: Mapped[str] = mapped_column(String(255))
     is_admin: Mapped[bool] = mapped_column(default=False)
+    cooking_instructions: Mapped[str | None] = mapped_column(
+        String(4000), nullable=True, default=None
+    )
 
 
 class UserSession(UUIDAuditBase):
