@@ -146,9 +146,13 @@
 
 	.feature {
 		display: grid;
-		grid-template-columns: 280px 1fr;
-		gap: clamp(2rem, 5vw, 4.5rem);
-		align-items: center;
+		grid-template-columns: 190px 1fr;
+		gap: clamp(1.5rem, 4vw, 3rem);
+		align-items: start;
+	}
+
+	.feature + .continue {
+		margin-top: 4.5rem;
 	}
 
 	.feature-plate {
@@ -197,10 +201,10 @@
 	.feature-title {
 		font-family: var(--f-grotesk);
 		font-weight: 700;
-		font-size: clamp(2rem, 4vw, 2.9rem);
+		font-size: clamp(1.7rem, 2.6vw, 2.2rem);
 		line-height: 1.08;
 		letter-spacing: -0.02em;
-		margin: 0.6rem 0 0.4rem;
+		margin: 0.4rem 0 0.3rem;
 		overflow-wrap: break-word;
 	}
 
@@ -227,11 +231,11 @@
 		font-size: 1.02rem;
 		line-height: 1.6;
 		color: var(--muted);
-		max-width: 36rem;
-		margin: 1.4rem 0 0;
+		max-width: 34rem;
+		margin: 1rem 0 0;
 		display: -webkit-box;
-		-webkit-line-clamp: 6;
-		line-clamp: 6;
+		-webkit-line-clamp: 3;
+		line-clamp: 3;
 		-webkit-box-orient: vertical;
 		overflow: hidden;
 		overflow-wrap: anywhere;
@@ -244,7 +248,7 @@
 
 	.cta {
 		display: inline-block;
-		margin-top: 2rem;
+		margin-top: 1.3rem;
 		font-family: var(--f-mono);
 		font-size: 0.72rem;
 		letter-spacing: 0.08em;
@@ -304,6 +308,9 @@
 			gap: 1.5rem;
 			align-items: start;
 		}
+		.feature + .continue {
+			margin-top: 3.5rem;
+		}
 	}
 
 	@media (max-width: 560px) {
@@ -321,8 +328,11 @@
 			max-width: none;
 		}
 		.feature-title {
-			font-size: clamp(2.3rem, 9vw, 3rem);
+			font-size: clamp(1.9rem, 7vw, 2.3rem);
 			margin-top: 0.2rem;
+		}
+		.feature + .continue {
+			margin-top: 3rem;
 		}
 		/* The cards reshape into the library's text-first rows at this width, so the
 		   strip becomes a hairline list rather than a column of plates. */
