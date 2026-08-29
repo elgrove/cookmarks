@@ -62,7 +62,9 @@ export const taskRunsSchema = z.array(taskRunSchema);
 // The type-specific `detail` payloads, by task_type. The wire keeps `detail` a loose
 // record; these describe what each type fills in, so the reporting UI can read it safely.
 export interface ExtractionDetail {
-	extraction_method: 'file' | 'block' | null;
+	extraction_method: 'file' | 'block' | 'pdf_ocr' | null;
+	ocr_model?: string;
+	extraction_model?: string;
 	total_chapters: number;
 	chapters_processed: number;
 	recipes_found: number;
@@ -99,6 +101,8 @@ export interface BookIngestDetail {
 	cover: boolean;
 	replaced_calibre_id: number | null;
 	extraction_queued: boolean;
+	// Why extract-after-add did nothing, when it was asked for and did not happen.
+	extraction_skipped?: string | null;
 	// Set on a run that failed because the library already holds this book — the id of
 	// the Cookmarks book it clashed with, which is what makes the replace offer possible.
 	duplicate_of_book_id?: string;

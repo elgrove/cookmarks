@@ -10,7 +10,6 @@ one flat row per (run, task, model, book) is appended to the ledger.
 
 import json
 import logging
-import subprocess
 import time
 import uuid
 from dataclasses import dataclass
@@ -20,14 +19,14 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.config import BACKEND_ROOT
-from app.covers import epub_path
+from app.epub import epub_path, pdf_path
 from app.models.book import Book
-from app.models.enums import TaskStatus, TaskType
+from app.models.enums import ExtractionMethod, TaskStatus, TaskType
 from app.models.task_run import TaskRun
 from app.services.ai import ModelRole
 from app.services.extraction.graph import get_extraction_graph
-from evals.config import LEDGER_PATH, RUNS_DIR, EvalConfig
+from app.services.extraction.state import ExtractionState
+from evals.config import LEDGER_PATH, RUNS_DIR, EvalConfig, git_sha
 from evals.data import from_predicted, load_gold
 from evals.environment import bind_pipeline, build_eval_database, resolve_api_key, set_provider
 from evals.matching import match_recipes
@@ -47,20 +46,6 @@ class RunMeta:
     input_tokens: int | None
     output_tokens: int | None
     duration_s: float
-
-
-def _git_sha() -> str | None:
-    try:
-        out = subprocess.run(
-            ["git", "rev-parse", "--short", "HEAD"],
-            capture_output=True,
-            text=True,
-            cwd=BACKEND_ROOT,
-            check=False,
-        )
-    except OSError:
-        return None
-    return out.stdout.strip() or None
 
 
 def _run_status(factory: sessionmaker[Session], run_id: uuid.UUID) -> TaskStatus | None:
@@ -114,22 +99,31 @@ def extract_book(
         if book_row is None:
             raise RuntimeError(f"Book {book.calibre_id} not seeded")
         book_id = book_row.id
-        epub = str(epub_path(book_row))
+        source = pdf_path(book_row) if book.format == "pdf" else epub_path(book_row)
+        if source is None:
+            raise RuntimeError(f"Book {book.calibre_id} has no {book.format.upper()} file")
 
     run_id = _create_run(factory, book_id, candidate.provider, force_block=force_block)
     graph = get_extraction_graph()
     gconf = {"configurable": {"thread_id": f"eval_{run_id}"}}
 
     started = time.monotonic()
-    state = {
+    state: ExtractionState = {
         "book_id": str(book_id),
-        "epub_path": epub,
         "report_id": str(run_id),
         "already_tried": [],
     }
+    if book.format == "pdf":
+        state["pdf_path"] = str(source)
+    else:
+        state["epub_path"] = str(source)
+    if book.pages is not None:
+        state["page_range"] = list(book.pages)
+    if book.format == "pdf":
+        state["force_ocr"] = True
     result = graph.invoke(state, gconf)
 
-    if _run_status(factory, run_id) == TaskStatus.REVIEW:
+    if book.format == "epub" and _run_status(factory, run_id) == TaskStatus.REVIEW:
         answer = _RESUME_ANSWER[book.has_photos]
         logger.info(f"Review pause on {book.slug}: answering {answer!r}")
         graph.update_state(gconf, {"human_response": answer}, as_node="await_human")
@@ -271,13 +265,15 @@ def run_eval(
 
     run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     timestamp = datetime.now(UTC).isoformat()
-    git_sha = _git_sha()
+    sha = git_sha()
     run_dir = RUNS_DIR / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
 
     records: list[LedgerRecord] = []
     for task in tasks:
-        ModelRole(task.role)  # validate the role exists before pinning
+        model_role = (
+            ModelRole.OCR if task.role == ExtractionMethod.PDF_OCR.value else ModelRole(task.role)
+        )
         force_block = task.role == ModelRole.BLOCKS_OF_FILES.value
         candidates = [c for c in task.models if not model_ids or c.id in model_ids]
         slugs = [s for s in task.books if not book_slugs or s in book_slugs]
@@ -287,14 +283,14 @@ def run_eval(
             except RuntimeError as exc:
                 logger.warning(f"Skipping {candidate.id}: {exc}")
                 continue
-            set_provider(factory, candidate.provider, key, {task.role: candidate.model})
+            set_provider(factory, candidate.provider, key, {model_role.value: candidate.model})
             for slug in slugs:
                 book = config.book(slug)
                 logger.info(f"Running {task.role} / {candidate.id} / {slug}")
                 raw_recipes, meta = extract_book(factory, candidate, book, force_block=force_block)
                 br = score_book(config, book, raw_recipes, meta)
                 _write_artefacts(run_dir, task.role, candidate.id, br, raw_recipes)
-                records.append(_to_ledger(run_id, timestamp, git_sha, task.role, candidate, br))
+                records.append(_to_ledger(run_id, timestamp, sha, task.role, candidate, br))
                 print(_book_line(task.role, candidate.id, br))
 
     _append_ledger(records)
@@ -303,7 +299,7 @@ def run_eval(
             {
                 "run_id": run_id,
                 "timestamp": timestamp,
-                "git_sha": git_sha,
+                "git_sha": sha,
                 "tasks": [t.role for t in tasks],
             },
             indent=2,

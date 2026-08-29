@@ -37,12 +37,13 @@ EVAL_DB_PATH = EVALS_DIR / "eval.sqlite3"
 _CONFIG_DB_PATH = settings.db_path
 
 _KEY_ENV_VAR = {
+    "ANTHROPIC": "ANTHROPIC_API_KEY",
     "GEMINI": "GEMINI_API_KEY",
     "OPENROUTER": "OPENROUTER_API_KEY",
 }
 
 
-def _make_engine(db_path: Path) -> Any:
+def make_engine(db_path: Path) -> Any:
     engine = create_engine(
         f"sqlite:///{db_path}", connect_args={"check_same_thread": False, "timeout": 30}
     )
@@ -88,7 +89,7 @@ def _read_config_provider() -> tuple[str | None, str | None]:
 
 
 def resolve_api_key(provider: str) -> str:
-    """Find the provider's key: environment first (GEMINI_API_KEY / OPENROUTER_API_KEY),
+    """Find the provider's key: environment first (ANTHROPIC_API_KEY / GEMINI_API_KEY / OPENROUTER_API_KEY),
     then the app DB's Config if it holds a key for this same provider. Keyless providers
     (e.g. the offline stub) need nothing, so return an empty string."""
     if not provider_requires_api_key(provider):
@@ -112,7 +113,7 @@ def build_eval_database(calibre_ids: list[int], *, reset: bool = True) -> sessio
         EVAL_DB_PATH.unlink()
     EVAL_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
-    engine = _make_engine(EVAL_DB_PATH)
+    engine = make_engine(EVAL_DB_PATH)
     Base.metadata.create_all(engine)
     factory = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
@@ -146,6 +147,17 @@ def set_provider(
         config.ai_provider = AIProvider(provider)
         config.api_key = api_key
         config.model_overrides = model_overrides
+        session.commit()
+
+
+def set_assistant_provider(
+    factory: sessionmaker[Session], provider: str, api_key: str, model: str
+) -> None:
+    with factory() as session:
+        config = get_config(session)
+        config.assistant_provider = AIProvider(provider)
+        config.assistant_api_key = api_key
+        config.model_overrides = {"assistant": model}
         session.commit()
 
 

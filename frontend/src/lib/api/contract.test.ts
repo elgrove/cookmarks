@@ -32,6 +32,7 @@ import { stagedBookSchema } from './ingest';
 import { configSchema } from './config';
 import { taskRunAckSchema } from './tasks';
 import { authMeSchema, userSchema } from './auth';
+import { conversationDetailSchema, conversationsResponseSchema, conversationSummarySchema } from './assistant';
 
 // Frontend half of the API wire contract (see /contract/README.md): the Zod
 // schemas must accept the shared example the backend pins itself to, and reject
@@ -312,5 +313,23 @@ describe('api wire contract', () => {
 		const { is_admin, ...rest } = example;
 		const drifted = { ...rest, isAdmin: is_admin };
 		expect(() => userSchema.parse(drifted)).toThrow();
+	});
+
+	it('accepts the assistant conversations example and the list wrapper', () => {
+		const example = load('assistantconversations.example.json');
+		expect(() => conversationSummarySchema.parse(example)).not.toThrow();
+		expect(() => conversationsResponseSchema.parse([example])).not.toThrow();
+	});
+
+	it('rejects an assistant conversation example with a drifted field name', () => {
+		const example = load('assistantconversations.example.json');
+		const { updated_at, ...rest } = example;
+		expect(() => conversationSummarySchema.parse({ ...rest, updatedAt: updated_at })).toThrow();
+	});
+
+	it('accepts the assistant conversation detail example, tool parts included', () => {
+		const example = load('assistantconversation.example.json');
+		const parsed = conversationDetailSchema.parse(example);
+		expect(parsed.messages[1].parts[0].type).toBe('tool-search_recipes');
 	});
 });

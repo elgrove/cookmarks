@@ -31,7 +31,7 @@ def run_calibre_sync() -> dict:
     books = read_calibre_books(
         settings.calibre_library_path,
         tag=settings.calibre_sync_tag,
-        book_format=settings.calibre_sync_format,
+        book_formats=settings.calibre_sync_formats,
     )
     library_ids = read_library_book_ids(settings.calibre_library_path)
     with SessionLocal() as session:

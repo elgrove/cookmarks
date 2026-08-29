@@ -33,6 +33,7 @@ DETAIL_KEYS = {
     "recipe_count",
     "has_cover",
     "has_epub",
+    "has_pdf",
     "added",
     "keywords",
     "recipes",
@@ -329,14 +330,29 @@ def test_book_detail_404_for_unknown_book(client: TestClient) -> None:
     assert client.get(f"/api/books/{uuid.uuid4()}").status_code == 404
 
 
-@pytest.fixture
-def library_with_epub(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """A temp Calibre root holding an .epub for the seeded "With Recipes" book."""
+def _library(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *files: str) -> Path:
+    """A temp Calibre root holding these files for the seeded "With Recipes" book."""
     book_dir = tmp_path / "Author One" / "With Recipes (1)"
-    book_dir.mkdir(parents=True)
-    (book_dir / "book.epub").write_bytes(b"PK\x03\x04 not a real epub, just bytes")
+    book_dir.mkdir(parents=True, exist_ok=True)
+    for name in files:
+        (book_dir / name).write_bytes(b"not a real book, just bytes")
     monkeypatch.setattr(settings, "calibre_library_path", tmp_path)
     return tmp_path
+
+
+@pytest.fixture
+def library_with_epub(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    return _library(tmp_path, monkeypatch, "book.epub")
+
+
+@pytest.fixture
+def library_with_pdf(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    return _library(tmp_path, monkeypatch, "book.pdf")
+
+
+@pytest.fixture
+def library_with_both(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    return _library(tmp_path, monkeypatch, "book.epub", "book.pdf")
 
 
 def test_has_epub_false_without_files(client: TestClient) -> None:
@@ -349,20 +365,45 @@ def test_has_epub_true_when_present(client: TestClient, library_with_epub: Path)
     assert client.get(f"/api/books/{book_id}").json()["has_epub"] is True
 
 
-def test_epub_served_when_present(client: TestClient, library_with_epub: Path) -> None:
+def test_has_pdf_false_without_files(client: TestClient) -> None:
     book_id = _book_id(client, "With Recipes")
-    resp = client.get(f"/api/books/{book_id}/epub")
+    assert client.get(f"/api/books/{book_id}").json()["has_pdf"] is False
+
+
+def test_has_pdf_true_when_present(client: TestClient, library_with_pdf: Path) -> None:
+    body = client.get(f"/api/books/{_book_id(client, 'With Recipes')}").json()
+    assert (body["has_pdf"], body["has_epub"]) == (True, False)
+
+
+def test_file_served_when_epub_present(client: TestClient, library_with_epub: Path) -> None:
+    book_id = _book_id(client, "With Recipes")
+    resp = client.get(f"/api/books/{book_id}/file")
     assert resp.status_code == 200
     assert resp.headers["content-type"] == "application/epub+zip"
 
 
-def test_epub_404_when_file_missing(client: TestClient) -> None:
+def test_file_served_when_pdf_present(client: TestClient, library_with_pdf: Path) -> None:
     book_id = _book_id(client, "With Recipes")
-    assert client.get(f"/api/books/{book_id}/epub").status_code == 404
+    resp = client.get(f"/api/books/{book_id}/file")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/pdf"
 
 
-def test_epub_404_for_unknown_book(client: TestClient) -> None:
-    assert client.get(f"/api/books/{uuid.uuid4()}/epub").status_code == 404
+def test_file_prefers_the_epub_when_a_book_holds_both(
+    client: TestClient, library_with_both: Path
+) -> None:
+    book_id = _book_id(client, "With Recipes")
+    resp = client.get(f"/api/books/{book_id}/file")
+    assert resp.headers["content-type"] == "application/epub+zip"
+
+
+def test_file_404_when_no_readable_format(client: TestClient) -> None:
+    book_id = _book_id(client, "With Recipes")
+    assert client.get(f"/api/books/{book_id}/file").status_code == 404
+
+
+def test_file_404_for_unknown_book(client: TestClient) -> None:
+    assert client.get(f"/api/books/{uuid.uuid4()}/file").status_code == 404
 
 
 def test_recipe_index_lists_all_in_order(client: TestClient) -> None:
@@ -377,7 +418,9 @@ def test_recipe_index_reflects_favourite(client: TestClient) -> None:
     book_id = _book_id(client, "With Recipes")
     rid = client.get(f"/api/books/{book_id}/recipe-index").json()[0]["id"]
     assert client.post(f"/api/recipes/{rid}/favourite").json()["is_favourite"] is True
-    idx = {e["id"]: e["is_favourite"] for e in client.get(f"/api/books/{book_id}/recipe-index").json()}
+    idx = {
+        e["id"]: e["is_favourite"] for e in client.get(f"/api/books/{book_id}/recipe-index").json()
+    }
     assert idx[rid] is True
 
 
@@ -390,9 +433,7 @@ def test_recipe_index_404_for_unknown_book(client: TestClient) -> None:
     assert client.get(f"/api/books/{uuid.uuid4()}/recipe-index").status_code == 404
 
 
-def test_delete_book_removes_recipes_and_list_items(
-    client: TestClient, session: Session
-) -> None:
+def test_delete_book_removes_recipes_and_list_items(client: TestClient, session: Session) -> None:
     book_id = _book_id(client, "With Recipes")
     rid = client.get(f"/api/books/{book_id}/recipe-index").json()[0]["id"]
     client.post(f"/api/recipes/{rid}/favourite")

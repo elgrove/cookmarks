@@ -97,6 +97,11 @@
 			class:active={$page.url.pathname.startsWith('/lists')}
 			href="/lists">Lists</a
 		>
+		<a
+			class="navlink"
+			class:active={$page.url.pathname.startsWith('/assistant')}
+			href="/assistant">Assistant</a
+		>
 		{#if $currentUser?.is_admin}
 			<a
 				class="navlink"

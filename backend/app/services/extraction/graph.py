@@ -36,11 +36,14 @@ from app.services.extraction.utils import (
     find_decorative_images,
     resolve_image_path_in_epub,
 )
+from app.services.pdf import ocr_book, page_count
 from app.services.rate_limiter import RateLimitedExecutor
 
 logger = logging.getLogger(__name__)
 
 _EMPTY_USAGE = Usage()
+WINDOW_PAGES = 10
+OVERLAP_PAGES = 2
 
 
 def _load_run(session: Session, report_id: str) -> TaskRun:
@@ -120,6 +123,127 @@ def analyse_epub(state: ExtractionState) -> dict:
         "extraction_type": extraction_type,
         "images_in_separate_chapters": images_in_separate,
     }
+
+
+def route_on_format(state: ExtractionState) -> str:
+    if state.get("epub_path"):
+        return "analyse_epub"
+    if state.get("pdf_path"):
+        return "ocr_pdf"
+    raise ValueError("Extraction state has no EPUB or PDF path")
+
+
+def _pdf_windows(page_total: int, start_page: int) -> list[tuple[int, int]]:
+    windows: list[tuple[int, int]] = []
+    offset = 0
+    step = WINDOW_PAGES - OVERLAP_PAGES
+    while offset < page_total:
+        end_offset = min(offset + WINDOW_PAGES, page_total)
+        windows.append((start_page + offset, start_page + end_offset - 1))
+        if end_offset == page_total:
+            break
+        offset += step
+    return windows
+
+
+def ocr_pdf(state: ExtractionState) -> dict:
+    with SessionLocal() as session:
+        run = _load_run(session, state["report_id"])
+        book = session.get(Book, uuid.UUID(state["book_id"]))
+        if book is None:
+            raise ValueError(f"Book {state['book_id']} not found")
+        provider = _require_provider(session)
+        if not provider.supports_vision:
+            raise NotImplementedError(f"{provider.name} cannot read images")
+        model = run.model_name or provider.model_for(ModelRole.OCR)
+        run.model_name = model
+        run.detail = {
+            **run.detail,
+            "ocr_model": model,
+            "extraction_model": provider.model_for(ModelRole.BLOCKS_OF_FILES),
+        }
+        run.extraction_method = ExtractionMethod.PDF_OCR
+        total_pages = page_count(Path(state["pdf_path"]))
+        page_range = state.get("page_range")
+        start, end = tuple(page_range) if page_range else (1, total_pages)
+        windows = _pdf_windows(end - start + 1, start)
+        run.total_chapters = len(windows)
+        session.commit()
+
+        def record_page(_page_number: int, usage: Usage) -> None:
+            _apply_usage(run, usage)
+            session.commit()
+
+        ocr_book(
+            book,
+            provider,
+            pages=(start, end),
+            force=state.get("force_ocr", False),
+            model=model,
+            on_page=record_page,
+        )
+
+    return {"page_count": end - start + 1, "page_range": [start, end]}
+
+
+def extract_pdf(state: ExtractionState) -> dict:
+    with SessionLocal() as session:
+        run = _load_run(session, state["report_id"])
+        book = session.get(Book, uuid.UUID(state["book_id"]))
+        if book is None:
+            raise ValueError(f"Book {state['book_id']} not found")
+        provider = _require_provider(session)
+        ocr_model = run.model_name or provider.model_for(ModelRole.OCR)
+        extraction_model = provider.model_for(ModelRole.BLOCKS_OF_FILES)
+        page_range = state.get("page_range")
+        start, end = tuple(page_range) if page_range else (1, state["page_count"])
+        page_text = ocr_book(book, provider, pages=(start, end), model=ocr_model)
+        window_bounds = _pdf_windows(len(page_text), start)
+        config = get_config(session)
+        rate_limiter = RateLimitedExecutor(
+            max_workers=settings.extraction_threads,
+            rate_per_minute=config.extraction_rate_limit_per_minute,
+        )
+
+        def process_window(
+            index: int, bounds: tuple[int, int]
+        ) -> tuple[int, str, list[RecipeData], Usage]:
+            first, last = bounds
+            content = "\n\n".join(
+                f"[PAGE {page_number}]\n{page_text[page_number - start]}"
+                for page_number in range(first, last + 1)
+            )
+            with rate_limiter:
+                recipes, usage = provider.extract_recipes(content, model=extraction_model)
+            return index, f"pages {first}-{last}", recipes, usage
+
+        found: list[tuple[int, RecipeData]] = []
+        processed = list(run.chapters_processed)
+        with ThreadPoolExecutor(max_workers=settings.extraction_threads) as executor:
+            futures = {
+                executor.submit(process_window, index, bounds): index
+                for index, bounds in enumerate(window_bounds)
+            }
+            for future in as_completed(futures):
+                index, label, recipes, usage = future.result()
+                processed.append(label)
+                _apply_usage(run, usage)
+                found.extend((index, recipe) for recipe in recipes)
+                run.chapters_processed = processed
+                session.commit()
+
+        found.sort(key=lambda item: item[0])
+        recipes = deduplicate_recipes_by_title([recipe for _, recipe in found])
+        raw_recipes: list[dict] = []
+        for order, recipe in enumerate(recipes, start=1):
+            data = recipe.model_dump(by_alias=True)
+            data["bookOrder"] = order
+            data["author"] = book.author
+            data["bookTitle"] = book.title
+            data["image"] = None
+            raw_recipes.append(data)
+
+    return {"raw_recipes": raw_recipes}
 
 
 def extract_file(state: ExtractionState) -> dict:
@@ -374,6 +498,8 @@ def route_post_analyse(state: ExtractionState) -> str:
 
 
 def route_post_validate(state: ExtractionState) -> str:
+    if state.get("pdf_path"):
+        return "finalise"
     raw_recipes = state.get("raw_recipes", [])
     has_image_paths = any(r.get("image") for r in raw_recipes)
 
@@ -422,10 +548,16 @@ def get_extraction_graph():
 
     workflow = StateGraph(ExtractionState)  # ty: ignore[invalid-argument-type]
 
-    workflow.set_entry_point("analyse_epub")
+    workflow.set_conditional_entry_point(route_on_format)
 
     workflow.add_node("analyse_epub", analyse_epub)
     workflow.add_conditional_edges("analyse_epub", route_post_analyse)
+
+    workflow.add_node("ocr_pdf", ocr_pdf)
+    workflow.add_edge("ocr_pdf", "extract_pdf")
+
+    workflow.add_node("extract_pdf", extract_pdf)
+    workflow.add_edge("extract_pdf", "validate")
 
     workflow.add_node("extract_file", extract_file)
     workflow.add_edge("extract_file", "validate")

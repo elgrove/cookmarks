@@ -7,7 +7,11 @@ class ExtractionState(TypedDict, total=False):
 
     book_id: str
     epub_path: str
+    pdf_path: str
     report_id: str
+    page_count: int
+    page_range: list[int] | None
+    force_ocr: bool
 
     chapter_files: list[str]
     extraction_type: Literal["file", "block"]

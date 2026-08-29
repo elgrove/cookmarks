@@ -46,6 +46,43 @@ const unit: VerifiableUnit<Props> = {
 			}
 		},
 		{
+			id: 'retry',
+			description: 'probe: the control offers a retry after a failure, and the retry dispatches',
+			probe: true,
+			props: {
+				recipeCount: 0,
+				onExtract: (() => {
+					let calls = 0;
+					return () => (++calls === 1 ? Promise.reject(new Error('broker down')) : Promise.resolve());
+				})()
+			},
+			act: async ({ click, wait }) => {
+				click(BTN);
+				await wait(0);
+				click(BTN);
+				await wait(0);
+			}
+		},
+		{
+			id: 'unavailable',
+			description: 'a book with no EPUB or PDF stays disabled and says why',
+			props: { recipeCount: 0, unavailable: true }
+		},
+		{
+			id: 'unavailable-click',
+			description: 'probe: clicking the disabled control does not dispatch',
+			probe: true,
+			props: {
+				recipeCount: 0,
+				unavailable: true,
+				onExtract: () => Promise.reject(new Error('must never be called'))
+			},
+			act: async ({ click, wait }) => {
+				click(BTN);
+				await wait(0);
+			}
+		},
+		{
 			id: 'huge-count',
 			description: 'probe: an absurd recipe count still yields one labelled Re-extract control',
 			probe: true,
@@ -89,6 +126,27 @@ const unit: VerifiableUnit<Props> = {
 			description: 'a rejected dispatch lands on the error state (never a false queued)',
 			onlyFixtures: ['reject'],
 			check: ({ contract }) => contract.state === 'error' || `state=${contract.state}`
+		},
+		{
+			id: 'retry-dispatches',
+			description: 'a click on the error state queues rather than falling on the floor',
+			onlyFixtures: ['retry'],
+			check: ({ contract }) => contract.state === 'queued' || `state=${contract.state}`
+		},
+		{
+			id: 'unavailable-explains-itself',
+			description: 'the disabled control names the required file formats',
+			onlyFixtures: ['unavailable', 'unavailable-click'],
+			check: ({ contract, root }) => {
+				if (contract.state !== 'unavailable') return `state=${contract.state}`;
+				const btn = root.querySelector<HTMLButtonElement>(BTN);
+				if (!btn?.disabled) return 'the control is not disabled';
+				if (!ariaLabel(root).includes('EPUB or PDF')) return `label=${ariaLabel(root)}`;
+				return (
+					(btn.textContent ?? '').includes('EPUB or PDF') ||
+					`no visible reason: "${btn.textContent}"`
+				);
+			}
 		},
 		{
 			id: 'huge-labelled',

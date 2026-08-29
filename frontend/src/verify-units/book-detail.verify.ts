@@ -5,6 +5,7 @@ import { z } from 'zod';
 
 type Props = {
 	book: BookDetailData;
+	onExtract?: () => Promise<void> | void;
 	onDelete?: (opts: { exclude: boolean; fromLibrary: boolean }) => void;
 	onMarkBookRead?: () => void;
 	onResetProgress?: () => void;
@@ -36,6 +37,7 @@ const bookSchema = z.object({
 	recipeCount: z.number().int().nonnegative(),
 	hasCover: z.boolean(),
 	hasEpub: z.boolean(),
+	hasPdf: z.boolean(),
 	added: z.string().nullable(),
 	keywords: z.array(z.string()),
 	recipes: z.array(recipeSchema),
@@ -82,6 +84,7 @@ const pastaGrannies: BookDetailData = {
 	recipeCount: 49,
 	hasCover: true,
 	hasEpub: true,
+	hasPdf: false,
 	added: '2025-05-22T20:56:10Z',
 	keywords: ['Italian', 'Pasta', 'Regional', 'Traditional'],
 	recipes: recipes(10),
@@ -250,8 +253,27 @@ const unit: VerifiableUnit<Props> = {
 		},
 		{
 			id: 'no-epub',
-			description: 'a book with no EPUB on disk offers no reader action at all',
-			props: { book: { ...pastaGrannies, hasEpub: false } }
+			description: 'a book with no readable file at all offers no reader action',
+			props: {
+				book: { ...pastaGrannies, hasEpub: false },
+				onExtract: () => Promise.resolve()
+			}
+		},
+		{
+			id: 'pdf-only',
+			description: 'a PDF cookbook supports reading and recipe extraction',
+			props: {
+				book: {
+					...pastaGrannies,
+					hasEpub: false,
+					hasPdf: true,
+					recipeCount: 0,
+					recipes: [],
+					reading: null,
+					resumeRecipe: null
+				},
+				onExtract: () => Promise.resolve()
+			}
 		},
 		{
 			id: 'long-title',
@@ -572,13 +594,34 @@ const unit: VerifiableUnit<Props> = {
 			onlyFixtures: ['no-epub'],
 			check: ({ root, contract }) => {
 				if (contract['has-epub'] !== 'false') return `has-epub contract=${contract['has-epub']}`;
-				if (root.querySelector('a.read-epub')) return 'reader link shown without an epub';
+				if (contract['has-pdf'] !== 'false') return `has-pdf contract=${contract['has-pdf']}`;
+				if (root.querySelector('a.read-epub')) return 'reader link shown without a file';
 				// With no pages to read, the recipes take the lead instead.
 				const primaries = [...root.querySelectorAll('.actions .btn.primary')];
 				if (!primaries.length) return true;
 				return (
 					(primaries.length === 1 && primaries[0].classList.contains('read-recipes')) ||
 					'a primary action remains that is not the recipes'
+				);
+			}
+		},
+		{
+			id: 'pdf-reads-and-extracts',
+			description:
+				'a PDF-only book opens in the reader and offers recipe extraction',
+			onlyFixtures: ['pdf-only'],
+			check: ({ root, contract, props }) => {
+				if (contract['has-pdf'] !== 'true') return `has-pdf contract=${contract['has-pdf']}`;
+				if (contract['has-epub'] !== 'false') return `has-epub contract=${contract['has-epub']}`;
+				const href = root.querySelector('a.read-epub')?.getAttribute('href');
+				const want = `/books/${props.book.id}/read`;
+				if (href !== want) return `read href=${href} expected ${want}`;
+				const extract = root.querySelector<HTMLButtonElement>('.extract');
+				if (!extract) return 'the extract control is missing';
+				if (extract.disabled) return 'extraction is disabled for the PDF';
+				return (
+					(extract.textContent ?? '').includes('Extract recipes') ||
+					`unexpected extract label: "${extract.textContent}"`
 				);
 			}
 		},

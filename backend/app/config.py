@@ -24,9 +24,10 @@ class Settings(BaseSettings):
     calibre_library_path: Path = Path.home() / "books" / "calibre-all"
 
     # Which Calibre books the live re-sync mirrors: those carrying this tag and
-    # having this format. Defaults match v1's proven filter ("Food" + EPUB).
+    # holding at least one of these formats. EPUB is v1's proven filter; PDF joins it
+    # for the fixed-layout cookbooks that only exist as one.
     calibre_sync_tag: str = "Food"
-    calibre_sync_format: str = "EPUB"
+    calibre_sync_formats: list[str] = ["EPUB", "PDF"]
 
     # Where an uploaded or downloaded book waits between staging and ingestion. In prod
     # this sits on the data volume (COOKMARKS_INGEST_STAGING_PATH=/data/ingest), so a
@@ -40,6 +41,8 @@ class Settings(BaseSettings):
     # Worker threads per extraction node (chapters/blocks extracted concurrently).
     # The per-minute request budget is a user-tunable Config column, not a setting.
     extraction_threads: int = 16
+    ocr_dpi: int = 200
+    ocr_page_concurrency: int = 4
 
     # How long a run may sit QUEUED or RUNNING before startup treats it as abandoned.
     # Well above the slowest real extraction, so a genuinely in-flight run is never

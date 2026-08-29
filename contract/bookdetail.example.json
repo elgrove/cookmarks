@@ -8,6 +8,7 @@
   "recipe_count": 100,
   "has_cover": true,
   "has_epub": true,
+  "has_pdf": false,
   "added": "2026-06-05T10:00:00Z",
   "keywords": [
     "Fundamentals",

@@ -59,6 +59,7 @@
 		staged = book;
 		title = book.title;
 		author = book.author;
+		extract = false;
 		stage = 'staged';
 	}
 
@@ -148,13 +149,16 @@
 	data-verify-can-submit={canSubmit ? 'true' : 'false'}
 	data-verify-duplicate-offers={offers}
 	data-verify-error={error}
+	data-verify-staged-format={staged?.format ?? ''}
+	data-verify-no-extraction="false"
 >
 	<header class="masthead">
 		<p class="eyebrow">Library</p>
 		<h1>Add a book</h1>
 		<p class="standfirst">
-			Upload a cookbook or paste a download link. Anything Calibre can convert becomes an EPUB
-			in the library; its cover and details are looked up for you.
+			Upload a cookbook or paste a download link. EPUBs and PDFs are kept as they are;
+			anything else Calibre can convert becomes an EPUB. Its cover and details come from
+			the file itself.
 		</p>
 	</header>
 
@@ -174,7 +178,11 @@
 			</label>
 
 			<label class="check">
-				<input type="checkbox" bind:checked={extract} disabled={stage === 'submitting'} />
+				<input
+					type="checkbox"
+					bind:checked={extract}
+					disabled={stage === 'submitting'}
+				/>
 				Extract recipes once it is added
 			</label>
 
@@ -425,7 +433,7 @@
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
-		font-family: var(--f-sans);
+		font-family: var(--f-grotesk);
 		font-size: 0.85rem;
 		color: var(--muted);
 	}
@@ -440,7 +448,7 @@
 	}
 
 	.btn {
-		font-family: var(--f-sans);
+		font-family: var(--f-grotesk);
 		font-weight: 600;
 		font-size: 0.8rem;
 		padding: 0.55rem 1.1rem;
@@ -521,7 +529,7 @@
 		color: var(--muted);
 	}
 	.run-error {
-		font-family: var(--f-sans);
+		font-family: var(--f-grotesk);
 		font-size: 0.8rem;
 		color: var(--danger);
 	}

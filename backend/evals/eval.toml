@@ -7,17 +7,37 @@
 
 [tasks.many_recipes_per_file]
 books  = ["craveable"]
-models = ["GEMINI:gemini-2.5-flash-lite", "GEMINI:gemini-2.5-flash"]
+models = [
+  "GEMINI:gemini-2.5-flash-lite",
+  "GEMINI:gemini-2.5-flash",
+  "ANTHROPIC:claude-sonnet-5",
+  "ANTHROPIC:claude-haiku-4-5-20251001",
+]
 
 [tasks.one_recipe_per_file]
 books  = ["curry-guy"]
-models = ["GEMINI:gemini-2.5-flash-lite", "GEMINI:gemini-2.5-flash", "OPENROUTER:openai/gpt-oss-120b"]
+models = [
+  "GEMINI:gemini-2.5-flash-lite",
+  "GEMINI:gemini-2.5-flash",
+  "OPENROUTER:openai/gpt-oss-120b",
+  "ANTHROPIC:claude-sonnet-5",
+  "ANTHROPIC:claude-haiku-4-5-20251001",
+]
 
 [tasks.blocks_of_files]
 # nothing-fancy has matchable images the image-match check misjudges, so the blocks
 # task forces block extraction (skipping that check) for its books.
 books  = ["nothing-fancy"]
-models = ["GEMINI:gemini-2.5-flash", "GEMINI:gemini-2.5-flash-lite"]
+models = [
+  "GEMINI:gemini-2.5-flash",
+  "GEMINI:gemini-2.5-flash-lite",
+  "ANTHROPIC:claude-sonnet-5",
+  "ANTHROPIC:claude-haiku-4-5-20251001",
+]
+
+[tasks.pdf_ocr]
+books = ["izakaya"]
+models = ["GEMINI:gemini-2.5-flash"]
 
 # Gold books. `calibre_id` resolves the EPUB from the Calibre library; `gold` is the
 # hand-curated truth (relative to this file).
@@ -39,6 +59,14 @@ calibre_id = 227
 gold = "gold/nothing-fancy/recipes.json"
 has_photos = true
 
+[[books]]
+slug = "izakaya"
+calibre_id = 685
+gold = "gold/izakaya/recipes.json"
+has_photos = false
+format = "pdf"
+pages = [21, 70]
+
 [matching]
 # rapidfuzz token_set_ratio (0-100): the minimum name similarity for a fuzzy match,
 # applied after an exact normalised-name pass.
@@ -53,3 +81,34 @@ ingredients = 0.30
 instructions = 0.30
 yields = 0.05
 image = 0.10
+
+# Assistant eval. Each prompt runs the real agent, with all its tools, against a
+# throwaway copy of the app database, and is scored on deterministic checks over the
+# transcript. `grounded` (every id the answer links was returned by a tool) is checked
+# for every prompt and needs no declaring.
+[assistant]
+models = [
+  "ANTHROPIC:claude-sonnet-5",
+  "ANTHROPIC:claude-haiku-4-5-20251001",
+  "GEMINI:gemini-2.5-flash",
+  "GEMINI:gemini-2.5-flash-lite",
+  "OPENROUTER:google/gemini-2.5-flash",
+]
+
+# Discovery: two ingredients, no dish named. A good answer tries more than one search
+# and comes back with real recipes from the library, linked.
+[[assistant.prompts]]
+id = "discovery"
+prompt = "I have a glut of fennel and some pork. What should I cook tonight?"
+expect_tools = ["search_recipes"]
+min_searches = 2
+min_recipe_links = 2
+
+# Substitution: the model has to find the recipe first, then read its method before it
+# can say anything true about swapping an ingredient out of it.
+[[assistant.prompts]]
+id = "substitution"
+prompt = "I want to make a dal but I have no tamarind. Find me one in my library and tell me what to use instead."
+expect_tools = ["get_recipe"]
+min_searches = 1
+min_recipe_links = 1

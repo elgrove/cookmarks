@@ -69,6 +69,21 @@ const unit: VerifiableUnit<Props> = {
 			props: { run: run() }
 		},
 		{
+			id: 'pdf-extraction',
+			description: 'a PDF extraction names its OCR and extraction models',
+			props: {
+				run: run({
+					id: 'r7',
+						detail: {
+						...extractionBase.detail,
+						extraction_method: 'pdf_ocr',
+						ocr_model: 'gemini-2.5-flash',
+						extraction_model: 'gemini-2.5-flash-lite'
+					}
+				})
+			}
+		},
+		{
 			id: 'extraction-failed',
 			description: 'a failed extraction surfaces its errors',
 			props: {
@@ -270,6 +285,24 @@ const unit: VerifiableUnit<Props> = {
 				const text = root.textContent ?? '';
 				if (!text.includes(extractionBase.book_title!)) return 'book title missing';
 				return text.includes('Recipes found') || 'recipes-found row missing';
+			}
+		},
+		{
+			id: 'pdf-models',
+			description: 'a PDF run shows its method and both model roles',
+			onlyFixtures: ['pdf-extraction'],
+			check: ({ root }) => {
+				const text = root.textContent ?? '';
+				if (!text.includes('PDF OCR')) return 'PDF method missing';
+				const rows = [...root.querySelectorAll('.row')];
+				const value = (label: string) =>
+					rows.find((row) => row.querySelector('dt')?.textContent === label)?.querySelector('dd')
+						?.textContent;
+				if (value('OCR model') !== 'gemini-2.5-flash') return 'OCR model row is wrong';
+				return (
+					value('Extraction model') === 'gemini-2.5-flash-lite' ||
+					'Extraction model row is wrong'
+				);
 			}
 		},
 		{

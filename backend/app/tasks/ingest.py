@@ -20,7 +20,7 @@ from app.models.task_run import TaskRun
 from app.services.ingest import DuplicateBookError, run_ingest
 from app.tasks.calibre_sync import run_calibre_sync
 from app.tasks.celery_app import celery_app
-from app.tasks.extraction import queue_extraction
+from app.tasks.extraction import NotExtractableError, queue_extraction
 from app.tasks.runs import complete_run, fail_run, start_run
 
 logger = logging.getLogger(__name__)
@@ -76,8 +76,9 @@ def ingest_book_task(run_id: str) -> dict:
         raise
 
     extraction_queued = False
+    skipped: str | None = None
     if params.get("extract"):
-        extraction_queued = _queue_extraction(outcome.calibre_id)
+        extraction_queued, skipped = _queue_extraction(outcome.calibre_id)
 
     detail = {
         "title": outcome.title,
@@ -89,22 +90,26 @@ def ingest_book_task(run_id: str) -> dict:
         "replaced_calibre_id": outcome.replaced_calibre_id,
         "sync": {key: len(value) for key, value in sync.items()},
         "extraction_queued": extraction_queued,
+        "extraction_skipped": skipped,
     }
     complete_run(run_id, detail)
     return detail
 
 
-def _queue_extraction(calibre_id: int) -> bool:
-    """Queue extraction on the book the sync just produced. Best-effort: the book is in
-    the library either way, and a failure here must not fail an ingest that worked."""
+def _queue_extraction(calibre_id: int) -> tuple[bool, str | None]:
+    """Queue extraction on the book the sync just produced, returning whether it was
+    queued and, if not, why. Best-effort: the book is in the library either way, and a
+    failure here must not fail an ingest that worked."""
     try:
         with SessionLocal() as session:
             book = session.scalars(select(Book).where(Book.calibre_id == calibre_id)).first()
             if book is None:
                 logger.warning("Ingested book %d did not sync; extraction not queued", calibre_id)
-                return False
+                return False, "the book did not sync into the app"
             queue_extraction(session, book)
-            return True
+            return True, None
+    except NotExtractableError as exc:
+        return False, str(exc)
     except Exception:
         logger.exception("Could not queue extraction after ingesting %d", calibre_id)
-        return False
+        return False, "the extraction run could not be queued"

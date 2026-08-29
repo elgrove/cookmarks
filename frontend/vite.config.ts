@@ -3,6 +3,8 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
 	plugins: [sveltekit()],
+	// foliate's PDF engine loads pdfjs with a top-level await.
+	build: { target: 'es2022' },
 	server: {
 		host: '0.0.0.0',
 		// Defaults match the standard dev setup; override to run worktrees side by side.

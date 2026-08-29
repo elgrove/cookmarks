@@ -5,32 +5,34 @@
 		/** Injected so the component stays network-free and verifiable in isolation;
 		 *  the page wires this to the POST. Awaited to drive posting → queued. */
 		onExtract?: () => Promise<void> | void;
+		unavailable?: boolean;
 	};
 
-	type State = 'idle' | 'posting' | 'queued' | 'error';
+	type State = 'idle' | 'posting' | 'queued' | 'error' | 'unavailable';
+
+	function stateLabel(state: State, idleLabel: string): string {
+		if (state === 'unavailable') return 'Recipe extraction needs an EPUB or PDF';
+		if (state === 'posting') return 'Queuing…';
+		if (state === 'queued') return 'Queued';
+		if (state === 'error') return "Couldn't queue — try again";
+		return idleLabel;
+	}
 </script>
 
 <script lang="ts">
 	import { onDestroy } from 'svelte';
 
-	let { recipeCount = 0, onExtract }: ExtractButtonProps = $props();
+	let { recipeCount = 0, onExtract, unavailable = false }: ExtractButtonProps = $props();
 
-	let state = $state<State>('idle');
+	let state: State = $state('idle');
 	let timer: ReturnType<typeof setTimeout> | undefined;
 
+	let shown = $derived<State>(unavailable ? 'unavailable' : state);
 	let idleLabel = $derived(recipeCount > 0 ? 'Re-extract recipes' : 'Extract recipes');
-	let label = $derived(
-		state === 'posting'
-			? 'Queuing…'
-			: state === 'queued'
-				? 'Queued'
-				: state === 'error'
-					? "Couldn't queue — try again"
-					: idleLabel
-	);
+	let label = $derived(stateLabel(shown, idleLabel));
 
 	async function extract() {
-		if (state === 'posting') return;
+		if (shown === 'posting' || shown === 'unavailable') return;
 		clearTimeout(timer);
 		state = 'posting';
 		try {
@@ -49,20 +51,20 @@
 
 <button
 	class="extract"
-	class:queued={state === 'queued'}
-	class:error={state === 'error'}
+	class:queued={shown === 'queued'}
+	class:error={shown === 'error'}
 	type="button"
 	data-verify-unit="extract-button"
-	data-verify-state={state}
+	data-verify-state={shown}
 	data-verify-recipe-count={recipeCount}
 	aria-label={label}
-	aria-busy={state === 'posting'}
-	disabled={state === 'posting'}
+	aria-busy={shown === 'posting'}
+	disabled={shown === 'posting' || shown === 'unavailable'}
 	onclick={extract}
 >
 	<span class="text">{label}</span>
 	<span class="mark" aria-hidden="true">
-		{#if state === 'queued'}✓{:else if state === 'error'}↻{:else}›{/if}
+		{#if shown === 'queued'}✓{:else if shown === 'error'}↻{:else if shown === 'unavailable'}—{:else}›{/if}
 	</span>
 </button>
 

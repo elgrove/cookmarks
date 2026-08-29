@@ -5,7 +5,7 @@
 	import { fetchBookDetail, type ReadingState } from '$lib/api/books';
 	import { cleanTitle, pageTitle } from '$lib/title';
 
-	let status = $state<'loading' | 'error' | 'no-epub' | 'ready'>('loading');
+	let status = $state<'loading' | 'error' | 'no-file' | 'ready'>('loading');
 	let book = $state<{
 		id: string;
 		title: string;
@@ -23,7 +23,7 @@
 		try {
 			const b = await fetchBookDetail(id);
 			book = { id: b.id, title: cleanTitle(b.title), author: b.author, reading: b.reading };
-			status = b.has_epub ? 'ready' : 'no-epub';
+			status = b.has_epub || b.has_pdf ? 'ready' : 'no-file';
 		} catch (err) {
 			console.error('failed to load book for reader', err);
 			status = 'error';
@@ -51,8 +51,8 @@
 	<div class="status">
 		{#if status === 'loading'}
 			<p class="msg">Loading…</p>
-		{:else if status === 'no-epub'}
-			<p class="msg">No EPUB is available for this book.</p>
+		{:else if status === 'no-file'}
+			<p class="msg">No readable file for this book.</p>
 			<a class="link" href={`/books/${$page.params.id}`}>← Back to book</a>
 		{:else}
 			<p class="msg">Couldn’t load this book.</p>

@@ -23,7 +23,7 @@ def test_read_config_returns_defaults_and_provider_catalogue(client: TestClient)
     assert body["extraction_rate_limit_per_minute"] == 256
 
     providers = {p["name"]: p["requires_api_key"] for p in body["providers"]}
-    assert providers == {"GEMINI": True, "OPENROUTER": True, "STUB": False}
+    assert providers == {"ANTHROPIC": True, "GEMINI": True, "OPENROUTER": True}
 
 
 def test_update_provider_and_rate_limit(client: TestClient) -> None:
@@ -38,6 +38,16 @@ def test_update_provider_and_rate_limit(client: TestClient) -> None:
     again = client.get("/api/config").json()
     assert again["ai_provider"] == "GEMINI"
     assert again["extraction_rate_limit_per_minute"] == 120
+
+
+def test_update_assistant_provider(client: TestClient, session: Session) -> None:
+    body = client.patch(
+        "/api/config", json={"assistant_provider": "ANTHROPIC", "assistant_api_key": "sk-assistant"}
+    ).json()
+    assert body["assistant_provider"] == "ANTHROPIC"
+    assert body["assistant_api_key_set"] is True
+    assert "assistant_api_key" not in body
+    assert _stored(session).assistant_api_key == "sk-assistant"
 
 
 def test_setting_api_key_flips_flag_but_never_echoes_it(

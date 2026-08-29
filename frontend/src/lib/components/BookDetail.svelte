@@ -15,6 +15,7 @@
 		recipeCount: number;
 		hasCover: boolean;
 		hasEpub: boolean;
+		hasPdf: boolean;
 		added: string | null;
 		keywords: string[];
 		recipes: BookDetailRecipe[];
@@ -118,6 +119,7 @@
 	let mode = $derived(book.reading?.mode ?? null);
 	let started = $derived(!!book.reading && !book.reading.finished && book.reading.fraction > 0);
 	let readPct = $derived(book.reading ? Math.round(book.reading.fraction * 100) : null);
+	let readable = $derived(book.hasEpub || book.hasPdf);
 </script>
 
 <article
@@ -129,6 +131,7 @@
 	data-verify-shown={shown}
 	data-verify-has-cover={book.hasCover ? 'true' : 'false'}
 	data-verify-has-epub={book.hasEpub ? 'true' : 'false'}
+	data-verify-has-pdf={book.hasPdf ? 'true' : 'false'}
 	data-verify-empty={book.recipeCount === 0 ? 'true' : 'false'}
 	data-verify-keywords={book.keywords.length}
 	data-verify-delete-mode={deleteMode}
@@ -230,7 +233,7 @@
 
 			<div class="actions">
 				<!-- Two ways to read a book, one shared position; the mode last read leads. -->
-				{#if book.hasEpub}
+				{#if readable}
 					<a
 						class="btn read-epub"
 						class:primary={mode !== 'recipes'}
@@ -245,8 +248,8 @@
 				{#if book.resumeRecipe}
 					<a
 						class="btn read-recipes"
-						class:primary={mode === 'recipes' || !book.hasEpub}
-						class:ghost={mode !== 'recipes' && book.hasEpub}
+						class:primary={mode === 'recipes' || !readable}
+						class:ghost={mode !== 'recipes' && readable}
 						style:order={mode === 'recipes' ? 1 : 2}
 						href={`/recipes/${book.resumeRecipe.id}?context=book`}
 						title={book.resumeRecipe.name}
@@ -309,7 +312,11 @@
 					{/if}
 				{/if}
 				{#if onExtract}
-					<ExtractButton recipeCount={book.recipeCount} {onExtract} />
+					<ExtractButton
+						recipeCount={book.recipeCount}
+						{onExtract}
+						unavailable={!book.hasEpub && !book.hasPdf}
+					/>
 				{/if}
 				{#if onDelete}
 					{#if deleteMode === 'confirm'}
