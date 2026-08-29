@@ -165,6 +165,16 @@ const unit: VerifiableUnit<Props> = {
 			check: ({ root }) => rateValue(root) === '999999999' || `rate=${rateValue(root)}`
 		},
 		{
+			id: 'density-select-rendered',
+			description: 'renders user-configurable book grid density select',
+			onlyFixtures: ['unset'],
+			check: ({ root, contract }) => {
+				const select = root.querySelector<HTMLSelectElement>('#book-grid-density');
+				if (!select) return 'missing #book-grid-density select';
+				return contract['book-grid-density'] === 'standard' || `density=${contract['book-grid-density']}`;
+			}
+		},
+		{
 			id: 'intentional-fail',
 			description: 'always fails — the truthfulness sentinel (expectFail)',
 			onlyFixtures: ['contract-lie'],

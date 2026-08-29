@@ -2,5 +2,6 @@
   "id": "6f1a9b6e-9c4a-4f2b-8a3e-7d2c5b1e4f90",
   "username": "aaron",
   "is_admin": true,
-  "auth_mode": "session"
+  "auth_mode": "session",
+  "book_grid_density": "standard"
 }

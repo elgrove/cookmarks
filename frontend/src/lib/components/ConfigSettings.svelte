@@ -25,10 +25,17 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
 	import { preference, setPreference, type ThemePref } from '$lib/theme';
+	import { currentUser, getBookGridDensity, setBookGridDensity } from '$lib/auth';
+	import type { BookGridDensity } from '$lib/api/auth';
 
 	let { config, onSave }: ConfigSettingsProps = $props();
 
 	let saveState = $state<State>('idle');
+	let density = $derived($currentUser?.book_grid_density ?? getBookGridDensity());
+
+	function handleDensityChange(d: BookGridDensity) {
+		void setBookGridDensity(d);
+	}
 	// '' means no provider selected (maps to null on the wire). Seeded from the config
 	// by the effect below — on mount and again after a save re-reads it.
 	let extractionProviderValue = $state('');
@@ -147,6 +154,7 @@
 	data-verify-assistant-provider={assistantProviderValue || 'none'}
 	data-verify-assistant-key-set={String(config.assistantApiKeySet)}
 	data-verify-assistant-key-action={assistantKeyAction}
+	data-verify-book-grid-density={density}
 	data-verify-dirty={String(dirty)}
 	onsubmit={(e) => {
 		e.preventDefault();
@@ -280,6 +288,21 @@
 				<option value="light">Light</option>
 				<option value="dark">Dark</option>
 				<option value="system">System</option>
+			</select>
+		</div>
+	</div>
+
+	<div class="field">
+		<label class="label" for="book-grid-density">Book grid density</label>
+		<div class="control">
+			<select
+				id="book-grid-density"
+				value={density}
+				onchange={(e) => handleDensityChange((e.currentTarget as HTMLSelectElement).value as BookGridDensity)}
+			>
+				<option value="sparse">Sparse</option>
+				<option value="standard">Standard</option>
+				<option value="compact">Compact</option>
 			</select>
 		</div>
 	</div>

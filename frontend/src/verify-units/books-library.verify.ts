@@ -1,8 +1,12 @@
-import BooksLibrary, { type LibraryBook } from '$lib/components/BooksLibrary.svelte';
+import BooksLibrary, {
+	type BooksLibraryProps,
+	type LibraryBook
+} from '$lib/components/BooksLibrary.svelte';
+import { bookGridDensitySchema } from '$lib/api/auth';
 import type { VerifiableUnit } from '$lib/verify/types';
 import { z } from 'zod';
 
-type Props = { books: LibraryBook[] };
+type Props = BooksLibraryProps;
 
 const bookSchema = z.object({
 	id: z.string(),
@@ -48,7 +52,10 @@ const unit: VerifiableUnit<Props> = {
 	description: 'The collection grid with client-side search + sort, recipe-count circles, and no-image plates.',
 	kind: 'component',
 	component: BooksLibrary,
-	propsSchema: z.object({ books: z.array(bookSchema) }),
+	propsSchema: z.object({
+		books: z.array(bookSchema),
+		density: bookGridDensitySchema.optional()
+	}),
 	fixtures: [
 		{ id: 'populated', description: 'several books, default (recently-added) order', props: { books: populated } },
 		{ id: 'empty', description: 'no books in the library', props: { books: [] } },
@@ -147,6 +154,41 @@ const unit: VerifiableUnit<Props> = {
 			description: 'clicking a keyword chip narrows the grid to books carrying it',
 			props: { books: populated },
 			act: ({ click }) => click('.keywords .chip[data-kw="Baking"]')
+		},
+		{
+			id: 'density-sparse',
+			description: 'sparse density renders with fewer columns',
+			props: { books: populated, density: 'sparse' }
+		},
+		{
+			id: 'density-compact',
+			description: 'compact density renders with more columns',
+			props: { books: populated, density: 'compact' }
+		},
+		{
+			id: 'density-menu-open',
+			description: 'clicking density trigger opens the SVG graphic options menu',
+			props: { books: populated, density: 'standard' },
+			act: ({ click }) => click('.density-trigger')
+		},
+		{
+			id: 'density-change',
+			description: 'clicking compact density option switches density',
+			props: { books: populated, density: 'standard' },
+			act: async ({ click }) => {
+				await click('.density-trigger');
+				await click('.density-option[data-density="compact"]');
+			}
+		},
+		{
+			id: 'density-probe',
+			description: 'probe: opening dropdown and switching density updates active selection',
+			probe: true,
+			props: { books: populated, density: 'sparse' },
+			act: async ({ click }) => {
+				await click('.density-trigger');
+				await click('.density-option[data-density="compact"]');
+			}
 		}
 	],
 	invariants: [
@@ -374,6 +416,74 @@ const unit: VerifiableUnit<Props> = {
 					Number(contract.count) === 0 &&
 					(root.textContent ?? '').includes('No extracted books yet')) ||
 				`extracted-only=${contract['extracted-only']} empty=${contract.empty} count=${contract.count}`
+		},
+		{
+			id: 'default-density',
+			description: 'default density is standard and reflects on contract',
+			onlyFixtures: ['populated'],
+			check: ({ contract }) =>
+				contract.density === 'standard' || `expected density=standard, saw ${contract.density}`
+		},
+		{
+			id: 'sparse-density',
+			description: 'sparse density fixture reflects on contract and grid data attribute',
+			onlyFixtures: ['density-sparse'],
+			check: ({ contract, root }) => {
+				if (contract.density !== 'sparse') return `contract density=${contract.density}`;
+				const grid = root.querySelector('.grid');
+				return (
+					grid?.getAttribute('data-density') === 'sparse' ||
+					`grid data-density=${grid?.getAttribute('data-density')}`
+				);
+			}
+		},
+		{
+			id: 'compact-density',
+			description: 'compact density fixture reflects on contract and grid data attribute',
+			onlyFixtures: ['density-compact'],
+			check: ({ contract, root }) => {
+				if (contract.density !== 'compact') return `contract density=${contract.density}`;
+				const grid = root.querySelector('.grid');
+				return (
+					grid?.getAttribute('data-density') === 'compact' ||
+					`grid data-density=${grid?.getAttribute('data-density')}`
+				);
+			}
+		},
+		{
+			id: 'density-click-switches',
+			description: 'clicking compact option updates contract and applies compact grid layout',
+			onlyFixtures: ['density-change'],
+			check: ({ contract, root }) => {
+				if (contract.density !== 'compact') return `contract density=${contract.density}`;
+				const grid = root.querySelector('.grid');
+				return (
+					grid?.getAttribute('data-density') === 'compact' ||
+					`grid data-density=${grid?.getAttribute('data-density')}`
+				);
+			}
+		},
+		{
+			id: 'density-menu-renders-options',
+			description: 'open density menu renders all 3 SVG options',
+			onlyFixtures: ['density-menu-open'],
+			check: ({ root }) => {
+				const options = root.querySelectorAll('.density-option');
+				return options.length === 3 || `expected 3 density options, saw ${options.length}`;
+			}
+		},
+		{
+			id: 'density-probe-invariants',
+			description: 'density probe leaves compact state active and applied',
+			onlyFixtures: ['density-probe'],
+			check: ({ contract, root }) => {
+				if (contract.density !== 'compact') return `contract density=${contract.density}`;
+				const grid = root.querySelector('.grid');
+				return (
+					grid?.getAttribute('data-density') === 'compact' ||
+					`grid data-density=${grid?.getAttribute('data-density')}`
+				);
+			}
 		}
 	]
 };
