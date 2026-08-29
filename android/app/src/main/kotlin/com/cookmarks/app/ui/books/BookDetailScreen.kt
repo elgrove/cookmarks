@@ -47,6 +47,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -55,6 +60,7 @@ import coil.compose.AsyncImage
 import com.cookmarks.app.api.Api
 import com.cookmarks.app.api.BookDetail
 import com.cookmarks.app.api.RecipeIndexEntry
+import com.cookmarks.app.ui.Feedback
 import com.cookmarks.app.ui.cleanTitle
 import com.cookmarks.app.ui.components.CoverPlate
 import com.cookmarks.app.ui.components.Loaded
@@ -281,6 +287,7 @@ private fun BookDetailContent(
                             } catch (e: Exception) {
                                 Log.w("BookDetail", "queue toggle failed", e)
                                 isQueued = !next
+                                Feedback.show("Couldn't update reading queue")
                             } finally {
                                 queueBusy = false
                             }
@@ -293,6 +300,10 @@ private fun BookDetailContent(
                         contentColor = if (isQueued) colors.clayDeep else colors.ink,
                     ),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                    modifier = Modifier.semantics {
+                        selected = isQueued
+                        stateDescription = if (isQueued) "in queue" else "not in queue"
+                    },
                 ) {
                     Text(
                         text = if (isQueued) "In queue" else "Queue to read",
@@ -316,6 +327,7 @@ private fun BookDetailContent(
                                 throw e
                             } catch (e: Exception) {
                                 Log.w("BookDetail", "read status toggle failed", e)
+                                Feedback.show("Couldn't update reading status")
                             } finally {
                                 readBusy = false
                             }
@@ -327,6 +339,10 @@ private fun BookDetailContent(
                         contentColor = colors.ink,
                     ),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                    modifier = Modifier.semantics {
+                        selected = isFinished
+                        stateDescription = if (isFinished) "finished" else "not finished"
+                    },
                 ) {
                     Text(
                         text = if (isFinished) "Mark unread" else "Mark read",
@@ -346,6 +362,7 @@ private fun BookDetailContent(
                                 throw e
                             } catch (e: Exception) {
                                 Log.w("BookDetail", "extraction trigger failed", e)
+                                Feedback.show("Couldn't trigger extraction")
                             } finally {
                                 extractBusy = false
                             }
@@ -397,7 +414,10 @@ private fun BookDetailContent(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { onReadFrom(entry.id) }
+                        .clickable(
+                            role = Role.Button,
+                            onClickLabel = "Read ${entry.name}",
+                        ) { onReadFrom(entry.id) }
                         .padding(horizontal = 20.dp, vertical = 12.dp),
                 ) {
                     MonoLabel(
@@ -415,7 +435,13 @@ private fun BookDetailContent(
                             .padding(start = 14.dp),
                     )
                     if (entry.is_favourite) {
-                        Text("★", color = colors.clay, modifier = Modifier.padding(start = 8.dp))
+                        Text(
+                            "★",
+                            color = colors.clay,
+                            modifier = Modifier
+                                .padding(start = 8.dp)
+                                .semantics { contentDescription = "Favourite" },
+                        )
                     }
                 }
                 if (i < shown.lastIndex) {

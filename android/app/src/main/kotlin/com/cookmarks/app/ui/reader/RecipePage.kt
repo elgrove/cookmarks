@@ -23,6 +23,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -65,14 +68,30 @@ fun RecipeContent(
                     MonoLabel(
                         if (showDescription) "Hide description" else "Show description",
                         colour = colors.clay,
-                        modifier = Modifier.clickable { showDescription = !showDescription }.padding(vertical = 6.dp),
+                        modifier = Modifier
+                            .clickable(
+                                role = Role.Button,
+                                onClickLabel = if (showDescription) "Hide description" else "Show description",
+                            ) { showDescription = !showDescription }
+                            .semantics {
+                                stateDescription = if (showDescription) "expanded" else "collapsed"
+                            }
+                            .padding(vertical = 6.dp),
                     )
                 }
                 if (recipe.has_image) {
                     MonoLabel(
                         if (showPhoto) "Hide photo" else "Show photo",
                         colour = colors.clay,
-                        modifier = Modifier.clickable { showPhoto = !showPhoto }.padding(vertical = 6.dp),
+                        modifier = Modifier
+                            .clickable(
+                                role = Role.Button,
+                                onClickLabel = if (showPhoto) "Hide photo" else "Show photo",
+                            ) { showPhoto = !showPhoto }
+                            .semantics {
+                                stateDescription = if (showPhoto) "expanded" else "collapsed"
+                            }
+                            .padding(vertical = 6.dp),
                     )
                 }
             }

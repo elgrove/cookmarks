@@ -25,6 +25,9 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import com.cookmarks.app.api.Api
@@ -83,11 +86,18 @@ fun AdminScreen(onBack: () -> Unit) {
                     modifier = Modifier.padding(top = 8.dp, bottom = 24.dp),
                 ) {
                     ThemeMode.entries.forEach { option ->
+                        val isSelected = option == mode
                         MonoLabel(
                             option.label,
-                            colour = if (option == mode) colors.clay else colors.faint,
+                            colour = if (isSelected) colors.clay else colors.faint,
                             modifier = Modifier
-                                .clickable { ThemePref.set(option) }
+                                .clickable(
+                                    role = Role.RadioButton,
+                                    onClickLabel = "Select ${option.label} theme",
+                                ) { ThemePref.set(option) }
+                                .semantics {
+                                    selected = isSelected
+                                }
                                 .padding(vertical = 8.dp),
                         )
                     }

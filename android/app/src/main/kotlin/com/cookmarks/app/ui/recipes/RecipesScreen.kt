@@ -38,8 +38,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
@@ -203,7 +207,12 @@ fun RecipesScreen(onOpenRecipe: (String, List<String>) -> Unit, onPlay: (GameSou
                                         if (st.semantic) st.tick++ else st.semantic = true
                                     }
                                 },
-                                modifier = Modifier.semantics { contentDescription = "AI search" },
+                                modifier = Modifier.semantics {
+                                    role = Role.Button
+                                    selected = st.semantic
+                                    stateDescription = if (st.semantic) "active" else "inactive"
+                                    contentDescription = "AI search"
+                                },
                             ) {
                                 Text(
                                     text = "\u2726",
@@ -246,7 +255,7 @@ fun RecipesScreen(onOpenRecipe: (String, List<String>) -> Unit, onPlay: (GameSou
                 }
             }
             st.semanticUnavailable -> item {
-                StateLine("No AI provider configured — st.semantic search is off.")
+                StateLine("No AI provider configured — semantic search is off.")
             }
             st.query.isBlank() && st.selected.isEmpty() -> item {
                 StateLine("Search, pick a keyword, or describe a dish and press \u2726.")
@@ -270,7 +279,10 @@ fun RecipesScreen(onOpenRecipe: (String, List<String>) -> Unit, onPlay: (GameSou
                             "Play in Discover \u2192",
                             colour = colors.clayDeep,
                             modifier = Modifier
-                                .clickable {
+                                .clickable(
+                                    role = Role.Button,
+                                    onClickLabel = "Play in Discover",
+                                ) {
                                     onPlay(
                                         if (st.semantic) GameSource.Semantic(st.query)
                                         else GameSource.Search(st.query, st.selected)
@@ -326,7 +338,14 @@ private fun KeywordChips(
                     .then(
                         if (active) Modifier.background(colors.clay) else Modifier
                     )
-                    .clickable { onToggle(name) }
+                    .clickable(
+                        role = Role.Checkbox,
+                        onClickLabel = if (active) "Remove keyword filter $name" else "Filter by keyword $name",
+                    ) { onToggle(name) }
+                    .semantics {
+                        this.selected = active
+                        this.stateDescription = if (active) "selected" else "not selected"
+                    }
                     .padding(horizontal = 10.dp, vertical = 6.dp),
             )
         }
@@ -339,7 +358,11 @@ private fun RecipeRow(recipe: RecipeSummary, onClick: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .clickable(
+                role = Role.Button,
+                onClickLabel = "Open ${recipe.name}",
+                onClick = onClick,
+            )
             .padding(horizontal = 20.dp, vertical = 12.dp),
     ) {
         Text(

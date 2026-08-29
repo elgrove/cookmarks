@@ -43,6 +43,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -221,6 +222,8 @@ private fun GameCardFace(card: GameCard, flippable: Boolean) {
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
                 enabled = flippable,
+                role = Role.Button,
+                onClickLabel = "Flip card",
             ) { flipped = !flipped },
     ) {
         if (angle <= 90f) {
