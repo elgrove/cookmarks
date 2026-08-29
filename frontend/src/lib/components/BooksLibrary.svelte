@@ -377,15 +377,15 @@
 	.chip {
 		display: inline-flex;
 		align-items: center;
-		gap: 0.4rem;
+		gap: 0.45rem;
 		font-family: var(--f-mono);
-		font-size: 0.74rem;
-		letter-spacing: 0.02em;
+		font-size: 0.72rem;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
 		color: var(--ink);
-		background: var(--bg-warm);
-		border: var(--border);
-		border-radius: 999px;
-		padding: 0.3rem 0.78rem;
+		background: var(--card);
+		border: var(--border-strong);
+		padding: 0.28rem 0.7rem;
 		cursor: pointer;
 		transition:
 			border-color 0.16s var(--ease-out),
@@ -411,7 +411,7 @@
 
 	.chip-count {
 		font-size: 0.64rem;
-		color: var(--faint);
+		color: var(--muted);
 	}
 
 	.chip.on .chip-count {
