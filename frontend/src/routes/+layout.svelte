@@ -109,12 +109,14 @@
 				class:active={$page.url.pathname.startsWith('/add')}
 				href="/add">Add</a
 			>
+		{/if}
+		{#if showAccount}
 			<a
 				class="admin-icon"
-				class:active={$page.url.pathname.startsWith('/admin')}
-				href="/admin"
-				aria-label="Admin"
-				title="Admin"
+				class:active={$page.url.pathname.startsWith('/config')}
+				href="/config"
+				aria-label={$currentUser?.is_admin ? 'Configuration' : 'Settings'}
+				title={$currentUser?.is_admin ? 'Configuration' : 'Settings'}
 			>
 				<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
 					<circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="1.8" />
@@ -127,12 +129,10 @@
 					/>
 				</svg>
 			</a>
-		{/if}
-		{#if showAccount}
 			<a
 				class="who"
-				class:active={$page.url.pathname.startsWith('/account')}
-				href="/account"
+				class:active={$page.url.pathname.startsWith('/config')}
+				href="/config"
 				>{$currentUser?.username}</a
 			>
 			<button class="signout" type="button" onclick={signOut}>Sign out</button>

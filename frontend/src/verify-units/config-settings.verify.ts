@@ -6,13 +6,15 @@ import type { VerifiableUnit } from '$lib/verify/types';
 
 type Props = ConfigSettingsProps;
 
-const PROVIDERS: ConfigSettingsConfig['providers'] = [
+const PROVIDERS: NonNullable<ConfigSettingsConfig['providers']> = [
 	{ name: 'ANTHROPIC', requiresApiKey: true },
 	{ name: 'GEMINI', requiresApiKey: true },
 	{ name: 'OPENROUTER', requiresApiKey: true }
 ];
 
 const config = (over: Partial<ConfigSettingsConfig> = {}): ConfigSettingsConfig => ({
+	isAdmin: true,
+	userInstructions: null,
 	extractionProvider: null,
 	extractionApiKeySet: false,
 	assistantProvider: null,
@@ -24,6 +26,7 @@ const config = (over: Partial<ConfigSettingsConfig> = {}): ConfigSettingsConfig 
 
 const RATE = '#rate-limit';
 const SAVE = '.save';
+const INSTRUCTIONS = '#user-instructions';
 
 const rateValue = (root: HTMLElement): string =>
 	root.querySelector<HTMLInputElement>(RATE)?.value ?? '';
@@ -32,7 +35,7 @@ const unit: VerifiableUnit<Props> = {
 	id: 'config-settings',
 	title: 'Config settings',
 	description:
-		'The admin Settings form over the Config singleton: AI provider, a write-only API key (set/not-set, replace, clear — never echoed), and the extraction rate limit. Saving drives idle → saving → saved, or → error if the PATCH rejects.',
+		'The Settings form over user instructions and AI configuration: user instructions for the assistant, theme preference, AI providers, write-only API keys (set/not-set, replace, clear — never echoed), and extraction rate limit. Non-admin users see only user instructions and appearance. Saving drives idle → saving → saved, or → error if the save rejects.',
 	kind: 'component',
 	component: ConfigSettings,
 	fixtures: [
@@ -50,6 +53,47 @@ const unit: VerifiableUnit<Props> = {
 			id: 'assistant-set',
 			description: 'assistant Anthropic with a key already stored',
 			props: { config: config({ assistantProvider: 'ANTHROPIC', assistantApiKeySet: true }) }
+		},
+		{
+			id: 'non-admin',
+			description: 'non-admin user sees user instructions and appearance, while admin fields are hidden',
+			props: {
+				config: config({
+					isAdmin: false,
+					userInstructions: 'Vegetarian. Likes bold spices.'
+				})
+			}
+		},
+		{
+			id: 'edit-instructions-save',
+			description: 'updating user instructions and saving settles on the saved confirmation',
+			props: {
+				config: config({
+					isAdmin: false,
+					userInstructions: null
+				}),
+				onSaveUserInstructions: () => Promise.resolve()
+			},
+			act: async ({ type, click, wait }) => {
+				type(INSTRUCTIONS, 'No dairy or peanuts.');
+				click(SAVE);
+				await wait(0);
+			}
+		},
+		{
+			id: 'instructions-over-limit',
+			description: 'probe: instructions exceeding 4,000 characters mark over-limit and disable saving',
+			probe: true,
+			props: {
+				config: config({
+					isAdmin: false,
+					userInstructions: null
+				})
+			},
+			act: async ({ type, wait }) => {
+				type(INSTRUCTIONS, 'a'.repeat(4001));
+				await wait(0);
+			}
 		},
 		{
 			id: 'edit-save',
@@ -117,13 +161,40 @@ const unit: VerifiableUnit<Props> = {
 			}
 		},
 		{
+			id: 'non-admin-hides-admin-fields',
+			description: 'non-admin user hides extraction and assistant admin controls',
+			onlyFixtures: ['non-admin'],
+			check: ({ contract, root }) => {
+				if (contract['is-admin'] !== 'false') return `is-admin=${contract['is-admin']}`;
+				if (root.querySelector('#user-instructions') === null) return 'missing user instructions textarea';
+				if (root.querySelector('#extraction-provider') !== null) return 'extraction provider visible for non-admin';
+				if (root.querySelector('#assistant-provider') !== null) return 'assistant provider visible for non-admin';
+				return root.querySelector('#rate-limit') === null || 'rate limit visible for non-admin';
+			}
+		},
+		{
+			id: 'edit-instructions-settles',
+			description: 'saving edited user instructions settles on the saved confirmation',
+			onlyFixtures: ['edit-instructions-save'],
+			check: ({ contract }) => contract.state === 'saved' || `state=${contract.state}`
+		},
+		{
+			id: 'over-limit-disables-save',
+			description: 'over-limit instructions report over-limit contract and disable save button',
+			onlyFixtures: ['instructions-over-limit'],
+			check: ({ contract, root }) => {
+				if (contract['over-limit'] !== 'true') return `over-limit=${contract['over-limit']}`;
+				const btn = root.querySelector<HTMLButtonElement>(SAVE);
+				return (btn && btn.disabled) || 'save button not disabled when over limit';
+			}
+		},
+		{
 			id: 'key-set-not-echoed',
 			description: 'a stored key reads as set (keep action), and never appears as text',
 			onlyFixtures: ['gemini-set'],
 			check: ({ contract, root }) => {
 				if (contract['extraction-key-set'] !== 'true') return `key-set=${contract['extraction-key-set']}`;
 				if (contract['extraction-key-action'] !== 'keep') return `key-action=${contract['extraction-key-action']}`;
-				// The password value is never rendered; only the masked "set" affordance shows.
 				return root.querySelector('input[type="password"]') === null || 'key input exposed';
 			}
 		},
@@ -174,3 +245,4 @@ const unit: VerifiableUnit<Props> = {
 };
 
 export default unit;
+

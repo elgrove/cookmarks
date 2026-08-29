@@ -15,17 +15,21 @@
 		deleteUser,
 		fetchUsers,
 		resetPassword,
+		updateMe,
 		type User
 	} from '$lib/api/auth';
 	import { currentUser } from '$lib/auth';
 	import { pageTitle } from '$lib/title';
 
-	const tabs: AdminTab[] = [
+	let isAdmin = $derived($currentUser?.is_admin ?? false);
+
+	const allTabs: AdminTab[] = [
 		{ id: 'settings', label: 'Settings' },
 		{ id: 'tasks', label: 'Tasks' },
 		{ id: 'task-runs', label: 'Task Runs' },
 		{ id: 'users', label: 'Users' }
 	];
+	let tabs = $derived(isAdmin ? allTabs : [{ id: 'settings', label: 'Settings' }]);
 	let active = $state('settings');
 
 	let status = $state<'loading' | 'error' | 'ready'>('loading');
@@ -38,22 +42,33 @@
 
 	// Map the snake_case wire shape to the component's camelCase props.
 	let settingsConfig = $derived<ConfigSettingsConfig | null>(
-		config
-			? {
-					extractionProvider: config.ai_provider,
-					extractionApiKeySet: config.api_key_set,
-					assistantProvider: config.assistant_provider,
-					assistantApiKeySet: config.assistant_api_key_set,
-					rateLimit: config.extraction_rate_limit_per_minute,
-					providers: config.providers.map((p) => ({
-						name: p.name,
-						requiresApiKey: p.requires_api_key
-					}))
+		isAdmin
+			? config
+				? {
+						isAdmin: true,
+						userInstructions: $currentUser?.user_instructions ?? null,
+						extractionProvider: config.ai_provider,
+						extractionApiKeySet: config.api_key_set,
+						assistantProvider: config.assistant_provider,
+						assistantApiKeySet: config.assistant_api_key_set,
+						rateLimit: config.extraction_rate_limit_per_minute,
+						providers: config.providers.map((p) => ({
+							name: p.name,
+							requiresApiKey: p.requires_api_key
+						}))
+					}
+				: null
+			: {
+					isAdmin: false,
+					userInstructions: $currentUser?.user_instructions ?? null
 				}
-			: null
 	);
 
 	async function load() {
+		if (!isAdmin) {
+			status = 'ready';
+			return;
+		}
 		status = 'loading';
 		try {
 			config = await fetchConfig();
@@ -67,6 +82,11 @@
 	// The PATCH returns the refreshed (key-free) config; assigning it re-seeds the form.
 	async function save(patch: ConfigUpdate) {
 		config = await updateConfig(patch);
+	}
+
+	async function saveUserInstructions(instructions: string | null) {
+		const updated = await updateMe({ user_instructions: instructions });
+		currentUser.set(updated);
 	}
 
 	async function loadRuns() {
@@ -105,19 +125,25 @@
 </script>
 
 <svelte:head>
-	<title>{pageTitle('Admin')}</title>
+	<title>{pageTitle(isAdmin ? 'Configuration' : 'Settings')}</title>
 </svelte:head>
 
 <section class="admin">
 	<header class="head">
-		<h1>Admin</h1>
+		<h1>{isAdmin ? 'Configuration' : 'Settings'}</h1>
 	</header>
 
-	<AdminTabs {tabs} {active} onSelect={selectTab} />
+	{#if isAdmin}
+		<AdminTabs {tabs} {active} onSelect={selectTab} />
+	{/if}
 
 	{#if active === 'settings'}
-		{#if status === 'ready' && settingsConfig}
-			<ConfigSettings config={settingsConfig} onSave={save} />
+		{#if (status === 'ready' || !isAdmin) && settingsConfig}
+			<ConfigSettings
+				config={settingsConfig}
+				onSave={save}
+				onSaveUserInstructions={saveUserInstructions}
+			/>
 		{:else if status === 'loading'}
 			<p class="msg">Loading settings…</p>
 		{:else}
