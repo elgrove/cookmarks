@@ -79,24 +79,24 @@
 		<section class="section">
 			<div class="section-head">
 				<span class="sec-num">01</span>
-				<h2 class="sec-title">Personal cooking instructions</h2>
+				<h2 class="sec-title">User instructions</h2>
 			</div>
 
 			<p class="section-desc">
-				Tell the assistant about your kitchen, equipment, pantry staples, dietary preferences, or
-				cooking style. These notes guide the assistant across every conversation.
+				Tell the assistant how you want it to help, including any kitchen, equipment, dietary
+				preferences, or style notes. These instructions guide the assistant across every conversation.
 			</p>
 
 			<div class="field">
 				<div class="field-header">
-					<label class="field-label" for="cooking-instructions">Instructions</label>
+					<label class="field-label" for="user-instructions">Instructions</label>
 					<span class="char-count" class:limit-reached={overLimit}>
 						{instructionsInput.length.toLocaleString('en-GB')} / 4,000
 					</span>
 				</div>
 				<textarea
-					id="cooking-instructions"
-					name="cooking_instructions"
+					id="user-instructions"
+					name="user_instructions"
 					rows="8"
 					bind:value={instructionsInput}
 					placeholder="e.g. Vegetarian. Cooking on induction with cast iron. Likes bold acid and lots of herbs. No coriander."

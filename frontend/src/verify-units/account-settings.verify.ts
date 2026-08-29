@@ -10,20 +10,20 @@ const NORMAL_INSTRUCTIONS =
 const MAX_INSTRUCTIONS = 'x'.repeat(4000);
 const OVER_LIMIT_INSTRUCTIONS = 'x'.repeat(4001);
 
-const TEXTAREA = '#cooking-instructions';
+const TEXTAREA = '#user-instructions';
 const SAVE = '.save-button';
 
 const unit: VerifiableUnit<Props> = {
 	id: 'account-settings',
 	title: 'Account settings',
 	description:
-		'The personal account settings surface for editing cooking instructions. Saving drives idle → saving → saved, or → error if the PATCH rejects. Text over 4,000 characters disables save.',
+		'The personal account settings surface for editing user instructions. Saving drives idle → saving → saved, or → error if the PATCH rejects. Text over 4,000 characters disables save.',
 	kind: 'component',
 	component: AccountSettings,
 	fixtures: [
 		{
 			id: 'normal',
-			description: 'an existing profile with cooking instructions',
+			description: 'an existing profile with user instructions',
 			props: { username: 'aaron', instructions: NORMAL_INSTRUCTIONS }
 		},
 		{

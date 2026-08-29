@@ -48,7 +48,7 @@ MAX_RESULTS = 20
 class AssistantDeps:
     session: Session
     user_id: uuid.UUID
-    cooking_instructions: str | None = None
+    user_instructions: str | None = None
 
 
 def _recipe_row(recipe: Recipe, book: Book) -> dict:
@@ -352,8 +352,8 @@ def _model(provider: AIProvider) -> Model | None:
 
 def _assistant_instructions(ctx: RunContext[AssistantDeps]) -> str:
     prompt = ASSISTANT_SYSTEM_PROMPT
-    if ctx.deps.cooking_instructions and ctx.deps.cooking_instructions.strip():
-        prompt = f"{prompt}\n\nPersonal cooking instructions for this cook:\n{ctx.deps.cooking_instructions.strip()}"
+    if ctx.deps.user_instructions and ctx.deps.user_instructions.strip():
+        prompt = f"{prompt}\n\nUser instructions for the user of this app:\n{ctx.deps.user_instructions.strip()}"
     return prompt
 
 

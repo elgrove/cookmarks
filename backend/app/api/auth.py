@@ -24,7 +24,7 @@ def _me(user: User) -> AuthMe:
         username=user.username,
         is_admin=user.is_admin,
         auth_mode=settings.auth_mode,
-        cooking_instructions=user.cooking_instructions,
+        user_instructions=user.user_instructions,
     )
 
 
@@ -71,12 +71,11 @@ def me(user: CurrentUser) -> AuthMe:
 
 @router.patch("/auth/me", response_model=AuthMe)
 def update_me(body: UserUpdate, user: CurrentUser, session: SessionDep) -> AuthMe:
-    if "cooking_instructions" in body.model_fields_set:
-        user.cooking_instructions = (
-            body.cooking_instructions.strip() if body.cooking_instructions else None
+    if "user_instructions" in body.model_fields_set:
+        user.user_instructions = (
+            body.user_instructions.strip() if body.user_instructions else None
         )
     session.add(user)
     session.commit()
     session.refresh(user)
     return _me(user)
-

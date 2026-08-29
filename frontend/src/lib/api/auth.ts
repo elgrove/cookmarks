@@ -8,7 +8,7 @@ export const authMeSchema = z.object({
 	username: z.string(),
 	is_admin: z.boolean(),
 	auth_mode: z.string(),
-	cooking_instructions: z.string().nullable().optional()
+	user_instructions: z.string().nullable().optional()
 });
 
 export const userSchema = z.object({
@@ -29,7 +29,7 @@ export async function fetchMe(fetchFn: typeof fetch = fetch): Promise<AuthMe | n
 }
 
 export async function updateMe(
-	input: { cooking_instructions?: string | null },
+	input: { user_instructions?: string | null },
 	fetchFn: typeof fetch = fetch
 ): Promise<AuthMe> {
 	const res = await fetchFn('/api/auth/me', {

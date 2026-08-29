@@ -1,4 +1,4 @@
-"""add cooking_instructions to users
+"""add user_instructions to users
 
 Revision ID: 7f82d8a85c3e
 Revises: ddf03f696722
@@ -20,9 +20,9 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     with op.batch_alter_table('users', schema=None) as batch_op:
-        batch_op.add_column(sa.Column('cooking_instructions', sa.String(length=4000), nullable=True))
+        batch_op.add_column(sa.Column('user_instructions', sa.String(length=4000), nullable=True))
 
 
 def downgrade() -> None:
     with op.batch_alter_table('users', schema=None) as batch_op:
-        batch_op.drop_column('cooking_instructions')
+        batch_op.drop_column('user_instructions')

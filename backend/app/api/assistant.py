@@ -175,7 +175,7 @@ async def chat(
             deps=AssistantDeps(
                 session=session,
                 user_id=user.id,
-                cooking_instructions=user.cooking_instructions,
+                user_instructions=user.user_instructions,
             ),
             on_complete=persist,
         )

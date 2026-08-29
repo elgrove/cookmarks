@@ -297,7 +297,7 @@ def test_title_is_only_set_once(
     assert conversation.title == "first"
 
 
-def test_chat_uses_user_cooking_instructions_and_does_not_persist_them_to_messages(
+def test_chat_uses_user_instructions_and_does_not_persist_them_to_messages(
     client: TestClient,
     session: Session,
     configured: None,
@@ -305,7 +305,7 @@ def test_chat_uses_user_cooking_instructions_and_does_not_persist_them_to_messag
 ) -> None:
     user = session.scalar(select(User).where(User.username == "tester"))
     assert user is not None
-    user.cooking_instructions = "No dairy or shellfish."
+    user.user_instructions = "No dairy or shellfish."
     session.add(user)
     session.commit()
 

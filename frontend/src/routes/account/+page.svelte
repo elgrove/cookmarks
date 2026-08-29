@@ -9,7 +9,7 @@
 	});
 
 	async function handleSave(instructions: string | null) {
-		const updated = await updateMe({ cooking_instructions: instructions });
+		const updated = await updateMe({ user_instructions: instructions });
 		currentUser.set(updated);
 	}
 </script>
@@ -17,7 +17,7 @@
 {#if $currentUser}
 	<AccountSettings
 		username={$currentUser.username}
-		instructions={$currentUser.cooking_instructions ?? null}
+		instructions={$currentUser.user_instructions ?? null}
 		onSave={handleSave}
 	/>
 {/if}

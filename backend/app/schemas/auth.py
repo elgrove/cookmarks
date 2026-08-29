@@ -14,11 +14,11 @@ class AuthMe(BaseModel):
     username: str
     is_admin: bool
     auth_mode: str
-    cooking_instructions: str | None = None
+    user_instructions: str | None = None
 
 
 class UserUpdate(BaseModel):
-    cooking_instructions: str | None = Field(default=None, max_length=4000)
+    user_instructions: str | None = Field(default=None, max_length=4000)
 
 
 class UserRead(BaseModel):
