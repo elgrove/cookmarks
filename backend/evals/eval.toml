@@ -7,17 +7,33 @@
 
 [tasks.many_recipes_per_file]
 books  = ["craveable"]
-models = ["GEMINI:gemini-2.5-flash-lite", "GEMINI:gemini-2.5-flash"]
+models = [
+  "GEMINI:gemini-2.5-flash-lite",
+  "GEMINI:gemini-2.5-flash",
+  "ANTHROPIC:claude-sonnet-5",
+  "ANTHROPIC:claude-haiku-4-5-20251001",
+]
 
 [tasks.one_recipe_per_file]
 books  = ["curry-guy"]
-models = ["GEMINI:gemini-2.5-flash-lite", "GEMINI:gemini-2.5-flash", "OPENROUTER:openai/gpt-oss-120b"]
+models = [
+  "GEMINI:gemini-2.5-flash-lite",
+  "GEMINI:gemini-2.5-flash",
+  "OPENROUTER:openai/gpt-oss-120b",
+  "ANTHROPIC:claude-sonnet-5",
+  "ANTHROPIC:claude-haiku-4-5-20251001",
+]
 
 [tasks.blocks_of_files]
 # nothing-fancy has matchable images the image-match check misjudges, so the blocks
 # task forces block extraction (skipping that check) for its books.
 books  = ["nothing-fancy"]
-models = ["GEMINI:gemini-2.5-flash", "GEMINI:gemini-2.5-flash-lite"]
+models = [
+  "GEMINI:gemini-2.5-flash",
+  "GEMINI:gemini-2.5-flash-lite",
+  "ANTHROPIC:claude-sonnet-5",
+  "ANTHROPIC:claude-haiku-4-5-20251001",
+]
 
 [tasks.pdf_ocr]
 books = ["izakaya"]
