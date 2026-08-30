@@ -2,10 +2,10 @@
 
 ## What this release is
 
-The v1 graph is a deliberate starting point for recipe discovery. It has 262 nodes and
-274 directed discovery edges. It is broad enough to let a future enrichment model make
+The v1 graph is a deliberate starting point for recipe discovery. It has 249 nodes and
+256 directed discovery edges. It is broad enough to let a future enrichment model make
 useful distinctions already present in the library—for example Cantonese, Sichuan,
-Punjabi, Kerala, Peranakan, Nikkei, Chifa and Cape Malay—while still rolling a recipe up
+Punjabi, Kerala and Cape Malay—while still rolling a recipe up
 through Chinese, East Asian or Asian; Indian, South Asian or Asian; and so on.
 
 The graph does not say that a broader node owns, creates, or geographically contains a
@@ -26,8 +26,8 @@ The seed was assembled in five passes:
    Mexican and Brazilian cuisines also receive selected regional nodes. United States
    cuisine remains deliberately broad, with Soul food as its single child.
 4. Add named traditions that do not fit a one-country tree: Indigenous North American,
-   Māori, Aboriginal Australian, Torres Strait Islander, Kurdish, Uyghur, Jewish, Romani,
-   Peranakan, Nikkei and Chifa.
+   Māori, Aboriginal Australian, Torres Strait Islander, Kurdish, Uyghur, Jewish and
+   Romani.
 5. Run a negative review: remove dish, ingredient, technique, restaurant-marketing and
    overly generic labels; avoid any edge that would be read as a claim of cultural origin
    or sovereignty.

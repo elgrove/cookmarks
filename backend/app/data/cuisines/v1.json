@@ -158,8 +158,6 @@
     {"id": "venezuelan", "name": "Venezuelan cuisine", "kinds": ["national"], "aliases": []},
     {"id": "ecuadorian", "name": "Ecuadorian cuisine", "kinds": ["national"], "aliases": []},
     {"id": "peruvian", "name": "Peruvian cuisine", "kinds": ["national"], "aliases": []},
-    {"id": "nikkei", "name": "Nikkei cuisine", "kinds": ["diaspora", "hybrid"], "aliases": ["Peruvian-Japanese cuisine"]},
-    {"id": "chifa", "name": "Chifa cuisine", "kinds": ["diaspora", "hybrid"], "aliases": ["Peruvian-Chinese cuisine"]},
     {"id": "bolivian", "name": "Bolivian cuisine", "kinds": ["national"], "aliases": []},
     {"id": "chilean", "name": "Chilean cuisine", "kinds": ["national"], "aliases": []},
     {"id": "brazilian", "name": "Brazilian cuisine", "kinds": ["national"], "aliases": []},
@@ -218,18 +216,12 @@
     {"id": "taiwanese", "name": "Taiwanese cuisine", "kinds": ["regional"], "aliases": []},
     {"id": "mongolian", "name": "Mongolian cuisine", "kinds": ["national", "regional"], "aliases": []},
     {"id": "okinawan", "name": "Okinawan cuisine", "kinds": ["regional"], "aliases": []},
-    {"id": "kaiseki", "name": "Kaiseki", "kinds": ["historical", "regional"], "aliases": []},
-    {"id": "korean-royal-court", "name": "Korean royal court cuisine", "kinds": ["historical"], "aliases": []},
-    {"id": "korean-temple", "name": "Korean temple cuisine", "kinds": ["religious"], "aliases": []},
     {"id": "vietnamese", "name": "Vietnamese cuisine", "kinds": ["national"], "aliases": []},
     {"id": "thai", "name": "Thai cuisine", "kinds": ["national"], "aliases": []},
     {"id": "lao", "name": "Lao cuisine", "kinds": ["national"], "aliases": ["Laotian cuisine"]},
     {"id": "cambodian", "name": "Cambodian cuisine", "kinds": ["national"], "aliases": ["Khmer cuisine"]},
     {"id": "myanmar", "name": "Myanmar cuisine", "kinds": ["national"], "aliases": ["Burmese cuisine"]},
     {"id": "indonesian", "name": "Indonesian cuisine", "kinds": ["national"], "aliases": []},
-    {"id": "javanese", "name": "Javanese cuisine", "kinds": ["regional", "ethnocultural"], "aliases": []},
-    {"id": "sundanese", "name": "Sundanese cuisine", "kinds": ["regional", "ethnocultural"], "aliases": []},
-    {"id": "minangkabau", "name": "Minangkabau cuisine", "kinds": ["regional", "ethnocultural"], "aliases": ["Padang cuisine"]},
     {"id": "malaysian", "name": "Malaysian cuisine", "kinds": ["national"], "aliases": []},
     {"id": "singaporean", "name": "Singaporean cuisine", "kinds": ["national"], "aliases": []},
     {"id": "filipino", "name": "Filipino cuisine", "kinds": ["national"], "aliases": []},
@@ -293,7 +285,6 @@
     {"id": "tahitian", "name": "Tahitian cuisine", "kinds": ["regional", "ethnocultural"], "aliases": []},
     {"id": "chamorro", "name": "Chamorro cuisine", "kinds": ["indigenous", "ethnocultural"], "aliases": []},
 
-    {"id": "peranakan", "name": "Peranakan cuisine", "kinds": ["diaspora", "hybrid", "ethnocultural"], "aliases": ["Nyonya cuisine"]},
     {"id": "buddhist-temple", "name": "Buddhist temple cuisines", "kinds": ["religious"], "aliases": []}
   ],
   "edges": [
@@ -330,8 +321,7 @@
     ["haitian", "caribbean"], ["jamaican", "caribbean"], ["trinidadian", "caribbean"],
     ["barbadian", "caribbean"], ["guyanese", "caribbean"], ["surinamese", "caribbean"],
     ["colombian", "andes"], ["venezuelan", "andes"], ["ecuadorian", "andes"], ["peruvian", "andes"],
-    ["bolivian", "andes"], ["nikkei", "peruvian"], ["nikkei", "japanese"], ["chifa", "peruvian"],
-    ["chifa", "chinese"], ["bahian", "brazilian"],
+    ["bolivian", "andes"], ["bahian", "brazilian"],
     ["mineiro", "brazilian"], ["gaucho", "brazilian"], ["gaucho", "southern-cone"],
     ["argentine", "southern-cone"], ["uruguayan", "southern-cone"], ["paraguayan", "southern-cone"], ["chilean", "southern-cone"],
 
@@ -354,12 +344,11 @@
     ["tibetan", "himalayan"], ["bhutanese", "himalayan"], ["cantonese", "chinese"], ["sichuan", "chinese"],
     ["hunan", "chinese"], ["fujian", "chinese"], ["jiangsu", "chinese"], ["zhejiang", "chinese"],
     ["shandong", "chinese"], ["anhui", "chinese"], ["taiwanese", "chinese"], ["mongolian", "east-asia"],
-    ["okinawan", "japanese"], ["kaiseki", "japanese"], ["korean-royal-court", "korean"],
-    ["korean-temple", "korean"], ["korean-temple", "buddhist-temple"], ["vietnamese", "mainland-southeast-asia"],
+    ["okinawan", "japanese"], ["vietnamese", "mainland-southeast-asia"],
     ["thai", "mainland-southeast-asia"], ["lao", "mainland-southeast-asia"], ["cambodian", "mainland-southeast-asia"],
-    ["myanmar", "mainland-southeast-asia"], ["indonesian", "maritime-southeast-asia"], ["javanese", "indonesian"],
-    ["sundanese", "indonesian"], ["minangkabau", "indonesian"], ["malaysian", "maritime-southeast-asia"],
-    ["singaporean", "maritime-southeast-asia"], ["filipino", "maritime-southeast-asia"], ["bruneian", "maritime-southeast-asia"],
+    ["myanmar", "mainland-southeast-asia"], ["indonesian", "maritime-southeast-asia"],
+    ["malaysian", "maritime-southeast-asia"], ["singaporean", "maritime-southeast-asia"],
+    ["filipino", "maritime-southeast-asia"], ["bruneian", "maritime-southeast-asia"],
 
     ["nordic", "europe"], ["baltic", "europe"], ["british-isles", "europe"], ["western-europe", "europe"],
     ["iberian", "europe"], ["italian-regional", "europe"], ["alpine", "europe"], ["central-europe", "europe"],
@@ -383,9 +372,8 @@
     ["aboriginal-australian", "oceania"], ["torres-strait-islander", "oceania"], ["maori", "oceania"],
     ["melanesian", "oceania"], ["micronesian", "oceania"], ["polynesian", "oceania"], ["australian", "oceania"],
     ["new-zealand", "oceania"], ["fijian", "melanesian"], ["papua-new-guinean", "melanesian"],
-    ["samoan", "polynesian"], ["tongan", "polynesian"], ["tahitian", "polynesian"], ["chamorro", "micronesian"],
+    ["samoan", "polynesian"], ["tongan", "polynesian"], ["tahitian", "polynesian"], ["chamorro", "micronesian"]
 
-    ["peranakan", "chinese"], ["peranakan", "malaysian"]
   ],
   "coverage": [
     {
@@ -433,11 +421,10 @@
       "note": "Indigenous traditions are first-class nodes rather than sublabels of settler-national cuisines."
     },
     {
-      "area": "Named ethnocultural and hybrid traditions",
+      "area": "Named ethnocultural traditions",
       "status": "reviewed",
       "country_or_territory_groups": [
-        "Jewish cuisines", "Romani cuisine", "Peranakan cuisine", "Nikkei cuisine", "Chifa cuisine",
-        "Buddhist temple cuisines"
+        "Jewish cuisines", "Romani cuisine", "Buddhist temple cuisines"
       ],
       "note": "These nodes are retained only where the foodway has a recognised name rather than a constructed pairing of cuisines."
     }
