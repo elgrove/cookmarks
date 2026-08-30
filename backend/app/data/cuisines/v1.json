@@ -45,7 +45,6 @@
     {"id": "southern-africa", "name": "Southern African cuisines", "kinds": ["regional"], "aliases": []},
     {"id": "indian-ocean-africa", "name": "Indian Ocean African cuisines", "kinds": ["regional"], "aliases": []},
 
-    {"id": "arctic", "name": "Arctic cuisines", "kinds": ["regional"], "aliases": []},
     {"id": "indigenous-north-american", "name": "Indigenous North American cuisines", "kinds": ["indigenous", "regional"], "aliases": ["Native North American cuisines"]},
     {"id": "north-america", "name": "North American cuisines", "kinds": ["regional"], "aliases": []},
     {"id": "mesoamerican", "name": "Mesoamerican cuisine", "kinds": ["regional", "historical"], "aliases": []},
@@ -53,7 +52,6 @@
     {"id": "caribbean", "name": "Caribbean cuisines", "kinds": ["regional"], "aliases": []},
     {"id": "andes", "name": "Andean cuisines", "kinds": ["regional"], "aliases": []},
     {"id": "amazonian", "name": "Amazonian cuisines", "kinds": ["regional", "indigenous"], "aliases": []},
-    {"id": "brazilian-regional", "name": "Brazilian regional cuisines", "kinds": ["regional"], "aliases": []},
     {"id": "southern-cone", "name": "Southern Cone cuisines", "kinds": ["regional"], "aliases": []},
 
     {"id": "west-asia", "name": "West Asian cuisines", "kinds": ["regional"], "aliases": ["Southwest Asian cuisines"]},
@@ -135,8 +133,6 @@
     {"id": "seychellois", "name": "Seychellois cuisine", "kinds": ["national"], "aliases": []},
 
     {"id": "canadian", "name": "Canadian cuisine", "kinds": ["national"], "aliases": []},
-    {"id": "quebecois", "name": "Québécois cuisine", "kinds": ["regional"], "aliases": ["Quebec cuisine"]},
-    {"id": "inuit", "name": "Inuit cuisine", "kinds": ["indigenous", "ethnocultural"], "aliases": []},
     {"id": "american", "name": "United States cuisine", "kinds": ["national"], "aliases": ["American cuisine", "US cuisine"]},
     {"id": "soul-food", "name": "Soul food", "kinds": ["ethnocultural", "diaspora"], "aliases": []},
     {"id": "mexican", "name": "Mexican cuisine", "kinds": ["national"], "aliases": []},
@@ -321,11 +317,10 @@
     ["lesotho", "southern-africa"], ["namibian", "southern-africa"], ["zimbabwean", "southern-africa"],
     ["malagasy", "indian-ocean-africa"], ["mauritian", "indian-ocean-africa"], ["seychellois", "indian-ocean-africa"],
 
-    ["arctic", "americas"], ["indigenous-north-american", "americas"], ["north-america", "americas"],
+    ["indigenous-north-american", "americas"], ["north-america", "americas"],
     ["mesoamerican", "americas"], ["central-america", "americas"], ["caribbean", "americas"],
-    ["andes", "americas"], ["amazonian", "americas"], ["brazilian-regional", "americas"], ["southern-cone", "americas"],
-    ["inuit", "arctic"], ["inuit", "indigenous-north-american"], ["canadian", "north-america"],
-    ["quebecois", "canadian"], ["american", "north-america"], ["soul-food", "american"],
+    ["andes", "americas"], ["amazonian", "americas"], ["brazilian", "americas"], ["southern-cone", "americas"],
+    ["canadian", "north-america"], ["american", "north-america"], ["soul-food", "american"],
     ["mexican", "north-america"],
     ["mexican", "mesoamerican"], ["oaxacan", "mexican"], ["yucatecan", "mexican"], ["veracruz", "mexican"],
     ["guatemalan", "central-america"],
@@ -336,7 +331,7 @@
     ["barbadian", "caribbean"], ["guyanese", "caribbean"], ["surinamese", "caribbean"],
     ["colombian", "andes"], ["venezuelan", "andes"], ["ecuadorian", "andes"], ["peruvian", "andes"],
     ["bolivian", "andes"], ["nikkei", "peruvian"], ["nikkei", "japanese"], ["chifa", "peruvian"],
-    ["chifa", "chinese"], ["brazilian", "brazilian-regional"], ["bahian", "brazilian"],
+    ["chifa", "chinese"], ["bahian", "brazilian"],
     ["mineiro", "brazilian"], ["gaucho", "brazilian"], ["gaucho", "southern-cone"],
     ["argentine", "southern-cone"], ["uruguayan", "southern-cone"], ["paraguayan", "southern-cone"], ["chilean", "southern-cone"],
 
@@ -406,7 +401,7 @@
       "area": "Americas",
       "status": "reviewed",
       "country_or_territory_groups": [
-        "Arctic and Indigenous North America", "Canada and United States", "Mexico and Mesoamerica", "Central America",
+        "Indigenous North America", "Canada and United States", "Mexico and Mesoamerica", "Central America",
         "Caribbean", "Andes", "Amazon basin", "Brazil", "Southern Cone"
       ],
       "note": "Indigenous and named regional nodes are retained alongside national nodes where a broad national label would flatten an established tradition."

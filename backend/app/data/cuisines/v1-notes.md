@@ -25,9 +25,9 @@ The seed was assembled in five passes:
    traditions; Indonesian cuisines include Javanese, Sundanese and Minangkabau; Italian,
    Mexican and Brazilian cuisines also receive selected regional nodes. United States
    cuisine remains deliberately broad, with Soul food as its single child.
-4. Add named traditions that do not fit a one-country tree: Inuit, Māori, Aboriginal
-   Australian, Torres Strait Islander, Kurdish, Uyghur, Jewish, Romani, Peranakan, Nikkei
-   and Chifa.
+4. Add named traditions that do not fit a one-country tree: Indigenous North American,
+   Māori, Aboriginal Australian, Torres Strait Islander, Kurdish, Uyghur, Jewish, Romani,
+   Peranakan, Nikkei and Chifa.
 5. Run a negative review: remove dish, ingredient, technique, restaurant-marketing and
    overly generic labels; avoid any edge that would be read as a claim of cultural origin
    or sovereignty.
