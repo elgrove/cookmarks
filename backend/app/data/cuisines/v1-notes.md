@@ -2,8 +2,8 @@
 
 ## What this release is
 
-The v1 graph is a deliberate starting point for recipe discovery. It has 248 nodes and
-255 directed discovery edges. It is broad enough to let a future enrichment model make
+The v1 graph is a deliberate starting point for recipe discovery. It has 247 nodes and
+244 directed discovery edges. It is broad enough to let a future enrichment model make
 useful distinctions already present in the library—for example Cantonese, Sichuan,
 Punjabi, Kerala and Cape Malay—while still rolling a recipe up
 through Chinese, East Asian or Asian; Indian, South Asian or Asian; and so on.
