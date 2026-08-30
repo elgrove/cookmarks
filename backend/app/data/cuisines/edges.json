@@ -1,0 +1,946 @@
+[
+  [
+    "Northern Africa",
+    "Africa"
+  ],
+  [
+    "Maghrebi",
+    "Northern Africa"
+  ],
+  [
+    "Nile Valley",
+    "Africa"
+  ],
+  [
+    "Horn of Africa",
+    "Africa"
+  ],
+  [
+    "East Africa",
+    "Africa"
+  ],
+  [
+    "Swahili",
+    "Africa"
+  ],
+  [
+    "Great Lakes Africa",
+    "Africa"
+  ],
+  [
+    "Central Africa",
+    "Africa"
+  ],
+  [
+    "Sahel",
+    "Africa"
+  ],
+  [
+    "West Africa",
+    "Africa"
+  ],
+  [
+    "Southern Africa",
+    "Africa"
+  ],
+  [
+    "Indian Ocean Africa",
+    "Africa"
+  ],
+  [
+    "Algerian",
+    "Maghrebi"
+  ],
+  [
+    "Libyan",
+    "Maghrebi"
+  ],
+  [
+    "Moroccan",
+    "Maghrebi"
+  ],
+  [
+    "Tunisian",
+    "Maghrebi"
+  ],
+  [
+    "Egyptian",
+    "Nile Valley"
+  ],
+  [
+    "Sudanese",
+    "Nile Valley"
+  ],
+  [
+    "Ethiopian",
+    "Horn of Africa"
+  ],
+  [
+    "Eritrean",
+    "Horn of Africa"
+  ],
+  [
+    "Somali",
+    "Horn of Africa"
+  ],
+  [
+    "Kenyan",
+    "East Africa"
+  ],
+  [
+    "Tanzanian",
+    "East Africa"
+  ],
+  [
+    "Ugandan",
+    "Great Lakes Africa"
+  ],
+  [
+    "Rwandan",
+    "Great Lakes Africa"
+  ],
+  [
+    "Burundian",
+    "Great Lakes Africa"
+  ],
+  [
+    "Zanzibari",
+    "Swahili"
+  ],
+  [
+    "Tanzanian",
+    "Swahili"
+  ],
+  [
+    "Angolan",
+    "Central Africa"
+  ],
+  [
+    "Cameroonian",
+    "Central Africa"
+  ],
+  [
+    "Congolese",
+    "Central Africa"
+  ],
+  [
+    "Gabonese",
+    "Central Africa"
+  ],
+  [
+    "Chadian",
+    "Sahel"
+  ],
+  [
+    "Beninese",
+    "West Africa"
+  ],
+  [
+    "Burkinabe",
+    "Sahel"
+  ],
+  [
+    "Cape Verdean",
+    "West Africa"
+  ],
+  [
+    "Ghanaian",
+    "West Africa"
+  ],
+  [
+    "Guinean",
+    "West Africa"
+  ],
+  [
+    "Ivorian",
+    "West Africa"
+  ],
+  [
+    "Liberian",
+    "West Africa"
+  ],
+  [
+    "Malian",
+    "Sahel"
+  ],
+  [
+    "Nigerian",
+    "West Africa"
+  ],
+  [
+    "Senegalese",
+    "West Africa"
+  ],
+  [
+    "Sierra Leonean",
+    "West Africa"
+  ],
+  [
+    "Togolese",
+    "West Africa"
+  ],
+  [
+    "Yoruba",
+    "Nigerian"
+  ],
+  [
+    "Igbo",
+    "Nigerian"
+  ],
+  [
+    "Hausa",
+    "Nigerian"
+  ],
+  [
+    "Hausa",
+    "Sahel"
+  ],
+  [
+    "South African",
+    "Southern Africa"
+  ],
+  [
+    "Cape Malay",
+    "South African"
+  ],
+  [
+    "Botswanan",
+    "Southern Africa"
+  ],
+  [
+    "Lesotho",
+    "Southern Africa"
+  ],
+  [
+    "Namibian",
+    "Southern Africa"
+  ],
+  [
+    "Zimbabwean",
+    "Southern Africa"
+  ],
+  [
+    "Malagasy",
+    "Indian Ocean Africa"
+  ],
+  [
+    "Mauritian",
+    "Indian Ocean Africa"
+  ],
+  [
+    "Seychellois",
+    "Indian Ocean Africa"
+  ],
+  [
+    "Indigenous North American",
+    "Americas"
+  ],
+  [
+    "North America",
+    "Americas"
+  ],
+  [
+    "Mesoamerican",
+    "Americas"
+  ],
+  [
+    "Central America",
+    "Americas"
+  ],
+  [
+    "Caribbean",
+    "Americas"
+  ],
+  [
+    "Andes",
+    "Americas"
+  ],
+  [
+    "Amazonian",
+    "Americas"
+  ],
+  [
+    "Brazilian",
+    "Americas"
+  ],
+  [
+    "Southern Cone",
+    "Americas"
+  ],
+  [
+    "Canadian",
+    "North America"
+  ],
+  [
+    "American",
+    "North America"
+  ],
+  [
+    "Soul Food",
+    "American"
+  ],
+  [
+    "Mexican",
+    "North America"
+  ],
+  [
+    "Mexican",
+    "Mesoamerican"
+  ],
+  [
+    "Oaxacan",
+    "Mexican"
+  ],
+  [
+    "Yucatecan",
+    "Mexican"
+  ],
+  [
+    "Veracruz",
+    "Mexican"
+  ],
+  [
+    "Guatemalan",
+    "Central America"
+  ],
+  [
+    "Guatemalan",
+    "Mesoamerican"
+  ],
+  [
+    "Salvadoran",
+    "Central America"
+  ],
+  [
+    "Honduran",
+    "Central America"
+  ],
+  [
+    "Nicaraguan",
+    "Central America"
+  ],
+  [
+    "Costa Rican",
+    "Central America"
+  ],
+  [
+    "Panamanian",
+    "Central America"
+  ],
+  [
+    "Cuban",
+    "Caribbean"
+  ],
+  [
+    "Puerto Rican",
+    "Caribbean"
+  ],
+  [
+    "Dominican",
+    "Caribbean"
+  ],
+  [
+    "Haitian",
+    "Caribbean"
+  ],
+  [
+    "Jamaican",
+    "Caribbean"
+  ],
+  [
+    "Trinidadian",
+    "Caribbean"
+  ],
+  [
+    "Barbadian",
+    "Caribbean"
+  ],
+  [
+    "Guyanese",
+    "Caribbean"
+  ],
+  [
+    "Surinamese",
+    "Caribbean"
+  ],
+  [
+    "Colombian",
+    "Andes"
+  ],
+  [
+    "Venezuelan",
+    "Andes"
+  ],
+  [
+    "Ecuadorian",
+    "Andes"
+  ],
+  [
+    "Peruvian",
+    "Andes"
+  ],
+  [
+    "Bolivian",
+    "Andes"
+  ],
+  [
+    "Bahian",
+    "Brazilian"
+  ],
+  [
+    "Mineiro",
+    "Brazilian"
+  ],
+  [
+    "Gaucho",
+    "Brazilian"
+  ],
+  [
+    "Gaucho",
+    "Southern Cone"
+  ],
+  [
+    "Argentine",
+    "Southern Cone"
+  ],
+  [
+    "Uruguayan",
+    "Southern Cone"
+  ],
+  [
+    "Paraguayan",
+    "Southern Cone"
+  ],
+  [
+    "Chilean",
+    "Southern Cone"
+  ],
+  [
+    "West Asia",
+    "Asia"
+  ],
+  [
+    "Oceania",
+    "Asia"
+  ],
+  [
+    "Levantine",
+    "West Asia"
+  ],
+  [
+    "Arabian Peninsula",
+    "West Asia"
+  ],
+  [
+    "Caucasian",
+    "West Asia"
+  ],
+  [
+    "Central Asia",
+    "Asia"
+  ],
+  [
+    "South Asia",
+    "Asia"
+  ],
+  [
+    "Himalayan",
+    "Asia"
+  ],
+  [
+    "East Asia",
+    "Asia"
+  ],
+  [
+    "Chinese",
+    "East Asia"
+  ],
+  [
+    "Japanese",
+    "East Asia"
+  ],
+  [
+    "Korean",
+    "East Asia"
+  ],
+  [
+    "Mainland Southeast Asia",
+    "Asia"
+  ],
+  [
+    "Maritime Southeast Asia",
+    "Asia"
+  ],
+  [
+    "Turkish",
+    "West Asia"
+  ],
+  [
+    "Iranian",
+    "West Asia"
+  ],
+  [
+    "Iraqi",
+    "West Asia"
+  ],
+  [
+    "Kurdish",
+    "West Asia"
+  ],
+  [
+    "Armenian",
+    "Caucasian"
+  ],
+  [
+    "Azerbaijani",
+    "Caucasian"
+  ],
+  [
+    "Georgian",
+    "Caucasian"
+  ],
+  [
+    "Syrian",
+    "Levantine"
+  ],
+  [
+    "Lebanese",
+    "Levantine"
+  ],
+  [
+    "Palestinian",
+    "Levantine"
+  ],
+  [
+    "Jordanian",
+    "Levantine"
+  ],
+  [
+    "Israeli",
+    "Levantine"
+  ],
+  [
+    "Arabian Gulf",
+    "Arabian Peninsula"
+  ],
+  [
+    "Yemeni",
+    "Arabian Peninsula"
+  ],
+  [
+    "Afghan",
+    "Central Asia"
+  ],
+  [
+    "Afghan",
+    "South Asia"
+  ],
+  [
+    "Kazakh",
+    "Central Asia"
+  ],
+  [
+    "Kyrgyz",
+    "Central Asia"
+  ],
+  [
+    "Tajik",
+    "Central Asia"
+  ],
+  [
+    "Turkmen",
+    "Central Asia"
+  ],
+  [
+    "Uzbek",
+    "Central Asia"
+  ],
+  [
+    "Uyghur",
+    "Central Asia"
+  ],
+  [
+    "Uyghur",
+    "Chinese"
+  ],
+  [
+    "Pakistani",
+    "South Asia"
+  ],
+  [
+    "Indian",
+    "South Asia"
+  ],
+  [
+    "Punjabi",
+    "Indian"
+  ],
+  [
+    "Punjabi",
+    "Pakistani"
+  ],
+  [
+    "Bengali",
+    "Indian"
+  ],
+  [
+    "Gujarati",
+    "Indian"
+  ],
+  [
+    "Rajasthani",
+    "Indian"
+  ],
+  [
+    "Kashmiri",
+    "Indian"
+  ],
+  [
+    "Kashmiri",
+    "Pakistani"
+  ],
+  [
+    "Hyderabadi",
+    "Indian"
+  ],
+  [
+    "Goan",
+    "Indian"
+  ],
+  [
+    "Maharashtrian",
+    "Indian"
+  ],
+  [
+    "Tamil",
+    "Indian"
+  ],
+  [
+    "Kerala",
+    "Indian"
+  ],
+  [
+    "Sri Lankan",
+    "South Asia"
+  ],
+  [
+    "Nepali",
+    "Himalayan"
+  ],
+  [
+    "Tibetan",
+    "Himalayan"
+  ],
+  [
+    "Bhutanese",
+    "Himalayan"
+  ],
+  [
+    "Cantonese",
+    "Chinese"
+  ],
+  [
+    "Sichuan",
+    "Chinese"
+  ],
+  [
+    "Hunan",
+    "Chinese"
+  ],
+  [
+    "Fujian",
+    "Chinese"
+  ],
+  [
+    "Jiangsu",
+    "Chinese"
+  ],
+  [
+    "Zhejiang",
+    "Chinese"
+  ],
+  [
+    "Shandong",
+    "Chinese"
+  ],
+  [
+    "Anhui",
+    "Chinese"
+  ],
+  [
+    "Taiwanese",
+    "Chinese"
+  ],
+  [
+    "Mongolian",
+    "East Asia"
+  ],
+  [
+    "Okinawan",
+    "Japanese"
+  ],
+  [
+    "Vietnamese",
+    "Mainland Southeast Asia"
+  ],
+  [
+    "Thai",
+    "Mainland Southeast Asia"
+  ],
+  [
+    "Lao",
+    "Mainland Southeast Asia"
+  ],
+  [
+    "Cambodian",
+    "Mainland Southeast Asia"
+  ],
+  [
+    "Myanmar",
+    "Mainland Southeast Asia"
+  ],
+  [
+    "Indonesian",
+    "Maritime Southeast Asia"
+  ],
+  [
+    "Malaysian",
+    "Maritime Southeast Asia"
+  ],
+  [
+    "Singaporean",
+    "Maritime Southeast Asia"
+  ],
+  [
+    "Filipino",
+    "Maritime Southeast Asia"
+  ],
+  [
+    "Bruneian",
+    "Maritime Southeast Asia"
+  ],
+  [
+    "Nordic",
+    "Europe"
+  ],
+  [
+    "Baltic",
+    "Europe"
+  ],
+  [
+    "Italian",
+    "Europe"
+  ],
+  [
+    "Eastern Europe",
+    "Europe"
+  ],
+  [
+    "Balkan",
+    "Europe"
+  ],
+  [
+    "Icelandic",
+    "Nordic"
+  ],
+  [
+    "Norwegian",
+    "Nordic"
+  ],
+  [
+    "Swedish",
+    "Nordic"
+  ],
+  [
+    "Danish",
+    "Nordic"
+  ],
+  [
+    "Finnish",
+    "Nordic"
+  ],
+  [
+    "English",
+    "Europe"
+  ],
+  [
+    "Scottish",
+    "Europe"
+  ],
+  [
+    "Welsh",
+    "Europe"
+  ],
+  [
+    "Irish",
+    "Europe"
+  ],
+  [
+    "French",
+    "Europe"
+  ],
+  [
+    "Provencal",
+    "French"
+  ],
+  [
+    "Alsatian",
+    "French"
+  ],
+  [
+    "Belgian",
+    "Europe"
+  ],
+  [
+    "Dutch",
+    "Europe"
+  ],
+  [
+    "German",
+    "Europe"
+  ],
+  [
+    "Austrian",
+    "Europe"
+  ],
+  [
+    "Swiss",
+    "Europe"
+  ],
+  [
+    "Spanish",
+    "Europe"
+  ],
+  [
+    "Catalan",
+    "Spanish"
+  ],
+  [
+    "Basque",
+    "Spanish"
+  ],
+  [
+    "Galician",
+    "Spanish"
+  ],
+  [
+    "Portuguese",
+    "Europe"
+  ],
+  [
+    "Sicilian",
+    "Italian"
+  ],
+  [
+    "Neapolitan",
+    "Italian"
+  ],
+  [
+    "Roman",
+    "Italian"
+  ],
+  [
+    "Tuscan",
+    "Italian"
+  ],
+  [
+    "Emilian",
+    "Italian"
+  ],
+  [
+    "Ligurian",
+    "Italian"
+  ],
+  [
+    "Venetian",
+    "Italian"
+  ],
+  [
+    "Piedmontese",
+    "Italian"
+  ],
+  [
+    "Sardinian",
+    "Italian"
+  ],
+  [
+    "Calabrian",
+    "Italian"
+  ],
+  [
+    "Greek",
+    "Europe"
+  ],
+  [
+    "Cypriot",
+    "Europe"
+  ],
+  [
+    "Maltese",
+    "Europe"
+  ],
+  [
+    "Polish",
+    "Europe"
+  ],
+  [
+    "Czech",
+    "Europe"
+  ],
+  [
+    "Slovak",
+    "Europe"
+  ],
+  [
+    "Hungarian",
+    "Europe"
+  ],
+  [
+    "Romanian",
+    "Eastern Europe"
+  ],
+  [
+    "Ukrainian",
+    "Eastern Europe"
+  ],
+  [
+    "Belarusian",
+    "Eastern Europe"
+  ],
+  [
+    "Russian",
+    "Eastern Europe"
+  ],
+  [
+    "Moldovan",
+    "Eastern Europe"
+  ],
+  [
+    "Bulgarian",
+    "Balkan"
+  ],
+  [
+    "Serbian",
+    "Balkan"
+  ],
+  [
+    "Croatian",
+    "Balkan"
+  ],
+  [
+    "Bosnian",
+    "Balkan"
+  ],
+  [
+    "Slovenian",
+    "Balkan"
+  ],
+  [
+    "Albanian",
+    "Balkan"
+  ],
+  [
+    "Jewish",
+    "Eastern Europe"
+  ]
+]
