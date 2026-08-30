@@ -6,7 +6,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,7 +13,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -27,7 +28,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
@@ -59,8 +62,7 @@ private data class Tab(val route: String, val label: String)
 
 private val Tabs = listOf(
     Tab("books", "Books"),
-    Tab("recipes", "Recipes"),
-    Tab("lists", "Lists"),
+    Tab("recipes", "Search"),
     Tab("discover", "Discover"),
 )
 
@@ -81,6 +83,7 @@ fun MainShell() {
     val immersive = route.startsWith("read/") || route.startsWith("read-list/") ||
         route.startsWith("discover/play")
     val snackbarHostState = remember { SnackbarHostState() }
+    var overflowExpanded by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         Feedback.messages.collect { message ->
@@ -116,8 +119,7 @@ fun MainShell() {
                         Tabs.forEach { tab ->
                             val active = route == tab.route || route.startsWith("${tab.route}/") ||
                                 (tab.route == "recipes" && route.startsWith("recipe/")) ||
-                                (tab.route == "books" && route.startsWith("read/")) ||
-                                (tab.route == "lists" && route.startsWith("read-list/"))
+                                (tab.route == "books" && route.startsWith("read/"))
                             Text(
                                 text = tab.label.uppercase(),
                                 style = MaterialTheme.typography.labelSmall.copy(fontSize = 13.sp, lineHeight = 18.sp),
@@ -145,23 +147,37 @@ fun MainShell() {
                                     .padding(horizontal = 4.dp, vertical = 16.dp),
                             )
                         }
-                    }
-                    Row(
-                        horizontalArrangement = Arrangement.End,
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(colors.bg)
-                            .padding(horizontal = 8.dp),
-                    ) {
-                        IconButton(
-                            onClick = { navController.navigate("admin") { launchSingleTop = true } },
-                        ) {
-                            Icon(
-                                Icons.Filled.Person,
-                                contentDescription = "Admin",
-                                tint = if (route == "admin") colors.clay else colors.muted,
-                            )
+                        Box(contentAlignment = Alignment.Center) {
+                            IconButton(onClick = { overflowExpanded = true }) {
+                                Icon(
+                                    Icons.Filled.MoreVert,
+                                    contentDescription = "More navigation",
+                                    tint = if (route.startsWith("lists") || route == "admin") {
+                                        colors.clay
+                                    } else {
+                                        colors.muted
+                                    },
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = overflowExpanded,
+                                onDismissRequest = { overflowExpanded = false },
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Lists") },
+                                    onClick = {
+                                        overflowExpanded = false
+                                        navController.navigate("lists") { launchSingleTop = true }
+                                    },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Configuration") },
+                                    onClick = {
+                                        overflowExpanded = false
+                                        navController.navigate("admin") { launchSingleTop = true }
+                                    },
+                                )
+                            }
                         }
                     }
                 }
