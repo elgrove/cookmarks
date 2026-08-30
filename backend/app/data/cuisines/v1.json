@@ -264,10 +264,7 @@
     {"id": "bosnian", "name": "Bosnian cuisine", "kinds": ["national"], "aliases": []},
     {"id": "slovenian", "name": "Slovenian cuisine", "kinds": ["national"], "aliases": []},
     {"id": "albanian", "name": "Albanian cuisine", "kinds": ["national"], "aliases": []},
-    {"id": "jewish", "name": "Jewish cuisines", "kinds": ["ethnocultural", "religious"], "aliases": []},
-    {"id": "romani", "name": "Romani cuisine", "kinds": ["ethnocultural"], "aliases": []},
-
-    {"id": "buddhist-temple", "name": "Buddhist temple cuisines", "kinds": ["religious"], "aliases": []}
+    {"id": "jewish", "name": "Jewish cuisines", "kinds": ["ethnocultural", "religious"], "aliases": []}
   ],
   "edges": [
     ["northern-africa", "africa"], ["maghrebi", "northern-africa"], ["nile-valley", "africa"],
@@ -333,7 +330,8 @@
     ["filipino", "maritime-southeast-asia"], ["bruneian", "maritime-southeast-asia"],
 
     ["nordic", "europe"], ["baltic", "europe"], ["italian", "europe"], ["eastern-europe", "europe"],
-    ["balkan", "europe"], ["english", "europe"], ["scottish", "europe"], ["welsh", "europe"],
+    ["balkan", "europe"], ["icelandic", "nordic"], ["norwegian", "nordic"], ["swedish", "nordic"],
+    ["danish", "nordic"], ["finnish", "nordic"], ["english", "europe"], ["scottish", "europe"], ["welsh", "europe"],
     ["irish", "europe"], ["french", "europe"], ["provencal", "french"], ["alsatian", "french"],
     ["belgian", "europe"], ["dutch", "europe"], ["german", "europe"], ["austrian", "europe"],
     ["swiss", "europe"], ["spanish", "europe"], ["catalan", "spanish"], ["basque", "spanish"],
@@ -382,9 +380,9 @@
       "country_or_territory_groups": [
         "Nordic and Baltic", "British and Irish nations", "France, Belgium and the Netherlands",
         "Spain and Portugal", "Italian regional cuisines", "Central European national cuisines",
-        "Eastern Europe", "Balkan", "Greece, Cyprus and Malta", "named ethnocultural traditions"
+        "Eastern Europe", "Balkan", "Greece, Cyprus and Malta"
       ],
-      "note": "The release does not treat political borders as the sole structure for ethnocultural or cross-border cuisines."
+      "note": "The release uses discovery edges only and does not make claims about cultural ownership or origin."
     },
     {
       "area": "Oceania",
@@ -393,14 +391,6 @@
         "Oceania"
       ],
       "note": "V1 retains Oceania only as a broad discovery label and does not model child cuisines."
-    },
-    {
-      "area": "Named ethnocultural traditions",
-      "status": "reviewed",
-      "country_or_territory_groups": [
-        "Jewish cuisines", "Romani cuisine", "Buddhist temple cuisines"
-      ],
-      "note": "These nodes are retained only where the foodway has a recognised name rather than a constructed pairing of cuisines."
     }
   ]
 }
