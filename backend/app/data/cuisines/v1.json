@@ -1,1874 +1,1643 @@
 {
   "nodes": [
     {
-      "id": "africa",
-      "name": "African cuisines"
+      "id": "Africa"
     },
     {
-      "id": "americas",
-      "name": "Cuisines of the Americas"
+      "id": "Americas"
     },
     {
-      "id": "asia",
-      "name": "Asian cuisines"
+      "id": "Asia"
     },
     {
-      "id": "europe",
-      "name": "European cuisines"
+      "id": "Europe"
     },
     {
-      "id": "oceania",
-      "name": "Oceanian cuisines"
+      "id": "Oceania"
     },
     {
-      "id": "northern-africa",
-      "name": "North African cuisines"
+      "id": "Northern Africa"
     },
     {
-      "id": "maghrebi",
-      "name": "Maghrebi cuisine"
+      "id": "Maghrebi"
     },
     {
-      "id": "nile-valley",
-      "name": "Nile Valley cuisines"
+      "id": "Nile Valley"
     },
     {
-      "id": "horn-of-africa",
-      "name": "Horn of Africa cuisines"
+      "id": "Horn of Africa"
     },
     {
-      "id": "east-africa",
-      "name": "East African cuisines"
+      "id": "East Africa"
     },
     {
-      "id": "swahili",
-      "name": "Swahili cuisine"
+      "id": "Swahili"
     },
     {
-      "id": "great-lakes-africa",
-      "name": "Great Lakes African cuisines"
+      "id": "Great Lakes Africa"
     },
     {
-      "id": "central-africa",
-      "name": "Central African cuisines"
+      "id": "Central Africa"
     },
     {
-      "id": "sahel",
-      "name": "Sahelian cuisines"
+      "id": "Sahel"
     },
     {
-      "id": "west-africa",
-      "name": "West African cuisines"
+      "id": "West Africa"
     },
     {
-      "id": "southern-africa",
-      "name": "Southern African cuisines"
+      "id": "Southern Africa"
     },
     {
-      "id": "indian-ocean-africa",
-      "name": "Indian Ocean African cuisines"
+      "id": "Indian Ocean Africa"
     },
     {
-      "id": "indigenous-north-american",
-      "name": "Indigenous North American cuisines"
+      "id": "Indigenous North American"
     },
     {
-      "id": "north-america",
-      "name": "North American cuisines"
+      "id": "North America"
     },
     {
-      "id": "mesoamerican",
-      "name": "Mesoamerican cuisine"
+      "id": "Mesoamerican"
     },
     {
-      "id": "central-america",
-      "name": "Central American cuisines"
+      "id": "Central America"
     },
     {
-      "id": "caribbean",
-      "name": "Caribbean cuisines"
+      "id": "Caribbean"
     },
     {
-      "id": "andes",
-      "name": "Andean cuisines"
+      "id": "Andes"
     },
     {
-      "id": "amazonian",
-      "name": "Amazonian cuisines"
+      "id": "Amazonian"
     },
     {
-      "id": "southern-cone",
-      "name": "Southern Cone cuisines"
+      "id": "Southern Cone"
     },
     {
-      "id": "west-asia",
-      "name": "West Asian cuisines"
+      "id": "West Asia"
     },
     {
-      "id": "levantine",
-      "name": "Levantine cuisine"
+      "id": "Levantine"
     },
     {
-      "id": "arabian-peninsula",
-      "name": "Arabian Peninsula cuisines"
+      "id": "Arabian Peninsula"
     },
     {
-      "id": "caucasian",
-      "name": "Caucasian cuisines"
+      "id": "Caucasian"
     },
     {
-      "id": "central-asia",
-      "name": "Central Asian cuisines"
+      "id": "Central Asia"
     },
     {
-      "id": "south-asia",
-      "name": "South Asian cuisines"
+      "id": "South Asia"
     },
     {
-      "id": "himalayan",
-      "name": "Himalayan cuisines"
+      "id": "Himalayan"
     },
     {
-      "id": "east-asia",
-      "name": "East Asian cuisines"
+      "id": "East Asia"
     },
     {
-      "id": "chinese",
-      "name": "Chinese cuisine"
+      "id": "Chinese"
     },
     {
-      "id": "japanese",
-      "name": "Japanese cuisine"
+      "id": "Japanese"
     },
     {
-      "id": "korean",
-      "name": "Korean cuisine"
+      "id": "Korean"
     },
     {
-      "id": "mainland-southeast-asia",
-      "name": "Mainland Southeast Asian cuisines"
+      "id": "Mainland Southeast Asia"
     },
     {
-      "id": "maritime-southeast-asia",
-      "name": "Maritime Southeast Asian cuisines"
+      "id": "Maritime Southeast Asia"
     },
     {
-      "id": "nordic",
-      "name": "Nordic cuisines"
+      "id": "Nordic"
     },
     {
-      "id": "baltic",
-      "name": "Baltic cuisines"
+      "id": "Baltic"
     },
     {
-      "id": "eastern-europe",
-      "name": "Eastern European cuisines"
+      "id": "Eastern Europe"
     },
     {
-      "id": "balkan",
-      "name": "Balkan cuisines"
+      "id": "Balkan"
     },
     {
-      "id": "algerian",
-      "name": "Algerian cuisine"
+      "id": "Algerian"
     },
     {
-      "id": "egyptian",
-      "name": "Egyptian cuisine"
+      "id": "Egyptian"
     },
     {
-      "id": "libyan",
-      "name": "Libyan cuisine"
+      "id": "Libyan"
     },
     {
-      "id": "moroccan",
-      "name": "Moroccan cuisine"
+      "id": "Moroccan"
     },
     {
-      "id": "tunisian",
-      "name": "Tunisian cuisine"
+      "id": "Tunisian"
     },
     {
-      "id": "sudanese",
-      "name": "Sudanese cuisine"
+      "id": "Sudanese"
     },
     {
-      "id": "ethiopian",
-      "name": "Ethiopian cuisine"
+      "id": "Ethiopian"
     },
     {
-      "id": "eritrean",
-      "name": "Eritrean cuisine"
+      "id": "Eritrean"
     },
     {
-      "id": "somali",
-      "name": "Somali cuisine"
+      "id": "Somali"
     },
     {
-      "id": "kenyan",
-      "name": "Kenyan cuisine"
+      "id": "Kenyan"
     },
     {
-      "id": "tanzanian",
-      "name": "Tanzanian cuisine"
+      "id": "Tanzanian"
     },
     {
-      "id": "ugandan",
-      "name": "Ugandan cuisine"
+      "id": "Ugandan"
     },
     {
-      "id": "rwandan",
-      "name": "Rwandan cuisine"
+      "id": "Rwandan"
     },
     {
-      "id": "burundian",
-      "name": "Burundian cuisine"
+      "id": "Burundian"
     },
     {
-      "id": "zanzibari",
-      "name": "Zanzibari cuisine"
+      "id": "Zanzibari"
     },
     {
-      "id": "angolan",
-      "name": "Angolan cuisine"
+      "id": "Angolan"
     },
     {
-      "id": "cameroonian",
-      "name": "Cameroonian cuisine"
+      "id": "Cameroonian"
     },
     {
-      "id": "congolese",
-      "name": "Congolese cuisine"
+      "id": "Congolese"
     },
     {
-      "id": "gabonese",
-      "name": "Gabonese cuisine"
+      "id": "Gabonese"
     },
     {
-      "id": "chadian",
-      "name": "Chadian cuisine"
+      "id": "Chadian"
     },
     {
-      "id": "beninese",
-      "name": "Beninese cuisine"
+      "id": "Beninese"
     },
     {
-      "id": "burkinabe",
-      "name": "Burkinabé cuisine"
+      "id": "Burkinabe"
     },
     {
-      "id": "cape-verdean",
-      "name": "Cape Verdean cuisine"
+      "id": "Cape Verdean"
     },
     {
-      "id": "ghanaian",
-      "name": "Ghanaian cuisine"
+      "id": "Ghanaian"
     },
     {
-      "id": "guinean",
-      "name": "Guinean cuisine"
+      "id": "Guinean"
     },
     {
-      "id": "ivorian",
-      "name": "Ivorian cuisine"
+      "id": "Ivorian"
     },
     {
-      "id": "liberian",
-      "name": "Liberian cuisine"
+      "id": "Liberian"
     },
     {
-      "id": "malian",
-      "name": "Malian cuisine"
+      "id": "Malian"
     },
     {
-      "id": "nigerian",
-      "name": "Nigerian cuisine"
+      "id": "Nigerian"
     },
     {
-      "id": "senegalese",
-      "name": "Senegalese cuisine"
+      "id": "Senegalese"
     },
     {
-      "id": "sierra-leonean",
-      "name": "Sierra Leonean cuisine"
+      "id": "Sierra Leonean"
     },
     {
-      "id": "togolese",
-      "name": "Togolese cuisine"
+      "id": "Togolese"
     },
     {
-      "id": "yoruba",
-      "name": "Yoruba cuisine"
+      "id": "Yoruba"
     },
     {
-      "id": "igbo",
-      "name": "Igbo cuisine"
+      "id": "Igbo"
     },
     {
-      "id": "hausa",
-      "name": "Hausa cuisine"
+      "id": "Hausa"
     },
     {
-      "id": "south-african",
-      "name": "South African cuisine"
+      "id": "South African"
     },
     {
-      "id": "cape-malay",
-      "name": "Cape Malay cuisine"
+      "id": "Cape Malay"
     },
     {
-      "id": "botswanan",
-      "name": "Botswanan cuisine"
+      "id": "Botswanan"
     },
     {
-      "id": "lesotho",
-      "name": "Cuisine of Lesotho"
+      "id": "Lesotho"
     },
     {
-      "id": "namibian",
-      "name": "Namibian cuisine"
+      "id": "Namibian"
     },
     {
-      "id": "zimbabwean",
-      "name": "Zimbabwean cuisine"
+      "id": "Zimbabwean"
     },
     {
-      "id": "malagasy",
-      "name": "Malagasy cuisine"
+      "id": "Malagasy"
     },
     {
-      "id": "mauritian",
-      "name": "Mauritian cuisine"
+      "id": "Mauritian"
     },
     {
-      "id": "seychellois",
-      "name": "Seychellois cuisine"
+      "id": "Seychellois"
     },
     {
-      "id": "canadian",
-      "name": "Canadian cuisine"
+      "id": "Canadian"
     },
     {
-      "id": "american",
-      "name": "United States cuisine"
+      "id": "American"
     },
     {
-      "id": "soul-food",
-      "name": "Soul food"
+      "id": "Soul Food"
     },
     {
-      "id": "mexican",
-      "name": "Mexican cuisine"
+      "id": "Mexican"
     },
     {
-      "id": "oaxacan",
-      "name": "Oaxacan cuisine"
+      "id": "Oaxacan"
     },
     {
-      "id": "yucatecan",
-      "name": "Yucatecan cuisine"
+      "id": "Yucatecan"
     },
     {
-      "id": "veracruz",
-      "name": "Veracruz cuisine"
+      "id": "Veracruz"
     },
     {
-      "id": "guatemalan",
-      "name": "Guatemalan cuisine"
+      "id": "Guatemalan"
     },
     {
-      "id": "salvadoran",
-      "name": "Salvadoran cuisine"
+      "id": "Salvadoran"
     },
     {
-      "id": "honduran",
-      "name": "Honduran cuisine"
+      "id": "Honduran"
     },
     {
-      "id": "nicaraguan",
-      "name": "Nicaraguan cuisine"
+      "id": "Nicaraguan"
     },
     {
-      "id": "costa-rican",
-      "name": "Costa Rican cuisine"
+      "id": "Costa Rican"
     },
     {
-      "id": "panamanian",
-      "name": "Panamanian cuisine"
+      "id": "Panamanian"
     },
     {
-      "id": "cuban",
-      "name": "Cuban cuisine"
+      "id": "Cuban"
     },
     {
-      "id": "puerto-rican",
-      "name": "Puerto Rican cuisine"
+      "id": "Puerto Rican"
     },
     {
-      "id": "dominican",
-      "name": "Dominican cuisine"
+      "id": "Dominican"
     },
     {
-      "id": "haitian",
-      "name": "Haitian cuisine"
+      "id": "Haitian"
     },
     {
-      "id": "jamaican",
-      "name": "Jamaican cuisine"
+      "id": "Jamaican"
     },
     {
-      "id": "trinidadian",
-      "name": "Trinidadian and Tobagonian cuisine"
+      "id": "Trinidadian"
     },
     {
-      "id": "barbadian",
-      "name": "Barbadian cuisine"
+      "id": "Barbadian"
     },
     {
-      "id": "guyanese",
-      "name": "Guyanese cuisine"
+      "id": "Guyanese"
     },
     {
-      "id": "surinamese",
-      "name": "Surinamese cuisine"
+      "id": "Surinamese"
     },
     {
-      "id": "colombian",
-      "name": "Colombian cuisine"
+      "id": "Colombian"
     },
     {
-      "id": "venezuelan",
-      "name": "Venezuelan cuisine"
+      "id": "Venezuelan"
     },
     {
-      "id": "ecuadorian",
-      "name": "Ecuadorian cuisine"
+      "id": "Ecuadorian"
     },
     {
-      "id": "peruvian",
-      "name": "Peruvian cuisine"
+      "id": "Peruvian"
     },
     {
-      "id": "bolivian",
-      "name": "Bolivian cuisine"
+      "id": "Bolivian"
     },
     {
-      "id": "chilean",
-      "name": "Chilean cuisine"
+      "id": "Chilean"
     },
     {
-      "id": "brazilian",
-      "name": "Brazilian cuisine"
+      "id": "Brazilian"
     },
     {
-      "id": "bahian",
-      "name": "Bahian cuisine"
+      "id": "Bahian"
     },
     {
-      "id": "mineiro",
-      "name": "Mineiro cuisine"
+      "id": "Mineiro"
     },
     {
-      "id": "gaucho",
-      "name": "Gaúcho cuisine"
+      "id": "Gaucho"
     },
     {
-      "id": "argentine",
-      "name": "Argentine cuisine"
+      "id": "Argentine"
     },
     {
-      "id": "uruguayan",
-      "name": "Uruguayan cuisine"
+      "id": "Uruguayan"
     },
     {
-      "id": "paraguayan",
-      "name": "Paraguayan cuisine"
+      "id": "Paraguayan"
     },
     {
-      "id": "turkish",
-      "name": "Turkish cuisine"
+      "id": "Turkish"
     },
     {
-      "id": "iranian",
-      "name": "Iranian cuisine"
+      "id": "Iranian"
     },
     {
-      "id": "iraqi",
-      "name": "Iraqi cuisine"
+      "id": "Iraqi"
     },
     {
-      "id": "kurdish",
-      "name": "Kurdish cuisine"
+      "id": "Kurdish"
     },
     {
-      "id": "armenian",
-      "name": "Armenian cuisine"
+      "id": "Armenian"
     },
     {
-      "id": "azerbaijani",
-      "name": "Azerbaijani cuisine"
+      "id": "Azerbaijani"
     },
     {
-      "id": "georgian",
-      "name": "Georgian cuisine"
+      "id": "Georgian"
     },
     {
-      "id": "syrian",
-      "name": "Syrian cuisine"
+      "id": "Syrian"
     },
     {
-      "id": "lebanese",
-      "name": "Lebanese cuisine"
+      "id": "Lebanese"
     },
     {
-      "id": "palestinian",
-      "name": "Palestinian cuisine"
+      "id": "Palestinian"
     },
     {
-      "id": "jordanian",
-      "name": "Jordanian cuisine"
+      "id": "Jordanian"
     },
     {
-      "id": "israeli",
-      "name": "Israeli cuisine"
+      "id": "Israeli"
     },
     {
-      "id": "arabian-gulf",
-      "name": "Arabian Gulf cuisine"
+      "id": "Arabian Gulf"
     },
     {
-      "id": "yemeni",
-      "name": "Yemeni cuisine"
+      "id": "Yemeni"
     },
     {
-      "id": "afghan",
-      "name": "Afghan cuisine"
+      "id": "Afghan"
     },
     {
-      "id": "kazakh",
-      "name": "Kazakh cuisine"
+      "id": "Kazakh"
     },
     {
-      "id": "kyrgyz",
-      "name": "Kyrgyz cuisine"
+      "id": "Kyrgyz"
     },
     {
-      "id": "tajik",
-      "name": "Tajik cuisine"
+      "id": "Tajik"
     },
     {
-      "id": "turkmen",
-      "name": "Turkmen cuisine"
+      "id": "Turkmen"
     },
     {
-      "id": "uzbek",
-      "name": "Uzbek cuisine"
+      "id": "Uzbek"
     },
     {
-      "id": "uyghur",
-      "name": "Uyghur cuisine"
+      "id": "Uyghur"
     },
     {
-      "id": "pakistani",
-      "name": "Pakistani cuisine"
+      "id": "Pakistani"
     },
     {
-      "id": "indian",
-      "name": "Indian cuisine"
+      "id": "Indian"
     },
     {
-      "id": "punjabi",
-      "name": "Punjabi cuisine"
+      "id": "Punjabi"
     },
     {
-      "id": "bengali",
-      "name": "Bengali cuisine"
+      "id": "Bengali"
     },
     {
-      "id": "gujarati",
-      "name": "Gujarati cuisine"
+      "id": "Gujarati"
     },
     {
-      "id": "rajasthani",
-      "name": "Rajasthani cuisine"
+      "id": "Rajasthani"
     },
     {
-      "id": "kashmiri",
-      "name": "Kashmiri cuisine"
+      "id": "Kashmiri"
     },
     {
-      "id": "hyderabadi",
-      "name": "Hyderabadi cuisine"
+      "id": "Hyderabadi"
     },
     {
-      "id": "goan",
-      "name": "Goan cuisine"
+      "id": "Goan"
     },
     {
-      "id": "maharashtrian",
-      "name": "Maharashtrian cuisine"
+      "id": "Maharashtrian"
     },
     {
-      "id": "tamil",
-      "name": "Tamil cuisine"
+      "id": "Tamil"
     },
     {
-      "id": "kerala",
-      "name": "Kerala cuisine"
+      "id": "Kerala"
     },
     {
-      "id": "sri-lankan",
-      "name": "Sri Lankan cuisine"
+      "id": "Sri Lankan"
     },
     {
-      "id": "nepali",
-      "name": "Nepali cuisine"
+      "id": "Nepali"
     },
     {
-      "id": "tibetan",
-      "name": "Tibetan cuisine"
+      "id": "Tibetan"
     },
     {
-      "id": "bhutanese",
-      "name": "Bhutanese cuisine"
+      "id": "Bhutanese"
     },
     {
-      "id": "cantonese",
-      "name": "Cantonese cuisine"
+      "id": "Cantonese"
     },
     {
-      "id": "sichuan",
-      "name": "Sichuan cuisine"
+      "id": "Sichuan"
     },
     {
-      "id": "hunan",
-      "name": "Hunan cuisine"
+      "id": "Hunan"
     },
     {
-      "id": "fujian",
-      "name": "Fujian cuisine"
+      "id": "Fujian"
     },
     {
-      "id": "jiangsu",
-      "name": "Jiangsu cuisine"
+      "id": "Jiangsu"
     },
     {
-      "id": "zhejiang",
-      "name": "Zhejiang cuisine"
+      "id": "Zhejiang"
     },
     {
-      "id": "shandong",
-      "name": "Shandong cuisine"
+      "id": "Shandong"
     },
     {
-      "id": "anhui",
-      "name": "Anhui cuisine"
+      "id": "Anhui"
     },
     {
-      "id": "taiwanese",
-      "name": "Taiwanese cuisine"
+      "id": "Taiwanese"
     },
     {
-      "id": "mongolian",
-      "name": "Mongolian cuisine"
+      "id": "Mongolian"
     },
     {
-      "id": "okinawan",
-      "name": "Okinawan cuisine"
+      "id": "Okinawan"
     },
     {
-      "id": "vietnamese",
-      "name": "Vietnamese cuisine"
+      "id": "Vietnamese"
     },
     {
-      "id": "thai",
-      "name": "Thai cuisine"
+      "id": "Thai"
     },
     {
-      "id": "lao",
-      "name": "Lao cuisine"
+      "id": "Lao"
     },
     {
-      "id": "cambodian",
-      "name": "Cambodian cuisine"
+      "id": "Cambodian"
     },
     {
-      "id": "myanmar",
-      "name": "Myanmar cuisine"
+      "id": "Myanmar"
     },
     {
-      "id": "indonesian",
-      "name": "Indonesian cuisine"
+      "id": "Indonesian"
     },
     {
-      "id": "malaysian",
-      "name": "Malaysian cuisine"
+      "id": "Malaysian"
     },
     {
-      "id": "singaporean",
-      "name": "Singaporean cuisine"
+      "id": "Singaporean"
     },
     {
-      "id": "filipino",
-      "name": "Filipino cuisine"
+      "id": "Filipino"
     },
     {
-      "id": "bruneian",
-      "name": "Bruneian cuisine"
+      "id": "Bruneian"
     },
     {
-      "id": "icelandic",
-      "name": "Icelandic cuisine"
+      "id": "Icelandic"
     },
     {
-      "id": "norwegian",
-      "name": "Norwegian cuisine"
+      "id": "Norwegian"
     },
     {
-      "id": "swedish",
-      "name": "Swedish cuisine"
+      "id": "Swedish"
     },
     {
-      "id": "danish",
-      "name": "Danish cuisine"
+      "id": "Danish"
     },
     {
-      "id": "finnish",
-      "name": "Finnish cuisine"
+      "id": "Finnish"
     },
     {
-      "id": "english",
-      "name": "English cuisine"
+      "id": "English"
     },
     {
-      "id": "scottish",
-      "name": "Scottish cuisine"
+      "id": "Scottish"
     },
     {
-      "id": "welsh",
-      "name": "Welsh cuisine"
+      "id": "Welsh"
     },
     {
-      "id": "irish",
-      "name": "Irish cuisine"
+      "id": "Irish"
     },
     {
-      "id": "french",
-      "name": "French cuisine"
+      "id": "French"
     },
     {
-      "id": "provencal",
-      "name": "Provençal cuisine"
+      "id": "Provencal"
     },
     {
-      "id": "alsatian",
-      "name": "Alsatian cuisine"
+      "id": "Alsatian"
     },
     {
-      "id": "belgian",
-      "name": "Belgian cuisine"
+      "id": "Belgian"
     },
     {
-      "id": "dutch",
-      "name": "Dutch cuisine"
+      "id": "Dutch"
     },
     {
-      "id": "german",
-      "name": "German cuisine"
+      "id": "German"
     },
     {
-      "id": "austrian",
-      "name": "Austrian cuisine"
+      "id": "Austrian"
     },
     {
-      "id": "swiss",
-      "name": "Swiss cuisine"
+      "id": "Swiss"
     },
     {
-      "id": "spanish",
-      "name": "Spanish cuisine"
+      "id": "Spanish"
     },
     {
-      "id": "catalan",
-      "name": "Catalan cuisine"
+      "id": "Catalan"
     },
     {
-      "id": "basque",
-      "name": "Basque cuisine"
+      "id": "Basque"
     },
     {
-      "id": "galician",
-      "name": "Galician cuisine"
+      "id": "Galician"
     },
     {
-      "id": "portuguese",
-      "name": "Portuguese cuisine"
+      "id": "Portuguese"
     },
     {
-      "id": "italian",
-      "name": "Italian cuisine"
+      "id": "Italian"
     },
     {
-      "id": "sicilian",
-      "name": "Sicilian cuisine"
+      "id": "Sicilian"
     },
     {
-      "id": "neapolitan",
-      "name": "Neapolitan cuisine"
+      "id": "Neapolitan"
     },
     {
-      "id": "roman",
-      "name": "Roman cuisine"
+      "id": "Roman"
     },
     {
-      "id": "tuscan",
-      "name": "Tuscan cuisine"
+      "id": "Tuscan"
     },
     {
-      "id": "emilian",
-      "name": "Emilian cuisine"
+      "id": "Emilian"
     },
     {
-      "id": "ligurian",
-      "name": "Ligurian cuisine"
+      "id": "Ligurian"
     },
     {
-      "id": "venetian",
-      "name": "Venetian cuisine"
+      "id": "Venetian"
     },
     {
-      "id": "piedmontese",
-      "name": "Piedmontese cuisine"
+      "id": "Piedmontese"
     },
     {
-      "id": "sardinian",
-      "name": "Sardinian cuisine"
+      "id": "Sardinian"
     },
     {
-      "id": "calabrian",
-      "name": "Calabrian cuisine"
+      "id": "Calabrian"
     },
     {
-      "id": "greek",
-      "name": "Greek cuisine"
+      "id": "Greek"
     },
     {
-      "id": "cypriot",
-      "name": "Cypriot cuisine"
+      "id": "Cypriot"
     },
     {
-      "id": "maltese",
-      "name": "Maltese cuisine"
+      "id": "Maltese"
     },
     {
-      "id": "polish",
-      "name": "Polish cuisine"
+      "id": "Polish"
     },
     {
-      "id": "czech",
-      "name": "Czech cuisine"
+      "id": "Czech"
     },
     {
-      "id": "slovak",
-      "name": "Slovak cuisine"
+      "id": "Slovak"
     },
     {
-      "id": "hungarian",
-      "name": "Hungarian cuisine"
+      "id": "Hungarian"
     },
     {
-      "id": "romanian",
-      "name": "Romanian cuisine"
+      "id": "Romanian"
     },
     {
-      "id": "ukrainian",
-      "name": "Ukrainian cuisine"
+      "id": "Ukrainian"
     },
     {
-      "id": "belarusian",
-      "name": "Belarusian cuisine"
+      "id": "Belarusian"
     },
     {
-      "id": "russian",
-      "name": "Russian cuisine"
+      "id": "Russian"
     },
     {
-      "id": "moldovan",
-      "name": "Moldovan cuisine"
+      "id": "Moldovan"
     },
     {
-      "id": "bulgarian",
-      "name": "Bulgarian cuisine"
+      "id": "Bulgarian"
     },
     {
-      "id": "serbian",
-      "name": "Serbian cuisine"
+      "id": "Serbian"
     },
     {
-      "id": "croatian",
-      "name": "Croatian cuisine"
+      "id": "Croatian"
     },
     {
-      "id": "bosnian",
-      "name": "Bosnian cuisine"
+      "id": "Bosnian"
     },
     {
-      "id": "slovenian",
-      "name": "Slovenian cuisine"
+      "id": "Slovenian"
     },
     {
-      "id": "albanian",
-      "name": "Albanian cuisine"
+      "id": "Albanian"
     },
     {
-      "id": "jewish",
-      "name": "Jewish cuisines"
+      "id": "Jewish"
     }
   ],
   "edges": [
     [
-      "northern-africa",
-      "africa"
+      "Northern Africa",
+      "Africa"
     ],
     [
-      "maghrebi",
-      "northern-africa"
+      "Maghrebi",
+      "Northern Africa"
     ],
     [
-      "nile-valley",
-      "africa"
+      "Nile Valley",
+      "Africa"
     ],
     [
-      "horn-of-africa",
-      "africa"
+      "Horn of Africa",
+      "Africa"
     ],
     [
-      "east-africa",
-      "africa"
+      "East Africa",
+      "Africa"
     ],
     [
-      "swahili",
-      "africa"
+      "Swahili",
+      "Africa"
     ],
     [
-      "great-lakes-africa",
-      "africa"
+      "Great Lakes Africa",
+      "Africa"
     ],
     [
-      "central-africa",
-      "africa"
+      "Central Africa",
+      "Africa"
     ],
     [
-      "sahel",
-      "africa"
+      "Sahel",
+      "Africa"
     ],
     [
-      "west-africa",
-      "africa"
+      "West Africa",
+      "Africa"
     ],
     [
-      "southern-africa",
-      "africa"
+      "Southern Africa",
+      "Africa"
     ],
     [
-      "indian-ocean-africa",
-      "africa"
+      "Indian Ocean Africa",
+      "Africa"
     ],
     [
-      "algerian",
-      "maghrebi"
+      "Algerian",
+      "Maghrebi"
     ],
     [
-      "libyan",
-      "maghrebi"
+      "Libyan",
+      "Maghrebi"
     ],
     [
-      "moroccan",
-      "maghrebi"
+      "Moroccan",
+      "Maghrebi"
     ],
     [
-      "tunisian",
-      "maghrebi"
+      "Tunisian",
+      "Maghrebi"
     ],
     [
-      "egyptian",
-      "nile-valley"
+      "Egyptian",
+      "Nile Valley"
     ],
     [
-      "sudanese",
-      "nile-valley"
+      "Sudanese",
+      "Nile Valley"
     ],
     [
-      "ethiopian",
-      "horn-of-africa"
+      "Ethiopian",
+      "Horn of Africa"
     ],
     [
-      "eritrean",
-      "horn-of-africa"
+      "Eritrean",
+      "Horn of Africa"
     ],
     [
-      "somali",
-      "horn-of-africa"
+      "Somali",
+      "Horn of Africa"
     ],
     [
-      "kenyan",
-      "east-africa"
+      "Kenyan",
+      "East Africa"
     ],
     [
-      "tanzanian",
-      "east-africa"
+      "Tanzanian",
+      "East Africa"
     ],
     [
-      "ugandan",
-      "great-lakes-africa"
+      "Ugandan",
+      "Great Lakes Africa"
     ],
     [
-      "rwandan",
-      "great-lakes-africa"
+      "Rwandan",
+      "Great Lakes Africa"
     ],
     [
-      "burundian",
-      "great-lakes-africa"
+      "Burundian",
+      "Great Lakes Africa"
     ],
     [
-      "zanzibari",
-      "swahili"
+      "Zanzibari",
+      "Swahili"
     ],
     [
-      "tanzanian",
-      "swahili"
+      "Tanzanian",
+      "Swahili"
     ],
     [
-      "angolan",
-      "central-africa"
+      "Angolan",
+      "Central Africa"
     ],
     [
-      "cameroonian",
-      "central-africa"
+      "Cameroonian",
+      "Central Africa"
     ],
     [
-      "congolese",
-      "central-africa"
+      "Congolese",
+      "Central Africa"
     ],
     [
-      "gabonese",
-      "central-africa"
+      "Gabonese",
+      "Central Africa"
     ],
     [
-      "chadian",
-      "sahel"
+      "Chadian",
+      "Sahel"
     ],
     [
-      "beninese",
-      "west-africa"
+      "Beninese",
+      "West Africa"
     ],
     [
-      "burkinabe",
-      "sahel"
+      "Burkinabe",
+      "Sahel"
     ],
     [
-      "cape-verdean",
-      "west-africa"
+      "Cape Verdean",
+      "West Africa"
     ],
     [
-      "ghanaian",
-      "west-africa"
+      "Ghanaian",
+      "West Africa"
     ],
     [
-      "guinean",
-      "west-africa"
+      "Guinean",
+      "West Africa"
     ],
     [
-      "ivorian",
-      "west-africa"
+      "Ivorian",
+      "West Africa"
     ],
     [
-      "liberian",
-      "west-africa"
+      "Liberian",
+      "West Africa"
     ],
     [
-      "malian",
-      "sahel"
+      "Malian",
+      "Sahel"
     ],
     [
-      "nigerian",
-      "west-africa"
+      "Nigerian",
+      "West Africa"
     ],
     [
-      "senegalese",
-      "west-africa"
+      "Senegalese",
+      "West Africa"
     ],
     [
-      "sierra-leonean",
-      "west-africa"
+      "Sierra Leonean",
+      "West Africa"
     ],
     [
-      "togolese",
-      "west-africa"
+      "Togolese",
+      "West Africa"
     ],
     [
-      "yoruba",
-      "nigerian"
+      "Yoruba",
+      "Nigerian"
     ],
     [
-      "igbo",
-      "nigerian"
+      "Igbo",
+      "Nigerian"
     ],
     [
-      "hausa",
-      "nigerian"
+      "Hausa",
+      "Nigerian"
     ],
     [
-      "hausa",
-      "sahel"
+      "Hausa",
+      "Sahel"
     ],
     [
-      "south-african",
-      "southern-africa"
+      "South African",
+      "Southern Africa"
     ],
     [
-      "cape-malay",
-      "south-african"
+      "Cape Malay",
+      "South African"
     ],
     [
-      "botswanan",
-      "southern-africa"
+      "Botswanan",
+      "Southern Africa"
     ],
     [
-      "lesotho",
-      "southern-africa"
+      "Lesotho",
+      "Southern Africa"
     ],
     [
-      "namibian",
-      "southern-africa"
+      "Namibian",
+      "Southern Africa"
     ],
     [
-      "zimbabwean",
-      "southern-africa"
+      "Zimbabwean",
+      "Southern Africa"
     ],
     [
-      "malagasy",
-      "indian-ocean-africa"
+      "Malagasy",
+      "Indian Ocean Africa"
     ],
     [
-      "mauritian",
-      "indian-ocean-africa"
+      "Mauritian",
+      "Indian Ocean Africa"
     ],
     [
-      "seychellois",
-      "indian-ocean-africa"
+      "Seychellois",
+      "Indian Ocean Africa"
     ],
     [
-      "indigenous-north-american",
-      "americas"
+      "Indigenous North American",
+      "Americas"
     ],
     [
-      "north-america",
-      "americas"
+      "North America",
+      "Americas"
     ],
     [
-      "mesoamerican",
-      "americas"
+      "Mesoamerican",
+      "Americas"
     ],
     [
-      "central-america",
-      "americas"
+      "Central America",
+      "Americas"
     ],
     [
-      "caribbean",
-      "americas"
+      "Caribbean",
+      "Americas"
     ],
     [
-      "andes",
-      "americas"
+      "Andes",
+      "Americas"
     ],
     [
-      "amazonian",
-      "americas"
+      "Amazonian",
+      "Americas"
     ],
     [
-      "brazilian",
-      "americas"
+      "Brazilian",
+      "Americas"
     ],
     [
-      "southern-cone",
-      "americas"
+      "Southern Cone",
+      "Americas"
     ],
     [
-      "canadian",
-      "north-america"
+      "Canadian",
+      "North America"
     ],
     [
-      "american",
-      "north-america"
+      "American",
+      "North America"
     ],
     [
-      "soul-food",
-      "american"
+      "Soul Food",
+      "American"
     ],
     [
-      "mexican",
-      "north-america"
+      "Mexican",
+      "North America"
     ],
     [
-      "mexican",
-      "mesoamerican"
+      "Mexican",
+      "Mesoamerican"
     ],
     [
-      "oaxacan",
-      "mexican"
+      "Oaxacan",
+      "Mexican"
     ],
     [
-      "yucatecan",
-      "mexican"
+      "Yucatecan",
+      "Mexican"
     ],
     [
-      "veracruz",
-      "mexican"
+      "Veracruz",
+      "Mexican"
     ],
     [
-      "guatemalan",
-      "central-america"
+      "Guatemalan",
+      "Central America"
     ],
     [
-      "guatemalan",
-      "mesoamerican"
+      "Guatemalan",
+      "Mesoamerican"
     ],
     [
-      "salvadoran",
-      "central-america"
+      "Salvadoran",
+      "Central America"
     ],
     [
-      "honduran",
-      "central-america"
+      "Honduran",
+      "Central America"
     ],
     [
-      "nicaraguan",
-      "central-america"
+      "Nicaraguan",
+      "Central America"
     ],
     [
-      "costa-rican",
-      "central-america"
+      "Costa Rican",
+      "Central America"
     ],
     [
-      "panamanian",
-      "central-america"
+      "Panamanian",
+      "Central America"
     ],
     [
-      "cuban",
-      "caribbean"
+      "Cuban",
+      "Caribbean"
     ],
     [
-      "puerto-rican",
-      "caribbean"
+      "Puerto Rican",
+      "Caribbean"
     ],
     [
-      "dominican",
-      "caribbean"
+      "Dominican",
+      "Caribbean"
     ],
     [
-      "haitian",
-      "caribbean"
+      "Haitian",
+      "Caribbean"
     ],
     [
-      "jamaican",
-      "caribbean"
+      "Jamaican",
+      "Caribbean"
     ],
     [
-      "trinidadian",
-      "caribbean"
+      "Trinidadian",
+      "Caribbean"
     ],
     [
-      "barbadian",
-      "caribbean"
+      "Barbadian",
+      "Caribbean"
     ],
     [
-      "guyanese",
-      "caribbean"
+      "Guyanese",
+      "Caribbean"
     ],
     [
-      "surinamese",
-      "caribbean"
+      "Surinamese",
+      "Caribbean"
     ],
     [
-      "colombian",
-      "andes"
+      "Colombian",
+      "Andes"
     ],
     [
-      "venezuelan",
-      "andes"
+      "Venezuelan",
+      "Andes"
     ],
     [
-      "ecuadorian",
-      "andes"
+      "Ecuadorian",
+      "Andes"
     ],
     [
-      "peruvian",
-      "andes"
+      "Peruvian",
+      "Andes"
     ],
     [
-      "bolivian",
-      "andes"
+      "Bolivian",
+      "Andes"
     ],
     [
-      "bahian",
-      "brazilian"
+      "Bahian",
+      "Brazilian"
     ],
     [
-      "mineiro",
-      "brazilian"
+      "Mineiro",
+      "Brazilian"
     ],
     [
-      "gaucho",
-      "brazilian"
+      "Gaucho",
+      "Brazilian"
     ],
     [
-      "gaucho",
-      "southern-cone"
+      "Gaucho",
+      "Southern Cone"
     ],
     [
-      "argentine",
-      "southern-cone"
+      "Argentine",
+      "Southern Cone"
     ],
     [
-      "uruguayan",
-      "southern-cone"
+      "Uruguayan",
+      "Southern Cone"
     ],
     [
-      "paraguayan",
-      "southern-cone"
+      "Paraguayan",
+      "Southern Cone"
     ],
     [
-      "chilean",
-      "southern-cone"
+      "Chilean",
+      "Southern Cone"
     ],
     [
-      "west-asia",
-      "asia"
+      "West Asia",
+      "Asia"
     ],
     [
-      "oceania",
-      "asia"
+      "Oceania",
+      "Asia"
     ],
     [
-      "levantine",
-      "west-asia"
+      "Levantine",
+      "West Asia"
     ],
     [
-      "arabian-peninsula",
-      "west-asia"
+      "Arabian Peninsula",
+      "West Asia"
     ],
     [
-      "caucasian",
-      "west-asia"
+      "Caucasian",
+      "West Asia"
     ],
     [
-      "central-asia",
-      "asia"
+      "Central Asia",
+      "Asia"
     ],
     [
-      "south-asia",
-      "asia"
+      "South Asia",
+      "Asia"
     ],
     [
-      "himalayan",
-      "asia"
+      "Himalayan",
+      "Asia"
     ],
     [
-      "east-asia",
-      "asia"
+      "East Asia",
+      "Asia"
     ],
     [
-      "chinese",
-      "east-asia"
+      "Chinese",
+      "East Asia"
     ],
     [
-      "japanese",
-      "east-asia"
+      "Japanese",
+      "East Asia"
     ],
     [
-      "korean",
-      "east-asia"
+      "Korean",
+      "East Asia"
     ],
     [
-      "mainland-southeast-asia",
-      "asia"
+      "Mainland Southeast Asia",
+      "Asia"
     ],
     [
-      "maritime-southeast-asia",
-      "asia"
+      "Maritime Southeast Asia",
+      "Asia"
     ],
     [
-      "turkish",
-      "west-asia"
+      "Turkish",
+      "West Asia"
     ],
     [
-      "iranian",
-      "west-asia"
+      "Iranian",
+      "West Asia"
     ],
     [
-      "iraqi",
-      "west-asia"
+      "Iraqi",
+      "West Asia"
     ],
     [
-      "kurdish",
-      "west-asia"
+      "Kurdish",
+      "West Asia"
     ],
     [
-      "armenian",
-      "caucasian"
+      "Armenian",
+      "Caucasian"
     ],
     [
-      "azerbaijani",
-      "caucasian"
+      "Azerbaijani",
+      "Caucasian"
     ],
     [
-      "georgian",
-      "caucasian"
+      "Georgian",
+      "Caucasian"
     ],
     [
-      "syrian",
-      "levantine"
+      "Syrian",
+      "Levantine"
     ],
     [
-      "lebanese",
-      "levantine"
+      "Lebanese",
+      "Levantine"
     ],
     [
-      "palestinian",
-      "levantine"
+      "Palestinian",
+      "Levantine"
     ],
     [
-      "jordanian",
-      "levantine"
+      "Jordanian",
+      "Levantine"
     ],
     [
-      "israeli",
-      "levantine"
+      "Israeli",
+      "Levantine"
     ],
     [
-      "arabian-gulf",
-      "arabian-peninsula"
+      "Arabian Gulf",
+      "Arabian Peninsula"
     ],
     [
-      "yemeni",
-      "arabian-peninsula"
+      "Yemeni",
+      "Arabian Peninsula"
     ],
     [
-      "afghan",
-      "central-asia"
+      "Afghan",
+      "Central Asia"
     ],
     [
-      "afghan",
-      "south-asia"
+      "Afghan",
+      "South Asia"
     ],
     [
-      "kazakh",
-      "central-asia"
+      "Kazakh",
+      "Central Asia"
     ],
     [
-      "kyrgyz",
-      "central-asia"
+      "Kyrgyz",
+      "Central Asia"
     ],
     [
-      "tajik",
-      "central-asia"
+      "Tajik",
+      "Central Asia"
     ],
     [
-      "turkmen",
-      "central-asia"
+      "Turkmen",
+      "Central Asia"
     ],
     [
-      "uzbek",
-      "central-asia"
+      "Uzbek",
+      "Central Asia"
     ],
     [
-      "uyghur",
-      "central-asia"
+      "Uyghur",
+      "Central Asia"
     ],
     [
-      "uyghur",
-      "chinese"
+      "Uyghur",
+      "Chinese"
     ],
     [
-      "pakistani",
-      "south-asia"
+      "Pakistani",
+      "South Asia"
     ],
     [
-      "indian",
-      "south-asia"
+      "Indian",
+      "South Asia"
     ],
     [
-      "punjabi",
-      "indian"
+      "Punjabi",
+      "Indian"
     ],
     [
-      "punjabi",
-      "pakistani"
+      "Punjabi",
+      "Pakistani"
     ],
     [
-      "bengali",
-      "indian"
+      "Bengali",
+      "Indian"
     ],
     [
-      "gujarati",
-      "indian"
+      "Gujarati",
+      "Indian"
     ],
     [
-      "rajasthani",
-      "indian"
+      "Rajasthani",
+      "Indian"
     ],
     [
-      "kashmiri",
-      "indian"
+      "Kashmiri",
+      "Indian"
     ],
     [
-      "kashmiri",
-      "pakistani"
+      "Kashmiri",
+      "Pakistani"
     ],
     [
-      "hyderabadi",
-      "indian"
+      "Hyderabadi",
+      "Indian"
     ],
     [
-      "goan",
-      "indian"
+      "Goan",
+      "Indian"
     ],
     [
-      "maharashtrian",
-      "indian"
+      "Maharashtrian",
+      "Indian"
     ],
     [
-      "tamil",
-      "indian"
+      "Tamil",
+      "Indian"
     ],
     [
-      "kerala",
-      "indian"
+      "Kerala",
+      "Indian"
     ],
     [
-      "sri-lankan",
-      "south-asia"
+      "Sri Lankan",
+      "South Asia"
     ],
     [
-      "nepali",
-      "himalayan"
+      "Nepali",
+      "Himalayan"
     ],
     [
-      "tibetan",
-      "himalayan"
+      "Tibetan",
+      "Himalayan"
     ],
     [
-      "bhutanese",
-      "himalayan"
+      "Bhutanese",
+      "Himalayan"
     ],
     [
-      "cantonese",
-      "chinese"
+      "Cantonese",
+      "Chinese"
     ],
     [
-      "sichuan",
-      "chinese"
+      "Sichuan",
+      "Chinese"
     ],
     [
-      "hunan",
-      "chinese"
+      "Hunan",
+      "Chinese"
     ],
     [
-      "fujian",
-      "chinese"
+      "Fujian",
+      "Chinese"
     ],
     [
-      "jiangsu",
-      "chinese"
+      "Jiangsu",
+      "Chinese"
     ],
     [
-      "zhejiang",
-      "chinese"
+      "Zhejiang",
+      "Chinese"
     ],
     [
-      "shandong",
-      "chinese"
+      "Shandong",
+      "Chinese"
     ],
     [
-      "anhui",
-      "chinese"
+      "Anhui",
+      "Chinese"
     ],
     [
-      "taiwanese",
-      "chinese"
+      "Taiwanese",
+      "Chinese"
     ],
     [
-      "mongolian",
-      "east-asia"
+      "Mongolian",
+      "East Asia"
     ],
     [
-      "okinawan",
-      "japanese"
+      "Okinawan",
+      "Japanese"
     ],
     [
-      "vietnamese",
-      "mainland-southeast-asia"
+      "Vietnamese",
+      "Mainland Southeast Asia"
     ],
     [
-      "thai",
-      "mainland-southeast-asia"
+      "Thai",
+      "Mainland Southeast Asia"
     ],
     [
-      "lao",
-      "mainland-southeast-asia"
+      "Lao",
+      "Mainland Southeast Asia"
     ],
     [
-      "cambodian",
-      "mainland-southeast-asia"
+      "Cambodian",
+      "Mainland Southeast Asia"
     ],
     [
-      "myanmar",
-      "mainland-southeast-asia"
+      "Myanmar",
+      "Mainland Southeast Asia"
     ],
     [
-      "indonesian",
-      "maritime-southeast-asia"
+      "Indonesian",
+      "Maritime Southeast Asia"
     ],
     [
-      "malaysian",
-      "maritime-southeast-asia"
+      "Malaysian",
+      "Maritime Southeast Asia"
     ],
     [
-      "singaporean",
-      "maritime-southeast-asia"
+      "Singaporean",
+      "Maritime Southeast Asia"
     ],
     [
-      "filipino",
-      "maritime-southeast-asia"
+      "Filipino",
+      "Maritime Southeast Asia"
     ],
     [
-      "bruneian",
-      "maritime-southeast-asia"
+      "Bruneian",
+      "Maritime Southeast Asia"
     ],
     [
-      "nordic",
-      "europe"
+      "Nordic",
+      "Europe"
     ],
     [
-      "baltic",
-      "europe"
+      "Baltic",
+      "Europe"
     ],
     [
-      "italian",
-      "europe"
+      "Italian",
+      "Europe"
     ],
     [
-      "eastern-europe",
-      "europe"
+      "Eastern Europe",
+      "Europe"
     ],
     [
-      "balkan",
-      "europe"
+      "Balkan",
+      "Europe"
     ],
     [
-      "icelandic",
-      "nordic"
+      "Icelandic",
+      "Nordic"
     ],
     [
-      "norwegian",
-      "nordic"
+      "Norwegian",
+      "Nordic"
     ],
     [
-      "swedish",
-      "nordic"
+      "Swedish",
+      "Nordic"
     ],
     [
-      "danish",
-      "nordic"
+      "Danish",
+      "Nordic"
     ],
     [
-      "finnish",
-      "nordic"
+      "Finnish",
+      "Nordic"
     ],
     [
-      "english",
-      "europe"
+      "English",
+      "Europe"
     ],
     [
-      "scottish",
-      "europe"
+      "Scottish",
+      "Europe"
     ],
     [
-      "welsh",
-      "europe"
+      "Welsh",
+      "Europe"
     ],
     [
-      "irish",
-      "europe"
+      "Irish",
+      "Europe"
     ],
     [
-      "french",
-      "europe"
+      "French",
+      "Europe"
     ],
     [
-      "provencal",
-      "french"
+      "Provencal",
+      "French"
     ],
     [
-      "alsatian",
-      "french"
+      "Alsatian",
+      "French"
     ],
     [
-      "belgian",
-      "europe"
+      "Belgian",
+      "Europe"
     ],
     [
-      "dutch",
-      "europe"
+      "Dutch",
+      "Europe"
     ],
     [
-      "german",
-      "europe"
+      "German",
+      "Europe"
     ],
     [
-      "austrian",
-      "europe"
+      "Austrian",
+      "Europe"
     ],
     [
-      "swiss",
-      "europe"
+      "Swiss",
+      "Europe"
     ],
     [
-      "spanish",
-      "europe"
+      "Spanish",
+      "Europe"
     ],
     [
-      "catalan",
-      "spanish"
+      "Catalan",
+      "Spanish"
     ],
     [
-      "basque",
-      "spanish"
+      "Basque",
+      "Spanish"
     ],
     [
-      "galician",
-      "spanish"
+      "Galician",
+      "Spanish"
     ],
     [
-      "portuguese",
-      "europe"
+      "Portuguese",
+      "Europe"
     ],
     [
-      "sicilian",
-      "italian"
+      "Sicilian",
+      "Italian"
     ],
     [
-      "neapolitan",
-      "italian"
+      "Neapolitan",
+      "Italian"
     ],
     [
-      "roman",
-      "italian"
+      "Roman",
+      "Italian"
     ],
     [
-      "tuscan",
-      "italian"
+      "Tuscan",
+      "Italian"
     ],
     [
-      "emilian",
-      "italian"
+      "Emilian",
+      "Italian"
     ],
     [
-      "ligurian",
-      "italian"
+      "Ligurian",
+      "Italian"
     ],
     [
-      "venetian",
-      "italian"
+      "Venetian",
+      "Italian"
     ],
     [
-      "piedmontese",
-      "italian"
+      "Piedmontese",
+      "Italian"
     ],
     [
-      "sardinian",
-      "italian"
+      "Sardinian",
+      "Italian"
     ],
     [
-      "calabrian",
-      "italian"
+      "Calabrian",
+      "Italian"
     ],
     [
-      "greek",
-      "europe"
+      "Greek",
+      "Europe"
     ],
     [
-      "cypriot",
-      "europe"
+      "Cypriot",
+      "Europe"
     ],
     [
-      "maltese",
-      "europe"
+      "Maltese",
+      "Europe"
     ],
     [
-      "polish",
-      "europe"
+      "Polish",
+      "Europe"
     ],
     [
-      "czech",
-      "europe"
+      "Czech",
+      "Europe"
     ],
     [
-      "slovak",
-      "europe"
+      "Slovak",
+      "Europe"
     ],
     [
-      "hungarian",
-      "europe"
+      "Hungarian",
+      "Europe"
     ],
     [
-      "romanian",
-      "eastern-europe"
+      "Romanian",
+      "Eastern Europe"
     ],
     [
-      "ukrainian",
-      "eastern-europe"
+      "Ukrainian",
+      "Eastern Europe"
     ],
     [
-      "belarusian",
-      "eastern-europe"
+      "Belarusian",
+      "Eastern Europe"
     ],
     [
-      "russian",
-      "eastern-europe"
+      "Russian",
+      "Eastern Europe"
     ],
     [
-      "moldovan",
-      "eastern-europe"
+      "Moldovan",
+      "Eastern Europe"
     ],
     [
-      "bulgarian",
-      "balkan"
+      "Bulgarian",
+      "Balkan"
     ],
     [
-      "serbian",
-      "balkan"
+      "Serbian",
+      "Balkan"
     ],
     [
-      "croatian",
-      "balkan"
+      "Croatian",
+      "Balkan"
     ],
     [
-      "bosnian",
-      "balkan"
+      "Bosnian",
+      "Balkan"
     ],
     [
-      "slovenian",
-      "balkan"
+      "Slovenian",
+      "Balkan"
     ],
     [
-      "albanian",
-      "balkan"
+      "Albanian",
+      "Balkan"
     ],
     [
-      "jewish",
-      "eastern-europe"
+      "Jewish",
+      "Eastern Europe"
     ]
   ]
 }
