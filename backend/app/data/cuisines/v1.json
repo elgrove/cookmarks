@@ -31,7 +31,6 @@
     {"id": "asia", "name": "Asian cuisines", "kinds": ["regional"], "aliases": []},
     {"id": "europe", "name": "European cuisines", "kinds": ["regional"], "aliases": []},
     {"id": "oceania", "name": "Oceanian cuisines", "kinds": ["regional"], "aliases": ["Pacific cuisines"]},
-    {"id": "transnational", "name": "Transnational cuisines", "kinds": ["regional"], "aliases": []},
 
     {"id": "northern-africa", "name": "North African cuisines", "kinds": ["regional"], "aliases": []},
     {"id": "maghrebi", "name": "Maghrebi cuisine", "kinds": ["regional", "ethnocultural"], "aliases": ["Maghreb cuisine"]},
@@ -139,19 +138,11 @@
     {"id": "quebecois", "name": "Québécois cuisine", "kinds": ["regional"], "aliases": ["Quebec cuisine"]},
     {"id": "inuit", "name": "Inuit cuisine", "kinds": ["indigenous", "ethnocultural"], "aliases": []},
     {"id": "american", "name": "United States cuisine", "kinds": ["national"], "aliases": ["American cuisine", "US cuisine"]},
-    {"id": "new-england", "name": "New England cuisine", "kinds": ["regional"], "aliases": []},
-    {"id": "southern-us", "name": "Southern United States cuisine", "kinds": ["regional"], "aliases": ["Southern American cuisine"]},
     {"id": "soul-food", "name": "Soul food", "kinds": ["ethnocultural", "diaspora"], "aliases": []},
-    {"id": "cajun", "name": "Cajun cuisine", "kinds": ["ethnocultural", "regional"], "aliases": []},
-    {"id": "louisiana-creole", "name": "Louisiana Creole cuisine", "kinds": ["ethnocultural", "regional"], "aliases": ["Creole cuisine of Louisiana"]},
-    {"id": "californian", "name": "Californian cuisine", "kinds": ["regional"], "aliases": ["California cuisine"]},
-    {"id": "new-mexican", "name": "New Mexican cuisine", "kinds": ["regional"], "aliases": []},
-    {"id": "hawaiian", "name": "Hawaiian cuisine", "kinds": ["regional", "indigenous"], "aliases": []},
     {"id": "mexican", "name": "Mexican cuisine", "kinds": ["national"], "aliases": []},
     {"id": "oaxacan", "name": "Oaxacan cuisine", "kinds": ["regional"], "aliases": ["Oaxaca cuisine"]},
     {"id": "yucatecan", "name": "Yucatecan cuisine", "kinds": ["regional"], "aliases": ["Yucatán cuisine"]},
     {"id": "veracruz", "name": "Veracruz cuisine", "kinds": ["regional"], "aliases": []},
-    {"id": "tex-mex", "name": "Tex-Mex cuisine", "kinds": ["hybrid", "regional"], "aliases": []},
     {"id": "guatemalan", "name": "Guatemalan cuisine", "kinds": ["national"], "aliases": []},
     {"id": "salvadoran", "name": "Salvadoran cuisine", "kinds": ["national"], "aliases": []},
     {"id": "honduran", "name": "Honduran cuisine", "kinds": ["national"], "aliases": []},
@@ -186,7 +177,7 @@
     {"id": "turkish", "name": "Turkish cuisine", "kinds": ["national"], "aliases": []},
     {"id": "iranian", "name": "Iranian cuisine", "kinds": ["national"], "aliases": ["Persian cuisine"]},
     {"id": "iraqi", "name": "Iraqi cuisine", "kinds": ["national"], "aliases": []},
-    {"id": "kurdish", "name": "Kurdish cuisine", "kinds": ["ethnocultural", "transnational"], "aliases": []},
+    {"id": "kurdish", "name": "Kurdish cuisine", "kinds": ["ethnocultural"], "aliases": []},
     {"id": "armenian", "name": "Armenian cuisine", "kinds": ["national", "ethnocultural"], "aliases": []},
     {"id": "azerbaijani", "name": "Azerbaijani cuisine", "kinds": ["national"], "aliases": ["Azeri cuisine"]},
     {"id": "georgian", "name": "Georgian cuisine", "kinds": ["national"], "aliases": []},
@@ -203,14 +194,14 @@
     {"id": "tajik", "name": "Tajik cuisine", "kinds": ["national"], "aliases": []},
     {"id": "turkmen", "name": "Turkmen cuisine", "kinds": ["national"], "aliases": []},
     {"id": "uzbek", "name": "Uzbek cuisine", "kinds": ["national"], "aliases": []},
-    {"id": "uyghur", "name": "Uyghur cuisine", "kinds": ["ethnocultural", "transnational"], "aliases": ["Uighur cuisine"]},
+    {"id": "uyghur", "name": "Uyghur cuisine", "kinds": ["ethnocultural"], "aliases": ["Uighur cuisine"]},
     {"id": "pakistani", "name": "Pakistani cuisine", "kinds": ["national"], "aliases": []},
     {"id": "indian", "name": "Indian cuisine", "kinds": ["national"], "aliases": []},
-    {"id": "punjabi", "name": "Punjabi cuisine", "kinds": ["regional", "transnational"], "aliases": []},
-    {"id": "bengali", "name": "Bengali cuisine", "kinds": ["regional", "ethnocultural", "transnational"], "aliases": []},
+    {"id": "punjabi", "name": "Punjabi cuisine", "kinds": ["regional"], "aliases": []},
+    {"id": "bengali", "name": "Bengali cuisine", "kinds": ["regional", "ethnocultural"], "aliases": []},
     {"id": "gujarati", "name": "Gujarati cuisine", "kinds": ["regional"], "aliases": []},
     {"id": "rajasthani", "name": "Rajasthani cuisine", "kinds": ["regional"], "aliases": []},
-    {"id": "kashmiri", "name": "Kashmiri cuisine", "kinds": ["regional", "transnational"], "aliases": []},
+    {"id": "kashmiri", "name": "Kashmiri cuisine", "kinds": ["regional"], "aliases": []},
     {"id": "hyderabadi", "name": "Hyderabadi cuisine", "kinds": ["regional"], "aliases": []},
     {"id": "goan", "name": "Goan cuisine", "kinds": ["regional"], "aliases": []},
     {"id": "maharashtrian", "name": "Maharashtrian cuisine", "kinds": ["regional"], "aliases": []},
@@ -267,7 +258,7 @@
     {"id": "swiss", "name": "Swiss cuisine", "kinds": ["national"], "aliases": []},
     {"id": "spanish", "name": "Spanish cuisine", "kinds": ["national"], "aliases": []},
     {"id": "catalan", "name": "Catalan cuisine", "kinds": ["regional", "ethnocultural"], "aliases": []},
-    {"id": "basque", "name": "Basque cuisine", "kinds": ["regional", "ethnocultural", "transnational"], "aliases": []},
+    {"id": "basque", "name": "Basque cuisine", "kinds": ["regional", "ethnocultural"], "aliases": []},
     {"id": "galician", "name": "Galician cuisine", "kinds": ["regional"], "aliases": []},
     {"id": "portuguese", "name": "Portuguese cuisine", "kinds": ["national"], "aliases": []},
     {"id": "italian", "name": "Italian cuisine", "kinds": ["national"], "aliases": []},
@@ -294,10 +285,8 @@
     {"id": "bosnian", "name": "Bosnian cuisine", "kinds": ["national"], "aliases": []},
     {"id": "slovenian", "name": "Slovenian cuisine", "kinds": ["national"], "aliases": []},
     {"id": "albanian", "name": "Albanian cuisine", "kinds": ["national"], "aliases": []},
-    {"id": "jewish", "name": "Jewish cuisines", "kinds": ["ethnocultural", "religious", "transnational"], "aliases": []},
-    {"id": "ashkenazi", "name": "Ashkenazi cuisine", "kinds": ["ethnocultural", "religious", "diaspora"], "aliases": []},
-    {"id": "sephardi", "name": "Sephardi cuisine", "kinds": ["ethnocultural", "religious", "diaspora"], "aliases": ["Sephardic cuisine"]},
-    {"id": "romani", "name": "Romani cuisine", "kinds": ["ethnocultural", "transnational"], "aliases": []},
+    {"id": "jewish", "name": "Jewish cuisines", "kinds": ["ethnocultural", "religious"], "aliases": []},
+    {"id": "romani", "name": "Romani cuisine", "kinds": ["ethnocultural"], "aliases": []},
 
     {"id": "australian", "name": "Australian cuisine", "kinds": ["national"], "aliases": []},
     {"id": "new-zealand", "name": "New Zealand cuisine", "kinds": ["national"], "aliases": ["Aotearoa cuisine"]},
@@ -308,17 +297,7 @@
     {"id": "tahitian", "name": "Tahitian cuisine", "kinds": ["regional", "ethnocultural"], "aliases": []},
     {"id": "chamorro", "name": "Chamorro cuisine", "kinds": ["indigenous", "ethnocultural"], "aliases": []},
 
-    {"id": "chinese-american", "name": "Chinese American cuisine", "kinds": ["diaspora", "hybrid"], "aliases": []},
-    {"id": "indian-caribbean", "name": "Indo-Caribbean cuisine", "kinds": ["diaspora", "hybrid"], "aliases": ["Indian Caribbean cuisine"]},
-    {"id": "italian-american", "name": "Italian American cuisine", "kinds": ["diaspora", "hybrid"], "aliases": []},
-    {"id": "korean-american", "name": "Korean American cuisine", "kinds": ["diaspora", "hybrid"], "aliases": []},
-    {"id": "korean-mexican", "name": "Korean-Mexican cuisine", "kinds": ["hybrid"], "aliases": []},
     {"id": "peranakan", "name": "Peranakan cuisine", "kinds": ["diaspora", "hybrid", "ethnocultural"], "aliases": ["Nyonya cuisine"]},
-    {"id": "indo-chinese", "name": "Indo-Chinese cuisine", "kinds": ["diaspora", "hybrid"], "aliases": []},
-    {"id": "anglo-indian", "name": "Anglo-Indian cuisine", "kinds": ["diaspora", "hybrid"], "aliases": []},
-    {"id": "afro-caribbean", "name": "Afro-Caribbean cuisines", "kinds": ["diaspora", "ethnocultural", "regional"], "aliases": []},
-    {"id": "halal", "name": "Halal food traditions", "kinds": ["religious"], "aliases": []},
-    {"id": "kosher", "name": "Kosher food traditions", "kinds": ["religious"], "aliases": []},
     {"id": "buddhist-temple", "name": "Buddhist temple cuisines", "kinds": ["religious"], "aliases": []}
   ],
   "edges": [
@@ -346,12 +325,10 @@
     ["mesoamerican", "americas"], ["central-america", "americas"], ["caribbean", "americas"],
     ["andes", "americas"], ["amazonian", "americas"], ["brazilian-regional", "americas"], ["southern-cone", "americas"],
     ["inuit", "arctic"], ["inuit", "indigenous-north-american"], ["canadian", "north-america"],
-    ["quebecois", "canadian"], ["american", "north-america"], ["new-england", "american"],
-    ["southern-us", "american"], ["soul-food", "southern-us"], ["cajun", "southern-us"],
-    ["louisiana-creole", "southern-us"], ["californian", "american"], ["new-mexican", "american"],
-    ["hawaiian", "american"], ["hawaiian", "polynesian"], ["mexican", "north-america"],
+    ["quebecois", "canadian"], ["american", "north-america"], ["soul-food", "american"],
+    ["mexican", "north-america"],
     ["mexican", "mesoamerican"], ["oaxacan", "mexican"], ["yucatecan", "mexican"], ["veracruz", "mexican"],
-    ["tex-mex", "mexican"], ["tex-mex", "southern-us"], ["guatemalan", "central-america"],
+    ["guatemalan", "central-america"],
     ["guatemalan", "mesoamerican"], ["salvadoran", "central-america"], ["honduran", "central-america"],
     ["nicaraguan", "central-america"], ["costa-rican", "central-america"], ["panamanian", "central-america"],
     ["cuban", "caribbean"], ["puerto-rican", "caribbean"], ["dominican", "caribbean"],
@@ -368,15 +345,15 @@
     ["himalayan", "asia"], ["east-asia", "asia"], ["chinese", "east-asia"], ["japanese", "east-asia"],
     ["korean", "east-asia"], ["mainland-southeast-asia", "asia"], ["maritime-southeast-asia", "asia"],
     ["turkish", "west-asia"], ["turkish", "mediterranean"], ["iranian", "west-asia"], ["iraqi", "west-asia"],
-    ["kurdish", "west-asia"], ["kurdish", "transnational"], ["armenian", "caucasian"],
+    ["kurdish", "west-asia"], ["armenian", "caucasian"],
     ["azerbaijani", "caucasian"], ["georgian", "caucasian"], ["syrian", "levantine"],
     ["lebanese", "levantine"], ["palestinian", "levantine"], ["jordanian", "levantine"],
     ["israeli", "levantine"], ["arabian-gulf", "arabian-peninsula"], ["yemeni", "arabian-peninsula"],
     ["afghan", "central-asia"], ["afghan", "south-asia"], ["kazakh", "central-asia"], ["kyrgyz", "central-asia"],
     ["tajik", "central-asia"], ["turkmen", "central-asia"], ["uzbek", "central-asia"],
     ["uyghur", "central-asia"], ["uyghur", "chinese"], ["pakistani", "south-asia"], ["indian", "south-asia"],
-    ["punjabi", "indian"], ["punjabi", "pakistani"], ["punjabi", "transnational"], ["bengali", "indian"],
-    ["bengali", "transnational"], ["gujarati", "indian"], ["rajasthani", "indian"], ["kashmiri", "indian"],
+    ["punjabi", "indian"], ["punjabi", "pakistani"], ["bengali", "indian"], ["gujarati", "indian"],
+    ["rajasthani", "indian"], ["kashmiri", "indian"],
     ["kashmiri", "pakistani"], ["hyderabadi", "indian"], ["goan", "indian"], ["maharashtrian", "indian"],
     ["tamil", "indian"], ["kerala", "indian"], ["sri-lankan", "south-asia"], ["nepali", "himalayan"],
     ["tibetan", "himalayan"], ["bhutanese", "himalayan"], ["cantonese", "chinese"], ["sichuan", "chinese"],
@@ -398,7 +375,7 @@
     ["provencal", "french"], ["provencal", "mediterranean"], ["alsatian", "french"], ["alsatian", "central-europe"],
     ["belgian", "western-europe"], ["dutch", "western-europe"], ["german", "central-europe"],
     ["austrian", "central-europe"], ["swiss", "alpine"], ["spanish", "iberian"], ["catalan", "spanish"],
-    ["catalan", "mediterranean"], ["basque", "spanish"], ["basque", "transnational"], ["galician", "spanish"],
+    ["catalan", "mediterranean"], ["basque", "spanish"], ["galician", "spanish"],
     ["portuguese", "iberian"], ["italian", "italian-regional"], ["sicilian", "italian"],
     ["sicilian", "mediterranean"], ["neapolitan", "italian"], ["roman", "italian"], ["tuscan", "italian"],
     ["emilian", "italian"], ["greek", "mediterranean"], ["cypriot", "mediterranean"], ["maltese", "mediterranean"],
@@ -406,23 +383,14 @@
     ["romanian", "eastern-europe"], ["ukrainian", "eastern-europe"], ["belarusian", "eastern-europe"],
     ["russian", "eastern-europe"], ["moldovan", "eastern-europe"], ["bulgarian", "balkan"], ["serbian", "balkan"],
     ["croatian", "balkan"], ["bosnian", "balkan"], ["slovenian", "balkan"], ["albanian", "balkan"],
-    ["jewish", "transnational"], ["ashkenazi", "jewish"], ["sephardi", "jewish"], ["romani", "transnational"],
+    ["jewish", "eastern-europe"],
 
     ["aboriginal-australian", "oceania"], ["torres-strait-islander", "oceania"], ["maori", "oceania"],
     ["melanesian", "oceania"], ["micronesian", "oceania"], ["polynesian", "oceania"], ["australian", "oceania"],
     ["new-zealand", "oceania"], ["fijian", "melanesian"], ["papua-new-guinean", "melanesian"],
     ["samoan", "polynesian"], ["tongan", "polynesian"], ["tahitian", "polynesian"], ["chamorro", "micronesian"],
 
-    ["chinese-american", "chinese"], ["chinese-american", "american"], ["chinese-american", "transnational"],
-    ["indian-caribbean", "indian"], ["indian-caribbean", "caribbean"], ["indian-caribbean", "transnational"],
-    ["italian-american", "italian"], ["italian-american", "american"], ["italian-american", "transnational"],
-    ["korean-american", "korean"], ["korean-american", "american"], ["korean-american", "transnational"],
-    ["korean-mexican", "korean"], ["korean-mexican", "mexican"], ["korean-mexican", "transnational"],
-    ["peranakan", "chinese"], ["peranakan", "malaysian"], ["peranakan", "transnational"],
-    ["indo-chinese", "indian"], ["indo-chinese", "chinese"], ["indo-chinese", "transnational"],
-    ["anglo-indian", "indian"], ["anglo-indian", "british-isles"], ["anglo-indian", "transnational"],
-    ["afro-caribbean", "caribbean"], ["afro-caribbean", "transnational"], ["halal", "transnational"],
-    ["kosher", "jewish"], ["buddhist-temple", "transnational"]
+    ["peranakan", "chinese"], ["peranakan", "malaysian"]
   ],
   "coverage": [
     {
@@ -441,7 +409,7 @@
         "Arctic and Indigenous North America", "Canada and United States", "Mexico and Mesoamerica", "Central America",
         "Caribbean", "Andes", "Amazon basin", "Brazil", "Southern Cone"
       ],
-      "note": "Indigenous and diaspora nodes are retained alongside national nodes where a broad national label would flatten an established tradition."
+      "note": "Indigenous and named regional nodes are retained alongside national nodes where a broad national label would flatten an established tradition."
     },
     {
       "area": "Asia",
@@ -470,13 +438,13 @@
       "note": "Indigenous traditions are first-class nodes rather than sublabels of settler-national cuisines."
     },
     {
-      "area": "Cross-border, diaspora and religious traditions",
+      "area": "Named ethnocultural and hybrid traditions",
       "status": "reviewed",
       "country_or_territory_groups": [
-        "Jewish cuisines", "Romani cuisine", "Asian and European diasporas in the Americas", "Peranakan and Indo-Chinese cuisines",
-        "Afro-Caribbean cuisines", "halal, kosher and Buddhist temple food traditions"
+        "Jewish cuisines", "Romani cuisine", "Peranakan cuisine", "Nikkei cuisine", "Chifa cuisine",
+        "Buddhist temple cuisines"
       ],
-      "note": "These links are discovery edges only and do not make claims about cultural ownership or origin."
+      "note": "These nodes are retained only where the foodway has a recognised name rather than a constructed pairing of cuisines."
     }
   ]
 }

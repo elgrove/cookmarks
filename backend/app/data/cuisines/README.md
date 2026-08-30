@@ -1,7 +1,7 @@
 # Cookmarks cuisine taxonomy seeds
 
-`v1.json` is the reviewed source release for Cookmarks' cuisine discovery graph. It is
-data, not a runtime model prompt or an attempt to determine culinary ownership. The
+`v1.json` is the versioned source seed for Cookmarks' cuisine discovery graph. It is
+data, not a runtime model prompt, a claim of comprehensive coverage, or an attempt to determine culinary ownership. The
 future MY-166 loader will materialise its nodes and directed edges in the database.
 
 ## Semantics
@@ -16,9 +16,9 @@ without also storing those broader labels on the recipe.
 
 ## Review model
 
-The initial graph was generated with structured model-led discovery across a global
-country-and-territory coverage checklist, then critically reviewed for missing regional,
-ethnocultural, Indigenous, diaspora, religious, historical and hybrid traditions.
+The initial graph was generated with structured model-led discovery across broad world
+regions, then critically reviewed for named regional, ethnocultural, Indigenous,
+historical and hybrid foodways.
 `Wikipedia's List of cuisines` is a candidate-discovery and coverage-audit source, not
 an authority to import. Wikidata's CC0 national-cuisine class, WorldCuisines, UNESCO
 and scholarly references provide complementary validation.
@@ -31,15 +31,13 @@ rationale; uncertain candidates belong in a future proposal, not the accepted re
 
 The release has three pieces:
 
-- `nodes`: stable lowercase slugs, a display name, one or more kinds, aliases and
-  provenance;
+- `nodes`: stable lowercase slugs, a display name, one or more kinds and aliases;
 - `edges`: two-item `[child, parent]` arrays, with release-level provenance; and
-- `coverage`: a review checklist of country or territory coverage and deliberately
-  deferred areas.
+- `coverage`: a regional review manifest and deliberately deferred areas.
 
 Aliases are for matching a model or a user query to a canonical ID. They are never
-silently shared: a normalised alias may identify one node only. Country names in the
-coverage checklist are a review scaffold, not graph parents.
+silently shared: a normalised alias may identify one node only. Geography in the
+coverage manifest is a review scaffold, not graph parentage.
 
-The test at `backend/tests/test_cuisine_seed.py` pins the release format, unique alias
-resolution, edge integrity, acyclicity, source references and country coverage.
+`backend/tests/test_cuisine_seed.py` validates node and alias uniqueness, edge
+integrity, acyclicity and release-level provenance references.
