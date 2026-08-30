@@ -73,13 +73,6 @@
     {"id": "eastern-europe", "name": "Eastern European cuisines", "kinds": ["regional"], "aliases": []},
     {"id": "balkan", "name": "Balkan cuisines", "kinds": ["regional"], "aliases": []},
 
-    {"id": "aboriginal-australian", "name": "Aboriginal Australian cuisines", "kinds": ["indigenous"], "aliases": []},
-    {"id": "torres-strait-islander", "name": "Torres Strait Islander cuisines", "kinds": ["indigenous"], "aliases": []},
-    {"id": "maori", "name": "Māori cuisine", "kinds": ["indigenous"], "aliases": ["Maori cuisine"]},
-    {"id": "melanesian", "name": "Melanesian cuisines", "kinds": ["regional"], "aliases": []},
-    {"id": "micronesian", "name": "Micronesian cuisines", "kinds": ["regional"], "aliases": []},
-    {"id": "polynesian", "name": "Polynesian cuisines", "kinds": ["regional"], "aliases": []},
-
     {"id": "algerian", "name": "Algerian cuisine", "kinds": ["national"], "aliases": []},
     {"id": "egyptian", "name": "Egyptian cuisine", "kinds": ["national"], "aliases": []},
     {"id": "libyan", "name": "Libyan cuisine", "kinds": ["national"], "aliases": []},
@@ -274,15 +267,6 @@
     {"id": "jewish", "name": "Jewish cuisines", "kinds": ["ethnocultural", "religious"], "aliases": []},
     {"id": "romani", "name": "Romani cuisine", "kinds": ["ethnocultural"], "aliases": []},
 
-    {"id": "australian", "name": "Australian cuisine", "kinds": ["national"], "aliases": []},
-    {"id": "new-zealand", "name": "New Zealand cuisine", "kinds": ["national"], "aliases": ["Aotearoa cuisine"]},
-    {"id": "fijian", "name": "Fijian cuisine", "kinds": ["national"], "aliases": []},
-    {"id": "papua-new-guinean", "name": "Papua New Guinean cuisine", "kinds": ["national"], "aliases": []},
-    {"id": "samoan", "name": "Samoan cuisine", "kinds": ["national", "ethnocultural"], "aliases": []},
-    {"id": "tongan", "name": "Tongan cuisine", "kinds": ["national", "ethnocultural"], "aliases": []},
-    {"id": "tahitian", "name": "Tahitian cuisine", "kinds": ["regional", "ethnocultural"], "aliases": []},
-    {"id": "chamorro", "name": "Chamorro cuisine", "kinds": ["indigenous", "ethnocultural"], "aliases": []},
-
     {"id": "buddhist-temple", "name": "Buddhist temple cuisines", "kinds": ["religious"], "aliases": []}
   ],
   "edges": [
@@ -323,7 +307,7 @@
     ["mineiro", "brazilian"], ["gaucho", "brazilian"], ["gaucho", "southern-cone"],
     ["argentine", "southern-cone"], ["uruguayan", "southern-cone"], ["paraguayan", "southern-cone"], ["chilean", "southern-cone"],
 
-    ["west-asia", "asia"], ["levantine", "west-asia"], ["arabian-peninsula", "west-asia"],
+    ["west-asia", "asia"], ["oceania", "asia"], ["levantine", "west-asia"], ["arabian-peninsula", "west-asia"],
     ["caucasian", "west-asia"], ["central-asia", "asia"], ["south-asia", "asia"],
     ["himalayan", "asia"], ["east-asia", "asia"], ["chinese", "east-asia"], ["japanese", "east-asia"],
     ["korean", "east-asia"], ["mainland-southeast-asia", "asia"], ["maritime-southeast-asia", "asia"],
@@ -361,12 +345,7 @@
     ["romanian", "eastern-europe"], ["ukrainian", "eastern-europe"], ["belarusian", "eastern-europe"],
     ["russian", "eastern-europe"], ["moldovan", "eastern-europe"], ["bulgarian", "balkan"], ["serbian", "balkan"],
     ["croatian", "balkan"], ["bosnian", "balkan"], ["slovenian", "balkan"], ["albanian", "balkan"],
-    ["jewish", "eastern-europe"],
-
-    ["aboriginal-australian", "oceania"], ["torres-strait-islander", "oceania"], ["maori", "oceania"],
-    ["melanesian", "oceania"], ["micronesian", "oceania"], ["polynesian", "oceania"], ["australian", "oceania"],
-    ["new-zealand", "oceania"], ["fijian", "melanesian"], ["papua-new-guinean", "melanesian"],
-    ["samoan", "polynesian"], ["tongan", "polynesian"], ["tahitian", "polynesian"], ["chamorro", "micronesian"]
+    ["jewish", "eastern-europe"]
 
   ],
   "coverage": [
@@ -411,9 +390,9 @@
       "area": "Oceania",
       "status": "reviewed",
       "country_or_territory_groups": [
-        "Aboriginal and Torres Strait Islander", "Aotearoa and Māori", "Melanesia", "Micronesia", "Polynesia", "Australia"
+        "Oceania"
       ],
-      "note": "Indigenous traditions are first-class nodes rather than sublabels of settler-national cuisines."
+      "note": "V1 retains Oceania only as a broad discovery label and does not model child cuisines."
     },
     {
       "area": "Named ethnocultural traditions",
