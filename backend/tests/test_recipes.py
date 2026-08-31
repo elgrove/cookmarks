@@ -23,7 +23,12 @@ RECIPE_KEYS = {
     "book_has_cover",
     "name",
     "description",
+    "ingredients_verbatim",
     "ingredients",
+    "enrichment_status",
+    "cuisines",
+    "methods",
+    "courses",
     "instructions",
     "yields",
     "keywords",
@@ -264,7 +269,13 @@ def test_recipe_detail_content(client: TestClient) -> None:
     assert body["name"] == "Recipe 0"
     assert body["description"] == "A quick weeknight pasta."
     assert body["yields"] == "Serves 2"
-    assert body["ingredients"] == ["200g pasta", "100g anchovy", "2 tbsp olive oil"]
+    assert [line["text"] for line in body["ingredients_verbatim"]] == [
+        "200g pasta",
+        "100g anchovy",
+        "2 tbsp olive oil",
+    ]
+    assert body["ingredients"] == []
+    assert body["enrichment_status"] == "pending"
     assert body["instructions"] == ["Boil the pasta.", "Toss with the oil and serve."]
     # Keywords come back sorted by name.
     assert body["keywords"] == ["Pasta", "Quick"]
@@ -285,6 +296,7 @@ def test_recipe_optional_fields_when_absent(client: TestClient) -> None:
     assert body["description"] is None
     assert body["yields"] is None
     assert body["has_image"] is False
+    assert body["ingredients_verbatim"] == []
     assert body["ingredients"] == []
     assert body["instructions"] == []
     assert body["keywords"] == []

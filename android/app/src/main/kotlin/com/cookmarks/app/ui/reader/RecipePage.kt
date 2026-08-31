@@ -116,17 +116,17 @@ fun RecipeContent(
         recipe.yields?.let {
             MonoLabel("Yields · $it", modifier = Modifier.padding(bottom = 16.dp))
         }
-        if (recipe.ingredients.isNotEmpty()) {
+        if (recipe.ingredients_verbatim.isNotEmpty()) {
             MonoLabel("Ingredients", colour = colors.clayDeep)
             Column(modifier = Modifier.padding(top = 8.dp, bottom = 20.dp)) {
-                recipe.ingredients.forEachIndexed { i, ingredient ->
+                recipe.ingredients_verbatim.forEachIndexed { i, line ->
                     Text(
-                        text = ingredient,
+                        text = line.text,
                         style = MaterialTheme.typography.bodyMedium,
                         color = colors.ink,
                         modifier = Modifier.padding(vertical = 6.dp),
                     )
-                    if (i < recipe.ingredients.lastIndex) HorizontalDivider(color = colors.line)
+                    if (i < recipe.ingredients_verbatim.lastIndex) HorizontalDivider(color = colors.line)
                 }
             }
         }

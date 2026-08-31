@@ -120,7 +120,7 @@ async def get_recipe(ctx: RunContext[AssistantDeps], recipe_id: str) -> dict:
         **_recipe_row(recipe, recipe.book),
         "description": recipe.description,
         "yields": recipe.yields,
-        "ingredients": list(recipe.ingredients),
+        "ingredients_verbatim": [line.text for line in recipe.ingredients_verbatim],
         "instructions": list(recipe.instructions),
     }
 
@@ -254,9 +254,7 @@ async def remove_recipes_from_list(
     }
 
 
-async def set_favourite(
-    ctx: RunContext[AssistantDeps], recipe_id: str, favourite: bool
-) -> dict:
+async def set_favourite(ctx: RunContext[AssistantDeps], recipe_id: str, favourite: bool) -> dict:
     """Star or unstar a recipe — its membership of the cook's default Favourites list."""
     session = ctx.deps.session
     recipe = _recipe(session, recipe_id)
@@ -327,9 +325,7 @@ def _known_recipe_ids(session: Session, recipe_ids: list[str]) -> set[uuid.UUID]
 
 
 def _list_size(session: Session, list_id: uuid.UUID) -> int:
-    return session.scalar(
-        select(func.count()).where(RecipeListItem.recipe_list_id == list_id)
-    ) or 0
+    return session.scalar(select(func.count()).where(RecipeListItem.recipe_list_id == list_id)) or 0
 
 
 def _model(provider: AIProvider) -> Model | None:
@@ -340,9 +336,7 @@ def _model(provider: AIProvider) -> Model | None:
     if provider.name == GeminiProvider.name:
         return GoogleModel(name, provider=PydanticGoogleProvider(api_key=provider.api_key))
     if provider.name == OpenRouterProvider.name:
-        return OpenAIChatModel(
-            name, provider=PydanticOpenRouterProvider(api_key=provider.api_key)
-        )
+        return OpenAIChatModel(name, provider=PydanticOpenRouterProvider(api_key=provider.api_key))
     if provider.name == StubProvider.name:
         # Offline: exercises the whole tool-calling path without a network or a key.
         # Read-only — a stub must never mutate the cook's lists.
@@ -370,4 +364,3 @@ def build_agent(session: Session) -> Agent[AssistantDeps, str] | None:
         instructions=_assistant_instructions,
         tools=TOOLS,
     )
-

@@ -4,7 +4,7 @@ from collections import OrderedDict
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, HTTPException, Query, Response, status
-from sqlalchemy import String, case, cast, func, literal_column, or_, over, select
+from sqlalchemy import case, func, literal_column, or_, over, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 from sqlalchemy.sql.elements import ColumnElement
 
@@ -15,13 +15,19 @@ from app.db import SessionDep
 from app.epub import read_epub_image
 from app.models.base import as_utc, utcnow
 from app.models.book import Book
-from app.models.enums import ReadingMode
+from app.models.enums import ReadingMode, RecipeEnrichmentStatus, RecipeFacetKind
+from app.models.ingredient import IngredientLine, IngredientOccurrence
 from app.models.recipe import Keyword, Recipe, recipe_keywords
+from app.models.recipe_fact import RecipeFacet
 from app.models.recipe_list import RecipeListItem
 from app.schemas.recipe import (
     EpubLocation,
+    IngredientLineRead,
+    IngredientOccurrenceRead,
     KeywordSummary,
+    RecipeCuisineRead,
     RecipeDetail,
+    RecipeFactRead,
     RecipeNeighbour,
     RecipeSearchResults,
     RecipeSummary,
@@ -143,7 +149,15 @@ def _search_conditions(
                 Recipe.name_folded.contains(term),
                 Book.title_folded.contains(term),
                 Book.author_folded.contains(term),
-                cast(Recipe.ingredients, String).ilike(like),
+                Recipe.id.in_(
+                    select(IngredientLine.recipe_id).where(IngredientLine.text.ilike(like))
+                ),
+                Recipe.id.in_(
+                    select(IngredientLine.recipe_id)
+                    .join(IngredientOccurrence, IngredientOccurrence.line_id == IngredientLine.id)
+                    .join(IngredientOccurrence.ingredient)
+                    .where(IngredientOccurrence.ingredient.has(name_folded=term))
+                ),
                 _keyword_match(Keyword.name.ilike(like)),
             )
         )
@@ -490,7 +504,16 @@ def get_recipe(
     recipe = session.scalar(
         select(Recipe)
         .where(Recipe.id == recipe_id)
-        .options(selectinload(Recipe.keywords), joinedload(Recipe.book))
+        .options(
+            selectinload(Recipe.keywords),
+            selectinload(Recipe.ingredients_verbatim)
+            .selectinload(IngredientLine.occurrences)
+            .joinedload(IngredientOccurrence.ingredient),
+            selectinload(Recipe.facets).joinedload(RecipeFacet.facet_value),
+            selectinload(Recipe.cuisines),
+            joinedload(Recipe.enrichment_state),
+            joinedload(Recipe.book),
+        )
     )
     if recipe is None:
         raise HTTPException(status_code=404, detail="recipe not found")
@@ -519,7 +542,61 @@ def get_recipe(
         book_has_cover=has_cover(book),
         name=recipe.name,
         description=recipe.description,
-        ingredients=recipe.ingredients,
+        ingredients_verbatim=[
+            IngredientLineRead.model_validate(line) for line in recipe.ingredients_verbatim
+        ],
+        ingredients=[
+            IngredientOccurrenceRead(
+                id=occurrence.id,
+                line_id=occurrence.line_id,
+                position=occurrence.position,
+                ingredient_id=occurrence.ingredient_id,
+                ingredient_name=occurrence.ingredient.name,
+                quantity=occurrence.quantity,
+                unit=occurrence.unit,
+                preparation=occurrence.preparation,
+                optional=occurrence.optional,
+                alternative_group=occurrence.alternative_group,
+                is_key=occurrence.is_key,
+                parse_method=occurrence.parse_method,
+                resolution_method=occurrence.resolution_method,
+            )
+            for line in recipe.ingredients_verbatim
+            for occurrence in line.occurrences
+        ],
+        enrichment_status=(
+            recipe.enrichment_state.status
+            if recipe.enrichment_state is not None
+            else RecipeEnrichmentStatus.PENDING
+        ),
+        cuisines=[
+            RecipeCuisineRead(
+                id=cuisine.cuisine_id, source=cuisine.source, evidence=cuisine.evidence
+            )
+            for cuisine in recipe.cuisines
+        ],
+        methods=[
+            RecipeFactRead(
+                id=fact.facet_value.value_id,
+                name=fact.facet_value.name,
+                is_primary=fact.is_primary,
+                source=fact.source,
+                evidence=fact.evidence,
+            )
+            for fact in recipe.facets
+            if fact.facet_value.kind is RecipeFacetKind.METHOD
+        ],
+        courses=[
+            RecipeFactRead(
+                id=fact.facet_value.value_id,
+                name=fact.facet_value.name,
+                is_primary=fact.is_primary,
+                source=fact.source,
+                evidence=fact.evidence,
+            )
+            for fact in recipe.facets
+            if fact.facet_value.kind is RecipeFacetKind.COURSE
+        ],
         instructions=recipe.instructions,
         yields=recipe.yields,
         keywords=sorted(k.name for k in recipe.keywords),

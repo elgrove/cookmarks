@@ -14,7 +14,7 @@ from app.api.recipes import _clear_keyword_cache, _clear_search_order_cache
 from app.config import settings
 from app.db import get_session
 from app.main import app
-from app.models import Base, Book, Keyword, Recipe, User
+from app.models import Base, Book, IngredientLine, Keyword, Recipe, User
 from app.services.auth import hash_password
 from app.services.embeddings import _clear_query_embed_cache
 
@@ -190,7 +190,6 @@ def _seed(session: Session) -> None:
             book_id=with_recipes.id,
             order=i,
             name=f"Recipe {i}",
-            ingredients=[],
             instructions=[],
         )
         # Recipe 0 carries full content + keywords so the search/filter paths
@@ -200,7 +199,11 @@ def _seed(session: Session) -> None:
             recipe.keywords = [pasta, quick]
             recipe.description = "A quick weeknight pasta."
             recipe.yields = "Serves 2"
-            recipe.ingredients = ["200g pasta", "100g anchovy", "2 tbsp olive oil"]
+            recipe.ingredients_verbatim = [
+                IngredientLine(position=0, text="200g pasta"),
+                IngredientLine(position=1, text="100g anchovy"),
+                IngredientLine(position=2, text="2 tbsp olive oil"),
+            ]
             recipe.instructions = ["Boil the pasta.", "Toss with the oil and serve."]
             recipe.image = "OPS/images/recipe-0.jpg"
         session.add(recipe)

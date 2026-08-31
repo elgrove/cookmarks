@@ -4,10 +4,24 @@ from app.models.book import Book, book_keywords
 from app.models.book_reading import BookReading
 from app.models.calibre_exclusion import CalibreExclusion
 from app.models.config import Config
-from app.models.enums import AIProvider, ExtractionMethod, TaskStatus, TaskType
+from app.models.enums import (
+    AIProvider,
+    ExtractionMethod,
+    IngredientLineKind,
+    IngredientParseMethod,
+    IngredientResolutionMethod,
+    RecipeEnrichmentStatus,
+    RecipeFacetKind,
+    RecipeFactSource,
+    TaskStatus,
+    TaskType,
+)
 from app.models.game import GameDismissal
+from app.models.ingredient import Ingredient, IngredientAlias, IngredientLine, IngredientOccurrence
 from app.models.reading_queue import ReadingQueueItem
 from app.models.recipe import Keyword, Recipe, recipe_keywords
+from app.models.recipe_enrichment import RecipeEnrichmentState
+from app.models.recipe_fact import RecipeCuisine, RecipeFacet, RecipeFacetValue
 from app.models.recipe_list import RecipeList, RecipeListItem
 from app.models.recipe_view import RecipeView
 from app.models.task_run import TaskRun
@@ -24,9 +38,23 @@ __all__ = [
     "Config",
     "ExtractionMethod",
     "GameDismissal",
+    "Ingredient",
+    "IngredientAlias",
+    "IngredientLine",
+    "IngredientLineKind",
+    "IngredientOccurrence",
+    "IngredientParseMethod",
+    "IngredientResolutionMethod",
     "Keyword",
     "ReadingQueueItem",
     "Recipe",
+    "RecipeCuisine",
+    "RecipeEnrichmentState",
+    "RecipeEnrichmentStatus",
+    "RecipeFacet",
+    "RecipeFacetKind",
+    "RecipeFacetValue",
+    "RecipeFactSource",
     "RecipeList",
     "RecipeListItem",
     "RecipeView",

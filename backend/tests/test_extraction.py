@@ -227,13 +227,13 @@ def test_route_post_resolve_no_images_already_tried_block() -> None:
 def test_recipe_data_normalises_and_aliases() -> None:
     r = RecipeData(
         name="PASTA alla NORMA",
-        recipeIngredients=["x"],
+        recipeIngredients=[{"text": "x"}],
         recipeInstructions=["y"],
         recipeYield="serves 4",
     )
     assert r.name == "Pasta Alla Norma"
     assert r.yields == "Serves 4"
-    assert r.ingredients == ["x"]
+    assert [line.text for line in r.ingredients] == ["x"]
     dumped = r.model_dump(by_alias=True)
     assert "recipeIngredients" in dumped and "bookOrder" in dumped
 
@@ -295,16 +295,20 @@ def test_provider_vision_capability() -> None:
 
 
 def test_deduplicate_recipes_keeps_fullest_in_first_position() -> None:
-    short = RecipeData(name="Curry", recipeIngredients=["spice"], recipeInstructions=["Cook."])
-    other = RecipeData(name="Rice", recipeIngredients=["rice"], recipeInstructions=["Boil."])
+    short = RecipeData(
+        name="Curry", recipeIngredients=[{"text": "spice"}], recipeInstructions=["Cook."]
+    )
+    other = RecipeData(
+        name="Rice", recipeIngredients=[{"text": "rice"}], recipeInstructions=["Boil."]
+    )
     full = RecipeData(
         name=" curry ",
-        recipeIngredients=["spice", "onion"],
+        recipeIngredients=[{"text": "spice"}, {"text": "onion"}],
         recipeInstructions=["Cook the onions until soft.", "Add the spice."],
     )
     result = deduplicate_recipes_by_title([short, other, full])
     assert [recipe.name for recipe in result] == ["Curry", "Rice"]
-    assert result[0].ingredients == ["spice", "onion"]
+    assert [line.text for line in result[0].ingredients] == ["spice", "onion"]
 
 
 def test_check_if_can_match_images_model_override(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -436,7 +440,7 @@ def test_resolve_images_sets_book_fields(
         "book_id": book_id,
         "epub_path": "/x.epub",
         "raw_recipes": [
-            {"name": "R1", "recipeIngredients": ["a"], "recipeInstructions": ["b"]},
+            {"name": "R1", "recipeIngredients": [{"text": "a"}], "recipeInstructions": ["b"]},
         ],
     }
     result = graph.resolve_images(state)
@@ -479,7 +483,7 @@ def test_save_creates_recipes_with_keywords(db: sessionmaker[Session]) -> None:
     raw = [
         {
             "name": "Pasta",
-            "recipeIngredients": ["x"],
+            "recipeIngredients": [{"text": "x"}],
             "recipeInstructions": ["y"],
             "keywords": ["Italian", "Quick"],
             "bookOrder": 1,
@@ -498,7 +502,12 @@ def test_save_creates_recipes_with_keywords(db: sessionmaker[Session]) -> None:
 
 def test_save_reconciles_by_name_in_place(db: sessionmaker[Session]) -> None:
     first = [
-        {"name": "Pasta", "recipeIngredients": ["x"], "recipeInstructions": ["y"], "bookOrder": 1}
+        {
+            "name": "Pasta",
+            "recipeIngredients": [{"text": "x"}],
+            "recipeInstructions": ["y"],
+            "bookOrder": 1,
+        }
     ]
     with db() as s:
         book = _make_book(s)
@@ -510,7 +519,7 @@ def test_save_reconciles_by_name_in_place(db: sessionmaker[Session]) -> None:
         {
             "name": "Pasta",
             "description": "updated",
-            "recipeIngredients": ["x2"],
+            "recipeIngredients": [{"text": "x2"}],
             "recipeInstructions": ["y2"],
             "keywords": ["Italian"],
             "bookOrder": 5,

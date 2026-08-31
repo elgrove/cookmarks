@@ -30,6 +30,31 @@ data class BookSummary(
 data class RecipeNeighbour(val id: String, val name: String)
 
 @Serializable
+data class IngredientLine(
+    val id: String,
+    val position: Int,
+    val kind: String?,
+    val text: String,
+)
+
+@Serializable
+data class IngredientOccurrence(
+    val id: String,
+    val line_id: String,
+    val position: Int,
+    val ingredient_id: String,
+    val ingredient_name: String,
+    val quantity: String?,
+    val unit: String?,
+    val preparation: String?,
+    val optional: Boolean,
+    val alternative_group: Int?,
+    val is_key: Boolean,
+    val parse_method: String,
+    val resolution_method: String,
+)
+
+@Serializable
 data class ReadingState(
     val mode: String,
     val fraction: Double,
@@ -129,7 +154,12 @@ data class RecipeDetail(
     val book_has_cover: Boolean,
     val name: String,
     val description: String?,
-    val ingredients: List<String>,
+    val ingredients_verbatim: List<IngredientLine>,
+    val ingredients: List<IngredientOccurrence>,
+    val enrichment_status: String,
+    val cuisines: List<RecipeCuisine>,
+    val methods: List<RecipeFact>,
+    val courses: List<RecipeFact>,
     val instructions: List<String>,
     val yields: String?,
     val keywords: List<String>,
@@ -140,6 +170,18 @@ data class RecipeDetail(
     val previous: RecipeNeighbour?,
     val next: RecipeNeighbour?,
 )
+
+@Serializable
+data class RecipeFact(
+    val id: String,
+    val name: String,
+    val is_primary: Boolean,
+    val source: String,
+    val evidence: String?,
+)
+
+@Serializable
+data class RecipeCuisine(val id: String, val source: String, val evidence: String?)
 
 @Serializable
 data class SimilarRecipes(val basis: String, val items: List<RecipeSummary>)

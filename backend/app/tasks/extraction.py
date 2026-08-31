@@ -1,6 +1,8 @@
+import json
 import logging
 import uuid
 from datetime import UTC, datetime
+from hashlib import sha256
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -8,8 +10,10 @@ from sqlalchemy.orm import Session
 from app.db import SessionLocal
 from app.epub import epub_path, has_epub, has_pdf, pdf_path
 from app.models.book import Book
-from app.models.enums import TaskStatus, TaskType
+from app.models.enums import RecipeEnrichmentStatus, TaskStatus, TaskType
+from app.models.ingredient import IngredientLine
 from app.models.recipe import Recipe
+from app.models.recipe_enrichment import RecipeEnrichmentState
 from app.models.task_run import TaskRun
 from app.schemas.extraction import RecipeData
 from app.services.ai import get_config
@@ -113,16 +117,61 @@ def _upsert_recipe(session: Session, book: Book, run: TaskRun, data: RecipeData)
         recipe = Recipe(book_id=book.id, name=data.name, order=data.book_order or 0)
         session.add(recipe)
 
+    source_text = [line.text for line in data.ingredients]
+    fingerprint = _source_fingerprint(data, source_text)
+    previous_fingerprint = (
+        recipe.enrichment_state.source_fingerprint if recipe.enrichment_state else None
+    )
+
     recipe.extraction_run_id = run.id
     recipe.order = data.book_order or 0
     recipe.description = data.description
-    recipe.ingredients = data.ingredients
     recipe.instructions = data.instructions
     recipe.yields = data.yields
     recipe.image = data.image or None
     recipe.keywords = [get_or_create_keyword(session, name) for name in data.keywords]
+    if fingerprint != previous_fingerprint:
+        # SQLite checks the (recipe_id, position) uniqueness while it flushes. Delete
+        # the old rows first, before inserting replacement lines at the same positions.
+        if recipe.ingredients_verbatim:
+            recipe.ingredients_verbatim.clear()
+            session.flush()
+        recipe.ingredients_verbatim = [
+            IngredientLine(position=position, text=text)
+            for position, text in enumerate(source_text)
+        ]
+        recipe.facets.clear()
+        recipe.cuisines.clear()
+        if recipe.enrichment_state is None:
+            recipe.enrichment_state = RecipeEnrichmentState(recipe_id=recipe.id)
+        state = recipe.enrichment_state
+        assert state is not None
+        state.status = RecipeEnrichmentStatus.PENDING
+        state.source_fingerprint = fingerprint
+        state.last_error = None
+        state.started_at = None
+        state.completed_at = None
+    elif recipe.enrichment_state is None:
+        recipe.enrichment_state = RecipeEnrichmentState(
+            recipe_id=recipe.id,
+            status=RecipeEnrichmentStatus.PENDING,
+            source_fingerprint=fingerprint,
+        )
     session.flush()
     return recipe
+
+
+def _source_fingerprint(data: RecipeData, ingredient_text: list[str]) -> str:
+    """Only source material is hashed: unchanged re-extraction keeps derived facts."""
+    source = {
+        "name": data.name,
+        "description": data.description,
+        "instructions": data.instructions,
+        "ingredients": ingredient_text,
+    }
+    return sha256(
+        json.dumps(source, ensure_ascii=False, separators=(",", ":")).encode()
+    ).hexdigest()
 
 
 def save_recipes_from_graph_state(
