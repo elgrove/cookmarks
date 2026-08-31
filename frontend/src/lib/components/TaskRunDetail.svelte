@@ -39,8 +39,8 @@
 		book_keywords: 'Book-keyword tagging',
 		keyword_dedup: 'Keyword vocabulary dedup',
 		calibre_sync: 'Calibre library sync',
-		book_ingest: 'Book added to the library'
-		, recipe_enrichment_pilot: 'Recipe enrichment pilot'
+		book_ingest: 'Book added to the library',
+		recipe_enrichment_pilot: 'Recipe enrichment pilot'
 	};
 
 	const dateFmt = new Intl.DateTimeFormat('en-GB', {

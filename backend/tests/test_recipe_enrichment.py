@@ -99,10 +99,53 @@ def test_invalid_response_rolls_back_and_keeps_previous_keywords(session) -> Non
 
 def test_stub_enrichment_is_separate_and_offline(session) -> None:
     recipe = _recipe(session)
+    assert recipe.enrichment_state is not None
+    recipe.enrichment_state.source_fingerprint = None  # migration-era row
+    session.commit()
     result, usage = enrich_recipe(session, recipe.id, provider=StubProvider(""))
     session.refresh(recipe)
     assert result["occurrences"] == 1
     assert usage.input_tokens == 0
     assert recipe.enrichment_state is not None
     assert recipe.enrichment_state.status is RecipeEnrichmentStatus.COMPLETE
+    assert recipe.enrichment_state.source_fingerprint is not None
     assert len(recipe.keywords) == 5
+
+
+def test_repeated_new_canonical_ingredient_resolves_to_one_identity(session) -> None:
+    recipe = _recipe(session)
+    recipe.ingredients_verbatim.append(IngredientLine(position=1, text="more seaweed"))
+    assert recipe.enrichment_state is not None
+    recipe.enrichment_state.source_fingerprint = "current"
+    session.commit()
+    _, proposals = build_context(session, recipe)
+    response = EnrichmentResponse.model_validate(
+        {
+            "recipe_id": str(recipe.id),
+            "source_fingerprint": "current",
+            "lines": [
+                {
+                    "line_id": str(line.id),
+                    "kind": "ingredient",
+                    "occurrences": [{"canonical_name": "Seaweed", "is_key": True}],
+                }
+                for line in recipe.ingredients_verbatim
+            ],
+            "cuisines": [],
+            "methods": [],
+            "courses": [],
+            "keywords": ["Cosy", "Fresh", "Outdoor", "Party", "Summer"],
+        }
+    )
+    apply_enrichment(
+        session,
+        recipe.id,
+        response,
+        proposals,
+        provider=StubProvider(""),
+        model="stub-enrichment",
+    )
+    session.commit()
+    occurrences = session.query(IngredientOccurrence).order_by(IngredientOccurrence.position).all()
+    assert len(occurrences) == 2
+    assert occurrences[0].ingredient_id == occurrences[1].ingredient_id

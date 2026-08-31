@@ -17,6 +17,7 @@ from app.main import app
 from app.models import Base, Book, IngredientLine, Keyword, Recipe, User
 from app.services.auth import hash_password
 from app.services.embeddings import _clear_query_embed_cache
+from app.tasks.recipe_enrichment import recipe_enrichment_pilot_task
 
 # Where the two seeded books live inside a Calibre library root.
 SEEDED_BOOK_PATHS = ("Author One/With Recipes (1)", "Author Two/No Recipes Yet (2)")
@@ -135,8 +136,6 @@ def ingest_dispatched(monkeypatch: pytest.MonkeyPatch) -> list[tuple[Any, ...]]:
 @pytest.fixture(autouse=True)
 def enrichment_pilot_dispatched(monkeypatch: pytest.MonkeyPatch) -> list[tuple[Any, ...]]:
     """Keep the admin pilot trigger off Redis while API tests record its dispatch."""
-    from app.tasks.recipe_enrichment import recipe_enrichment_pilot_task
-
     calls: list[tuple[Any, ...]] = []
 
     def _record(*args: Any, **_kwargs: Any) -> None:

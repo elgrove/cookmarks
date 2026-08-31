@@ -24,8 +24,8 @@
 		{ id: 'book_keywords', label: 'Keywords' },
 		{ id: 'keyword_dedup', label: 'Dedup' },
 		{ id: 'calibre_sync', label: 'Calibre' },
-		{ id: 'book_ingest', label: 'Added books' }
-		, { id: 'recipe_enrichment_pilot', label: 'Enrichment pilot' }
+		{ id: 'book_ingest', label: 'Added books' },
+		{ id: 'recipe_enrichment_pilot', label: 'Enrichment pilot' }
 	];
 
 	const TYPE_LABELS: Record<TaskType, string> = {

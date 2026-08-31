@@ -12,7 +12,7 @@ from sqlalchemy.orm import selectinload
 from app.db import SessionLocal
 from app.models.recipe import Recipe
 from app.models.task_run import TaskRun
-from app.services.ai import Usage, get_ai_provider
+from app.services.ai import AIResponseError, Usage, get_ai_provider
 from app.services.recipe_enrichment.service import enrich_recipe
 from app.tasks.celery_app import celery_app
 from app.tasks.runs import complete_run, fail_run, start_run
@@ -117,10 +117,11 @@ def run_recipe_enrichment_pilot(run_id: str) -> dict:
                     )
                     usage += call_usage
                     session.refresh(recipe)
+                    status = "skipped" if metrics.get("skipped") else "complete"
                     outcomes.append(
                         {
                             "recipe_id": str(recipe_id),
-                            "status": "complete",
+                            "status": status,
                             "elapsed_seconds": round((datetime.now(UTC) - started).total_seconds(), 3),
                             "keywords": [keyword.name for keyword in recipe.keywords],
                             "line_kinds": [line.kind.value if line.kind else None for line in recipe.ingredients_verbatim],
@@ -139,6 +140,8 @@ def run_recipe_enrichment_pilot(run_id: str) -> dict:
                         }
                     )
                 except Exception as exc:
+                    if isinstance(exc, AIResponseError):
+                        usage += exc.usage
                     outcomes.append(
                         {
                             "recipe_id": str(recipe_id),
@@ -168,6 +171,7 @@ def run_recipe_enrichment_pilot(run_id: str) -> dict:
         detail = {
             "attempted": len(outcomes),
             "complete": statuses["complete"],
+            "skipped": statuses["skipped"],
             "failed": statuses["failed"],
             "stale_response": statuses["stale"],
             "outcomes": outcomes,

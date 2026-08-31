@@ -1,9 +1,11 @@
 """Validation, transactional application and orchestration for recipe enrichment."""
 
+import json
 import logging
 import uuid
 from collections import Counter
 from datetime import UTC, datetime
+from hashlib import sha256
 
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session, selectinload
@@ -42,6 +44,32 @@ logger = logging.getLogger(__name__)
 
 class EnrichmentValidationError(ValueError):
     """The provider response violates the load-bearing enrichment contract."""
+
+
+def source_fingerprint(recipe: Recipe) -> str:
+    """The persisted equivalent of extraction's source fingerprint.
+
+    MY-173 deliberately left migrated rows without a fingerprint. Computing it from
+    the same source-only fields lets their first enrichment safely establish the
+    idempotency boundary without re-extracting the book.
+    """
+    source = {
+        "name": recipe.name,
+        "description": recipe.description,
+        "instructions": recipe.instructions,
+        "ingredients": [line.text for line in recipe.ingredients_verbatim],
+    }
+    return sha256(json.dumps(source, ensure_ascii=False, separators=(",", ":")).encode()).hexdigest()
+
+
+def ensure_source_fingerprint(recipe: Recipe) -> str:
+    state = recipe.enrichment_state
+    if state is None:
+        raise EnrichmentValidationError("recipe has no enrichment state")
+    if state.source_fingerprint is None:
+        state.source_fingerprint = source_fingerprint(recipe)
+    assert state.source_fingerprint is not None
+    return state.source_fingerprint
 
 
 def _recipe_with_facts(session: Session, recipe_id: uuid.UUID) -> Recipe:
@@ -91,8 +119,9 @@ def build_context(session: Session, recipe: Recipe) -> tuple[dict, dict[str, Det
     }
     facets = list(session.scalars(select(RecipeFacetValue)))
     state = recipe.enrichment_state
-    if state is None or not state.source_fingerprint:
-        raise EnrichmentValidationError("recipe has no source fingerprint to enrich")
+    if state is None:
+        raise EnrichmentValidationError("recipe has no enrichment state")
+    source = ensure_source_fingerprint(recipe)
     return (
         {
             "vocabulary": {
@@ -118,7 +147,7 @@ def build_context(session: Session, recipe: Recipe) -> tuple[dict, dict[str, Det
             },
             "recipe": {
                 "id": str(recipe.id),
-                "source_fingerprint": state.source_fingerprint,
+                "source_fingerprint": source,
                 "name": recipe.name,
                 "description": recipe.description,
                 "yield": recipe.yields,
@@ -181,8 +210,6 @@ def _validate_response(
     canonical_ids = set(canonical)
     proposed = [occ.canonical_name for line in response.lines for occ in line.occurrences if occ.canonical_name]
     proposed_folded = [fold(name) for name in proposed]
-    if len(proposed_folded) != len(set(proposed_folded)):
-        raise EnrichmentValidationError("duplicate canonical ingredient proposal")
     occupied = {item.name_folded for item in canonical.values()} | {
         item.name_folded for item in aliases.values()
     }
@@ -287,8 +314,14 @@ def _apply_response(
                     resolution = IngredientResolutionMethod.AI_CREATED
                 source_name = decision_occurrence.source_name
                 if source_name and fold(source_name) != ingredient.name_folded:
-                    add_ingredient_alias(session, ingredient, source_name)
-                    aliases_created += 1
+                    existing_alias = session.scalar(
+                        select(IngredientAlias).where(IngredientAlias.name_folded == fold(source_name))
+                    )
+                    if existing_alias is None:
+                        add_ingredient_alias(session, ingredient, source_name)
+                        aliases_created += 1
+                    elif existing_alias.ingredient_id != ingredient.id:
+                        raise EnrichmentValidationError("ingredient alias collides with another ingredient")
                 quantity = decision_occurrence.quantity
                 unit = decision_occurrence.unit
                 preparation = decision_occurrence.preparation
@@ -405,6 +438,7 @@ def enrich_recipe(
         raise RuntimeError("No usable AI provider is configured")
     if state is None:
         raise EnrichmentValidationError("recipe has no enrichment state")
+    ensure_source_fingerprint(recipe)
     state.status = RecipeEnrichmentStatus.RUNNING
     state.started_at = datetime.now(UTC)
     session.commit()
