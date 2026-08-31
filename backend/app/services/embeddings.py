@@ -63,8 +63,8 @@ def recipe_to_text(recipe: Recipe) -> str:
     parts = [recipe.name]
     if recipe.keywords:
         parts.append(", ".join(k.name for k in recipe.keywords))
-    if recipe.ingredients:
-        parts.append(", ".join(recipe.ingredients))
+    if recipe.ingredients_verbatim:
+        parts.append(", ".join(line.text for line in recipe.ingredients_verbatim))
     return ". ".join(parts)
 
 
@@ -114,7 +114,11 @@ def backfill(session: Session, provider: AIProvider | None = None) -> int:
     embedded = VectorStore(session).embedded_ids()
     recipes = [
         recipe
-        for recipe in session.scalars(select(Recipe).options(selectinload(Recipe.keywords)))
+        for recipe in session.scalars(
+            select(Recipe).options(
+                selectinload(Recipe.keywords), selectinload(Recipe.ingredients_verbatim)
+            )
+        )
         if recipe.id not in embedded
     ]
     count = embed_recipes(session, recipes, provider)

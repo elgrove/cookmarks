@@ -43,7 +43,7 @@ class RecipeData(BaseModel):
 
     name: str
     description: str | None = None
-    ingredients: list[str] = Field(min_length=1, alias="recipeIngredients")
+    ingredients: list["RecipeIngredientData"] = Field(min_length=1, alias="recipeIngredients")
     instructions: list[str] = Field(min_length=1, alias="recipeInstructions")
     yields: str | None = Field(None, alias="recipeYield")
     image: str | None = None
@@ -60,3 +60,9 @@ class RecipeData(BaseModel):
             self.yields = (
                 self.yields.capitalize() if self.yields[0].isalpha() else self.yields.lower()
             )
+
+
+class RecipeIngredientData(BaseModel):
+    """A verbatim source line. Classification and parsing happen in enrichment."""
+
+    text: str = Field(min_length=1)

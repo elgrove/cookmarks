@@ -73,7 +73,7 @@ class StubProvider(AIProvider):
         recipe = {
             "name": f"Stub Recipe {suffix}",
             "description": "Synthetic recipe produced by StubProvider for offline dev.",
-            "recipeIngredients": ["1 cup stub flour", "2 stub eggs"],
+            "recipeIngredients": [{"text": "1 cup stub flour"}, {"text": "2 stub eggs"}],
             "recipeInstructions": ["Combine ingredients.", "Cook until done."],
             "recipeYield": "Serves 4",
             "keywords": ["Stub", "Dev"],

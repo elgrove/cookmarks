@@ -4,6 +4,14 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.models.enums import (
+    IngredientLineKind,
+    IngredientParseMethod,
+    IngredientResolutionMethod,
+    RecipeEnrichmentStatus,
+    RecipeFactSource,
+)
+
 
 class RecipeRow(BaseModel):
     """A recipe as it appears in a book's recipe index: name + its keywords."""
@@ -107,6 +115,47 @@ class RecipeNeighbour(BaseModel):
     name: str
 
 
+class IngredientLineRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    position: int
+    kind: IngredientLineKind | None
+    text: str
+
+
+class IngredientOccurrenceRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    line_id: uuid.UUID
+    position: int
+    ingredient_id: uuid.UUID
+    ingredient_name: str
+    quantity: str | None
+    unit: str | None
+    preparation: str | None
+    optional: bool
+    alternative_group: int | None
+    is_key: bool
+    parse_method: IngredientParseMethod
+    resolution_method: IngredientResolutionMethod
+
+
+class RecipeFactRead(BaseModel):
+    id: str
+    name: str
+    is_primary: bool
+    source: RecipeFactSource
+    evidence: str | None
+
+
+class RecipeCuisineRead(BaseModel):
+    id: str
+    source: RecipeFactSource
+    evidence: str | None
+
+
 class RecipeDetail(BaseModel):
     """A single recipe's reading view, with the book provenance it links back to.
 
@@ -131,7 +180,12 @@ class RecipeDetail(BaseModel):
     book_has_cover: bool
     name: str
     description: str | None
-    ingredients: list[str]
+    ingredients_verbatim: list[IngredientLineRead]
+    ingredients: list[IngredientOccurrenceRead]
+    enrichment_status: RecipeEnrichmentStatus
+    cuisines: list[RecipeCuisineRead]
+    methods: list[RecipeFactRead]
+    courses: list[RecipeFactRead]
     instructions: list[str]
     yields: str | None
     keywords: list[str]

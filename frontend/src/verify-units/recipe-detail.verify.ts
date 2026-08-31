@@ -15,7 +15,7 @@ const recipeSchema = z.object({
 	bookHasCover: z.boolean(),
 	name: z.string(),
 	description: z.string().nullable(),
-	ingredients: z.array(z.string()),
+	ingredientsVerbatim: z.array(z.object({ id: z.string(), position: z.number(), kind: z.enum(['ingredient', 'heading', 'note']).nullable(), text: z.string() })),
 	instructions: z.array(z.string()),
 	yields: z.string().nullable(),
 	keywords: z.array(z.string()),
@@ -29,6 +29,8 @@ const recipeSchema = z.object({
 	next: z.object({ id: z.string(), name: z.string() }).nullable()
 });
 
+const lines = (texts: string[]): RecipeDetailData['ingredientsVerbatim'] => texts.map((text, position) => ({ id: `00000000-0000-4000-8000-${String(position + 1).padStart(12, '0')}`, position, kind: 'ingredient', text }));
+
 const trofie: RecipeDetailData = {
 	id: '7c9e6679-7425-40de-944b-e07fc1f90ae7',
 	bookId: 'a0054f3d-3f99-4502-aa48-dc933c13fab8',
@@ -38,14 +40,14 @@ const trofie: RecipeDetailData = {
 	name: "Rosetta's Trofie with Basil Sauce",
 	description:
 		'A Ligurian classic: hand-rolled trofie tossed through a vivid basil pesto pounded by hand. Rosetta has made it this way for sixty years.',
-	ingredients: [
+	ingredientsVerbatim: lines([
 		'400g trofie pasta',
 		'60g basil leaves',
 		'50g pine nuts',
 		'2 garlic cloves',
 		'120ml extra-virgin olive oil',
 		'40g Parmesan, finely grated'
-	],
+	]),
 	instructions: [
 		'Pound the basil, garlic and pine nuts to a coarse paste.',
 		'Work in the cheese, then trickle in the oil until glossy.',
@@ -107,7 +109,7 @@ const unit: VerifiableUnit<Props> = {
 					yields: null,
 					keywords: [],
 					hasImage: false,
-					ingredients: ['4 large eggs'],
+					ingredientsVerbatim: lines(['4 large eggs']),
 					instructions: ['Boil the eggs for 7 minutes.', 'Cool under cold water, then peel.']
 				}
 			}
@@ -184,7 +186,7 @@ const unit: VerifiableUnit<Props> = {
 					name: 'Grand-mère’s Slow-Braised Bourguignon with Crème Fraîche, Sauté Mushrooms & Far More Than Will Ever Sit On One Line',
 					description:
 						'An unhurried Sunday braise — beef cheeks coloured hard, doused in a whole bottle of red, and left to fall apart over an afternoon while the kitchen fills with the smell of bay and thyme and patience.',
-					ingredients: Array.from({ length: 14 }, (_, i) => `Ingredient ${i + 1} — a reasonably long descriptive line that keeps going`),
+					ingredientsVerbatim: lines(Array.from({ length: 14 }, (_, i) => `Ingredient ${i + 1} — a reasonably long descriptive line that keeps going`)),
 					instructions: Array.from({ length: 12 }, (_, i) => `Step ${i + 1}: a fairly verbose instruction that wraps across more than a single line to test the method gutter.`),
 					keywords: ['Beef', 'Braise', 'French', 'Sunday', 'Slow', 'Winter', 'Stew']
 				}
@@ -216,10 +218,10 @@ const unit: VerifiableUnit<Props> = {
 			id: 'ingredient-count',
 			description: 'rendered ingredient rows match the count contract and the props',
 			check: ({ contract, root, props }) => {
-				if (Number(contract.ingredients) !== props.recipe.ingredients.length)
-					return `contract ingredients=${contract.ingredients} expected ${props.recipe.ingredients.length}`;
+				if (Number(contract.ingredients) !== props.recipe.ingredientsVerbatim.length)
+					return `contract ingredients=${contract.ingredients} expected ${props.recipe.ingredientsVerbatim.length}`;
 				const rows = root.querySelectorAll('.ingredients li').length;
-				return rows === props.recipe.ingredients.length || `rendered ${rows} ingredient rows`;
+				return rows === props.recipe.ingredientsVerbatim.length || `rendered ${rows} ingredient rows`;
 			}
 		},
 		{

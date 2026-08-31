@@ -56,7 +56,7 @@ def test_to_eval_recipe_accepts_predicted_aliases() -> None:
     r = to_eval_recipe(
         {
             "name": "Dal",
-            "recipeIngredients": ["lentils", "water"],
+            "recipeIngredients": [{"text": "lentils"}, {"text": "water"}],
             "recipeInstructions": ["boil"],
             "recipeYield": "Serves 4",
         }

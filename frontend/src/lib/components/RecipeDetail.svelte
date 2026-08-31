@@ -7,7 +7,7 @@
 		bookHasCover: boolean;
 		name: string;
 		description: string | null;
-		ingredients: string[];
+		ingredientsVerbatim: { id: string; position: number; kind: 'ingredient' | 'heading' | 'note' | null; text: string }[];
 		instructions: string[];
 		yields: string | null;
 		keywords: string[];
@@ -114,7 +114,7 @@
 	class="recipe"
 	data-verify-unit="recipe-detail"
 	data-verify-id={recipe.id}
-	data-verify-ingredients={recipe.ingredients.length}
+	data-verify-ingredients={recipe.ingredientsVerbatim.length}
 	data-verify-steps={recipe.instructions.length}
 	data-verify-keywords={recipe.keywords.length}
 	data-verify-has-image={recipe.hasImage ? 'true' : 'false'}
@@ -218,12 +218,12 @@
 		<section class="block">
 			{#if showImage && recipe.yields}<p class="yields yield-lead">{recipe.yields}</p>{/if}
 			<p class="label">Ingredients</p>
-			{#if recipe.ingredients.length}
+			{#if recipe.ingredientsVerbatim.length}
 				<ul class="ingredients">
-					{#each recipe.ingredients as ing, i (i)}
-						<li>
+					{#each recipe.ingredientsVerbatim as line, i (line.id)}
+						<li class:heading={line.kind === 'heading'} class:note={line.kind === 'note'} data-verify-line-kind={line.kind ?? 'unknown'}>
 							<span class="ingno" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
-							<span class="ingtext">{ing}</span>
+							<span class="ingtext">{line.text}</span>
 						</li>
 					{/each}
 				</ul>

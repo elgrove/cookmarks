@@ -32,7 +32,7 @@ def _first_list(d: dict, *keys: str) -> list[str]:
     for key in keys:
         value = d.get(key)
         if value:
-            return [str(item) for item in value]
+            return [str(item["text"]) if isinstance(item, dict) and "text" in item else str(item) for item in value]
     return []
 
 

@@ -183,8 +183,7 @@ def test_continue_reading_is_most_recent_first(client: TestClient, session: Sess
     session.add(other)
     session.flush()
     session.add_all(
-        Recipe(book_id=other.id, order=i, name=f"Other {i}", ingredients=[], instructions=[])
-        for i in range(2)
+        Recipe(book_id=other.id, order=i, name=f"Other {i}", instructions=[]) for i in range(2)
     )
     session.commit()
 

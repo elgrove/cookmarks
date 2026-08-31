@@ -77,7 +77,7 @@ class ContractTest {
     @Test
     fun recipe_detail() {
         val recipe = pin<RecipeDetail>("recipe")
-        assertEquals(3, recipe.ingredients.size)
+        assertEquals(3, recipe.ingredients_verbatim.size)
         assertEquals("book", recipe.context)
     }
 

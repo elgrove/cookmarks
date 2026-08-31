@@ -10,6 +10,9 @@ from app.text import fold
 
 if TYPE_CHECKING:
     from app.models.book import Book
+    from app.models.ingredient import IngredientLine
+    from app.models.recipe_enrichment import RecipeEnrichmentState
+    from app.models.recipe_fact import RecipeCuisine, RecipeFacet
     from app.models.recipe_list import RecipeListItem
     from app.models.task_run import TaskRun
 
@@ -65,7 +68,6 @@ class Recipe(UUIDAuditBase):
     # costs ~300ms against ~55ms for a plain scan of a stored column.
     name_folded: Mapped[str] = mapped_column(String(500), default="")
     description: Mapped[str | None] = mapped_column(Text)
-    ingredients: Mapped[list[str]] = mapped_column(JSON, default=list)
     instructions: Mapped[list[str]] = mapped_column(JSON, default=list)
     yields: Mapped[str | None] = mapped_column(String(200))
     image: Mapped[str | None] = mapped_column(Text)
@@ -87,4 +89,16 @@ class Recipe(UUIDAuditBase):
     )
     list_items: Mapped[list["RecipeListItem"]] = relationship(
         back_populates="recipe", cascade="all, delete-orphan"
+    )
+    ingredients_verbatim: Mapped[list["IngredientLine"]] = relationship(
+        back_populates="recipe", cascade="all, delete-orphan", order_by="IngredientLine.position"
+    )
+    facets: Mapped[list["RecipeFacet"]] = relationship(
+        back_populates="recipe", cascade="all, delete-orphan"
+    )
+    cuisines: Mapped[list["RecipeCuisine"]] = relationship(
+        back_populates="recipe", cascade="all, delete-orphan"
+    )
+    enrichment_state: Mapped["RecipeEnrichmentState | None"] = relationship(
+        back_populates="recipe", cascade="all, delete-orphan", uselist=False
     )

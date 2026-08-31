@@ -110,7 +110,7 @@
 				bookHasCover: r.book_has_cover,
 				name: r.name,
 				description: r.description,
-				ingredients: r.ingredients,
+				ingredientsVerbatim: r.ingredients_verbatim,
 				instructions: r.instructions,
 				yields: r.yields,
 				keywords: r.keywords,
