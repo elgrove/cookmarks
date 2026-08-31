@@ -6,9 +6,11 @@ from app.models.book import Book
 from app.models.enums import TaskType
 from app.models.recipe import Keyword
 from app.schemas.tasks import BookKeywordTaskRequest, TaskRunAck
+from app.services.ai import get_config
 from app.tasks.book_keywords import enqueue_backfill_book_keywords
 from app.tasks.calibre_sync import enqueue_calibre_sync
 from app.tasks.keyword_dedup import enqueue_dedup_keywords
+from app.tasks.recipe_enrichment import choose_pilot_sample, enqueue_recipe_enrichment_pilot
 from app.tasks.runs import create_task_run
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
@@ -62,3 +64,18 @@ def trigger_calibre_sync(session: SessionDep) -> TaskRunAck:
     run = create_task_run(session, TaskType.CALIBRE_SYNC)
     enqueue_calibre_sync(str(run.id))
     return TaskRunAck(task="calibre_sync", status="queued", queued=0)
+
+
+@router.post(
+    "/recipe-enrichment-pilot",
+    response_model=TaskRunAck,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+def trigger_recipe_enrichment_pilot(session: SessionDep) -> TaskRunAck:
+    """Queue the reviewed 100-recipe live-provider enrichment pilot, never Batch."""
+    sample = choose_pilot_sample(session)
+    run = create_task_run(session, TaskType.RECIPE_ENRICHMENT_PILOT, detail=sample)
+    run.provider_name = get_config(session).ai_provider
+    session.commit()
+    enqueue_recipe_enrichment_pilot(str(run.id))
+    return TaskRunAck(task="recipe_enrichment_pilot", status="queued", queued=len(sample["recipe_ids"]))

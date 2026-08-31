@@ -26,6 +26,7 @@ class OpenRouterProvider(AIProvider):
         ModelRole.BOOK_KEYWORDS: "google/gemini-2.5-flash",
         ModelRole.KEYWORD_DEDUP: "google/gemini-2.5-flash",
         ModelRole.ASSISTANT: "google/gemini-2.5-flash",
+        ModelRole.RECIPE_ENRICHMENT: "google/gemini-2.5-flash",
     }
 
     def _complete(

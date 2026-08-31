@@ -479,7 +479,7 @@ def test_finalise_marks_done(db: sessionmaker[Session]) -> None:
 # --------------------------------------------------------------------------- #
 
 
-def test_save_creates_recipes_with_keywords(db: sessionmaker[Session]) -> None:
+def test_save_creates_recipes_without_first_pass_keywords(db: sessionmaker[Session]) -> None:
     raw = [
         {
             "name": "Pasta",
@@ -496,7 +496,7 @@ def test_save_creates_recipes_with_keywords(db: sessionmaker[Session]) -> None:
         assert count == 1
         recipes = s.scalars(select(Recipe)).all()
         assert len(recipes) == 1
-        assert {k.name for k in recipes[0].keywords} == {"Italian", "Quick"}
+        assert recipes[0].keywords == []
         assert recipes[0].order == 1
 
 
@@ -534,7 +534,7 @@ def test_save_reconciles_by_name_in_place(db: sessionmaker[Session]) -> None:
         assert recipes[0].id == recipe_id  # stable identity across re-extraction
         assert recipes[0].description == "updated"
         assert recipes[0].order == 5
-        assert {k.name for k in recipes[0].keywords} == {"Italian"}
+        assert recipes[0].keywords == []
 
 
 # --------------------------------------------------------------------------- #
@@ -607,7 +607,7 @@ def test_end_to_end_stub_review_then_resume(e2e: tuple[sessionmaker[Session], Pa
         recipes = s.scalars(select(Recipe)).all()
         assert len(recipes) == 2
         assert all(r.book_id == uuid.UUID(book_id) for r in recipes)
-        assert all("Stub" in {k.name for k in r.keywords} for r in recipes)
+        assert all(len(r.keywords) == 5 for r in recipes)
         run = s.scalars(select(TaskRun)).one()
         assert run.status == TaskStatus.DONE
         assert run.recipes_found == 2

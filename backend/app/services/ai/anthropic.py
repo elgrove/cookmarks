@@ -22,6 +22,7 @@ class AnthropicProvider(AIProvider):
         ModelRole.BOOK_KEYWORDS: "claude-sonnet-5",
         ModelRole.KEYWORD_DEDUP: "claude-sonnet-5",
         ModelRole.ASSISTANT: "claude-sonnet-5",
+        ModelRole.RECIPE_ENRICHMENT: "claude-sonnet-5",
     }
 
     def __init__(self, api_key: str, model_overrides: dict[str, str] | None = None) -> None:

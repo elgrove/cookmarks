@@ -133,6 +133,20 @@ def ingest_dispatched(monkeypatch: pytest.MonkeyPatch) -> list[tuple[Any, ...]]:
 
 
 @pytest.fixture(autouse=True)
+def enrichment_pilot_dispatched(monkeypatch: pytest.MonkeyPatch) -> list[tuple[Any, ...]]:
+    """Keep the admin pilot trigger off Redis while API tests record its dispatch."""
+    from app.tasks.recipe_enrichment import recipe_enrichment_pilot_task
+
+    calls: list[tuple[Any, ...]] = []
+
+    def _record(*args: Any, **_kwargs: Any) -> None:
+        calls.append(args)
+
+    monkeypatch.setattr(recipe_enrichment_pilot_task, "delay", _record)
+    return calls
+
+
+@pytest.fixture(autouse=True)
 def _reset_caches() -> Iterator[None]:
     # These caches are module-global; clear them so each test's fresh DB (with fresh
     # recipe ids / its own keyword set) never reads a previous test's cached values.

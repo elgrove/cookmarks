@@ -7,6 +7,7 @@ type Props = TasksPanelProps;
 const RUN = '.run';
 const CHECK = '.regen-check';
 const DEDUP_RUN = '.dedup-run';
+const ENRICHMENT_RUN = '.enrichment-run';
 
 // A handler that echoes the chosen mode back as the queued count, so an invariant can
 // prove the regenerate flag actually reached the call (99 when regenerating, else 1).
@@ -22,6 +23,11 @@ const fixedDedup =
 	(queued: number) =>
 	(): Promise<TaskRunAck> =>
 		Promise.resolve({ task: 'keyword_dedup', status: 'queued', queued });
+
+const fixedEnrichment =
+	(queued: number) =>
+	(): Promise<TaskRunAck> =>
+		Promise.resolve({ task: 'recipe_enrichment_pilot', status: 'queued', queued });
 
 const unit: VerifiableUnit<Props> = {
 	id: 'tasks-panel',
@@ -100,6 +106,28 @@ const unit: VerifiableUnit<Props> = {
 			props: { onRun: fixedRun(5), onDedup: () => Promise.reject(new Error('broker down')) },
 			act: async ({ click, wait }) => {
 				click(DEDUP_RUN);
+				await wait(0);
+			}
+		},
+		{
+			id: 'enrichment-run',
+			description: 'the live enrichment pilot queues its bounded sample for later review',
+			props: { onRun: fixedRun(5), onEnrichmentPilot: fixedEnrichment(100) },
+			act: async ({ click, wait }) => {
+				click(ENRICHMENT_RUN);
+				await wait(0);
+			}
+		},
+		{
+			id: 'enrichment-reject',
+			description: 'probe: pilot dispatch failure is honestly visible',
+			probe: true,
+			props: {
+				onRun: fixedRun(5),
+				onEnrichmentPilot: () => Promise.reject(new Error('provider unavailable'))
+			},
+			act: async ({ click, wait }) => {
+				click(ENRICHMENT_RUN);
 				await wait(0);
 			}
 		},
@@ -201,6 +229,24 @@ const unit: VerifiableUnit<Props> = {
 			check: ({ contract }) =>
 				(contract['dedup-state'] === 'error' && contract['dedup-queued'] === '') ||
 				`dedup-state=${contract['dedup-state']} dedup-queued=${contract['dedup-queued']}`
+		},
+		{
+			id: 'enrichment-queues',
+			description: 'a successful pilot reports the reproducible sample count',
+			onlyFixtures: ['enrichment-run'],
+			check: ({ contract, root }) =>
+				(contract['enrichment-state'] === 'done' &&
+					contract['enrichment-queued'] === '100' &&
+					(root.textContent ?? '').includes('Review the per-recipe results')) ||
+				`state=${contract['enrichment-state']} queued=${contract['enrichment-queued']}`
+		},
+		{
+			id: 'enrichment-reject-errors',
+			description: 'a rejected pilot dispatch does not show a false queue confirmation',
+			onlyFixtures: ['enrichment-reject'],
+			check: ({ contract }) =>
+				(contract['enrichment-state'] === 'error' && contract['enrichment-queued'] === '') ||
+				`state=${contract['enrichment-state']} queued=${contract['enrichment-queued']}`
 		},
 		{
 			id: 'intentional-fail',
