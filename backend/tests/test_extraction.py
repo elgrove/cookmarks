@@ -21,7 +21,7 @@ from app.models.enums import AIProvider as AIProviderEnum
 from app.models.enums import ExtractionMethod, TaskStatus, TaskType
 from app.models.recipe import Recipe
 from app.models.task_run import TaskRun
-from app.schemas.extraction import RecipeData
+from app.schemas.extraction import RecipeData, RecipeIngredientData
 from app.schemas.task_run import TaskRunRead
 from app.services.ai import (
     ModelRole,
@@ -227,7 +227,7 @@ def test_route_post_resolve_no_images_already_tried_block() -> None:
 def test_recipe_data_normalises_and_aliases() -> None:
     r = RecipeData(
         name="PASTA alla NORMA",
-        recipeIngredients=[{"text": "x"}],
+        recipeIngredients=[RecipeIngredientData(text="x")],
         recipeInstructions=["y"],
         recipeYield="serves 4",
     )
@@ -296,14 +296,14 @@ def test_provider_vision_capability() -> None:
 
 def test_deduplicate_recipes_keeps_fullest_in_first_position() -> None:
     short = RecipeData(
-        name="Curry", recipeIngredients=[{"text": "spice"}], recipeInstructions=["Cook."]
+        name="Curry", recipeIngredients=[RecipeIngredientData(text="spice")], recipeInstructions=["Cook."]
     )
     other = RecipeData(
-        name="Rice", recipeIngredients=[{"text": "rice"}], recipeInstructions=["Boil."]
+        name="Rice", recipeIngredients=[RecipeIngredientData(text="rice")], recipeInstructions=["Boil."]
     )
     full = RecipeData(
         name=" curry ",
-        recipeIngredients=[{"text": "spice"}, {"text": "onion"}],
+        recipeIngredients=[RecipeIngredientData(text="spice"), RecipeIngredientData(text="onion")],
         recipeInstructions=["Cook the onions until soft.", "Add the spice."],
     )
     result = deduplicate_recipes_by_title([short, other, full])
