@@ -12,13 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
@@ -28,10 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
@@ -63,6 +54,7 @@ private data class Tab(val route: String, val label: String)
 private val Tabs = listOf(
     Tab("books", "Books"),
     Tab("recipes", "Search"),
+    Tab("lists", "Lists"),
     Tab("discover", "Discover"),
 )
 
@@ -83,7 +75,6 @@ fun MainShell() {
     val immersive = route.startsWith("read/") || route.startsWith("read-list/") ||
         route.startsWith("discover/play")
     val snackbarHostState = remember { SnackbarHostState() }
-    var overflowExpanded by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         Feedback.messages.collect { message ->
@@ -147,38 +138,6 @@ fun MainShell() {
                                     .padding(horizontal = 4.dp, vertical = 16.dp),
                             )
                         }
-                        Box(contentAlignment = Alignment.Center) {
-                            IconButton(onClick = { overflowExpanded = true }) {
-                                Icon(
-                                    Icons.Filled.MoreVert,
-                                    contentDescription = "More navigation",
-                                    tint = if (route.startsWith("lists") || route == "admin") {
-                                        colors.clay
-                                    } else {
-                                        colors.muted
-                                    },
-                                )
-                            }
-                            DropdownMenu(
-                                expanded = overflowExpanded,
-                                onDismissRequest = { overflowExpanded = false },
-                            ) {
-                                DropdownMenuItem(
-                                    text = { Text("Lists") },
-                                    onClick = {
-                                        overflowExpanded = false
-                                        navController.navigate("lists") { launchSingleTop = true }
-                                    },
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("Configuration") },
-                                    onClick = {
-                                        overflowExpanded = false
-                                        navController.navigate("admin") { launchSingleTop = true }
-                                    },
-                                )
-                            }
-                        }
                     }
                 }
             }
@@ -239,6 +198,7 @@ fun MainShell() {
                     ListsScreen(
                         onOpenList = { navController.navigate("lists/$it") },
                         onOpenQueue = { navController.navigate("lists/reading-queue") },
+                        onOpenAdmin = { navController.navigate("admin") { launchSingleTop = true } },
                     )
                 }
                 composable("lists/reading-queue") {
