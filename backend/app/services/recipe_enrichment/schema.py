@@ -1,32 +1,30 @@
-"""The versioned wire contract for one enrichment completion."""
+"""Versioned wire contract for one enrichment completion."""
 
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-SCHEMA_VERSION = "v2"
-PROMPT_VERSION = "v2"
+SCHEMA_VERSION = "v3"
+PROMPT_VERSION = "v3"
 TAXONOMY_VERSION = "v1"
 
 
-class OccurrenceDecision(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+class EnrichmentDecision(BaseModel):
+    """Shared validation configuration for enrichment response models."""
 
-    ingredient_id: str | None = Field(
-        default=None,
-        description="An exact ID from the supplied ingredient vocabulary. Mutually exclusive with canonical_name.",
-    )
-    canonical_name: str | None = Field(
-        default=None,
-        description="A new singular UK-English canonical ingredient name. Mutually exclusive with ingredient_id.",
-    )
-    source_name: str | None = None
-    quantity: str | None = None
-    unit: str | None = None
-    preparation: str | None = None
-    optional: bool = False
-    alternative_group: int | None = Field(default=None, ge=0)
-    is_key: bool = False
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+
+class OccurrenceDecision(EnrichmentDecision):
+    ingredient_id: str | None = Field(default=None, alias="i")
+    canonical_name: str | None = Field(default=None, alias="n")
+    source_name: str | None = Field(default=None, alias="s")
+    quantity: str | None = Field(default=None, alias="q")
+    unit: str | None = Field(default=None, alias="u")
+    preparation: str | None = Field(default=None, alias="p")
+    optional: bool = Field(default=False, alias="x")
+    alternative_group: int | None = Field(default=None, ge=0, alias="a")
+    is_key: bool = Field(default=False, alias="k")
 
     @model_validator(mode="after")
     def has_resolution(self) -> "OccurrenceDecision":
@@ -35,49 +33,39 @@ class OccurrenceDecision(BaseModel):
         return self
 
 
-class LineDecision(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+class LineDecision(EnrichmentDecision):
+    """An AI replacement or an otherwise unresolved ingredient line."""
 
-    line_id: str
-    kind: Literal["ingredient", "heading", "note"]
-    accept_deterministic: Literal[True] | None = Field(
-        default=None,
-        description=(
-            "Set true only for a line ID supplied in deterministic_proposals; then omit occurrences. "
-            "For every ai_parse_line_id omit this field."
-        ),
-    )
-    occurrences: list[OccurrenceDecision] = Field(default_factory=list)
-
-    @model_validator(mode="after")
-    def has_one_parse_path(self) -> "LineDecision":
-        if self.accept_deterministic and self.occurrences:
-            raise ValueError("an accepted deterministic proposal must not include occurrences")
-        return self
+    line_id: str = Field(alias="l")
+    occurrences: list[OccurrenceDecision] = Field(alias="o")
 
 
-class FactDecision(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+class NonIngredientLineDecision(EnrichmentDecision):
+    """Only exceptional heading/note lines need a decision; ingredient is the default."""
 
-    value_id: str
-    source: Literal["explicit", "inferred"]
-    evidence: str | None = None
+    line_id: str = Field(alias="l")
+    kind: Literal["heading", "note"] = Field(alias="k")
+
+
+class FactDecision(EnrichmentDecision):
+    value_id: str = Field(alias="v")
+    source: Literal["explicit", "inferred"] = Field(alias="s")
+    evidence: str | None = Field(default=None, alias="e")
 
 
 class MethodDecision(FactDecision):
-    is_primary: bool = False
+    is_primary: bool = Field(default=False, alias="p")
 
 
-class EnrichmentResponse(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    recipe_id: str
-    source_fingerprint: str
-    lines: list[LineDecision]
-    cuisines: list[FactDecision] = Field(default_factory=list)
-    methods: list[MethodDecision] = Field(default_factory=list)
-    courses: list[FactDecision] = Field(default_factory=list)
-    keywords: list[str]
+class EnrichmentResponse(EnrichmentDecision):
+    recipe_id: str = Field(alias="r")
+    source_fingerprint: str = Field(alias="f")
+    parsed_lines: list[LineDecision] = Field(default_factory=list, alias="p")
+    non_ingredient_lines: list[NonIngredientLineDecision] = Field(default_factory=list, alias="n")
+    cuisines: list[FactDecision] = Field(default_factory=list, alias="c")
+    methods: list[MethodDecision] = Field(default_factory=list, alias="m")
+    courses: list[FactDecision] = Field(default_factory=list, alias="o")
+    keywords: list[str] = Field(alias="w")
 
     @model_validator(mode="after")
     def one_primary_method(self) -> "EnrichmentResponse":

@@ -72,27 +72,23 @@ class StubProvider(AIProvider):
 
         if prompt.startswith("Recipe enrichment prompt"):
             recipe = json.loads(prompt.rsplit("Recipe-specific input:\n", 1)[1])
-            lines = []
+            parsed_lines = []
             token = recipe["id"].split("-")[0]
             for index, line in enumerate(recipe["lines"], start=1):
-                lines.append(
+                parsed_lines.append(
                     {
-                        "line_id": line["id"],
-                        "kind": "ingredient",
-                        "occurrences": [
+                        "l": line["id"],
+                        "o": [
                             {"canonical_name": f"Stub Ingredient {token} {index}", "is_key": False}
                         ],
                     }
                 )
             return json.dumps(
                 {
-                    "recipe_id": recipe["id"],
-                    "source_fingerprint": recipe["source_fingerprint"],
-                    "lines": lines,
-                    "cuisines": [],
-                    "methods": [],
-                    "courses": [],
-                    "keywords": ["Cosy", "Fresh", "Outdoor", "Summer", "Weeknight"],
+                    "r": recipe["id"],
+                    "f": recipe["source_fingerprint"],
+                    "p": parsed_lines,
+                    "w": ["Cosy", "Fresh", "Outdoor", "Summer", "Weeknight"],
                 }
             ), usage
 

@@ -77,12 +77,16 @@ class Usage:
     cost_usd: Decimal | None = None
     input_tokens: int | None = None
     output_tokens: int | None = None
+    candidate_tokens: int | None = None
+    thinking_tokens: int | None = None
 
     def __add__(self, other: "Usage") -> "Usage":
         return Usage(
             cost_usd=_sum_optional(self.cost_usd, other.cost_usd),
             input_tokens=_sum_optional(self.input_tokens, other.input_tokens),
             output_tokens=_sum_optional(self.output_tokens, other.output_tokens),
+            candidate_tokens=_sum_optional(self.candidate_tokens, other.candidate_tokens),
+            thinking_tokens=_sum_optional(self.thinking_tokens, other.thinking_tokens),
         )
 
 

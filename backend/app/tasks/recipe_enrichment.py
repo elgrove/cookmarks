@@ -186,6 +186,8 @@ def run_recipe_enrichment_pilot(run_id: str) -> dict:
             "primary_method_coverage": sum(
                 bool(item.get("methods")) for item in outcomes if item["status"] == "complete"
             ),
+            "candidate_tokens": usage.candidate_tokens,
+            "thinking_tokens": usage.thinking_tokens,
             **dict(line_counts),
         }
         complete_run(run_id, detail, usage)

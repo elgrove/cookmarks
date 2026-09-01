@@ -199,28 +199,27 @@ def _validate_response(
     if response.source_fingerprint != state.source_fingerprint:
         raise EnrichmentValidationError("response source fingerprint is stale")
     lines = {str(line.id): line for line in recipe.ingredients_verbatim}
-    decisions = [decision.line_id for decision in response.lines]
-    if set(decisions) != set(lines) or len(decisions) != len(set(decisions)):
-        raise EnrichmentValidationError("response must decide every known line exactly once")
-    if any(decision.line_id not in lines for decision in response.lines):
+    parsed = {decision.line_id: decision for decision in response.parsed_lines}
+    non_ingredient = {decision.line_id: decision for decision in response.non_ingredient_lines}
+    if len(parsed) != len(response.parsed_lines) or len(non_ingredient) != len(
+        response.non_ingredient_lines
+    ):
+        raise EnrichmentValidationError("response contains duplicate line decisions")
+    if not (set(parsed) | set(non_ingredient)) <= set(lines):
         raise EnrichmentValidationError("response includes an unknown ingredient line")
-    for decision in response.lines:
-        if decision.accept_deterministic and decision.line_id not in proposals:
-            raise EnrichmentValidationError("accepted deterministic proposal was not supplied")
-        if decision.kind == IngredientLineKind.INGREDIENT and not (
-            decision.accept_deterministic or decision.occurrences
-        ):
-            raise EnrichmentValidationError("ingredient line has no occurrence")
-        if decision.kind != IngredientLineKind.INGREDIENT and (
-            decision.accept_deterministic or decision.occurrences
-        ):
-            raise EnrichmentValidationError("only ingredient lines may contain occurrences")
+    if set(parsed) & set(non_ingredient):
+        raise EnrichmentValidationError("line cannot be both parsed and non-ingredient")
+    ai_line_ids = set(lines) - set(proposals)
+    if (set(parsed) | set(non_ingredient)) & ai_line_ids != ai_line_ids:
+        raise EnrichmentValidationError("response must decide every AI-parsed line")
+    if any(not decision.occurrences for decision in response.parsed_lines):
+        raise EnrichmentValidationError("parsed ingredient line has no occurrence")
 
     canonical, aliases = _ingredient_vocab(session)
     canonical_ids = set(canonical)
     proposed = [
         occ.canonical_name
-        for line in response.lines
+        for line in response.parsed_lines
         for occ in line.occurrences
         if occ.canonical_name
     ]
@@ -230,7 +229,7 @@ def _validate_response(
     }
     if any(name in occupied for name in proposed_folded):
         raise EnrichmentValidationError("canonical ingredient collides with vocabulary")
-    for occurrence in (occ for line in response.lines for occ in line.occurrences):
+    for occurrence in (occ for line in response.parsed_lines for occ in line.occurrences):
         if occurrence.ingredient_id and occurrence.ingredient_id not in canonical_ids:
             raise EnrichmentValidationError("response references an unknown canonical ingredient")
 
@@ -302,25 +301,32 @@ def _apply_response(
     occurrences_created = 0
     deterministic_accepted = 0
     ai_lines = 0
-    for decision in response.lines:
-        line = next(
-            line for line in recipe.ingredients_verbatim if str(line.id) == decision.line_id
-        )
-        line.kind = IngredientLineKind(decision.kind)
+    parsed_lines = {decision.line_id: decision for decision in response.parsed_lines}
+    non_ingredient_lines = {
+        decision.line_id: decision for decision in response.non_ingredient_lines
+    }
+    for line in recipe.ingredients_verbatim:
+        line_id = str(line.id)
         session.execute(delete(IngredientOccurrence).where(IngredientOccurrence.line_id == line.id))
         parsed = []
-        if decision.accept_deterministic:
+        if line_id in non_ingredient_lines:
+            line.kind = IngredientLineKind(non_ingredient_lines[line_id].kind)
+        elif line_id in parsed_lines:
+            decision = parsed_lines[line_id]
+            line.kind = IngredientLineKind.INGREDIENT
+            ai_lines += 1
+            parsed = [(item, IngredientParseMethod.AI, item) for item in decision.occurrences]
+        else:
+            line.kind = IngredientLineKind.INGREDIENT
+            assert line_id in proposals
             deterministic_accepted += 1
             parsed = [
                 (item, IngredientParseMethod.DETERMINISTIC, None)
-                for item in proposals[decision.line_id].occurrences
+                for item in proposals[line_id].occurrences
             ]
-        elif decision.kind == IngredientLineKind.INGREDIENT:
-            ai_lines += 1
-            parsed = [(item, IngredientParseMethod.AI, item) for item in decision.occurrences]
         for position, (raw, parse_method, decision_occurrence) in enumerate(parsed):
             if parse_method is IngredientParseMethod.DETERMINISTIC:
-                assert isinstance(raw, type(proposals[decision.line_id].occurrences[0]))
+                assert isinstance(raw, type(proposals[line_id].occurrences[0]))
                 ingredient, resolution = _resolve_existing(session, raw.name)
                 existing_ingredients += 1
                 quantity, unit, preparation = raw.quantity, raw.unit, raw.preparation

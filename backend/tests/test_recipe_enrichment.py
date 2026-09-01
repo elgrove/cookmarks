@@ -39,10 +39,9 @@ def _response(recipe: Recipe, ingredient_id: uuid.UUID, **overrides) -> Enrichme
     data = {
         "recipe_id": str(recipe.id),
         "source_fingerprint": "current",
-        "lines": [
+        "parsed_lines": [
             {
                 "line_id": str(recipe.ingredients_verbatim[0].id),
-                "kind": "ingredient",
                 "occurrences": [{"ingredient_id": str(ingredient_id), "is_key": True}],
             }
         ],
@@ -138,8 +137,8 @@ def test_only_methods_offer_primary_flag(session) -> None:
             courses=[{"value_id": "main", "source": "inferred", "is_primary": True}],
         )
     definitions = ENRICHMENT_JSON_SCHEMA["$defs"]
-    assert "is_primary" not in definitions["FactDecision"]["properties"]
-    assert "is_primary" in definitions["MethodDecision"]["properties"]
+    assert "p" not in definitions["FactDecision"]["properties"]
+    assert "p" in definitions["MethodDecision"]["properties"]
 
 
 def test_response_rejects_ambiguous_occurrence_resolution(session) -> None:
@@ -149,10 +148,9 @@ def test_response_rejects_ambiguous_occurrence_resolution(session) -> None:
         _response(
             recipe,
             ingredient.id,
-            lines=[
+            parsed_lines=[
                 {
                     "line_id": str(recipe.ingredients_verbatim[0].id),
-                    "kind": "ingredient",
                     "occurrences": [
                         {
                             "ingredient_id": str(ingredient.id),
@@ -164,7 +162,7 @@ def test_response_rejects_ambiguous_occurrence_resolution(session) -> None:
         )
 
 
-def test_response_rejects_deterministic_acceptance_for_an_ai_line(session) -> None:
+def test_response_rejects_missing_ai_line_decision(session) -> None:
     recipe = _recipe(session)
     ingredient = create_ingredient(session, "Sea Salt")
     _, proposals = build_context(session, recipe)
@@ -172,15 +170,9 @@ def test_response_rejects_deterministic_acceptance_for_an_ai_line(session) -> No
     response = _response(
         recipe,
         ingredient.id,
-        lines=[
-            {
-                "line_id": str(recipe.ingredients_verbatim[0].id),
-                "kind": "ingredient",
-                "accept_deterministic": True,
-            }
-        ],
+        parsed_lines=[],
     )
-    with pytest.raises(EnrichmentValidationError, match="was not supplied"):
+    with pytest.raises(EnrichmentValidationError, match="must decide every AI-parsed"):
         apply_enrichment(
             session,
             recipe.id,
@@ -191,34 +183,16 @@ def test_response_rejects_deterministic_acceptance_for_an_ai_line(session) -> No
         )
 
 
-def test_response_rejects_false_deterministic_acceptance(session) -> None:
-    recipe = _recipe(session)
-    ingredient = create_ingredient(session, "Sea Salt")
-    with pytest.raises(ValidationError, match="Input should be True"):
-        _response(
-            recipe,
-            ingredient.id,
-            lines=[
-                {
-                    "line_id": str(recipe.ingredients_verbatim[0].id),
-                    "kind": "ingredient",
-                    "accept_deterministic": False,
-                    "occurrences": [{"ingredient_id": str(ingredient.id)}],
-                }
-            ],
-        )
-
-
 def test_schema_version_tracks_the_constrained_output_change() -> None:
-    assert SCHEMA_VERSION == "v2"
+    assert SCHEMA_VERSION == "v3"
 
 
 def test_prompt_distinguishes_deterministic_and_ai_line_decisions(session) -> None:
     recipe = _recipe(session)
     context, _ = build_context(session, recipe)
     prompt = build_prompt(context)
-    assert "For every ai_parse_line_id,\nomit accept_deterministic" in prompt
-    assert "never both" in prompt
+    assert "Omit accepted deterministic proposals entirely" in prompt
+    assert "never\nboth" in prompt
 
 
 def test_repeated_new_canonical_ingredient_resolves_to_one_identity(session) -> None:
@@ -232,10 +206,9 @@ def test_repeated_new_canonical_ingredient_resolves_to_one_identity(session) -> 
         {
             "recipe_id": str(recipe.id),
             "source_fingerprint": "current",
-            "lines": [
+            "parsed_lines": [
                 {
                     "line_id": str(line.id),
-                    "kind": "ingredient",
                     "occurrences": [{"canonical_name": "Seaweed", "is_key": True}],
                 }
                 for line in recipe.ingredients_verbatim
