@@ -1,5 +1,3 @@
-import uuid
-
 import pytest
 from pydantic import ValidationError
 
@@ -20,7 +18,7 @@ from app.services.recipe_enrichment.service import (
     build_context,
     enrich_recipe,
 )
-from app.services.recipe_facts import create_ingredient
+from app.services.recipe_facts import add_ingredient_alias, create_ingredient
 
 
 def _recipe(session) -> Recipe:
@@ -35,14 +33,14 @@ def _recipe(session) -> Recipe:
     return recipe
 
 
-def _response(recipe: Recipe, ingredient_id: uuid.UUID, **overrides) -> EnrichmentResponse:
+def _response(recipe: Recipe, **overrides) -> EnrichmentResponse:
     data = {
         "recipe_id": str(recipe.id),
         "source_fingerprint": "current",
         "parsed_lines": [
             {
                 "line_id": str(recipe.ingredients_verbatim[0].id),
-                "occurrences": [{"ingredient_id": str(ingredient_id), "is_key": True}],
+                "occurrences": [{"canonical_name": "Sea Salt", "is_key": True}],
             }
         ],
         "cuisines": [],
@@ -58,13 +56,13 @@ def _response(recipe: Recipe, ingredient_id: uuid.UUID, **overrides) -> Enrichme
 
 def test_apply_enrichment_replaces_all_derived_facts_atomically(session) -> None:
     recipe = _recipe(session)
-    ingredient = create_ingredient(session, "Sea Salt")
+    create_ingredient(session, "Sea Salt")
     context, proposals = build_context(session, recipe)
     assert context["recipe"]["ai_parse_line_ids"] == [str(recipe.ingredients_verbatim[0].id)]
     result = apply_enrichment(
         session,
         recipe.id,
-        _response(recipe, ingredient.id),
+        _response(recipe),
         proposals,
         provider=StubProvider(""),
         model="stub-enrichment",
@@ -72,6 +70,7 @@ def test_apply_enrichment_replaces_all_derived_facts_atomically(session) -> None
     session.commit()
     session.refresh(recipe)
     assert result["occurrences"] == 1
+    assert result["existing_ingredients"] == 1
     assert recipe.enrichment_state is not None
     assert recipe.enrichment_state.status is RecipeEnrichmentStatus.COMPLETE
     assert [item.ingredient.name for item in session.query(IngredientOccurrence).all()] == [
@@ -87,13 +86,42 @@ def test_apply_enrichment_replaces_all_derived_facts_atomically(session) -> None
     }
 
 
+def test_apply_enrichment_resolves_an_ai_canonical_name_through_an_alias(session) -> None:
+    recipe = _recipe(session)
+    ingredient = create_ingredient(session, "Chickpea")
+    add_ingredient_alias(session, ingredient, "Garbanzo Bean")
+    response = _response(
+        recipe,
+        parsed_lines=[
+            {
+                "line_id": str(recipe.ingredients_verbatim[0].id),
+                "occurrences": [{"canonical_name": "Garbanzo Bean", "is_key": True}],
+            }
+        ],
+    )
+    _, proposals = build_context(session, recipe)
+
+    result = apply_enrichment(
+        session,
+        recipe.id,
+        response,
+        proposals,
+        provider=StubProvider(""),
+        model="stub-enrichment",
+    )
+
+    occurrence = session.query(IngredientOccurrence).one()
+    assert result["existing_ingredients"] == 1
+    assert occurrence.ingredient_id == ingredient.id
+
+
 def test_invalid_response_rolls_back_and_keeps_previous_keywords(session) -> None:
     recipe = _recipe(session)
     recipe.keywords = [Keyword(name="Existing")]
-    ingredient = create_ingredient(session, "Sea Salt")
+    create_ingredient(session, "Sea Salt")
     session.commit()
     _, proposals = build_context(session, recipe)
-    bad = _response(recipe, ingredient.id, keywords=["Only", "Four", "Keywords", "Here"])
+    bad = _response(recipe, keywords=["Only", "Four", "Keywords", "Here"])
     with pytest.raises(EnrichmentValidationError, match="exactly five"):
         apply_enrichment(
             session,
@@ -129,33 +157,47 @@ def test_stub_enrichment_is_separate_and_offline(session) -> None:
 
 def test_only_methods_offer_primary_flag(session) -> None:
     recipe = _recipe(session)
-    ingredient = create_ingredient(session, "Sea Salt")
     with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
-        _response(
-            recipe,
-            ingredient.id,
-            courses=[{"value_id": "main", "source": "inferred", "is_primary": True}],
-        )
+        _response(recipe, courses=[{"value_id": "main", "source": "inferred", "is_primary": True}])
     definitions = ENRICHMENT_JSON_SCHEMA["$defs"]
     assert "p" not in definitions["FactDecision"]["properties"]
     assert "p" in definitions["MethodDecision"]["properties"]
 
 
-def test_response_rejects_ambiguous_occurrence_resolution(session) -> None:
+def test_enrichment_prompt_requires_one_occurrence_resolution_and_central_methods() -> None:
+    prompt = build_prompt(
+        {
+            "vocabulary": {"ingredients": [], "cuisines": [], "methods": [], "courses": []},
+            "recipe": {
+                "id": "recipe-id",
+                "source_fingerprint": "fingerprint",
+                "name": "Recipe",
+                "description": None,
+                "yield": None,
+                "instructions": [],
+                "lines": [],
+                "deterministic_proposals": [],
+                "ai_parse_line_ids": [],
+            },
+        }
+    )
+
+    assert "There is\nno ingredient ID field" in prompt
+    assert "central, intentional cooking technique" in prompt
+    assert "chopping, slicing, mixing" in prompt
+    assert "Decide cuisines, methods and courses" in prompt
+
+
+def test_response_rejects_ingredient_ids(session) -> None:
     recipe = _recipe(session)
-    ingredient = create_ingredient(session, "Sea Salt")
-    with pytest.raises(ValidationError, match="exactly one"):
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
         _response(
             recipe,
-            ingredient.id,
             parsed_lines=[
                 {
                     "line_id": str(recipe.ingredients_verbatim[0].id),
                     "occurrences": [
-                        {
-                            "ingredient_id": str(ingredient.id),
-                            "canonical_name": "Sea Salt",
-                        }
+                        {"ingredient_id": "ingredient-id", "canonical_name": "Sea Salt"}
                     ],
                 }
             ],
@@ -164,12 +206,10 @@ def test_response_rejects_ambiguous_occurrence_resolution(session) -> None:
 
 def test_response_rejects_missing_ai_line_decision(session) -> None:
     recipe = _recipe(session)
-    ingredient = create_ingredient(session, "Sea Salt")
     _, proposals = build_context(session, recipe)
     assert not proposals
     response = _response(
         recipe,
-        ingredient.id,
         parsed_lines=[],
     )
     with pytest.raises(EnrichmentValidationError, match="must decide every AI-parsed"):
@@ -183,8 +223,8 @@ def test_response_rejects_missing_ai_line_decision(session) -> None:
         )
 
 
-def test_schema_version_tracks_the_constrained_output_change() -> None:
-    assert SCHEMA_VERSION == "v3"
+def test_schema_version_tracks_the_name_only_output_change() -> None:
+    assert SCHEMA_VERSION == "v4"
 
 
 def test_prompt_distinguishes_deterministic_and_ai_line_decisions(session) -> None:
@@ -192,7 +232,7 @@ def test_prompt_distinguishes_deterministic_and_ai_line_decisions(session) -> No
     context, _ = build_context(session, recipe)
     prompt = build_prompt(context)
     assert "Omit accepted deterministic proposals entirely" in prompt
-    assert "never\nboth" in prompt
+    assert "no ingredient ID field" in prompt
 
 
 def test_repeated_new_canonical_ingredient_resolves_to_one_identity(session) -> None:

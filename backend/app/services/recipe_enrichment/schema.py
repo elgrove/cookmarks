@@ -4,8 +4,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-SCHEMA_VERSION = "v3"
-PROMPT_VERSION = "v3"
+SCHEMA_VERSION = "v4"
+PROMPT_VERSION = "v6"
 TAXONOMY_VERSION = "v1"
 
 
@@ -16,8 +16,7 @@ class EnrichmentDecision(BaseModel):
 
 
 class OccurrenceDecision(EnrichmentDecision):
-    ingredient_id: str | None = Field(default=None, alias="i")
-    canonical_name: str | None = Field(default=None, alias="n")
+    canonical_name: str = Field(min_length=1, alias="n")
     source_name: str | None = Field(default=None, alias="s")
     quantity: str | None = Field(default=None, alias="q")
     unit: str | None = Field(default=None, alias="u")
@@ -25,13 +24,6 @@ class OccurrenceDecision(EnrichmentDecision):
     optional: bool = Field(default=False, alias="x")
     alternative_group: int | None = Field(default=None, ge=0, alias="a")
     is_key: bool = Field(default=False, alias="k")
-
-    @model_validator(mode="after")
-    def has_resolution(self) -> "OccurrenceDecision":
-        if bool(self.ingredient_id) == bool(self.canonical_name):
-            raise ValueError("occurrence needs exactly one ingredient_id or canonical_name")
-        return self
-
 
 class LineDecision(EnrichmentDecision):
     """An AI replacement or an otherwise unresolved ingredient line."""

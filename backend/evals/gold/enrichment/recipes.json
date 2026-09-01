@@ -1,0 +1,985 @@
+[
+  {
+    "id": "ccdfd2a9-98d7-4369-bcef-ba707027266e",
+    "slug": "teriyaki-yellowtail",
+    "name": "Teriyaki Yellowtail (buri No Teriyaki)",
+    "archetype": "simple",
+    "yields": "Serves 4 as part of a larger meal",
+    "instructions": [
+      "1. Pat the yellowtail fillets dry with a paper towel, then season lightly with the salt. Set aside.",
+      "2. Whisk together the sake, mirin, soy sauce, and sugar in a bowl.",
+      "3. Heat a large nonstick skillet over medium heat, then coat with the vegetable oil. Carefully lay the yellowtail fillets in the pan and cook until golden brown on the first side, about 2 minutes. Flip and cook for 1 more minute. Add the sauce mixture and cook for about 3 minutes, flipping the fillets occasionally to coat them in sauce, until the fish is cooked through and the sauce is beginning to get syrupy.",
+      "4. Transfer the fillets to a plate and top with the sauce. Serve with steamed rice."
+    ],
+    "lines": [
+      {
+        "position": 0,
+        "text": "4 yellowtail (hamachi) fillets (about 12 ounces)",
+        "kind": "ingredient",
+        "occurrences": [
+          {
+            "canonical_name": "Yellowtail Fillet",
+            "quantity": "4",
+            "unit": null,
+            "preparation": null,
+            "optional": false,
+            "alternative_group": null,
+            "is_key": true
+          }
+        ]
+      },
+      {
+        "position": 1,
+        "text": "1\u00bd teaspoons kosher salt",
+        "kind": "ingredient",
+        "occurrences": [
+          {
+            "canonical_name": "Kosher Salt",
+            "quantity": "1\u00bd",
+            "unit": "tsp",
+            "preparation": null,
+            "optional": false,
+            "alternative_group": null,
+            "is_key": false
+          }
+        ]
+      },
+      {
+        "position": 2,
+        "text": "3 tablespoons sake",
+        "kind": "ingredient",
+        "occurrences": [
+          {
+            "canonical_name": "Sake",
+            "quantity": "3",
+            "unit": "tbsp",
+            "preparation": null,
+            "optional": false,
+            "alternative_group": null,
+            "is_key": false
+          }
+        ]
+      },
+      {
+        "position": 3,
+        "text": "3 tablespoons mirin",
+        "kind": "ingredient",
+        "occurrences": [
+          {
+            "canonical_name": "Mirin",
+            "quantity": "3",
+            "unit": "tbsp",
+            "preparation": null,
+            "optional": false,
+            "alternative_group": null,
+            "is_key": false
+          }
+        ]
+      },
+      {
+        "position": 4,
+        "text": "3 tablespoons soy sauce",
+        "kind": "ingredient",
+        "occurrences": [
+          {
+            "canonical_name": "Soy Sauce",
+            "quantity": "3",
+            "unit": "tbsp",
+            "preparation": null,
+            "optional": false,
+            "alternative_group": null,
+            "is_key": false
+          }
+        ]
+      },
+      {
+        "position": 5,
+        "text": "1 tablespoon plus 2 teaspoons sugar",
+        "kind": "ingredient",
+        "occurrences": [
+          {
+            "canonical_name": "Sugar",
+            "quantity": "1 tbsp plus 2 tsp",
+            "unit": "tbsp",
+            "preparation": null,
+            "optional": false,
+            "alternative_group": null,
+            "is_key": false
+          }
+        ]
+      },
+      {
+        "position": 6,
+        "text": "2 teaspoons vegetable oil",
+        "kind": "ingredient",
+        "occurrences": [
+          {
+            "canonical_name": "Vegetable Oil",
+            "quantity": "2",
+            "unit": "tsp",
+            "preparation": null,
+            "optional": false,
+            "alternative_group": null,
+            "is_key": false
+          }
+        ]
+      },
+      {
+        "position": 7,
+        "text": "For Serving",
+        "kind": "heading",
+        "occurrences": []
+      },
+      {
+        "position": 8,
+        "text": "Steamed rice",
+        "kind": "ingredient",
+        "occurrences": [
+          {
+            "canonical_name": "Steamed Rice",
+            "quantity": null,
+            "unit": null,
+            "preparation": null,
+            "optional": false,
+            "alternative_group": null,
+            "is_key": false
+          }
+        ]
+      }
+    ],
+    "cuisines": [
+      {
+        "value_id": "japanese",
+        "source": "explicit",
+        "evidence": "Buri no Teriyaki"
+      }
+    ],
+    "methods": [
+      {
+        "value_id": "fry",
+        "source": "explicit",
+        "evidence": "cook until golden brown on the first side, about 2 minutes",
+        "is_primary": true
+      }
+    ],
+    "courses": [
+      {
+        "value_id": "main",
+        "source": "inferred",
+        "evidence": "main dish with rice"
+      }
+    ],
+    "accepted_courses": [
+      "main"
+    ],
+    "residual_keywords": [
+      "Teriyaki",
+      "Yellowtail",
+      "Buri",
+      "Pan Fried",
+      "Glazed"
+    ]
+  },
+  {
+    "id": "189c9f1e-7807-42dc-8f7b-5acfc650e903",
+    "slug": "aubergine-borani",
+    "name": "Aubergine Borani",
+    "archetype": "multi_step_compound",
+    "yields": null,
+    "instructions": [
+      "Sprinkle the aubergine slices with the salt and set aside for 5 minutes to draw out the moisture, then rinse and dry with paper towels.",
+      "Heat an overhead grill (broiler) to high. Drizzle the aubergine slices with the oil, place on a baking tray and grill (broil) until brown on one side, then flip and brown on the other. Set aside.",
+      "To make the tomato topping, heat the oil in a frying pan over medium heat. When it is hot, add the onion, garlic and ginger and cook, stirring, until light brown, then add the tomatoes and salt and cook until the tomatoes are soft and the oil rises to the surface. Set aside.",
+      "For the yoghurt and mint, mix all the ingredients together.",
+      "To assemble the dish, lay most of the aubergine slices on a serving plate and spoon over the tomato topping, then drizzle with the yoghurt and mint. Finish with the remaining aubergine slices.",
+      "For the tempering, heat the oil in a small frying pan over medium heat. When it is hot, add the cumin seeds and chillies and fry for a few seconds, then pour over the dish.",
+      "Serve at room temperature, garnished with dill and coriander."
+    ],
+    "lines": [
+      {
+        "position": 0,
+        "text": "2 aubergines (eggplants), cut into rounds about 5 mm (\u00bc inch) thick",
+        "kind": "ingredient",
+        "occurrences": [
+          {
+            "canonical_name": "Aubergine",
+            "quantity": "2",
+            "unit": null,
+            "preparation": "cut into rounds",
+            "optional": false,
+            "alternative_group": null,
+            "is_key": true
+          }
+        ]
+      },
+      {
+        "position": 1,
+        "text": "1 tablespoon Himalayan pink salt",
+        "kind": "ingredient",
+        "occurrences": [
+          {
+            "canonical_name": "Pink Salt",
+            "quantity": "1",
+            "unit": "tbsp",
+            "preparation": null,
+            "optional": false,
+            "alternative_group": null,
+            "is_key": false
+          }
+        ]
+      },
+      {
+        "position": 2,
+        "text": "2 tablespoons sunflower oil",
+        "kind": "ingredient",
+        "occurrences": [
+          {
+            "canonical_name": "Sunflower Oil",
+            "quantity": "2",
+            "unit": "tbsp",
+            "preparation": null,
+            "optional": false,
+            "alternative_group": null,
+            "is_key": false
+          }
+        ]
+      },
+      {
+        "position": 3,
+        "text": "For the tomato topping",
+        "kind": "heading",
+        "occurrences": []
+      },
+      {
+        "position": 4,
+        "text": "2 tablespoons sunflower oil",
+        "kind": "ingredient",
+        "occurrences": [
+          {
+            "canonical_name": "Sunflower Oil",
+            "quantity": "2",
+            "unit": "tbsp",
+            "preparation": null,
+            "optional": false,
+            "alternative_group": null,
+            "is_key": false
+          }
+        ]
+      },
+      {
+        "position": 5,
+        "text": "1 small red onion, finely chopped",
+        "kind": "ingredient",
+        "occurrences": [
+          {
+            "canonical_name": "Red Onion",
+            "quantity": "1",
+            "unit": "small",
+            "preparation": "finely chopped",
+            "optional": false,
+            "alternative_group": null,
+            "is_key": false
+          }
+        ]
+      },
+      {
+        "position": 6,
+        "text": "2 garlic cloves, thinly sliced",
+        "kind": "ingredient",
+        "occurrences": [
+          {
+            "canonical_name": "Garlic",
+            "quantity": "2",
+            "unit": "clove",
+            "preparation": "thinly sliced",
+            "optional": false,
+            "alternative_group": null,
+            "is_key": false
+          }
+        ]
+      },
+      {
+        "position": 7,
+        "text": "1 teaspoon finely grated ginger",
+        "kind": "ingredient",
+        "occurrences": [
+          {
+            "canonical_name": "Ginger",
+            "quantity": "1",
+            "unit": "tsp",
+            "preparation": "finely grated",
+            "optional": false,
+            "alternative_group": null,
+            "is_key": false
+          }
+        ]
+      },
+      {
+        "position": 8,
+        "text": "4 tomatoes, finely chopped",
+        "kind": "ingredient",
+        "occurrences": [
+          {
+            "canonical_name": "Tomato",
+            "quantity": "4",
+            "unit": null,
+            "preparation": "finely chopped",
+            "optional": false,
+            "alternative_group": null,
+            "is_key": true
+          }
+        ]
+      },
+      {
+        "position": 9,
+        "text": "salt, to taste",
+        "kind": "ingredient",
+        "occurrences": [
+          {
+            "canonical_name": "Salt",
+            "quantity": null,
+            "unit": null,
+            "preparation": "to taste",
+            "optional": false,
+            "alternative_group": null,
+            "is_key": false
+          }
+        ]
+      },
+      {
+        "position": 10,
+        "text": "For the yoghurt and mint",
+        "kind": "heading",
+        "occurrences": []
+      },
+      {
+        "position": 11,
+        "text": "260 g (1 cup) full-fat Greek-style yoghurt",
+        "kind": "ingredient",
+        "occurrences": [
+          {
+            "canonical_name": "Greek Yoghurt",
+            "quantity": "260",
+            "unit": "g",
+            "preparation": null,
+            "optional": false,
+            "alternative_group": null,
+            "is_key": true
+          }
+        ]
+      },
+      {
+        "position": 12,
+        "text": "\u00bd teaspoon crushed garlic",
+        "kind": "ingredient",
+        "occurrences": [
+          {
+            "canonical_name": "Garlic",
+            "quantity": "\u00bd",
+            "unit": "tsp",
+            "preparation": "crushed",
+            "optional": false,
+            "alternative_group": null,
+            "is_key": false
+          }
+        ]
+      },
+      {
+        "position": 13,
+        "text": "1 teaspoon dried mint",
+        "kind": "ingredient",
+        "occurrences": [
+          {
+            "canonical_name": "Dried Mint",
+            "quantity": "1",
+            "unit": "tsp",
+            "preparation": null,
+            "optional": false,
+            "alternative_group": null,
+            "is_key": false
+          }
+        ]
+      },
+      {
+        "position": 14,
+        "text": "salt, to taste",
+        "kind": "ingredient",
+        "occurrences": [
+          {
+            "canonical_name": "Salt",
+            "quantity": null,
+            "unit": null,
+            "preparation": "to taste",
+            "optional": false,
+            "alternative_group": null,
+            "is_key": false
+          }
+        ]
+      },
+      {
+        "position": 15,
+        "text": "For the tempering",
+        "kind": "heading",
+        "occurrences": []
+      },
+      {
+        "position": 16,
+        "text": "1 tablespoon sunflower oil",
+        "kind": "ingredient",
+        "occurrences": [
+          {
+            "canonical_name": "Sunflower Oil",
+            "quantity": "1",
+            "unit": "tbsp",
+            "preparation": null,
+            "optional": false,
+            "alternative_group": null,
+            "is_key": false
+          }
+        ]
+      },
+      {
+        "position": 17,
+        "text": "\u00bd teaspoon cumin seeds",
+        "kind": "ingredient",
+        "occurrences": [
+          {
+            "canonical_name": "Cumin Seeds",
+            "quantity": "\u00bd",
+            "unit": "tsp",
+            "preparation": null,
+            "optional": false,
+            "alternative_group": null,
+            "is_key": false
+          }
+        ]
+      },
+      {
+        "position": 18,
+        "text": "2 dried red chillies",
+        "kind": "ingredient",
+        "occurrences": [
+          {
+            "canonical_name": "Dried Red Chilli",
+            "quantity": "2",
+            "unit": null,
+            "preparation": null,
+            "optional": false,
+            "alternative_group": null,
+            "is_key": false
+          }
+        ]
+      },
+      {
+        "position": 19,
+        "text": "To garnish",
+        "kind": "heading",
+        "occurrences": []
+      },
+      {
+        "position": 20,
+        "text": "1 tablespoon chopped dill",
+        "kind": "ingredient",
+        "occurrences": [
+          {
+            "canonical_name": "Dill",
+            "quantity": "1",
+            "unit": "tbsp",
+            "preparation": "chopped",
+            "optional": false,
+            "alternative_group": null,
+            "is_key": false
+          }
+        ]
+      },
+      {
+        "position": 21,
+        "text": "1 tablespoon coriander (cilantro) leaves",
+        "kind": "ingredient",
+        "occurrences": [
+          {
+            "canonical_name": "Coriander",
+            "quantity": "1",
+            "unit": "tbsp",
+            "preparation": null,
+            "optional": false,
+            "alternative_group": null,
+            "is_key": false
+          }
+        ]
+      }
+    ],
+    "cuisines": [
+      {
+        "value_id": "pakistani",
+        "source": "explicit",
+        "evidence": "Pakistani kitchen memoir"
+      }
+    ],
+    "accepted_cuisines": [
+      "pakistani",
+      "afghan"
+    ],
+    "methods": [
+      {
+        "value_id": "grill",
+        "source": "explicit",
+        "evidence": "Heat an overhead grill (broiler) to high... grill (broil) until brown",
+        "is_primary": true
+      },
+      {
+        "value_id": "fry",
+        "source": "explicit",
+        "evidence": "fry for a few seconds",
+        "is_primary": false
+      }
+    ],
+    "courses": [
+      {
+        "value_id": "side",
+        "source": "inferred",
+        "evidence": "layered aubergine vegetable dish"
+      }
+    ],
+    "accepted_courses": [
+      "side",
+      "main",
+      "starter"
+    ],
+    "residual_keywords": [
+      "Borani",
+      "Tarka",
+      "Tempering",
+      "Layered",
+      "Yoghurt Dip"
+    ]
+  },
+  {
+    "id": "07bdd2a9-9df0-463a-be0b-8c688bbd9796",
+    "slug": "curry-udon",
+    "name": "Curry Udon",
+    "archetype": "heading_and_alternative_heavy",
+    "yields": "Serves 4",
+    "instructions": [
+      "Heat the oil in a saucepan over a medium heat and add the onion. Cook until lightly browned, then add the chilli, garlic and red pepper. Continue to cook until the garlic has softened and the pepper has started to brown.",
+      "Remove the veg from the pan with a slotted spoon and reserve. Add the butter to the pan and let it melt, then whisk in the flour. Cook until the roux turns a light golden brown, stirring constantly. Add the curry powder and garam masala, reduce the heat to low and cook for a few minutes, stirring frequently. Add the stock or dashi in a thin stream, whisking constantly to prevent lumps, and bring to the boil. Add the soy sauce and ketchup or tonkatsu sauce and reduce to a simmer.",
+      "If using a sweetcorn cob, blanch in boiling water then cut off the kernels, or heat up the tinned sweetcorn in a saucepan or the microwave.",
+      "Cook the udon according to the package instructions, then drain and portion into deep bowls. Pour over the curry broth and top with the sweetcorn kernels, saut\u00e9ed onion and pepper mixture, spring onions, eggs, chilli flakes, pickled ginger, cheese, if using, and sesame seeds."
+    ],
+    "lines": [
+      {
+        "position": 0,
+        "text": "2 tablespoons vegetable oil",
+        "kind": "ingredient",
+        "occurrences": [
+          {
+            "canonical_name": "Vegetable Oil",
+            "quantity": "2",
+            "unit": "tbsp",
+            "preparation": null,
+            "optional": false,
+            "alternative_group": null,
+            "is_key": false
+          }
+        ]
+      },
+      {
+        "position": 1,
+        "text": "1 large onion, thinly sliced",
+        "kind": "ingredient",
+        "occurrences": [
+          {
+            "canonical_name": "Onion",
+            "quantity": "1",
+            "unit": "large",
+            "preparation": "thinly sliced",
+            "optional": false,
+            "alternative_group": null,
+            "is_key": false
+          }
+        ]
+      },
+      {
+        "position": 2,
+        "text": "1 green chilli, very finely chopped",
+        "kind": "ingredient",
+        "occurrences": [
+          {
+            "canonical_name": "Green Chilli",
+            "quantity": "1",
+            "unit": null,
+            "preparation": "very finely chopped",
+            "optional": false,
+            "alternative_group": null,
+            "is_key": false
+          }
+        ]
+      },
+      {
+        "position": 3,
+        "text": "2 garlic cloves, very finely chopped",
+        "kind": "ingredient",
+        "occurrences": [
+          {
+            "canonical_name": "Garlic",
+            "quantity": "2",
+            "unit": "clove",
+            "preparation": "very finely chopped",
+            "optional": false,
+            "alternative_group": null,
+            "is_key": false
+          }
+        ]
+      },
+      {
+        "position": 4,
+        "text": "1 red (bell) pepper, diced",
+        "kind": "ingredient",
+        "occurrences": [
+          {
+            "canonical_name": "Red Pepper",
+            "quantity": "1",
+            "unit": null,
+            "preparation": "diced",
+            "optional": false,
+            "alternative_group": null,
+            "is_key": false
+          }
+        ]
+      },
+      {
+        "position": 5,
+        "text": "60 g (2 oz/\u00bd stick) butter",
+        "kind": "ingredient",
+        "occurrences": [
+          {
+            "canonical_name": "Butter",
+            "quantity": "60",
+            "unit": "g",
+            "preparation": null,
+            "optional": false,
+            "alternative_group": null,
+            "is_key": false
+          }
+        ]
+      },
+      {
+        "position": 6,
+        "text": "6 tablespoons plain (all-purpose) flour",
+        "kind": "ingredient",
+        "occurrences": [
+          {
+            "canonical_name": "Plain Flour",
+            "quantity": "6",
+            "unit": "tbsp",
+            "preparation": null,
+            "optional": false,
+            "alternative_group": null,
+            "is_key": false
+          }
+        ]
+      },
+      {
+        "position": 7,
+        "text": "45 g (1\u00be oz) Madras curry powder (you can use hot or mild, or a combination of both)",
+        "kind": "ingredient",
+        "occurrences": [
+          {
+            "canonical_name": "Madras Curry Powder",
+            "quantity": "45",
+            "unit": "g",
+            "preparation": null,
+            "optional": false,
+            "alternative_group": null,
+            "is_key": false
+          }
+        ]
+      },
+      {
+        "position": 8,
+        "text": "2 tablespoons garam masala",
+        "kind": "ingredient",
+        "occurrences": [
+          {
+            "canonical_name": "Garam Masala",
+            "quantity": "2",
+            "unit": "tbsp",
+            "preparation": null,
+            "optional": false,
+            "alternative_group": null,
+            "is_key": false
+          }
+        ]
+      },
+      {
+        "position": 9,
+        "text": "1.2 litres (41 fl oz/5 cups) chicken or beef stock, dashi, or any combination of the three",
+        "kind": "ingredient",
+        "occurrences": [
+          {
+            "canonical_name": "Chicken Stock",
+            "quantity": "1.2",
+            "unit": "litre",
+            "preparation": null,
+            "optional": false,
+            "alternative_group": 0,
+            "is_key": false
+          },
+          {
+            "canonical_name": "Beef Stock",
+            "quantity": "1.2",
+            "unit": "litre",
+            "preparation": null,
+            "optional": false,
+            "alternative_group": 0,
+            "is_key": false
+          },
+          {
+            "canonical_name": "Dashi",
+            "quantity": "1.2",
+            "unit": "litre",
+            "preparation": null,
+            "optional": false,
+            "alternative_group": 0,
+            "is_key": false
+          }
+        ]
+      },
+      {
+        "position": 10,
+        "text": "4 tablespoons soy sauce, or more to taste",
+        "kind": "ingredient",
+        "occurrences": [
+          {
+            "canonical_name": "Soy Sauce",
+            "quantity": "4",
+            "unit": "tbsp",
+            "preparation": null,
+            "optional": false,
+            "alternative_group": null,
+            "is_key": false
+          }
+        ]
+      },
+      {
+        "position": 11,
+        "text": "4 tablespoons ketchup or Tonkatsu Sauce",
+        "kind": "ingredient",
+        "occurrences": [
+          {
+            "canonical_name": "Ketchup",
+            "quantity": "4",
+            "unit": "tbsp",
+            "preparation": null,
+            "optional": false,
+            "alternative_group": 1,
+            "is_key": false
+          },
+          {
+            "canonical_name": "Tonkatsu Sauce",
+            "quantity": "4",
+            "unit": "tbsp",
+            "preparation": null,
+            "optional": false,
+            "alternative_group": 1,
+            "is_key": false
+          }
+        ]
+      },
+      {
+        "position": 12,
+        "text": "salt",
+        "kind": "ingredient",
+        "occurrences": [
+          {
+            "canonical_name": "Salt",
+            "quantity": null,
+            "unit": null,
+            "preparation": null,
+            "optional": false,
+            "alternative_group": null,
+            "is_key": false
+          }
+        ]
+      },
+      {
+        "position": 13,
+        "text": "1 sweetcorn cob, or 150 g (5 oz) tinned sweetcorn",
+        "kind": "ingredient",
+        "occurrences": [
+          {
+            "canonical_name": "Sweetcorn",
+            "quantity": "1",
+            "unit": "cob",
+            "preparation": null,
+            "optional": false,
+            "alternative_group": 2,
+            "is_key": false
+          },
+          {
+            "canonical_name": "Tinned Sweetcorn",
+            "quantity": "150",
+            "unit": "g",
+            "preparation": null,
+            "optional": false,
+            "alternative_group": 2,
+            "is_key": false
+          }
+        ]
+      },
+      {
+        "position": 14,
+        "text": "4 portions of udon noodles",
+        "kind": "ingredient",
+        "occurrences": [
+          {
+            "canonical_name": "Udon Noodles",
+            "quantity": "4",
+            "unit": "portion",
+            "preparation": null,
+            "optional": false,
+            "alternative_group": null,
+            "is_key": true
+          }
+        ]
+      },
+      {
+        "position": 15,
+        "text": "2 spring onions (scallions), finely sliced",
+        "kind": "ingredient",
+        "occurrences": [
+          {
+            "canonical_name": "Spring Onion",
+            "quantity": "2",
+            "unit": null,
+            "preparation": "finely sliced",
+            "optional": false,
+            "alternative_group": null,
+            "is_key": false
+          }
+        ]
+      },
+      {
+        "position": 16,
+        "text": "4 eggs, poached or soft-boiled",
+        "kind": "ingredient",
+        "occurrences": [
+          {
+            "canonical_name": "Egg",
+            "quantity": "4",
+            "unit": null,
+            "preparation": "poached or soft-boiled",
+            "optional": false,
+            "alternative_group": null,
+            "is_key": false
+          }
+        ]
+      },
+      {
+        "position": 17,
+        "text": "pinch of dried chilli flakes (optional)",
+        "kind": "ingredient",
+        "occurrences": [
+          {
+            "canonical_name": "Chilli Flakes",
+            "quantity": "1",
+            "unit": "pinch",
+            "preparation": null,
+            "optional": true,
+            "alternative_group": null,
+            "is_key": false
+          }
+        ]
+      },
+      {
+        "position": 18,
+        "text": "40\u201350 g (1\u00bd\u20132 oz) red pickled ginger (optional)",
+        "kind": "ingredient",
+        "occurrences": [
+          {
+            "canonical_name": "Red Pickled Ginger",
+            "quantity": "40\u201350",
+            "unit": "g",
+            "preparation": null,
+            "optional": true,
+            "alternative_group": null,
+            "is_key": false
+          }
+        ]
+      },
+      {
+        "position": 19,
+        "text": "50 g (2 oz) Cheddar cheese, grated (optional \u2013 but it\u2019s DELICIOUS)",
+        "kind": "ingredient",
+        "occurrences": [
+          {
+            "canonical_name": "Cheddar Cheese",
+            "quantity": "50",
+            "unit": "g",
+            "preparation": "grated",
+            "optional": true,
+            "alternative_group": null,
+            "is_key": false
+          }
+        ]
+      },
+      {
+        "position": 20,
+        "text": "toasted sesame seeds",
+        "kind": "ingredient",
+        "occurrences": [
+          {
+            "canonical_name": "Sesame Seeds",
+            "quantity": null,
+            "unit": null,
+            "preparation": "toasted",
+            "optional": false,
+            "alternative_group": null,
+            "is_key": false
+          }
+        ]
+      }
+    ],
+    "cuisines": [
+      {
+        "value_id": "japanese",
+        "source": "explicit",
+        "evidence": "JapanEasy curry udon"
+      }
+    ],
+    "accepted_cuisines": [
+      "japanese"
+    ],
+    "methods": [
+      {
+        "value_id": "simmer",
+        "source": "explicit",
+        "evidence": "reduce to a simmer",
+        "is_primary": true
+      },
+      {
+        "value_id": "boil",
+        "source": "explicit",
+        "evidence": "bring to the boil",
+        "is_primary": false
+      }
+    ],
+    "courses": [
+      {
+        "value_id": "main",
+        "source": "inferred",
+        "evidence": "noodle soup bowl"
+      }
+    ],
+    "accepted_courses": [
+      "main"
+    ],
+    "residual_keywords": [
+      "Curry Udon",
+      "Udon",
+      "Noodle Soup",
+      "Japanese Curry",
+      "Comfort Food"
+    ]
+  }
+]

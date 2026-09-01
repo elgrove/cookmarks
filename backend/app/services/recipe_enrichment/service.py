@@ -131,14 +131,6 @@ def build_context(
     return (
         {
             "vocabulary": {
-                "ingredients": [
-                    {
-                        "id": str(item.id),
-                        "name": item.name,
-                        "aliases": [alias.name for alias in item.aliases],
-                    }
-                    for item in canonical.values()
-                ],
                 "cuisines": sorted(accepted_cuisine_ids()),
                 "methods": [
                     {"id": item.value_id, "name": item.name}
@@ -216,22 +208,8 @@ def _validate_response(
         raise EnrichmentValidationError("parsed ingredient line has no occurrence")
 
     canonical, aliases = _ingredient_vocab(session)
-    canonical_ids = set(canonical)
-    proposed = [
-        occ.canonical_name
-        for line in response.parsed_lines
-        for occ in line.occurrences
-        if occ.canonical_name
-    ]
+    proposed = [occ.canonical_name for line in response.parsed_lines for occ in line.occurrences]
     proposed_folded = [fold(name) for name in proposed]
-    occupied = {item.name_folded for item in canonical.values()} | {
-        item.name_folded for item in aliases.values()
-    }
-    if any(name in occupied for name in proposed_folded):
-        raise EnrichmentValidationError("canonical ingredient collides with vocabulary")
-    for occurrence in (occ for line in response.parsed_lines for occ in line.occurrences):
-        if occurrence.ingredient_id and occurrence.ingredient_id not in canonical_ids:
-            raise EnrichmentValidationError("response references an unknown canonical ingredient")
 
     cuisine_ids = [fact.value_id for fact in response.cuisines]
     if len(cuisine_ids) != len(set(cuisine_ids)) or not set(cuisine_ids) <= accepted_cuisine_ids():
@@ -296,6 +274,10 @@ def _apply_response(
     state = recipe.enrichment_state
     assert state is not None
     created: dict[str, Ingredient] = {}
+    canonical_by_name = {item.name_folded: item for item in session.scalars(select(Ingredient))}
+    aliases_by_name = {
+        item.name_folded: item for item in session.scalars(select(IngredientAlias))
+    }
     aliases_created = 0
     existing_ingredients = 0
     occurrences_created = 0
@@ -335,20 +317,20 @@ def _apply_response(
                 is_key = False
             else:
                 assert decision_occurrence is not None
-                if decision_occurrence.ingredient_id:
-                    ingredient = session.get(
-                        Ingredient, uuid.UUID(decision_occurrence.ingredient_id)
-                    )
-                    assert ingredient is not None
+                canonical_name = decision_occurrence.canonical_name
+                name_folded = fold(canonical_name)
+                ingredient = canonical_by_name.get(name_folded)
+                if ingredient is None:
+                    alias = aliases_by_name.get(name_folded)
+                    ingredient = alias.ingredient if alias is not None else None
+                if ingredient is not None:
                     resolution = IngredientResolutionMethod.AI_EXISTING
                     existing_ingredients += 1
                 else:
-                    canonical_name = decision_occurrence.canonical_name
-                    assert canonical_name is not None
-                    ingredient = created.get(fold(canonical_name))
+                    ingredient = created.get(name_folded)
                     if ingredient is None:
                         ingredient = create_ingredient(session, canonical_name)
-                        created[fold(canonical_name)] = ingredient
+                        created[name_folded] = ingredient
                     resolution = IngredientResolutionMethod.AI_CREATED
                 source_name = decision_occurrence.source_name
                 if source_name and fold(source_name) != ingredient.name_folded:
