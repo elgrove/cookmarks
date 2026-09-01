@@ -40,11 +40,11 @@ class LineDecision(BaseModel):
 
     line_id: str
     kind: Literal["ingredient", "heading", "note"]
-    accept_deterministic: bool = Field(
-        default=False,
+    accept_deterministic: Literal[True] | None = Field(
+        default=None,
         description=(
             "Set true only for a line ID supplied in deterministic_proposals; then omit occurrences. "
-            "For every ai_parse_line_id omit this field or leave it false."
+            "For every ai_parse_line_id omit this field."
         ),
     )
     occurrences: list[OccurrenceDecision] = Field(default_factory=list)

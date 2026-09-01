@@ -187,6 +187,24 @@ def test_response_rejects_deterministic_acceptance_for_an_ai_line(session) -> No
         )
 
 
+def test_response_rejects_false_deterministic_acceptance(session) -> None:
+    recipe = _recipe(session)
+    ingredient = create_ingredient(session, "Sea Salt")
+    with pytest.raises(ValidationError, match="Input should be True"):
+        _response(
+            recipe,
+            ingredient.id,
+            lines=[
+                {
+                    "line_id": str(recipe.ingredients_verbatim[0].id),
+                    "kind": "ingredient",
+                    "accept_deterministic": False,
+                    "occurrences": [{"ingredient_id": str(ingredient.id)}],
+                }
+            ],
+        )
+
+
 def test_prompt_distinguishes_deterministic_and_ai_line_decisions(session) -> None:
     recipe = _recipe(session)
     context, _ = build_context(session, recipe)
