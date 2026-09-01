@@ -5,15 +5,21 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 SCHEMA_VERSION = "v1"
-PROMPT_VERSION = "v1"
+PROMPT_VERSION = "v2"
 TAXONOMY_VERSION = "v1"
 
 
 class OccurrenceDecision(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    ingredient_id: str | None = None
-    canonical_name: str | None = None
+    ingredient_id: str | None = Field(
+        default=None,
+        description="An exact ID from the supplied ingredient vocabulary. Mutually exclusive with canonical_name.",
+    )
+    canonical_name: str | None = Field(
+        default=None,
+        description="A new singular UK-English canonical ingredient name. Mutually exclusive with ingredient_id.",
+    )
     source_name: str | None = None
     quantity: str | None = None
     unit: str | None = None
@@ -34,8 +40,20 @@ class LineDecision(BaseModel):
 
     line_id: str
     kind: Literal["ingredient", "heading", "note"]
-    accept_deterministic: bool = False
+    accept_deterministic: bool = Field(
+        default=False,
+        description=(
+            "Set true only for a line ID supplied in deterministic_proposals; then omit occurrences. "
+            "For every ai_parse_line_id omit this field or leave it false."
+        ),
+    )
     occurrences: list[OccurrenceDecision] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def has_one_parse_path(self) -> "LineDecision":
+        if self.accept_deterministic and self.occurrences:
+            raise ValueError("an accepted deterministic proposal must not include occurrences")
+        return self
 
 
 class FactDecision(BaseModel):

@@ -8,6 +8,7 @@ from app.models.ingredient import IngredientLine, IngredientOccurrence
 from app.models.recipe import Keyword, Recipe
 from app.models.recipe_enrichment import RecipeEnrichmentState
 from app.services.ai.stub import StubProvider
+from app.services.recipe_enrichment.prompt import build_prompt
 from app.services.recipe_enrichment.schema import ENRICHMENT_JSON_SCHEMA, EnrichmentResponse
 from app.services.recipe_enrichment.service import (
     EnrichmentValidationError,
@@ -135,6 +136,63 @@ def test_only_methods_offer_primary_flag(session) -> None:
     definitions = ENRICHMENT_JSON_SCHEMA["$defs"]
     assert "is_primary" not in definitions["FactDecision"]["properties"]
     assert "is_primary" in definitions["MethodDecision"]["properties"]
+
+
+def test_response_rejects_ambiguous_occurrence_resolution(session) -> None:
+    recipe = _recipe(session)
+    ingredient = create_ingredient(session, "Sea Salt")
+    with pytest.raises(ValidationError, match="exactly one"):
+        _response(
+            recipe,
+            ingredient.id,
+            lines=[
+                {
+                    "line_id": str(recipe.ingredients_verbatim[0].id),
+                    "kind": "ingredient",
+                    "occurrences": [
+                        {
+                            "ingredient_id": str(ingredient.id),
+                            "canonical_name": "Sea Salt",
+                        }
+                    ],
+                }
+            ],
+        )
+
+
+def test_response_rejects_deterministic_acceptance_for_an_ai_line(session) -> None:
+    recipe = _recipe(session)
+    ingredient = create_ingredient(session, "Sea Salt")
+    _, proposals = build_context(session, recipe)
+    assert not proposals
+    response = _response(
+        recipe,
+        ingredient.id,
+        lines=[
+            {
+                "line_id": str(recipe.ingredients_verbatim[0].id),
+                "kind": "ingredient",
+                "accept_deterministic": True,
+            }
+        ],
+    )
+    with pytest.raises(EnrichmentValidationError, match="was not supplied"):
+        apply_enrichment(
+            session,
+            recipe.id,
+            response,
+            proposals,
+            provider=StubProvider(""),
+            model="stub-enrichment",
+        )
+
+
+def test_prompt_distinguishes_deterministic_and_ai_line_decisions(session) -> None:
+    recipe = _recipe(session)
+    context, _ = build_context(session, recipe)
+    prompt = build_prompt(context)
+    assert "For every ai_parse_line_id,\nomit accept_deterministic" in prompt
+    assert "never both" in prompt
 
 
 def test_repeated_new_canonical_ingredient_resolves_to_one_identity(session) -> None:
