@@ -6,6 +6,7 @@ Revises: 8e916b37b495, 7f82d8a85c3e
 
 import json
 import uuid
+from datetime import UTC, datetime
 from typing import Sequence, Union
 
 from alembic import op
@@ -33,7 +34,7 @@ def upgrade() -> None:
         sa.Column("name_folded", sa.String(300), nullable=False, unique=True),
         *_audit_columns(),
     )
-    op.create_index("ix_ingredients_name_folded", "ingredients", ["name_folded"])
+    op.create_index("ix_ingredients_name_folded", "ingredients", ["name_folded"], unique=True)
     op.create_table(
         "ingredient_aliases",
         sa.Column("ingredient_id", sa.Uuid(), sa.ForeignKey("ingredients.id", ondelete="CASCADE"), nullable=False),
@@ -42,7 +43,7 @@ def upgrade() -> None:
         *_audit_columns(),
     )
     op.create_index("ix_ingredient_aliases_ingredient_id", "ingredient_aliases", ["ingredient_id"])
-    op.create_index("ix_ingredient_aliases_name_folded", "ingredient_aliases", ["name_folded"])
+    op.create_index("ix_ingredient_aliases_name_folded", "ingredient_aliases", ["name_folded"], unique=True)
     op.create_table(
         "ingredient_lines",
         sa.Column("recipe_id", sa.Uuid(), sa.ForeignKey("recipes.id", ondelete="CASCADE"), nullable=False),
@@ -104,12 +105,13 @@ def upgrade() -> None:
         sa.Column("started_at", sa.DateTime(timezone=True)), sa.Column("completed_at", sa.DateTime(timezone=True)),
         sa.Column("task_run_id", sa.Uuid(), sa.ForeignKey("task_runs.id", ondelete="SET NULL")), *_audit_columns(),
     )
-    op.create_index("ix_recipe_enrichment_states_recipe_id", "recipe_enrichment_states", ["recipe_id"])
+    op.create_index("ix_recipe_enrichment_states_recipe_id", "recipe_enrichment_states", ["recipe_id"], unique=True)
 
     connection = op.get_bind()
     recipes = connection.execute(sa.text("SELECT id, ingredients FROM recipes")).mappings()
     line_rows = []
     state_rows = []
+    now = datetime.now(UTC)
     for recipe in recipes:
         recipe_id = recipe["id"]
         ingredients = recipe["ingredients"]
@@ -119,11 +121,11 @@ def upgrade() -> None:
             line_rows.append({
                 "id": uuid.uuid5(uuid.NAMESPACE_URL, f"cookmarks:ingredient-line:{recipe_id}:{position}").hex,
                 "recipe_id": recipe_id, "position": position, "text": text,
-                "created_at": sa.func.now(), "updated_at": sa.func.now(),
+                "created_at": now, "updated_at": now,
             })
         state_rows.append({
             "id": uuid.uuid5(uuid.NAMESPACE_URL, f"cookmarks:enrichment:{recipe_id}").hex,
-            "recipe_id": recipe_id, "status": "pending", "created_at": sa.func.now(), "updated_at": sa.func.now(),
+            "recipe_id": recipe_id, "status": "pending", "created_at": now, "updated_at": now,
         })
     lines = sa.table("ingredient_lines", sa.column("id"), sa.column("recipe_id"), sa.column("position"), sa.column("text"), sa.column("created_at"), sa.column("updated_at"))
     states = sa.table("recipe_enrichment_states", sa.column("id"), sa.column("recipe_id"), sa.column("status"), sa.column("created_at"), sa.column("updated_at"))
