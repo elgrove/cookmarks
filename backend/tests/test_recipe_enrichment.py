@@ -9,7 +9,11 @@ from app.models.recipe import Keyword, Recipe
 from app.models.recipe_enrichment import RecipeEnrichmentState
 from app.services.ai.stub import StubProvider
 from app.services.recipe_enrichment.prompt import build_prompt
-from app.services.recipe_enrichment.schema import ENRICHMENT_JSON_SCHEMA, EnrichmentResponse
+from app.services.recipe_enrichment.schema import (
+    ENRICHMENT_JSON_SCHEMA,
+    SCHEMA_VERSION,
+    EnrichmentResponse,
+)
 from app.services.recipe_enrichment.service import (
     EnrichmentValidationError,
     apply_enrichment,
@@ -203,6 +207,10 @@ def test_response_rejects_false_deterministic_acceptance(session) -> None:
                 }
             ],
         )
+
+
+def test_schema_version_tracks_the_constrained_output_change() -> None:
+    assert SCHEMA_VERSION == "v2"
 
 
 def test_prompt_distinguishes_deterministic_and_ai_line_decisions(session) -> None:

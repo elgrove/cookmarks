@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-SCHEMA_VERSION = "v1"
+SCHEMA_VERSION = "v2"
 PROMPT_VERSION = "v2"
 TAXONOMY_VERSION = "v1"
 
