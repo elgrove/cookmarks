@@ -8,6 +8,7 @@ from google.genai.types import ContentListUnion, GenerateContentConfigDict
 
 from app.services.ai.base import AIProvider, AIResponseError, EmbedTask, ModelRole, Usage
 from app.services.prompts import READ_PAGE_PROMPT
+from app.services.recipe_enrichment.schema import ENRICHMENT_JSON_SCHEMA
 
 logger = logging.getLogger(__name__)
 logging.getLogger("google.genai").setLevel(logging.ERROR)
@@ -75,6 +76,8 @@ class GeminiProvider(AIProvider):
         }
         if schema:
             config["response_json_schema"] = schema
+            if schema is ENRICHMENT_JSON_SCHEMA:
+                config["thinking_config"] = {"thinking_budget": 0}
 
         response = self.client.models.generate_content(model=model, contents=prompt, config=config)
 
