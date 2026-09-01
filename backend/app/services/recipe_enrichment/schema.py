@@ -44,6 +44,9 @@ class FactDecision(BaseModel):
     value_id: str
     source: Literal["explicit", "inferred"]
     evidence: str | None = None
+
+
+class MethodDecision(FactDecision):
     is_primary: bool = False
 
 
@@ -54,7 +57,7 @@ class EnrichmentResponse(BaseModel):
     source_fingerprint: str
     lines: list[LineDecision]
     cuisines: list[FactDecision] = Field(default_factory=list)
-    methods: list[FactDecision] = Field(default_factory=list)
+    methods: list[MethodDecision] = Field(default_factory=list)
     courses: list[FactDecision] = Field(default_factory=list)
     keywords: list[str]
 
@@ -62,8 +65,6 @@ class EnrichmentResponse(BaseModel):
     def one_primary_method(self) -> "EnrichmentResponse":
         if sum(fact.is_primary for fact in self.methods) > 1:
             raise ValueError("at most one primary method")
-        if any(fact.is_primary for fact in self.cuisines + self.courses):
-            raise ValueError("only methods may be primary")
         return self
 
 

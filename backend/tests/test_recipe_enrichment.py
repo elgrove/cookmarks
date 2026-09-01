@@ -1,13 +1,14 @@
 import uuid
 
 import pytest
+from pydantic import ValidationError
 
 from app.models.enums import RecipeEnrichmentStatus
 from app.models.ingredient import IngredientLine, IngredientOccurrence
 from app.models.recipe import Keyword, Recipe
 from app.models.recipe_enrichment import RecipeEnrichmentState
 from app.services.ai.stub import StubProvider
-from app.services.recipe_enrichment.schema import EnrichmentResponse
+from app.services.recipe_enrichment.schema import ENRICHMENT_JSON_SCHEMA, EnrichmentResponse
 from app.services.recipe_enrichment.service import (
     EnrichmentValidationError,
     apply_enrichment,
@@ -41,7 +42,9 @@ def _response(recipe: Recipe, ingredient_id: uuid.UUID, **overrides) -> Enrichme
             }
         ],
         "cuisines": [],
-        "methods": [{"value_id": "bake", "source": "explicit", "evidence": "Bake it.", "is_primary": True}],
+        "methods": [
+            {"value_id": "bake", "source": "explicit", "evidence": "Bake it.", "is_primary": True}
+        ],
         "courses": [],
         "keywords": ["Cosy", "Fresh", "Outdoor", "Party", "Summer"],
     }
@@ -67,9 +70,17 @@ def test_apply_enrichment_replaces_all_derived_facts_atomically(session) -> None
     assert result["occurrences"] == 1
     assert recipe.enrichment_state is not None
     assert recipe.enrichment_state.status is RecipeEnrichmentStatus.COMPLETE
-    assert [item.ingredient.name for item in session.query(IngredientOccurrence).all()] == ["Sea Salt"]
+    assert [item.ingredient.name for item in session.query(IngredientOccurrence).all()] == [
+        "Sea Salt"
+    ]
     assert [fact.facet_value.value_id for fact in recipe.facets] == ["bake"]
-    assert {keyword.name for keyword in recipe.keywords} == {"Cosy", "Fresh", "Outdoor", "Party", "Summer"}
+    assert {keyword.name for keyword in recipe.keywords} == {
+        "Cosy",
+        "Fresh",
+        "Outdoor",
+        "Party",
+        "Summer",
+    }
 
 
 def test_invalid_response_rolls_back_and_keeps_previous_keywords(session) -> None:
@@ -110,6 +121,20 @@ def test_stub_enrichment_is_separate_and_offline(session) -> None:
     assert recipe.enrichment_state.status is RecipeEnrichmentStatus.COMPLETE
     assert recipe.enrichment_state.source_fingerprint is not None
     assert len(recipe.keywords) == 5
+
+
+def test_only_methods_offer_primary_flag(session) -> None:
+    recipe = _recipe(session)
+    ingredient = create_ingredient(session, "Sea Salt")
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        _response(
+            recipe,
+            ingredient.id,
+            courses=[{"value_id": "main", "source": "inferred", "is_primary": True}],
+        )
+    definitions = ENRICHMENT_JSON_SCHEMA["$defs"]
+    assert "is_primary" not in definitions["FactDecision"]["properties"]
+    assert "is_primary" in definitions["MethodDecision"]["properties"]
 
 
 def test_repeated_new_canonical_ingredient_resolves_to_one_identity(session) -> None:

@@ -59,7 +59,9 @@ def source_fingerprint(recipe: Recipe) -> str:
         "instructions": recipe.instructions,
         "ingredients": [line.text for line in recipe.ingredients_verbatim],
     }
-    return sha256(json.dumps(source, ensure_ascii=False, separators=(",", ":")).encode()).hexdigest()
+    return sha256(
+        json.dumps(source, ensure_ascii=False, separators=(",", ":")).encode()
+    ).hexdigest()
 
 
 def ensure_source_fingerprint(recipe: Recipe) -> str:
@@ -101,11 +103,15 @@ def _resolved_proposal(
     canonical: dict[str, Ingredient],
     aliases: dict[str, IngredientAlias],
 ) -> bool:
-    names = {item.name_folded for item in canonical.values()} | {item.name_folded for item in aliases.values()}
+    names = {item.name_folded for item in canonical.values()} | {
+        item.name_folded for item in aliases.values()
+    }
     return all(fold(occurrence.name) in names for occurrence in proposal.occurrences)
 
 
-def build_context(session: Session, recipe: Recipe) -> tuple[dict, dict[str, DeterministicProposal]]:
+def build_context(
+    session: Session, recipe: Recipe
+) -> tuple[dict, dict[str, DeterministicProposal]]:
     """Build the provider input; stable vocabularies deliberately precede recipe data."""
     upsert_facet_vocabulary(session)
     session.flush()
@@ -152,7 +158,9 @@ def build_context(session: Session, recipe: Recipe) -> tuple[dict, dict[str, Det
                 "description": recipe.description,
                 "yield": recipe.yields,
                 "instructions": recipe.instructions,
-                "lines": [{"id": str(line.id), "text": line.text} for line in recipe.ingredients_verbatim],
+                "lines": [
+                    {"id": str(line.id), "text": line.text} for line in recipe.ingredients_verbatim
+                ],
                 "deterministic_proposals": [
                     {
                         "line_id": proposal.line_id,
@@ -161,7 +169,9 @@ def build_context(session: Session, recipe: Recipe) -> tuple[dict, dict[str, Det
                     for proposal in proposals.values()
                 ],
                 "ai_parse_line_ids": [
-                    str(line.id) for line in recipe.ingredients_verbatim if str(line.id) not in proposals
+                    str(line.id)
+                    for line in recipe.ingredients_verbatim
+                    if str(line.id) not in proposals
                 ],
             },
         },
@@ -208,7 +218,12 @@ def _validate_response(
 
     canonical, aliases = _ingredient_vocab(session)
     canonical_ids = set(canonical)
-    proposed = [occ.canonical_name for line in response.lines for occ in line.occurrences if occ.canonical_name]
+    proposed = [
+        occ.canonical_name
+        for line in response.lines
+        for occ in line.occurrences
+        if occ.canonical_name
+    ]
     proposed_folded = [fold(name) for name in proposed]
     occupied = {item.name_folded for item in canonical.values()} | {
         item.name_folded for item in aliases.values()
@@ -222,8 +237,13 @@ def _validate_response(
     cuisine_ids = [fact.value_id for fact in response.cuisines]
     if len(cuisine_ids) != len(set(cuisine_ids)) or not set(cuisine_ids) <= accepted_cuisine_ids():
         raise EnrichmentValidationError("response contains unknown or duplicate cuisine")
-    values = {(item.kind, item.value_id): item for item in session.scalars(select(RecipeFacetValue))}
-    for kind, facts in ((RecipeFacetKind.METHOD, response.methods), (RecipeFacetKind.COURSE, response.courses)):
+    values = {
+        (item.kind, item.value_id): item for item in session.scalars(select(RecipeFacetValue))
+    }
+    for kind, facts in (
+        (RecipeFacetKind.METHOD, response.methods),
+        (RecipeFacetKind.COURSE, response.courses),
+    ):
         ids = [fact.value_id for fact in facts]
         if len(ids) != len(set(ids)) or any((kind, value_id) not in values for value_id in ids):
             raise EnrichmentValidationError(f"response contains unknown or duplicate {kind.value}")
@@ -236,12 +256,20 @@ def _validate_response(
     if len(folded_keywords) != len(set(folded_keywords)):
         raise EnrichmentValidationError("response contains duplicate residual keywords")
     forbidden = set(cuisine_ids)
-    forbidden |= {fold(values[(RecipeFacetKind.METHOD, fact.value_id)].name) for fact in response.methods}
-    forbidden |= {fold(values[(RecipeFacetKind.COURSE, fact.value_id)].name) for fact in response.courses}
-    forbidden |= {item.name_folded for item in canonical.values()} | {item.name_folded for item in aliases.values()}
+    forbidden |= {
+        fold(values[(RecipeFacetKind.METHOD, fact.value_id)].name) for fact in response.methods
+    }
+    forbidden |= {
+        fold(values[(RecipeFacetKind.COURSE, fact.value_id)].name) for fact in response.courses
+    }
+    forbidden |= {item.name_folded for item in canonical.values()} | {
+        item.name_folded for item in aliases.values()
+    }
     forbidden |= set(proposed_folded)
     if set(folded_keywords) & forbidden:
-        raise EnrichmentValidationError("residual keyword duplicates a structured fact or ingredient")
+        raise EnrichmentValidationError(
+            "residual keyword duplicates a structured fact or ingredient"
+        )
 
 
 def _resolve_existing(session: Session, name: str) -> tuple[Ingredient, IngredientResolutionMethod]:
@@ -275,7 +303,9 @@ def _apply_response(
     deterministic_accepted = 0
     ai_lines = 0
     for decision in response.lines:
-        line = next(line for line in recipe.ingredients_verbatim if str(line.id) == decision.line_id)
+        line = next(
+            line for line in recipe.ingredients_verbatim if str(line.id) == decision.line_id
+        )
         line.kind = IngredientLineKind(decision.kind)
         session.execute(delete(IngredientOccurrence).where(IngredientOccurrence.line_id == line.id))
         parsed = []
@@ -300,7 +330,9 @@ def _apply_response(
             else:
                 assert decision_occurrence is not None
                 if decision_occurrence.ingredient_id:
-                    ingredient = session.get(Ingredient, uuid.UUID(decision_occurrence.ingredient_id))
+                    ingredient = session.get(
+                        Ingredient, uuid.UUID(decision_occurrence.ingredient_id)
+                    )
                     assert ingredient is not None
                     resolution = IngredientResolutionMethod.AI_EXISTING
                     existing_ingredients += 1
@@ -315,13 +347,17 @@ def _apply_response(
                 source_name = decision_occurrence.source_name
                 if source_name and fold(source_name) != ingredient.name_folded:
                     existing_alias = session.scalar(
-                        select(IngredientAlias).where(IngredientAlias.name_folded == fold(source_name))
+                        select(IngredientAlias).where(
+                            IngredientAlias.name_folded == fold(source_name)
+                        )
                     )
                     if existing_alias is None:
                         add_ingredient_alias(session, ingredient, source_name)
                         aliases_created += 1
                     elif existing_alias.ingredient_id != ingredient.id:
-                        raise EnrichmentValidationError("ingredient alias collides with another ingredient")
+                        raise EnrichmentValidationError(
+                            "ingredient alias collides with another ingredient"
+                        )
                 quantity = decision_occurrence.quantity
                 unit = decision_occurrence.unit
                 preparation = decision_occurrence.preparation
@@ -348,19 +384,31 @@ def _apply_response(
     recipe.facets.clear()
     recipe.cuisines.clear()
     session.flush()
-    facet_values = {(item.kind, item.value_id): item for item in session.scalars(select(RecipeFacetValue))}
-    for kind, facts in ((RecipeFacetKind.METHOD, response.methods), (RecipeFacetKind.COURSE, response.courses)):
-        for fact in facts:
-            recipe.facets.append(
-                RecipeFacet(
-                    facet_value_id=facet_values[(kind, fact.value_id)].id,
-                    is_primary=fact.is_primary,
-                    source=RecipeFactSource(fact.source),
-                    evidence=fact.evidence,
-                )
+    facet_values = {
+        (item.kind, item.value_id): item for item in session.scalars(select(RecipeFacetValue))
+    }
+    for fact in response.methods:
+        recipe.facets.append(
+            RecipeFacet(
+                facet_value_id=facet_values[(RecipeFacetKind.METHOD, fact.value_id)].id,
+                is_primary=fact.is_primary,
+                source=RecipeFactSource(fact.source),
+                evidence=fact.evidence,
             )
+        )
+    for fact in response.courses:
+        recipe.facets.append(
+            RecipeFacet(
+                facet_value_id=facet_values[(RecipeFacetKind.COURSE, fact.value_id)].id,
+                is_primary=False,
+                source=RecipeFactSource(fact.source),
+                evidence=fact.evidence,
+            )
+        )
     recipe.cuisines = [
-        RecipeCuisine(cuisine_id=fact.value_id, source=RecipeFactSource(fact.source), evidence=fact.evidence)
+        RecipeCuisine(
+            cuisine_id=fact.value_id, source=RecipeFactSource(fact.source), evidence=fact.evidence
+        )
         for fact in response.cuisines
     ]
     recipe.keywords = [get_or_create_keyword(session, value.strip()) for value in response.keywords]
@@ -381,7 +429,9 @@ def _apply_response(
         "ingredients_created": len(created),
         "existing_ingredients": existing_ingredients,
         "aliases_created": aliases_created,
-        "headings": sum(line.kind is IngredientLineKind.HEADING for line in recipe.ingredients_verbatim),
+        "headings": sum(
+            line.kind is IngredientLineKind.HEADING for line in recipe.ingredients_verbatim
+        ),
     }
 
 

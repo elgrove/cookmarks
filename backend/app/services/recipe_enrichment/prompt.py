@@ -9,7 +9,9 @@ Classify every supplied line. Every ingredient line needs one or more resolved o
 Use only supplied cuisine/method/course IDs. Timings and diets are out of scope.
 Choose exactly five Title Case UK-English residual keywords. They must add information not
 already represented by a selected fact, canonical ingredient or alias. Preserve culinary
-specificity; do not turn a specific product into a generic parent ingredient."""
+specificity; do not turn a specific product into a generic parent ingredient. Set is_primary
+only for a method. An occurrence must contain exactly one resolution: use ingredient_id only
+for an exact supplied vocabulary ID, otherwise use canonical_name only."""
 
 
 def build_prompt(context: dict) -> str:
