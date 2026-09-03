@@ -15,6 +15,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -27,6 +31,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
@@ -46,7 +51,7 @@ import com.cookmarks.app.ui.components.rememberLoad
 import com.cookmarks.app.ui.theme.CmTheme
 
 @Composable
-fun BooksScreen(onOpenBook: (String) -> Unit) {
+fun BooksScreen(onOpenBook: (String) -> Unit, onOpenAdmin: () -> Unit) {
     val colors = CmTheme.colors
     var tick by remember { mutableIntStateOf(0) }
     val state by rememberLoad(tick) { Api.service.books() }
@@ -66,12 +71,24 @@ fun BooksScreen(onOpenBook: (String) -> Unit) {
         ) {
             item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(2) }) {
                 Column {
-                    Text(
-                        text = "Books",
-                        style = MaterialTheme.typography.displaySmall,
-                        color = colors.ink,
-                        modifier = Modifier.padding(bottom = 12.dp),
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                    ) {
+                        Text(
+                            text = "Books",
+                            style = MaterialTheme.typography.displaySmall,
+                            color = colors.ink,
+                            modifier = Modifier.weight(1f),
+                        )
+                        IconButton(onClick = onOpenAdmin) {
+                            Icon(
+                                imageVector = Icons.Filled.Settings,
+                                contentDescription = "Open configuration",
+                                tint = colors.muted,
+                            )
+                        }
+                    }
                     OutlinedTextField(
                         value = query,
                         onValueChange = { query = it },

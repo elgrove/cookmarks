@@ -42,7 +42,6 @@ import kotlinx.coroutines.launch
 fun ListsScreen(
     onOpenList: (String) -> Unit,
     onOpenQueue: () -> Unit,
-    onOpenAdmin: () -> Unit,
 ) {
     val colors = CmTheme.colors
     val scope = rememberCoroutineScope()
@@ -75,27 +74,12 @@ fun ListsScreen(
         ) {
             item {
                 Column(modifier = Modifier.padding(horizontal = 20.dp)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                    ) {
-                        Text(
-                            text = "Lists",
-                            style = MaterialTheme.typography.displaySmall,
-                            color = colors.ink,
-                            modifier = Modifier.weight(1f),
-                        )
-                        MonoLabel(
-                            "Configuration",
-                            colour = colors.faint,
-                            modifier = Modifier
-                                .clickable(
-                                    role = Role.Button,
-                                    onClickLabel = "Open configuration",
-                                ) { onOpenAdmin() }
-                                .padding(vertical = 8.dp),
-                        )
-                    }
+                    Text(
+                        text = "Lists",
+                        style = MaterialTheme.typography.displaySmall,
+                        color = colors.ink,
+                        modifier = Modifier.padding(bottom = 12.dp),
+                    )
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         OutlinedTextField(
                             value = newName,

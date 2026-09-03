@@ -156,7 +156,10 @@ fun MainShell() {
                 popExitTransition = { fadeOut(tween(90)) },
             ) {
                 composable("books") {
-                    BooksScreen(onOpenBook = { navController.navigate("books/$it") })
+                    BooksScreen(
+                        onOpenBook = { navController.navigate("books/$it") },
+                        onOpenAdmin = { navController.navigate("admin") { launchSingleTop = true } },
+                    )
                 }
                 composable("books/{bookId}") { entry ->
                     val bookId = entry.arguments?.getString("bookId") ?: return@composable
@@ -201,7 +204,6 @@ fun MainShell() {
                     ListsScreen(
                         onOpenList = { navController.navigate("lists/$it") },
                         onOpenQueue = { navController.navigate("lists/reading-queue") },
-                        onOpenAdmin = { navController.navigate("admin") { launchSingleTop = true } },
                     )
                 }
                 composable("lists/reading-queue") {
