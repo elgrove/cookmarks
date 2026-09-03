@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -27,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -99,7 +101,7 @@ fun MainShell() {
         },
         bottomBar = {
             if (!immersive) {
-                Column {
+                Column(modifier = Modifier.navigationBarsPadding()) {
                     HorizontalDivider(color = colors.lineStrong)
                     Row(
                         modifier = Modifier
@@ -116,6 +118,7 @@ fun MainShell() {
                                 style = MaterialTheme.typography.labelSmall.copy(fontSize = 13.sp, lineHeight = 18.sp),
                                 color = if (active) colors.clay else colors.muted,
                                 maxLines = 1,
+                                textAlign = TextAlign.Center,
                                 modifier = Modifier
                                     .weight(1f)
                                     .clickable(
