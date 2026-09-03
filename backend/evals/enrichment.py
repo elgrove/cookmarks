@@ -24,7 +24,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from app.services.ai import AIProvider
+from app.services.ai import AIProvider, AIResponseError
 from app.services.ai.anthropic import AnthropicProvider
 from app.services.ai.gemini import GeminiProvider
 from app.services.ai.openrouter import OpenRouterProvider
@@ -156,6 +156,7 @@ class EnrichmentRecipeRecord(BaseModel):
     thinking_tokens: int | None
     cost_usd: float | None
     duration_s: float
+    finish_reason: str | None = None
     error: str | None = None
 
 
@@ -617,6 +618,7 @@ def evaluate_enrichment_recipe(
             thinking_tokens=usage.thinking_tokens,
             cost_usd=float(usage.cost_usd) if usage.cost_usd is not None else None,
             duration_s=round(duration, 3),
+            finish_reason=usage.finish_reason,
         )
 
         artefact_path = run_dir / f"{gold.slug}_{candidate.provider}_{candidate.model.replace('/', '_')}.json"
@@ -627,6 +629,31 @@ def evaluate_enrichment_recipe(
         }
         artefact_path.write_text(json.dumps(artefact_data, indent=2))
         return record
+
+    except AIResponseError as exc:
+        duration = time.monotonic() - started
+        logger.error(f"{gold.slug} / {candidate.id} failed: {exc}")
+        return EnrichmentRecipeRecord(
+            run_id=run_id,
+            timestamp=timestamp,
+            git_sha=sha,
+            recipe_id=gold.id,
+            recipe_slug=gold.slug,
+            recipe_name=gold.name,
+            archetype=gold.archetype,
+            model_id=candidate.id,
+            provider=candidate.provider,
+            model=candidate.model,
+            scores=_zero_enrichment_scores(),
+            input_tokens=exc.usage.input_tokens,
+            output_tokens=exc.usage.output_tokens,
+            candidate_tokens=exc.usage.candidate_tokens,
+            thinking_tokens=exc.usage.thinking_tokens,
+            cost_usd=float(exc.usage.cost_usd) if exc.usage.cost_usd is not None else None,
+            duration_s=round(duration, 3),
+            finish_reason=exc.usage.finish_reason,
+            error=str(exc)[:500],
+        )
 
     except Exception as exc:
         duration = time.monotonic() - started

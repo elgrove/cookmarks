@@ -79,6 +79,7 @@ class Usage:
     output_tokens: int | None = None
     candidate_tokens: int | None = None
     thinking_tokens: int | None = None
+    finish_reason: str | None = None
 
     def __add__(self, other: "Usage") -> "Usage":
         return Usage(
@@ -87,6 +88,7 @@ class Usage:
             output_tokens=_sum_optional(self.output_tokens, other.output_tokens),
             candidate_tokens=_sum_optional(self.candidate_tokens, other.candidate_tokens),
             thinking_tokens=_sum_optional(self.thinking_tokens, other.thinking_tokens),
+            finish_reason=other.finish_reason or self.finish_reason,
         )
 
 

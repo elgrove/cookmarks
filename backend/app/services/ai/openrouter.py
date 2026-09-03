@@ -87,13 +87,15 @@ class OpenRouterProvider(AIProvider):
                     raise ValueError(f"OpenRouter API error: {error_data}")
 
                 response.raise_for_status()
-                content = result["choices"][0]["message"]["content"]
+                choice = result["choices"][0]
+                content = choice["message"]["content"]
                 usage_data = result.get("usage", {})
                 raw_cost = usage_data.get("cost")
                 usage = Usage(
                     cost_usd=Decimal(str(raw_cost)) if raw_cost else None,
                     input_tokens=usage_data.get("prompt_tokens") or None,
                     output_tokens=usage_data.get("completion_tokens") or None,
+                    finish_reason=choice.get("finish_reason"),
                 )
                 return content or "", usage
 

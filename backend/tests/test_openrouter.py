@@ -15,17 +15,21 @@ def test_complete_sends_strict_json_schema(monkeypatch: Any) -> None:
         return httpx.Response(
             200,
             request=request,
-            json={"choices": [{"message": {"content": "{}"}}], "usage": {}},
+            json={
+                "choices": [{"finish_reason": "stop", "message": {"content": "{}"}}],
+                "usage": {},
+            },
         )
 
     monkeypatch.setattr("app.services.ai.openrouter.httpx.post", fake_post)
     provider = OpenRouterProvider(api_key="test-key")
 
-    content, _usage = provider._complete(
+    content, usage = provider._complete(
         "Return JSON.", "openai/gpt-oss-120b", schema={"type": "object"}
     )
 
     assert content == "{}"
+    assert usage.finish_reason == "stop"
     assert captured["response_format"] == {
         "type": "json_schema",
         "json_schema": {"name": "cookmarks_response", "strict": True, "schema": {"type": "object"}},
