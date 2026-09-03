@@ -16,6 +16,7 @@ import time
 import tomllib
 import uuid
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime
 from hashlib import sha256
 from pathlib import Path
@@ -42,6 +43,7 @@ logger = logging.getLogger(__name__)
 
 ENRICHMENT_GOLD_PATH = EVALS_DIR / "gold" / "enrichment" / "recipes.json"
 ENRICHMENT_LEDGER_PATH = EVALS_DIR / "enrichment.jsonl"
+MAX_CONCURRENT_ENRICHMENT_REQUESTS = 6
 
 _FRACTION_MAP = {
     "½": "0.5",
@@ -554,6 +556,103 @@ def leaderboard(records: list[EnrichmentRecipeRecord]) -> str:
     return "Enrichment Leaderboard\n\n" + _table(headers, rows)
 
 
+def _zero_enrichment_scores() -> EnrichmentDimensionScores:
+    return EnrichmentDimensionScores(
+        ingredient_identity_precision=0.0,
+        ingredient_identity_recall=0.0,
+        ingredient_identity_f1=0.0,
+        quantity_accuracy=0.0,
+        unit_accuracy=0.0,
+        preparation_accuracy=0.0,
+        optional_accuracy=0.0,
+        alternative_group_accuracy=0.0,
+        ingredient_details_mean=0.0,
+        line_kinds_accuracy=0.0,
+        cuisine_score=0.0,
+        primary_method_score=0.0,
+        methods_jaccard=0.0,
+        course_score=0.0,
+        facets_mean=0.0,
+        keywords_validity=0.0,
+        keywords_count=0,
+        keywords_duplicates=0,
+        keywords_overlap=0,
+        composite=0.0,
+    )
+
+
+def evaluate_enrichment_recipe(
+    candidate: CandidateModel,
+    provider: AIProvider,
+    gold: GoldRecipe,
+    *,
+    run_id: str,
+    timestamp: str,
+    sha: str | None,
+    run_dir: Path,
+) -> EnrichmentRecipeRecord:
+    """Evaluate one independent model and recipe pair."""
+    context = build_gold_context(gold)
+    started = time.monotonic()
+
+    try:
+        response, usage = provider.enrich_recipe(context, candidate.model)
+        duration = time.monotonic() - started
+        scores = score_enrichment_response(gold, response)
+        record = EnrichmentRecipeRecord(
+            run_id=run_id,
+            timestamp=timestamp,
+            git_sha=sha,
+            recipe_id=gold.id,
+            recipe_slug=gold.slug,
+            recipe_name=gold.name,
+            archetype=gold.archetype,
+            model_id=candidate.id,
+            provider=candidate.provider,
+            model=candidate.model,
+            scores=scores,
+            input_tokens=usage.input_tokens,
+            output_tokens=usage.output_tokens,
+            candidate_tokens=usage.candidate_tokens,
+            thinking_tokens=usage.thinking_tokens,
+            cost_usd=float(usage.cost_usd) if usage.cost_usd is not None else None,
+            duration_s=round(duration, 3),
+        )
+
+        artefact_path = run_dir / f"{gold.slug}_{candidate.provider}_{candidate.model.replace('/', '_')}.json"
+        artefact_data = {
+            "record": record.model_dump(),
+            "response": response.model_dump(),
+            "gold": gold.model_dump(),
+        }
+        artefact_path.write_text(json.dumps(artefact_data, indent=2))
+        return record
+
+    except Exception as exc:
+        duration = time.monotonic() - started
+        logger.error(f"{gold.slug} / {candidate.id} failed: {exc}")
+        return EnrichmentRecipeRecord(
+            run_id=run_id,
+            timestamp=timestamp,
+            git_sha=sha,
+            recipe_id=gold.id,
+            recipe_slug=gold.slug,
+            recipe_name=gold.name,
+            archetype=gold.archetype,
+            model_id=candidate.id,
+            provider=candidate.provider,
+            model=candidate.model,
+            scores=_zero_enrichment_scores(),
+            input_tokens=None,
+            output_tokens=None,
+            candidate_tokens=None,
+            thinking_tokens=None,
+            cost_usd=None,
+            duration_s=round(duration, 3),
+            error=str(exc)[:500],
+        )
+
+
 def run_enrichment_eval(
     config_path: Path = DEFAULT_CONFIG_PATH,
     model_ids: list[str] | None = None,
@@ -582,7 +681,7 @@ def run_enrichment_eval(
     run_dir = RUNS_DIR / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
 
-    records: list[EnrichmentRecipeRecord] = []
+    providers: list[tuple[CandidateModel, AIProvider]] = []
 
     for candidate in models:
         try:
@@ -592,101 +691,42 @@ def run_enrichment_eval(
             continue
 
         provider = instantiate_provider(candidate, key)
+        providers.append((candidate, provider))
 
-        for gold in gold_recipes:
-            logger.info(f"Evaluating {gold.slug} with {candidate.id}")
-            context = build_gold_context(gold)
-            started = time.monotonic()
+    evaluations = [
+        (candidate, provider, gold)
+        for gold in gold_recipes
+        for candidate, provider in providers
+    ]
 
-            try:
-                response, usage = provider.enrich_recipe(context, candidate.model)
-                duration = time.monotonic() - started
-                scores = score_enrichment_response(gold, response)
-                record = EnrichmentRecipeRecord(
-                    run_id=run_id,
-                    timestamp=timestamp,
-                    git_sha=sha,
-                    recipe_id=gold.id,
-                    recipe_slug=gold.slug,
-                    recipe_name=gold.name,
-                    archetype=gold.archetype,
-                    model_id=candidate.id,
-                    provider=candidate.provider,
-                    model=candidate.model,
-                    scores=scores,
-                    input_tokens=usage.input_tokens,
-                    output_tokens=usage.output_tokens,
-                    candidate_tokens=usage.candidate_tokens,
-                    thinking_tokens=usage.thinking_tokens,
-                    cost_usd=float(usage.cost_usd) if usage.cost_usd is not None else None,
-                    duration_s=round(duration, 3),
-                )
+    records: list[EnrichmentRecipeRecord] = []
+    if not evaluations:
+        return records
 
-                # Write individual run artifact
-                artefact_path = (
-                    run_dir
-                    / f"{gold.slug}_{candidate.provider}_{candidate.model.replace('/', '_')}.json"
-                )
-                artefact_data = {
-                    "record": record.model_dump(),
-                    "response": response.model_dump(),
-                    "gold": gold.model_dump(),
-                }
-                artefact_path.write_text(json.dumps(artefact_data, indent=2))
-
-            except Exception as exc:
-                duration = time.monotonic() - started
-                logger.error(f"{gold.slug} / {candidate.id} failed: {exc}")
-                zero_scores = EnrichmentDimensionScores(
-                    ingredient_identity_precision=0.0,
-                    ingredient_identity_recall=0.0,
-                    ingredient_identity_f1=0.0,
-                    quantity_accuracy=0.0,
-                    unit_accuracy=0.0,
-                    preparation_accuracy=0.0,
-                    optional_accuracy=0.0,
-                    alternative_group_accuracy=0.0,
-                    ingredient_details_mean=0.0,
-                    line_kinds_accuracy=0.0,
-                    cuisine_score=0.0,
-                    primary_method_score=0.0,
-                    methods_jaccard=0.0,
-                    course_score=0.0,
-                    facets_mean=0.0,
-                    keywords_validity=0.0,
-                    keywords_count=0,
-                    keywords_duplicates=0,
-                    keywords_overlap=0,
-                    composite=0.0,
-                )
-                record = EnrichmentRecipeRecord(
-                    run_id=run_id,
-                    timestamp=timestamp,
-                    git_sha=sha,
-                    recipe_id=gold.id,
-                    recipe_slug=gold.slug,
-                    recipe_name=gold.name,
-                    archetype=gold.archetype,
-                    model_id=candidate.id,
-                    provider=candidate.provider,
-                    model=candidate.model,
-                    scores=zero_scores,
-                    input_tokens=None,
-                    output_tokens=None,
-                    candidate_tokens=None,
-                    thinking_tokens=None,
-                    cost_usd=None,
-                    duration_s=round(duration, 3),
-                    error=str(exc)[:500],
-                )
-
+    workers = min(MAX_CONCURRENT_ENRICHMENT_REQUESTS, len(evaluations))
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = {
+            executor.submit(
+                evaluate_enrichment_recipe,
+                candidate,
+                provider,
+                gold,
+                run_id=run_id,
+                timestamp=timestamp,
+                sha=sha,
+                run_dir=run_dir,
+            ): (candidate, gold)
+            for candidate, provider, gold in evaluations
+        }
+        for future in as_completed(futures):
+            record = future.result()
             records.append(record)
             status_str = (
                 f"score={record.scores.composite:.3f}"
                 if record.error is None
                 else f"ERROR: {record.error[:40]}"
             )
-            print(f"  {gold.slug:35s} {candidate.id:30s} {status_str} ({record.duration_s:.1f}s)")
+            print(f"  {record.recipe_slug:35s} {record.model_id:30s} {status_str} ({record.duration_s:.1f}s)")
 
     # Append to ledger
     with open(ENRICHMENT_LEDGER_PATH, "a") as f:

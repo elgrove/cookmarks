@@ -47,7 +47,8 @@ class OpenRouterProvider(AIProvider):
                 },
             }
             payload["provider"] = {"require_parameters": True}
-        if model == "openai/gpt-oss-120b":
+            payload["max_tokens"] = 4_096
+        elif model == "openai/gpt-oss-120b":
             payload["max_tokens"] = 110_000
 
         result: dict[str, Any] = {}

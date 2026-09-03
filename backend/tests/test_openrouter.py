@@ -31,3 +31,4 @@ def test_complete_sends_strict_json_schema(monkeypatch: Any) -> None:
         "json_schema": {"name": "cookmarks_response", "strict": True, "schema": {"type": "object"}},
     }
     assert captured["provider"] == {"require_parameters": True}
+    assert captured["max_tokens"] == 4_096
