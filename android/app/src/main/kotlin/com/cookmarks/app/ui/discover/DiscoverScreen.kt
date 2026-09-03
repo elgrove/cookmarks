@@ -1,16 +1,16 @@
 package com.cookmarks.app.ui.discover
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.defaultMinSize
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
@@ -34,7 +34,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.cookmarks.app.api.Api
@@ -45,7 +47,6 @@ import com.cookmarks.app.ui.theme.CmTheme
 private const val INSPIRATION_POOL_SIZE = 100
 private const val INSPIRATION_KEYWORD_COUNT = 6
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun DiscoverScreen(onPlay: (GameSource) -> Unit) {
     val colors = CmTheme.colors
@@ -110,22 +111,25 @@ fun DiscoverScreen(onPlay: (GameSource) -> Unit) {
             }
             if (inspiration.isNotEmpty()) {
                 MonoLabel("Start with an idea", colour = colors.faint, modifier = Modifier.padding(bottom = 8.dp))
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    inspiration.forEach { keyword ->
-                        MonoLabel(
-                            keyword.name,
-                            colour = colors.muted,
-                            modifier = Modifier
-                                .border(1.dp, colors.lineStrong)
-                                .defaultMinSize(minHeight = 48.dp)
-                                .clickable {
-                                    query = keyword.name
-                                }
-                                .padding(horizontal = 10.dp, vertical = 6.dp),
-                        )
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    inspiration.chunked(2).forEach { row ->
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            row.forEach { keyword ->
+                                InspirationChip(
+                                    name = keyword.name,
+                                    onClick = { query = keyword.name },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .defaultMinSize(minHeight = 48.dp),
+                                )
+                            }
+                            if (row.size == 1) {
+                                Box(modifier = Modifier.weight(1f))
+                            }
+                        }
                     }
                 }
             }
@@ -140,5 +144,28 @@ fun DiscoverScreen(onPlay: (GameSource) -> Unit) {
             val label = if (trimmedQuery.isEmpty()) "Play all recipes" else "Play “$trimmedQuery”"
             Text(text = label, style = MaterialTheme.typography.labelLarge)
         }
+    }
+}
+
+@Composable
+private fun InspirationChip(name: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val colors = CmTheme.colors
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .background(colors.bgWarm)
+            .border(1.dp, colors.lineStrong)
+            .clickable(
+                role = Role.Button,
+                onClickLabel = "Search for $name",
+                onClick = onClick,
+            ),
+    ) {
+        Text(
+            text = name.uppercase(),
+            style = MaterialTheme.typography.labelMedium,
+            color = colors.muted,
+            maxLines = 1,
+        )
     }
 }
