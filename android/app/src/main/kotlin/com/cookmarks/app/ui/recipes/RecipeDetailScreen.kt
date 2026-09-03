@@ -146,7 +146,7 @@ fun RecipeDetailScreen(
         }
     }
     if (sheetOpen) {
-        ListsSheet(currentId, onDismiss = { sheetOpen = false })
+        RecipeListsSheet(currentId, onDismiss = { sheetOpen = false })
     }
 }
 
@@ -209,7 +209,7 @@ private fun SimilarRail(recipeId: String, onOpenRecipe: (String, List<String>) -
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ListsSheet(recipeId: String, onDismiss: () -> Unit) {
+fun RecipeListsSheet(recipeId: String, onDismiss: () -> Unit) {
     val colors = CmTheme.colors
     val scope = rememberCoroutineScope()
     var tick by remember { mutableIntStateOf(0) }
