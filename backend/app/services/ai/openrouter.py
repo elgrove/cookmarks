@@ -37,6 +37,16 @@ class OpenRouterProvider(AIProvider):
             "messages": [{"role": "user", "content": prompt}],
             "temperature": temp,
         }
+        if schema is not None:
+            payload["response_format"] = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "cookmarks_response",
+                    "strict": True,
+                    "schema": schema,
+                },
+            }
+            payload["provider"] = {"require_parameters": True}
         if model == "openai/gpt-oss-120b":
             payload["max_tokens"] = 110_000
 
