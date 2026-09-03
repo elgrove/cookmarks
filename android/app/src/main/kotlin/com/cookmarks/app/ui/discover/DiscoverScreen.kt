@@ -45,7 +45,7 @@ import com.cookmarks.app.ui.components.rememberLoad
 import com.cookmarks.app.ui.theme.CmTheme
 
 private const val INSPIRATION_POOL_SIZE = 100
-private const val INSPIRATION_KEYWORD_COUNT = 6
+private const val INSPIRATION_KEYWORD_COUNT = 12
 
 @Composable
 fun DiscoverScreen(onPlay: (GameSource) -> Unit) {
