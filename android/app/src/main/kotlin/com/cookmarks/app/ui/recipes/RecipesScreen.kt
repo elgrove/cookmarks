@@ -324,7 +324,7 @@ private fun KeywordChips(
     val names = (selected + pool.map { it.name }).distinct().take(24)
     if (names.isEmpty()) return
     FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
         verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
     ) {
