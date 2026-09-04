@@ -20,6 +20,7 @@ models = [
   "GEMINI:gemini-2.5-flash-lite",
   "GEMINI:gemini-2.5-flash",
   "OPENROUTER:openai/gpt-oss-120b",
+  "OPENROUTER:google/gemma-4-31b-it",
   "OPENROUTER:qwen/qwen3.8-flash",
   "ANTHROPIC:claude-sonnet-5",
   "ANTHROPIC:claude-haiku-4-5-20251001",

@@ -226,8 +226,8 @@ def _validate_response(
             raise EnrichmentValidationError(f"response contains unknown or duplicate {kind.value}")
     if sum(fact.is_primary for fact in response.methods) > 1:
         raise EnrichmentValidationError("response has multiple primary methods")
-    if len(response.keywords) != 5:
-        raise EnrichmentValidationError("response must contain exactly five residual keywords")
+    if len(response.keywords) > 5:
+        raise EnrichmentValidationError("response must contain at most five residual keywords")
     keywords = [_validate_keyword(value) for value in response.keywords]
     folded_keywords = [fold(value) for value in keywords]
     if len(folded_keywords) != len(set(folded_keywords)):

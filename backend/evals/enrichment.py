@@ -5,7 +5,7 @@ Scores candidate models across five separate dimensions:
 2. Ingredient Details: accuracy of quantities, units, preparation, optionality, and alternatives.
 3. Line Kinds: classification accuracy across ingredient vs heading vs note lines.
 4. Controlled Facets: accuracy on cuisines, primary/secondary cooking methods, and courses.
-5. Residual Keywords: exactly five Title Case UK-English keywords without forbidden overlap.
+5. Residual Keywords: zero to five Title Case UK-English keywords without forbidden overlap.
 
 Evaluation runs against the curated gold set in ``evals/gold/enrichment/recipes.json``.
 """
@@ -30,6 +30,8 @@ from app.services.ai.gemini import GeminiProvider
 from app.services.ai.openrouter import OpenRouterProvider
 from app.services.ai.stub import StubProvider
 from app.services.recipe_enrichment.schema import (
+    PROMPT_VERSION,
+    SCHEMA_VERSION,
     EnrichmentResponse,
 )
 from app.services.recipe_facts import accepted_cuisine_ids, facet_vocabulary
@@ -58,6 +60,30 @@ _FRACTION_MAP = {
     "3/4": "0.75",
 }
 
+_UNIT_ALIASES = {
+    "tablespoon": "tbsp",
+    "tablespoons": "tbsp",
+    "tb": "tbsp",
+    "tbs": "tbsp",
+    "teaspoon": "tsp",
+    "teaspoons": "tsp",
+    "cups": "cup",
+    "gram": "g",
+    "grams": "g",
+    "kilogram": "kg",
+    "kilograms": "kg",
+    "millilitre": "ml",
+    "millilitres": "ml",
+    "milliliter": "ml",
+    "milliliters": "ml",
+    "liters": "litre",
+    "ounces": "oz",
+    "ounce": "oz",
+    "pounds": "lb",
+    "pound": "lb",
+    "cloves": "clove",
+}
+
 
 def _norm_str(val: str | None) -> str:
     if not val:
@@ -66,6 +92,11 @@ def _norm_str(val: str | None) -> str:
     for frac, dec in _FRACTION_MAP.items():
         text = text.replace(frac, dec)
     return text
+
+
+def _norm_unit(val: str | None) -> str:
+    unit = _norm_str(val)
+    return _UNIT_ALIASES.get(unit, unit)
 
 
 class GoldOccurrence(BaseModel):
@@ -149,6 +180,8 @@ class EnrichmentRecipeRecord(BaseModel):
     model_id: str
     provider: str
     model: str
+    prompt_version: str | None = None
+    schema_version: str | None = None
     scores: EnrichmentDimensionScores
     input_tokens: int | None
     output_tokens: int | None
@@ -228,8 +261,8 @@ def score_ingredient_details(
                     1.0 if g_qty == p_qty or (g_qty in p_qty) or (p_qty in g_qty) else 0.0
                 )
 
-                g_u = _norm_str(g_occ.unit)
-                p_u = _norm_str(p_occ.unit)
+                g_u = _norm_unit(g_occ.unit)
+                p_u = _norm_unit(p_occ.unit)
                 unit_matches.append(1.0 if g_u == p_u else 0.0)
 
                 g_p = _norm_str(g_occ.preparation)
@@ -335,7 +368,7 @@ def score_residual_keywords(
     keywords: list[str], gold: GoldRecipe, response: EnrichmentResponse
 ) -> dict[str, Any]:
     count = len(keywords)
-    count_score = max(0.0, 1.0 - abs(5 - count) * 0.2)
+    count_score = 1.0 if count <= 5 else 0.0
 
     seen = set()
     duplicates = 0
@@ -348,7 +381,7 @@ def score_residual_keywords(
         if kw.istitle() or (kw and kw[0].isupper()):
             title_case_count += 1
 
-    title_score = title_case_count / count if count else 0.0
+    title_score = title_case_count / count if count else 1.0
 
     forbidden = {fold(c.value_id) for c in response.cuisines}
     forbidden |= {fold(m.value_id) for m in response.methods}
@@ -460,6 +493,57 @@ def build_gold_context(gold: GoldRecipe) -> dict:
             "ai_parse_line_ids": ai_parse_line_ids,
         },
     }
+
+
+def validate_enrichment_response(context: dict, response: EnrichmentResponse) -> None:
+    """Reject structured responses that the production application would not accept."""
+    recipe = context["recipe"]
+    if response.recipe_id != recipe["id"]:
+        raise ValueError("response recipe ID does not match the requested recipe")
+    if response.source_fingerprint != recipe["source_fingerprint"]:
+        raise ValueError("response source fingerprint does not match the requested recipe")
+
+    expected_line_ids = set(recipe["ai_parse_line_ids"])
+    parsed_ids = [line.line_id for line in response.parsed_lines]
+    non_ingredient_ids = [line.line_id for line in response.non_ingredient_lines]
+    decision_ids = set(parsed_ids) | set(non_ingredient_ids)
+    if len(parsed_ids) != len(set(parsed_ids)) or len(non_ingredient_ids) != len(
+        set(non_ingredient_ids)
+    ):
+        raise ValueError("response contains duplicate line decisions")
+    if set(parsed_ids) & set(non_ingredient_ids) or decision_ids != expected_line_ids:
+        raise ValueError("response must make one decision for every requested line")
+    if any(not line.occurrences for line in response.parsed_lines):
+        raise ValueError("response has an ingredient line without occurrences")
+
+    vocabulary = context["vocabulary"]
+    source_text = fold(
+        " ".join(
+            value
+            for value in [
+                recipe["name"],
+                recipe["yield"],
+                recipe["description"],
+                *recipe["instructions"],
+            ]
+            if value
+        )
+    )
+    allowed = {
+        "cuisine": set(vocabulary["cuisines"]),
+        "method": {item["id"] for item in vocabulary["methods"]},
+        "course": {item["id"] for item in vocabulary["courses"]},
+    }
+    for kind, facts in (
+        ("cuisine", response.cuisines),
+        ("method", response.methods),
+        ("course", response.courses),
+    ):
+        value_ids = [fact.value_id for fact in facts]
+        if len(value_ids) != len(set(value_ids)) or not set(value_ids) <= allowed[kind]:
+            raise ValueError(f"response contains an unknown or duplicate {kind}")
+        if any(not fact.evidence or fold(fact.evidence) not in source_text for fact in facts):
+            raise ValueError(f"response contains {kind} evidence outside the recipe source")
 
 
 def instantiate_provider(candidate: CandidateModel, api_key: str) -> AIProvider:
@@ -598,6 +682,16 @@ def evaluate_enrichment_recipe(
 
     try:
         response, usage = provider.enrich_recipe(context, candidate.model)
+        try:
+            validate_enrichment_response(context, response)
+        except ValueError as exc:
+            artefact_path = (
+                run_dir / f"{gold.slug}_{candidate.provider}_{candidate.model.replace('/', '_')}.invalid.json"
+            )
+            artefact_path.write_text(
+                json.dumps({"response": response.model_dump(), "gold": gold.model_dump()}, indent=2)
+            )
+            raise AIResponseError(f"Invalid recipe enrichment response: {exc}", usage) from exc
         duration = time.monotonic() - started
         scores = score_enrichment_response(gold, response)
         record = EnrichmentRecipeRecord(
@@ -611,6 +705,8 @@ def evaluate_enrichment_recipe(
             model_id=candidate.id,
             provider=candidate.provider,
             model=candidate.model,
+            prompt_version=PROMPT_VERSION,
+            schema_version=SCHEMA_VERSION,
             scores=scores,
             input_tokens=usage.input_tokens,
             output_tokens=usage.output_tokens,
@@ -644,6 +740,8 @@ def evaluate_enrichment_recipe(
             model_id=candidate.id,
             provider=candidate.provider,
             model=candidate.model,
+            prompt_version=PROMPT_VERSION,
+            schema_version=SCHEMA_VERSION,
             scores=_zero_enrichment_scores(),
             input_tokens=exc.usage.input_tokens,
             output_tokens=exc.usage.output_tokens,
@@ -669,6 +767,8 @@ def evaluate_enrichment_recipe(
             model_id=candidate.id,
             provider=candidate.provider,
             model=candidate.model,
+            prompt_version=PROMPT_VERSION,
+            schema_version=SCHEMA_VERSION,
             scores=_zero_enrichment_scores(),
             input_tokens=None,
             output_tokens=None,

@@ -7,6 +7,7 @@ from typing import Any, ClassVar
 import httpx
 
 from app.services.ai.base import MAX_TIMEOUT, AIProvider, ModelRole, Usage
+from app.services.recipe_enrichment.schema import ENRICHMENT_JSON_SCHEMA
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +15,9 @@ _API_URL = "https://openrouter.ai/api/v1/chat/completions"
 _RETRYABLE_STATUS = (429, 500, 502, 503, 504)
 _MAX_RETRIES = 5
 _BACKOFF_FACTOR = 2
+_GEMMA_31B_MODEL = "google/gemma-4-31b-it"
+_GEMMA_31B_ENRICHMENT_MAX_TOKENS = 8_192
+_DEFAULT_STRUCTURED_MAX_TOKENS = 4_096
 
 
 class OpenRouterProvider(AIProvider):
@@ -47,7 +51,11 @@ class OpenRouterProvider(AIProvider):
                 },
             }
             payload["provider"] = {"require_parameters": True}
-            payload["max_tokens"] = 4_096
+            payload["max_tokens"] = (
+                _GEMMA_31B_ENRICHMENT_MAX_TOKENS
+                if model == _GEMMA_31B_MODEL and schema == ENRICHMENT_JSON_SCHEMA
+                else _DEFAULT_STRUCTURED_MAX_TOKENS
+            )
         elif model == "openai/gpt-oss-120b":
             payload["max_tokens"] = 110_000
 

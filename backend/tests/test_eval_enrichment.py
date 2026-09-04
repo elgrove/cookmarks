@@ -20,6 +20,7 @@ from evals.enrichment import (
     score_ingredient_identity,
     score_line_kinds,
     score_residual_keywords,
+    validate_enrichment_response,
 )
 
 
@@ -79,22 +80,34 @@ def _sample_gold_recipe() -> GoldRecipe:
     )
 
 
-def test_gold_dataset_loads_three_contrasting_recipes() -> None:
+def _gold_line_id(line: GoldLine) -> str:
+    return str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{line.position}:{line.text}"))
+
+
+def test_gold_dataset_loads_five_contrasting_recipes() -> None:
     recipes = load_gold_recipes(ENRICHMENT_GOLD_PATH)
-    assert len(recipes) == 3
+    assert len(recipes) == 5
     archetypes = {r.archetype for r in recipes}
-    assert archetypes == {"simple", "multi_step_compound", "heading_and_alternative_heavy"}
+    assert archetypes == {
+        "simple",
+        "multi_step_compound",
+        "heading_and_alternative_heavy",
+        "stir_fry_with_optional_and_alternative_ingredients",
+        "baked_cake_with_sections_and_alternatives",
+    }
     slugs = [r.slug for r in recipes]
     assert "teriyaki-yellowtail" in slugs
     assert "aubergine-borani" in slugs
     assert "curry-udon" in slugs
+    assert "pad-thai" in slugs
+    assert "brown-butter-buttermilk-cake" in slugs
 
 
 
 def test_score_ingredient_identity_exact_and_misses() -> None:
     gold = _sample_gold_recipe()
-    line0_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{gold.lines[0].position}:{gold.lines[0].text}"))
-    line2_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{gold.lines[2].position}:{gold.lines[2].text}"))
+    line0_id = _gold_line_id(gold.lines[0])
+    line2_id = _gold_line_id(gold.lines[2])
 
     # Perfect match
     resp_perfect = EnrichmentResponse.model_validate(
@@ -153,7 +166,7 @@ def test_score_ingredient_identity_exact_and_misses() -> None:
 
 def test_score_line_kinds_detects_headings() -> None:
     gold = _sample_gold_recipe()
-    line1_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{gold.lines[1].position}:{gold.lines[1].text}"))
+    line1_id = _gold_line_id(gold.lines[1])
 
     resp_correct = EnrichmentResponse.model_validate(
         {
@@ -228,6 +241,115 @@ def test_score_residual_keywords_validity() -> None:
     assert scores["keywords_overlap"] == 0
 
 
+def test_score_residual_keywords_allows_an_empty_list() -> None:
+    gold = _sample_gold_recipe()
+    resp = EnrichmentResponse.model_validate(
+        {
+            "recipe_id": gold.id,
+            "source_fingerprint": "fp",
+            "parsed_lines": [],
+            "non_ingredient_lines": [],
+            "cuisines": [],
+            "methods": [],
+            "courses": [],
+            "keywords": [],
+        }
+    )
+
+    scores = score_residual_keywords(resp.keywords, gold, resp)
+
+    assert scores["keywords_validity"] == 1.0
+    assert scores["keywords_count"] == 0
+
+
+def test_score_ingredient_details_normalises_unit_spelling() -> None:
+    gold = _sample_gold_recipe()
+    line0_id = _gold_line_id(gold.lines[0])
+    line2_id = _gold_line_id(gold.lines[2])
+    response = EnrichmentResponse.model_validate(
+        {
+            "recipe_id": gold.id,
+            "source_fingerprint": "fp",
+            "parsed_lines": [
+                {"line_id": line0_id, "occurrences": [{"canonical_name": "Apple"}]},
+                {
+                    "line_id": line2_id,
+                    "occurrences": [
+                        {"canonical_name": "Olive Oil", "quantity": "1", "unit": "tablespoon"}
+                    ],
+                },
+            ],
+            "non_ingredient_lines": [],
+            "cuisines": [],
+            "methods": [],
+            "courses": [],
+            "keywords": [],
+        }
+    )
+
+    scores = score_enrichment_response(gold, response)
+
+    assert scores.unit_accuracy == 1.0
+
+
+def test_validate_enrichment_response_rejects_a_course_in_cuisines() -> None:
+    gold = _sample_gold_recipe()
+    context = build_gold_context(gold)
+    response = EnrichmentResponse.model_validate(
+        {
+            "recipe_id": gold.id,
+            "source_fingerprint": context["recipe"]["source_fingerprint"],
+            "parsed_lines": [
+                {
+                    "line_id": line_id,
+                    "occurrences": [{"canonical_name": "Apple"}],
+                }
+                for line_id in context["recipe"]["ai_parse_line_ids"]
+            ],
+            "non_ingredient_lines": [],
+            "cuisines": [{"value_id": "starter", "source": "inferred"}],
+            "methods": [],
+            "courses": [],
+            "keywords": [],
+        }
+    )
+
+    with pytest.raises(ValueError, match="unknown or duplicate cuisine"):
+        validate_enrichment_response(context, response)
+
+
+def test_validate_enrichment_response_rejects_evidence_outside_the_source() -> None:
+    gold = _sample_gold_recipe()
+    context = build_gold_context(gold)
+    response = EnrichmentResponse.model_validate(
+        {
+            "recipe_id": gold.id,
+            "source_fingerprint": context["recipe"]["source_fingerprint"],
+            "parsed_lines": [
+                {
+                    "line_id": line_id,
+                    "occurrences": [{"canonical_name": "Apple"}],
+                }
+                for line_id in context["recipe"]["ai_parse_line_ids"]
+            ],
+            "non_ingredient_lines": [],
+            "cuisines": [],
+            "methods": [],
+            "courses": [
+                {
+                    "value_id": "starter",
+                    "source": "inferred",
+                    "evidence": "A separate culinary judgement",
+                }
+            ],
+            "keywords": [],
+        }
+    )
+
+    with pytest.raises(ValueError, match="evidence outside the recipe source"):
+        validate_enrichment_response(context, response)
+
+
 def test_build_gold_context_structures_reusable_input() -> None:
     gold = _sample_gold_recipe()
     context = build_gold_context(gold)
@@ -240,9 +362,9 @@ def test_build_gold_context_structures_reusable_input() -> None:
 
 def test_score_enrichment_response_composite() -> None:
     gold = _sample_gold_recipe()
-    line0_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{gold.lines[0].position}:{gold.lines[0].text}"))
-    line1_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{gold.lines[1].position}:{gold.lines[1].text}"))
-    line2_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{gold.lines[2].position}:{gold.lines[2].text}"))
+    line0_id = _gold_line_id(gold.lines[0])
+    line1_id = _gold_line_id(gold.lines[1])
+    line2_id = _gold_line_id(gold.lines[2])
 
     resp = EnrichmentResponse.model_validate(
         {

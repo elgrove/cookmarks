@@ -4,8 +4,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-SCHEMA_VERSION = "v4"
-PROMPT_VERSION = "v6"
+SCHEMA_VERSION = "v5"
+PROMPT_VERSION = "v14"
 TAXONOMY_VERSION = "v1"
 
 
@@ -16,11 +16,11 @@ class EnrichmentDecision(BaseModel):
 
 
 class OccurrenceDecision(EnrichmentDecision):
-    canonical_name: str = Field(min_length=1, alias="n")
-    source_name: str | None = Field(default=None, alias="s")
-    quantity: str | None = Field(default=None, alias="q")
-    unit: str | None = Field(default=None, alias="u")
-    preparation: str | None = Field(default=None, alias="p")
+    canonical_name: str = Field(min_length=1, max_length=300, alias="n")
+    source_name: str | None = Field(default=None, max_length=500, alias="s")
+    quantity: str | None = Field(default=None, max_length=100, alias="q")
+    unit: str | None = Field(default=None, max_length=50, alias="u")
+    preparation: str | None = Field(default=None, max_length=500, alias="p")
     optional: bool = Field(default=False, alias="x")
     alternative_group: int | None = Field(default=None, ge=0, alias="a")
     is_key: bool = Field(default=False, alias="k")
@@ -29,7 +29,7 @@ class LineDecision(EnrichmentDecision):
     """An AI replacement or an otherwise unresolved ingredient line."""
 
     line_id: str = Field(alias="l")
-    occurrences: list[OccurrenceDecision] = Field(alias="o")
+    occurrences: list[OccurrenceDecision] = Field(min_length=1, max_length=20, alias="o")
 
 
 class NonIngredientLineDecision(EnrichmentDecision):
@@ -42,7 +42,7 @@ class NonIngredientLineDecision(EnrichmentDecision):
 class FactDecision(EnrichmentDecision):
     value_id: str = Field(alias="v")
     source: Literal["explicit", "inferred"] = Field(alias="s")
-    evidence: str | None = Field(default=None, alias="e")
+    evidence: str | None = Field(default=None, max_length=300, alias="e")
 
 
 class MethodDecision(FactDecision):
@@ -52,12 +52,14 @@ class MethodDecision(FactDecision):
 class EnrichmentResponse(EnrichmentDecision):
     recipe_id: str = Field(alias="r")
     source_fingerprint: str = Field(alias="f")
-    parsed_lines: list[LineDecision] = Field(default_factory=list, alias="p")
-    non_ingredient_lines: list[NonIngredientLineDecision] = Field(default_factory=list, alias="n")
-    cuisines: list[FactDecision] = Field(default_factory=list, alias="c")
-    methods: list[MethodDecision] = Field(default_factory=list, alias="m")
-    courses: list[FactDecision] = Field(default_factory=list, alias="o")
-    keywords: list[str] = Field(alias="w")
+    parsed_lines: list[LineDecision] = Field(default_factory=list, max_length=100, alias="p")
+    non_ingredient_lines: list[NonIngredientLineDecision] = Field(
+        default_factory=list, max_length=100, alias="n"
+    )
+    cuisines: list[FactDecision] = Field(default_factory=list, max_length=10, alias="c")
+    methods: list[MethodDecision] = Field(default_factory=list, max_length=10, alias="m")
+    courses: list[FactDecision] = Field(default_factory=list, max_length=10, alias="o")
+    keywords: list[str] = Field(max_length=5, alias="w")
 
     @model_validator(mode="after")
     def one_primary_method(self) -> "EnrichmentResponse":
@@ -67,3 +69,21 @@ class EnrichmentResponse(EnrichmentDecision):
 
 
 ENRICHMENT_JSON_SCHEMA = EnrichmentResponse.model_json_schema()
+
+
+def _without_stateful_constraints(value: object) -> object:
+    """Remove JSON Schema limits that Gemini cannot compile for this response."""
+    if isinstance(value, dict):
+        return {
+            key: _without_stateful_constraints(item)
+            for key, item in value.items()
+            if key not in {"maxItems", "maxLength", "minItems", "minLength", "minimum"}
+        }
+    if isinstance(value, list):
+        return [_without_stateful_constraints(item) for item in value]
+    return value
+
+
+# Gemini validates the returned JSON with this reduced schema. Pydantic still applies
+# the full constraints after the response is received.
+GEMINI_ENRICHMENT_JSON_SCHEMA = _without_stateful_constraints(ENRICHMENT_JSON_SCHEMA)

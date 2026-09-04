@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from app.models.enums import RecipeEnrichmentStatus
+from app.models.enums import IngredientLineKind, RecipeEnrichmentStatus
 from app.models.ingredient import IngredientLine, IngredientOccurrence
 from app.models.recipe import Keyword, Recipe
 from app.models.recipe_enrichment import RecipeEnrichmentState
@@ -9,6 +9,7 @@ from app.services.ai.stub import StubProvider
 from app.services.recipe_enrichment.prompt import build_prompt
 from app.services.recipe_enrichment.schema import (
     ENRICHMENT_JSON_SCHEMA,
+    GEMINI_ENRICHMENT_JSON_SCHEMA,
     SCHEMA_VERSION,
     EnrichmentResponse,
 )
@@ -115,29 +116,34 @@ def test_apply_enrichment_resolves_an_ai_canonical_name_through_an_alias(session
     assert occurrence.ingredient_id == ingredient.id
 
 
-def test_invalid_response_rolls_back_and_keeps_previous_keywords(session) -> None:
+def test_empty_keywords_replace_previous_keywords(session) -> None:
     recipe = _recipe(session)
     recipe.keywords = [Keyword(name="Existing")]
     create_ingredient(session, "Sea Salt")
     session.commit()
     _, proposals = build_context(session, recipe)
-    bad = _response(recipe, keywords=["Only", "Four", "Keywords", "Here"])
-    with pytest.raises(EnrichmentValidationError, match="exactly five"):
-        apply_enrichment(
-            session,
-            recipe.id,
-            bad,
-            proposals,
-            provider=StubProvider(""),
-            model="stub-enrichment",
-        )
+    response = _response(recipe, keywords=[])
+    apply_enrichment(
+        session,
+        recipe.id,
+        response,
+        proposals,
+        provider=StubProvider(""),
+        model="stub-enrichment",
+    )
     session.commit()
     session.refresh(recipe)
     assert recipe.enrichment_state is not None
-    assert recipe.enrichment_state.status is RecipeEnrichmentStatus.FAILED
-    assert [keyword.name for keyword in recipe.keywords] == ["Existing"]
-    assert recipe.ingredients_verbatim[0].kind is None
-    assert session.query(IngredientOccurrence).count() == 0
+    assert recipe.enrichment_state.status is RecipeEnrichmentStatus.COMPLETE
+    assert recipe.keywords == []
+    assert recipe.ingredients_verbatim[0].kind is IngredientLineKind.INGREDIENT
+    assert session.query(IngredientOccurrence).count() == 1
+
+
+def test_response_rejects_more_than_five_keywords(session) -> None:
+    recipe = _recipe(session)
+    with pytest.raises(ValidationError, match="at most 5 items"):
+        _response(recipe, keywords=["One", "Two", "Three", "Four", "Five", "Six"])
 
 
 def test_stub_enrichment_is_separate_and_offline(session) -> None:
@@ -162,6 +168,17 @@ def test_only_methods_offer_primary_flag(session) -> None:
     definitions = ENRICHMENT_JSON_SCHEMA["$defs"]
     assert "p" not in definitions["FactDecision"]["properties"]
     assert "p" in definitions["MethodDecision"]["properties"]
+
+
+def test_gemini_enrichment_schema_omits_stateful_constraints() -> None:
+    """Gemini receives a schema it can compile; local validation stays strict."""
+    schema_text = str(GEMINI_ENRICHMENT_JSON_SCHEMA)
+
+    assert "maxItems" not in schema_text
+    assert "maxLength" not in schema_text
+    assert "minItems" not in schema_text
+    assert "minLength" not in schema_text
+    assert "minimum" not in schema_text
 
 
 def test_enrichment_prompt_requires_one_occurrence_resolution_and_central_methods() -> None:
@@ -223,8 +240,8 @@ def test_response_rejects_missing_ai_line_decision(session) -> None:
         )
 
 
-def test_schema_version_tracks_the_name_only_output_change() -> None:
-    assert SCHEMA_VERSION == "v4"
+def test_schema_version_tracks_the_bounded_output_change() -> None:
+    assert SCHEMA_VERSION == "v5"
 
 
 def test_prompt_distinguishes_deterministic_and_ai_line_decisions(session) -> None:
