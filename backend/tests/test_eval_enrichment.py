@@ -112,8 +112,6 @@ def test_score_ingredient_identity_exact_and_misses() -> None:
     # Perfect match
     resp_perfect = EnrichmentResponse.model_validate(
         {
-            "recipe_id": gold.id,
-            "source_fingerprint": "fp",
             "parsed_lines": [
                 {
                     "line_id": line0_id,
@@ -139,8 +137,6 @@ def test_score_ingredient_identity_exact_and_misses() -> None:
     # Partial match
     resp_partial = EnrichmentResponse.model_validate(
         {
-            "recipe_id": gold.id,
-            "source_fingerprint": "fp",
             "parsed_lines": [
                 {
                     "line_id": line0_id,
@@ -170,8 +166,6 @@ def test_score_line_kinds_detects_headings() -> None:
 
     resp_correct = EnrichmentResponse.model_validate(
         {
-            "recipe_id": gold.id,
-            "source_fingerprint": "fp",
             "parsed_lines": [],
             "non_ingredient_lines": [{"line_id": line1_id, "kind": "heading"}],
             "cuisines": [],
@@ -185,8 +179,6 @@ def test_score_line_kinds_detects_headings() -> None:
 
     resp_wrong = EnrichmentResponse.model_validate(
         {
-            "recipe_id": gold.id,
-            "source_fingerprint": "fp",
             "parsed_lines": [],
             "non_ingredient_lines": [],
             "cuisines": [],
@@ -203,13 +195,11 @@ def test_score_facets() -> None:
     gold = _sample_gold_recipe()
     resp = EnrichmentResponse.model_validate(
         {
-            "recipe_id": gold.id,
-            "source_fingerprint": "fp",
             "parsed_lines": [],
             "non_ingredient_lines": [],
-            "cuisines": [{"value_id": "british", "source": "inferred"}],
+            "cuisines": ["british"],
             "methods": [],
-            "courses": [{"value_id": "starter", "source": "inferred"}],
+            "courses": ["starter"],
             "keywords": ["One", "Two", "Three", "Four", "Five"],
         }
     )
@@ -224,8 +214,6 @@ def test_score_residual_keywords_validity() -> None:
     gold = _sample_gold_recipe()
     resp = EnrichmentResponse.model_validate(
         {
-            "recipe_id": gold.id,
-            "source_fingerprint": "fp",
             "parsed_lines": [],
             "non_ingredient_lines": [],
             "cuisines": [],
@@ -245,8 +233,6 @@ def test_score_residual_keywords_allows_an_empty_list() -> None:
     gold = _sample_gold_recipe()
     resp = EnrichmentResponse.model_validate(
         {
-            "recipe_id": gold.id,
-            "source_fingerprint": "fp",
             "parsed_lines": [],
             "non_ingredient_lines": [],
             "cuisines": [],
@@ -268,8 +254,6 @@ def test_score_ingredient_details_normalises_unit_spelling() -> None:
     line2_id = _gold_line_id(gold.lines[2])
     response = EnrichmentResponse.model_validate(
         {
-            "recipe_id": gold.id,
-            "source_fingerprint": "fp",
             "parsed_lines": [
                 {"line_id": line0_id, "occurrences": [{"canonical_name": "Apple"}]},
                 {
@@ -297,8 +281,6 @@ def test_validate_enrichment_response_rejects_a_course_in_cuisines() -> None:
     context = build_gold_context(gold)
     response = EnrichmentResponse.model_validate(
         {
-            "recipe_id": gold.id,
-            "source_fingerprint": context["recipe"]["source_fingerprint"],
             "parsed_lines": [
                 {
                     "line_id": line_id,
@@ -307,7 +289,7 @@ def test_validate_enrichment_response_rejects_a_course_in_cuisines() -> None:
                 for line_id in context["recipe"]["ai_parse_line_ids"]
             ],
             "non_ingredient_lines": [],
-            "cuisines": [{"value_id": "starter", "source": "inferred"}],
+            "cuisines": ["starter"],
             "methods": [],
             "courses": [],
             "keywords": [],
@@ -318,13 +300,11 @@ def test_validate_enrichment_response_rejects_a_course_in_cuisines() -> None:
         validate_enrichment_response(context, response)
 
 
-def test_validate_enrichment_response_rejects_evidence_outside_the_source() -> None:
+def test_validate_enrichment_response_rejects_unknown_course() -> None:
     gold = _sample_gold_recipe()
     context = build_gold_context(gold)
     response = EnrichmentResponse.model_validate(
         {
-            "recipe_id": gold.id,
-            "source_fingerprint": context["recipe"]["source_fingerprint"],
             "parsed_lines": [
                 {
                     "line_id": line_id,
@@ -335,18 +315,12 @@ def test_validate_enrichment_response_rejects_evidence_outside_the_source() -> N
             "non_ingredient_lines": [],
             "cuisines": [],
             "methods": [],
-            "courses": [
-                {
-                    "value_id": "starter",
-                    "source": "inferred",
-                    "evidence": "A separate culinary judgement",
-                }
-            ],
+            "courses": ["unknown-course"],
             "keywords": [],
         }
     )
 
-    with pytest.raises(ValueError, match="evidence outside the recipe source"):
+    with pytest.raises(ValueError, match="unknown or duplicate course"):
         validate_enrichment_response(context, response)
 
 
@@ -368,8 +342,6 @@ def test_score_enrichment_response_composite() -> None:
 
     resp = EnrichmentResponse.model_validate(
         {
-            "recipe_id": gold.id,
-            "source_fingerprint": "fp",
             "parsed_lines": [
                 {
                     "line_id": line0_id,
@@ -394,9 +366,9 @@ def test_score_enrichment_response_composite() -> None:
                 },
             ],
             "non_ingredient_lines": [{"line_id": line1_id, "kind": "heading"}],
-            "cuisines": [{"value_id": "british", "source": "inferred"}],
+            "cuisines": ["british"],
             "methods": [],
-            "courses": [{"value_id": "starter", "source": "inferred"}],
+            "courses": ["starter"],
             "keywords": ["Crispy", "Healthy", "Quick", "Summer", "Vegan"],
         }
     )

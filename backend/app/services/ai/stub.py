@@ -85,8 +85,6 @@ class StubProvider(AIProvider):
                 )
             return json.dumps(
                 {
-                    "r": recipe["id"],
-                    "f": recipe["source_fingerprint"],
                     "p": parsed_lines,
                     "w": ["Cosy", "Fresh", "Outdoor", "Summer", "Weeknight"],
                 }

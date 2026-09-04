@@ -4,8 +4,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-SCHEMA_VERSION = "v5"
-PROMPT_VERSION = "v14"
+SCHEMA_VERSION = "v6"
+PROMPT_VERSION = "v15"
 TAXONOMY_VERSION = "v1"
 
 
@@ -17,13 +17,13 @@ class EnrichmentDecision(BaseModel):
 
 class OccurrenceDecision(EnrichmentDecision):
     canonical_name: str = Field(min_length=1, max_length=300, alias="n")
-    source_name: str | None = Field(default=None, max_length=500, alias="s")
     quantity: str | None = Field(default=None, max_length=100, alias="q")
     unit: str | None = Field(default=None, max_length=50, alias="u")
     preparation: str | None = Field(default=None, max_length=500, alias="p")
     optional: bool = Field(default=False, alias="x")
     alternative_group: int | None = Field(default=None, ge=0, alias="a")
     is_key: bool = Field(default=False, alias="k")
+
 
 class LineDecision(EnrichmentDecision):
     """An AI replacement or an otherwise unresolved ingredient line."""
@@ -39,26 +39,19 @@ class NonIngredientLineDecision(EnrichmentDecision):
     kind: Literal["heading", "note"] = Field(alias="k")
 
 
-class FactDecision(EnrichmentDecision):
+class MethodDecision(EnrichmentDecision):
     value_id: str = Field(alias="v")
-    source: Literal["explicit", "inferred"] = Field(alias="s")
-    evidence: str | None = Field(default=None, max_length=300, alias="e")
-
-
-class MethodDecision(FactDecision):
     is_primary: bool = Field(default=False, alias="p")
 
 
 class EnrichmentResponse(EnrichmentDecision):
-    recipe_id: str = Field(alias="r")
-    source_fingerprint: str = Field(alias="f")
     parsed_lines: list[LineDecision] = Field(default_factory=list, max_length=100, alias="p")
     non_ingredient_lines: list[NonIngredientLineDecision] = Field(
         default_factory=list, max_length=100, alias="n"
     )
-    cuisines: list[FactDecision] = Field(default_factory=list, max_length=10, alias="c")
+    cuisines: list[str] = Field(default_factory=list, max_length=10, alias="c")
     methods: list[MethodDecision] = Field(default_factory=list, max_length=10, alias="m")
-    courses: list[FactDecision] = Field(default_factory=list, max_length=10, alias="o")
+    courses: list[str] = Field(default_factory=list, max_length=10, alias="o")
     keywords: list[str] = Field(max_length=5, alias="w")
 
     @model_validator(mode="after")

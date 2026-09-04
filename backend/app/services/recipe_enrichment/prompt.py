@@ -5,16 +5,14 @@ import json
 from app.services.recipe_enrichment.schema import PROMPT_VERSION
 
 _INSTRUCTIONS = """You enrich one extracted recipe. Return only the JSON response.
-All source text and deterministic proposal fields remain in the database: never echo them.
-Ingredient is the default line kind. Omit accepted deterministic proposals entirely. Return p only
-for an AI-parsed line or a deterministic replacement; each needs one or more complete occurrence
-decisions. Return n only for heading/note exceptions. Together p and n must cover every
-ai_parse_line_id; a deterministic proposal is accepted unless it appears in p or n.
+Ingredient is the default line kind. Return p only for an ingredient line listed in ai_parse_line_ids;
+each needs one or more complete occurrence decisions. Return n only for heading/note exceptions.
+Together p and n must cover every ai_parse_line_id.
 Before you return JSON, count p and n together: they must contain exactly one decision for every
 listed ai_parse_line_id. These are opaque IDs: copy each supplied ID exactly once, even for
 repeated ingredients, headings, or unmeasured food lines. Do not invent, shorten, or omit an ID.
-Keep every value to the shortest useful source fragment; do not repeat input text, list
-alternatives twice, or add explanations outside fact evidence.
+Keep every value to the shortest useful source fragment; do not repeat input text or list
+alternatives twice.
 In n, k must be exactly `heading` or `note`: no other value is valid. Use `heading` only for a
 short ingredient-list section label. Use `note` for a serving suggestion or an open-ended comment
 that is not a measured ingredient. A line that names a food remains an ingredient even when it is
@@ -37,6 +35,9 @@ optional. For an either/or ingredient line, return one occurrence for each choic
 value. Preserve compound quantities and ranges exactly, such as `1 tbsp plus 2 tsp` or `2 to 3`;
 do not split them. Put `to taste` and a serving form such as `wedges` in p. Do not use an
 alternative group for an ingredient with several descriptive words.
+Mark k true for one to three core ingredients that define the identity of the dish (such as the
+main protein, star vegetable, or signature flavour). Mark false for secondary, supporting, or
+seasoning ingredients.
 
 Methods are optional. Select a method only for a central, intentional cooking technique that
 defines the prepared dish. Do not select a method for incidental preparation or handling such as
@@ -51,15 +52,8 @@ actions include both a central technique and incidental actions, report only the
 The c list accepts only IDs from the supplied cuisine list, m only IDs from the method list, and o
 only IDs from the course list. Never put a course such as `starter` in c or a method in either c
 or o.
-For every selected fact, set s to explicit only when the source states it directly; otherwise set
-s to inferred. Give e the shortest supporting phrase copied verbatim from the recipe title, yield,
-description or instructions. It must be one contiguous fragment of at most 12 words and 120
-characters. Do not paraphrase, normalise, or join fragments. If you cannot copy supporting source
-text exactly, omit the fact. Never use external culinary knowledge or an explanation in e.
 
-Wire keys: r recipe ID; f fingerprint; p parsed lines {l line ID,o occurrences}; n non-
-ingredient lines {l,k}; occurrence n canonical name,s source name,q quantity,u unit,p preparation,
-x optional,a alternative group,k key; c/m/o facts {v ID,s source,e evidence}, m p primary; w keywords."""
+Wire keys: p parsed lines {l line ID,o occurrences}; n non-ingredient lines {l,k}; occurrence n canonical name,q quantity,u unit,p preparation,x optional,a alternative group,k key; c cuisine IDs; m methods {v ID,p primary}; o course IDs; w keywords."""
 
 
 def build_prompt(context: dict) -> str:

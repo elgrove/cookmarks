@@ -319,7 +319,7 @@ def score_line_kinds(gold_lines: list[GoldLine], response: EnrichmentResponse) -
 
 
 def score_facets(gold: GoldRecipe, response: EnrichmentResponse) -> dict[str, float]:
-    pred_cuisines = {item.value_id for item in response.cuisines}
+    pred_cuisines = set(response.cuisines)
     accepted_cuisines = set(gold.accepted_cuisines or [item.value_id for item in gold.cuisines])
     if not accepted_cuisines and not pred_cuisines:
         cuisine_score = 1.0
@@ -329,7 +329,6 @@ def score_facets(gold: GoldRecipe, response: EnrichmentResponse) -> dict[str, fl
         cuisine_score = 1.0
     else:
         cuisine_score = 0.0
-
 
     gold_primary = next((item.value_id for item in gold.methods if item.is_primary), None)
     pred_primary = next((item.value_id for item in response.methods if item.is_primary), None)
@@ -344,7 +343,7 @@ def score_facets(gold: GoldRecipe, response: EnrichmentResponse) -> dict[str, fl
     else:
         methods_jaccard = len(gold_methods & pred_methods) / len(gold_methods | pred_methods)
 
-    pred_courses = {item.value_id for item in response.courses}
+    pred_courses = set(response.courses)
     accepted_courses = set(gold.accepted_courses or [item.value_id for item in gold.courses])
     if not accepted_courses and not pred_courses:
         course_score = 1.0
@@ -383,9 +382,9 @@ def score_residual_keywords(
 
     title_score = title_case_count / count if count else 1.0
 
-    forbidden = {fold(c.value_id) for c in response.cuisines}
+    forbidden = {fold(c) for c in response.cuisines}
     forbidden |= {fold(m.value_id) for m in response.methods}
-    forbidden |= {fold(o.value_id) for o in response.courses}
+    forbidden |= {fold(o) for o in response.courses}
     forbidden |= {
         fold(occ.canonical_name)
         for line in response.parsed_lines
@@ -460,14 +459,6 @@ def build_gold_context(gold: GoldRecipe) -> dict:
         {"id": entry["id"], "name": entry["name"]} for entry in entries if entry["kind"] == "course"
     ]
 
-    source = {
-        "name": gold.name,
-        "description": None,
-        "instructions": gold.instructions,
-        "ingredients": [line.text for line in gold.lines],
-    }
-    fp = source_fingerprint_dict(source)
-
     lines_payload = []
     ai_parse_line_ids = []
     for line in gold.lines:
@@ -482,15 +473,14 @@ def build_gold_context(gold: GoldRecipe) -> dict:
             "courses": courses,
         },
         "recipe": {
-            "id": gold.id,
-            "source_fingerprint": fp,
-            "name": gold.name,
-            "description": None,
-            "yield": gold.yields,
-            "instructions": gold.instructions,
-            "lines": lines_payload,
-            "deterministic_proposals": [],
-            "ai_parse_line_ids": ai_parse_line_ids,
+            **{
+                "id": gold.id,
+                "name": gold.name,
+                "instructions": gold.instructions,
+                "lines": lines_payload,
+                "ai_parse_line_ids": ai_parse_line_ids,
+            },
+            **({"yield": gold.yields} if gold.yields else {}),
         },
     }
 
@@ -498,11 +488,6 @@ def build_gold_context(gold: GoldRecipe) -> dict:
 def validate_enrichment_response(context: dict, response: EnrichmentResponse) -> None:
     """Reject structured responses that the production application would not accept."""
     recipe = context["recipe"]
-    if response.recipe_id != recipe["id"]:
-        raise ValueError("response recipe ID does not match the requested recipe")
-    if response.source_fingerprint != recipe["source_fingerprint"]:
-        raise ValueError("response source fingerprint does not match the requested recipe")
-
     expected_line_ids = set(recipe["ai_parse_line_ids"])
     parsed_ids = [line.line_id for line in response.parsed_lines]
     non_ingredient_ids = [line.line_id for line in response.non_ingredient_lines]
@@ -517,33 +502,24 @@ def validate_enrichment_response(context: dict, response: EnrichmentResponse) ->
         raise ValueError("response has an ingredient line without occurrences")
 
     vocabulary = context["vocabulary"]
-    source_text = fold(
-        " ".join(
-            value
-            for value in [
-                recipe["name"],
-                recipe["yield"],
-                recipe["description"],
-                *recipe["instructions"],
-            ]
-            if value
-        )
-    )
     allowed = {
         "cuisine": set(vocabulary["cuisines"]),
         "method": {item["id"] for item in vocabulary["methods"]},
         "course": {item["id"] for item in vocabulary["courses"]},
     }
-    for kind, facts in (
-        ("cuisine", response.cuisines),
-        ("method", response.methods),
-        ("course", response.courses),
+    if (
+        len(response.cuisines) != len(set(response.cuisines))
+        or not set(response.cuisines) <= allowed["cuisine"]
     ):
-        value_ids = [fact.value_id for fact in facts]
-        if len(value_ids) != len(set(value_ids)) or not set(value_ids) <= allowed[kind]:
-            raise ValueError(f"response contains an unknown or duplicate {kind}")
-        if any(not fact.evidence or fold(fact.evidence) not in source_text for fact in facts):
-            raise ValueError(f"response contains {kind} evidence outside the recipe source")
+        raise ValueError("response contains an unknown or duplicate cuisine")
+    method_ids = [fact.value_id for fact in response.methods]
+    if len(method_ids) != len(set(method_ids)) or not set(method_ids) <= allowed["method"]:
+        raise ValueError("response contains an unknown or duplicate method")
+    if (
+        len(response.courses) != len(set(response.courses))
+        or not set(response.courses) <= allowed["course"]
+    ):
+        raise ValueError("response contains an unknown or duplicate course")
 
 
 def instantiate_provider(candidate: CandidateModel, api_key: str) -> AIProvider:

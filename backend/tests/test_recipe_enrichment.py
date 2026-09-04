@@ -36,8 +36,6 @@ def _recipe(session) -> Recipe:
 
 def _response(recipe: Recipe, **overrides) -> EnrichmentResponse:
     data = {
-        "recipe_id": str(recipe.id),
-        "source_fingerprint": "current",
         "parsed_lines": [
             {
                 "line_id": str(recipe.ingredients_verbatim[0].id),
@@ -45,9 +43,7 @@ def _response(recipe: Recipe, **overrides) -> EnrichmentResponse:
             }
         ],
         "cuisines": [],
-        "methods": [
-            {"value_id": "bake", "source": "explicit", "evidence": "Bake it.", "is_primary": True}
-        ],
+        "methods": [{"value_id": "bake", "is_primary": True}],
         "courses": [],
         "keywords": ["Cosy", "Fresh", "Outdoor", "Party", "Summer"],
     }
@@ -163,10 +159,10 @@ def test_stub_enrichment_is_separate_and_offline(session) -> None:
 
 def test_only_methods_offer_primary_flag(session) -> None:
     recipe = _recipe(session)
-    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
-        _response(recipe, courses=[{"value_id": "main", "source": "inferred", "is_primary": True}])
+    with pytest.raises(ValidationError, match="Input should be a valid string"):
+        _response(recipe, courses=[{"value_id": "main", "is_primary": True}])
     definitions = ENRICHMENT_JSON_SCHEMA["$defs"]
-    assert "p" not in definitions["FactDecision"]["properties"]
+    assert "MethodDecision" in definitions
     assert "p" in definitions["MethodDecision"]["properties"]
 
 
@@ -241,14 +237,14 @@ def test_response_rejects_missing_ai_line_decision(session) -> None:
 
 
 def test_schema_version_tracks_the_bounded_output_change() -> None:
-    assert SCHEMA_VERSION == "v5"
+    assert SCHEMA_VERSION == "v6"
 
 
 def test_prompt_distinguishes_deterministic_and_ai_line_decisions(session) -> None:
     recipe = _recipe(session)
     context, _ = build_context(session, recipe)
     prompt = build_prompt(context)
-    assert "Omit accepted deterministic proposals entirely" in prompt
+    assert "ai_parse_line_ids" in prompt
     assert "no ingredient ID field" in prompt
 
 
@@ -261,8 +257,6 @@ def test_repeated_new_canonical_ingredient_resolves_to_one_identity(session) -> 
     _, proposals = build_context(session, recipe)
     response = EnrichmentResponse.model_validate(
         {
-            "recipe_id": str(recipe.id),
-            "source_fingerprint": "current",
             "parsed_lines": [
                 {
                     "line_id": str(line.id),

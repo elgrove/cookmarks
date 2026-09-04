@@ -33,7 +33,6 @@ from app.services.recipe_enrichment.schema import (
 )
 from app.services.recipe_facts import (
     accepted_cuisine_ids,
-    add_ingredient_alias,
     create_ingredient,
     upsert_facet_vocabulary,
 )
@@ -127,7 +126,7 @@ def build_context(
     state = recipe.enrichment_state
     if state is None:
         raise EnrichmentValidationError("recipe has no enrichment state")
-    source = ensure_source_fingerprint(recipe)
+    ensure_source_fingerprint(recipe)
     return (
         {
             "vocabulary": {
@@ -144,27 +143,22 @@ def build_context(
                 ],
             },
             "recipe": {
-                "id": str(recipe.id),
-                "source_fingerprint": source,
-                "name": recipe.name,
-                "description": recipe.description,
-                "yield": recipe.yields,
-                "instructions": recipe.instructions,
-                "lines": [
-                    {"id": str(line.id), "text": line.text} for line in recipe.ingredients_verbatim
-                ],
-                "deterministic_proposals": [
-                    {
-                        "line_id": proposal.line_id,
-                        "occurrences": [item.__dict__ for item in proposal.occurrences],
-                    }
-                    for proposal in proposals.values()
-                ],
-                "ai_parse_line_ids": [
-                    str(line.id)
-                    for line in recipe.ingredients_verbatim
-                    if str(line.id) not in proposals
-                ],
+                **{
+                    "id": str(recipe.id),
+                    "name": recipe.name,
+                    "instructions": recipe.instructions,
+                    "lines": [
+                        {"id": str(line.id), "text": line.text}
+                        for line in recipe.ingredients_verbatim
+                    ],
+                    "ai_parse_line_ids": [
+                        str(line.id)
+                        for line in recipe.ingredients_verbatim
+                        if str(line.id) not in proposals
+                    ],
+                },
+                **({"description": recipe.description} if recipe.description else {}),
+                **({"yield": recipe.yields} if recipe.yields else {}),
             },
         },
         proposals,
@@ -184,12 +178,6 @@ def _validate_response(
     response: EnrichmentResponse,
     proposals: dict[str, DeterministicProposal],
 ) -> None:
-    state = recipe.enrichment_state
-    assert state is not None
-    if response.recipe_id != str(recipe.id):
-        raise EnrichmentValidationError("response recipe ID does not match")
-    if response.source_fingerprint != state.source_fingerprint:
-        raise EnrichmentValidationError("response source fingerprint is stale")
     lines = {str(line.id): line for line in recipe.ingredients_verbatim}
     parsed = {decision.line_id: decision for decision in response.parsed_lines}
     non_ingredient = {decision.line_id: decision for decision in response.non_ingredient_lines}
@@ -211,19 +199,22 @@ def _validate_response(
     proposed = [occ.canonical_name for line in response.parsed_lines for occ in line.occurrences]
     proposed_folded = [fold(name) for name in proposed]
 
-    cuisine_ids = [fact.value_id for fact in response.cuisines]
+    cuisine_ids = response.cuisines
     if len(cuisine_ids) != len(set(cuisine_ids)) or not set(cuisine_ids) <= accepted_cuisine_ids():
         raise EnrichmentValidationError("response contains unknown or duplicate cuisine")
     values = {
         (item.kind, item.value_id): item for item in session.scalars(select(RecipeFacetValue))
     }
-    for kind, facts in (
-        (RecipeFacetKind.METHOD, response.methods),
-        (RecipeFacetKind.COURSE, response.courses),
+    method_ids = [fact.value_id for fact in response.methods]
+    if len(method_ids) != len(set(method_ids)) or any(
+        (RecipeFacetKind.METHOD, value_id) not in values for value_id in method_ids
     ):
-        ids = [fact.value_id for fact in facts]
-        if len(ids) != len(set(ids)) or any((kind, value_id) not in values for value_id in ids):
-            raise EnrichmentValidationError(f"response contains unknown or duplicate {kind.value}")
+        raise EnrichmentValidationError("response contains unknown or duplicate method")
+    course_ids = response.courses
+    if len(course_ids) != len(set(course_ids)) or any(
+        (RecipeFacetKind.COURSE, value_id) not in values for value_id in course_ids
+    ):
+        raise EnrichmentValidationError("response contains unknown or duplicate course")
     if sum(fact.is_primary for fact in response.methods) > 1:
         raise EnrichmentValidationError("response has multiple primary methods")
     if len(response.keywords) > 5:
@@ -237,7 +228,7 @@ def _validate_response(
         fold(values[(RecipeFacetKind.METHOD, fact.value_id)].name) for fact in response.methods
     }
     forbidden |= {
-        fold(values[(RecipeFacetKind.COURSE, fact.value_id)].name) for fact in response.courses
+        fold(values[(RecipeFacetKind.COURSE, value_id)].name) for value_id in response.courses
     }
     forbidden |= {item.name_folded for item in canonical.values()} | {
         item.name_folded for item in aliases.values()
@@ -332,20 +323,6 @@ def _apply_response(
                         ingredient = create_ingredient(session, canonical_name)
                         created[name_folded] = ingredient
                     resolution = IngredientResolutionMethod.AI_CREATED
-                source_name = decision_occurrence.source_name
-                if source_name and fold(source_name) != ingredient.name_folded:
-                    existing_alias = session.scalar(
-                        select(IngredientAlias).where(
-                            IngredientAlias.name_folded == fold(source_name)
-                        )
-                    )
-                    if existing_alias is None:
-                        add_ingredient_alias(session, ingredient, source_name)
-                        aliases_created += 1
-                    elif existing_alias.ingredient_id != ingredient.id:
-                        raise EnrichmentValidationError(
-                            "ingredient alias collides with another ingredient"
-                        )
                 quantity = decision_occurrence.quantity
                 unit = decision_occurrence.unit
                 preparation = decision_occurrence.preparation
@@ -380,24 +357,24 @@ def _apply_response(
             RecipeFacet(
                 facet_value_id=facet_values[(RecipeFacetKind.METHOD, fact.value_id)].id,
                 is_primary=fact.is_primary,
-                source=RecipeFactSource(fact.source),
-                evidence=fact.evidence,
+                source=RecipeFactSource.INFERRED,
+                evidence=None,
             )
         )
-    for fact in response.courses:
+    for course_id in response.courses:
         recipe.facets.append(
             RecipeFacet(
-                facet_value_id=facet_values[(RecipeFacetKind.COURSE, fact.value_id)].id,
+                facet_value_id=facet_values[(RecipeFacetKind.COURSE, course_id)].id,
                 is_primary=False,
-                source=RecipeFactSource(fact.source),
-                evidence=fact.evidence,
+                source=RecipeFactSource.INFERRED,
+                evidence=None,
             )
         )
     recipe.cuisines = [
         RecipeCuisine(
-            cuisine_id=fact.value_id, source=RecipeFactSource(fact.source), evidence=fact.evidence
+            cuisine_id=cuisine_id, source=RecipeFactSource.INFERRED, evidence=None
         )
-        for fact in response.cuisines
+        for cuisine_id in response.cuisines
     ]
     recipe.keywords = [get_or_create_keyword(session, value.strip()) for value in response.keywords]
     state.status = RecipeEnrichmentStatus.COMPLETE
