@@ -30,6 +30,7 @@ from app.services.recipe_enrichment.schema import (
     SCHEMA_VERSION,
     TAXONOMY_VERSION,
     EnrichmentResponse,
+    Stage1Response,
 )
 from app.services.recipe_facts import (
     accepted_cuisine_ids,
@@ -84,6 +85,7 @@ def _recipe_with_facts(session: Session, recipe_id: uuid.UUID) -> Recipe:
             selectinload(Recipe.keywords),
             selectinload(Recipe.facets).selectinload(RecipeFacet.facet_value),
             selectinload(Recipe.cuisines),
+            selectinload(Recipe.book),
         )
     )
     if recipe is None:
@@ -163,6 +165,67 @@ def build_context(
         },
         proposals,
     )
+
+
+def build_stage1_context(
+    recipe: Recipe,
+    proposals: dict[str, DeterministicProposal],
+) -> dict:
+    ai_line_ids = [
+        str(line.id)
+        for line in recipe.ingredients_verbatim
+        if str(line.id) not in proposals
+    ]
+    return {
+        "recipe": {
+            "id": str(recipe.id),
+            "instructions": recipe.instructions,
+            "lines": [
+                {"id": str(line.id), "text": line.text}
+                for line in recipe.ingredients_verbatim
+                if str(line.id) in ai_line_ids
+            ],
+            "ai_parse_line_ids": ai_line_ids,
+        }
+    }
+
+
+def build_stage2_context(
+    session: Session,
+    recipe: Recipe,
+    extracted_ingredients: list[str],
+    *,
+    include_description: bool = True,
+) -> dict:
+    upsert_facet_vocabulary(session)
+    session.flush()
+    facets = list(session.scalars(select(RecipeFacetValue)))
+    ctx = {
+        "vocabulary": {
+            "cuisines": sorted(accepted_cuisine_ids()),
+            "methods": [
+                {"id": item.value_id, "name": item.name}
+                for item in facets
+                if item.kind is RecipeFacetKind.METHOD
+            ],
+            "courses": [
+                {"id": item.value_id, "name": item.name}
+                for item in facets
+                if item.kind is RecipeFacetKind.COURSE
+            ],
+        },
+        "recipe": {
+            "id": str(recipe.id),
+            "name": recipe.name,
+            "book_title": recipe.book.title if recipe.book else None,
+            "book_author": recipe.book.author if recipe.book else None,
+            "ingredients": extracted_ingredients,
+            "instructions": recipe.instructions,
+        },
+    }
+    if include_description and recipe.description:
+        ctx["recipe"]["description"] = recipe.description
+    return ctx
 
 
 def _validate_keyword(value: str) -> str:
@@ -442,8 +505,9 @@ def enrich_recipe(
     *,
     provider: AIProvider | None = None,
     task_run_id: uuid.UUID | None = None,
+    include_description: bool = True,
 ) -> tuple[dict[str, int], Usage]:
-    """Call the configured provider once then atomically persist the valid response."""
+    """Execute two-stage enrichment and atomically persist the valid response."""
     recipe = _recipe_with_facts(session, recipe_id)
     state = recipe.enrichment_state
     if state is not None and state.status is RecipeEnrichmentStatus.COMPLETE:
@@ -457,10 +521,33 @@ def enrich_recipe(
     state.status = RecipeEnrichmentStatus.RUNNING
     state.started_at = datetime.now(UTC)
     session.commit()
-    context, proposals = build_context(session, _recipe_with_facts(session, recipe_id))
+    recipe = _recipe_with_facts(session, recipe_id)
+    _, proposals = build_context(session, recipe)
     model = provider.model_for(ModelRole.RECIPE_ENRICHMENT)
     try:
-        response, usage = provider.enrich_recipe(context, model)
+        stage1_context = build_stage1_context(recipe, proposals)
+        if not stage1_context["recipe"]["ai_parse_line_ids"]:
+            stage1_response = Stage1Response(p=[], n=[])
+            usage1 = Usage()
+        else:
+            stage1_response, usage1 = provider.enrich_recipe_stage1(stage1_context, model)
+
+        deterministic_names = [
+            occ.name for p in proposals.values() for occ in p.occurrences
+        ]
+        ai_names = [
+            occ.canonical_name for line in stage1_response.parsed_lines for occ in line.occurrences
+        ]
+        all_ingredients = deterministic_names + ai_names
+
+        stage2_context = build_stage2_context(
+            session, recipe, all_ingredients, include_description=include_description
+        )
+        stage2_response, usage2 = provider.enrich_recipe_stage2(stage2_context, model)
+
+        response = EnrichmentResponse.from_stages(stage1_response, stage2_response)
+        usage = usage1 + usage2
+
         result = apply_enrichment(
             session,
             recipe_id,

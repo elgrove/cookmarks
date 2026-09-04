@@ -75,6 +75,11 @@ def _build_parser() -> argparse.ArgumentParser:
     enrich_p.add_argument(
         "--config", type=Path, default=DEFAULT_CONFIG_PATH, help="path to eval.toml"
     )
+    enrich_p.add_argument(
+        "--no-description",
+        action="store_true",
+        help="omit recipe descriptions from Stage 2 input context",
+    )
 
     rep_p = sub.add_parser("report", help="summarise the ledger (no run)")
     rep_p.add_argument(
@@ -105,7 +110,12 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "enrichment":
-        records = enrichment.run_enrichment_eval(args.config, args.models, args.recipes)
+        records = enrichment.run_enrichment_eval(
+            args.config,
+            args.models,
+            args.recipes,
+            include_description=not args.no_description,
+        )
         print("\n" + enrichment.leaderboard(records))
         return 0
 

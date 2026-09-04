@@ -24,15 +24,19 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from app.services.ai import AIProvider, AIResponseError
+from app.services.ai import AIProvider, AIResponseError, Usage
 from app.services.ai.anthropic import AnthropicProvider
 from app.services.ai.gemini import GeminiProvider
 from app.services.ai.openrouter import OpenRouterProvider
 from app.services.ai.stub import StubProvider
+from app.services.recipe_enrichment.parser import DeterministicProposal, parse_line
 from app.services.recipe_enrichment.schema import (
     PROMPT_VERSION,
     SCHEMA_VERSION,
     EnrichmentResponse,
+    LineDecision,
+    OccurrenceDecision,
+    Stage1Response,
 )
 from app.services.recipe_facts import accepted_cuisine_ids, facet_vocabulary
 from app.text import fold
@@ -129,6 +133,9 @@ class GoldRecipe(BaseModel):
     name: str
     archetype: str
     yields: str | None = None
+    description: str | None = None
+    book_title: str | None = None
+    book_author: str | None = None
     instructions: list[str]
     lines: list[GoldLine]
     cuisines: list[GoldFact] = []
@@ -198,17 +205,57 @@ def load_gold_recipes(path: Path = ENRICHMENT_GOLD_PATH) -> list[GoldRecipe]:
     return [GoldRecipe.model_validate(item) for item in data]
 
 
+_EVAL_PLURAL_MAP = {
+    "noodles": "noodle",
+    "sprouts": "sprout",
+    "seeds": "seed",
+    "flakes": "flake",
+    "leaves": "leaf",
+    "chives": "chive",
+}
+
+_EVAL_EN_GB_MAP = {
+    "chile": "chilli",
+    "chili": "chilli",
+    "chiles": "chilli",
+    "chilis": "chilli",
+    "chillies": "chilli",
+    "cilantro": "coriander",
+    "eggplant": "aubergine",
+    "eggplants": "aubergine",
+    "zucchini": "courgette",
+    "zucchinis": "courgette",
+    "scallion": "spring onion",
+    "scallions": "spring onion",
+    "green onion": "spring onion",
+    "green onions": "spring onion",
+}
+
+
+def _norm_eval_ingredient(name: str) -> str:
+    folded = fold(name)
+    tokens = folded.split()
+    norm_tokens: list[str] = []
+    for t in tokens:
+        if t in _EVAL_EN_GB_MAP:
+            t = _EVAL_EN_GB_MAP[t]
+        if t in _EVAL_PLURAL_MAP:
+            t = _EVAL_PLURAL_MAP[t]
+        norm_tokens.append(t)
+    return " ".join(norm_tokens)
+
+
 def score_ingredient_identity(
     gold_lines: list[GoldLine], response: EnrichmentResponse
 ) -> tuple[float, float, float]:
     gold_names = {
-        fold(occ.canonical_name)
+        _norm_eval_ingredient(occ.canonical_name)
         for line in gold_lines
         for occ in line.occurrences
         if occ.canonical_name
     }
     pred_names = {
-        fold(occ.canonical_name)
+        _norm_eval_ingredient(occ.canonical_name)
         for line in response.parsed_lines
         for occ in line.occurrences
     }
@@ -450,6 +497,111 @@ def source_fingerprint_dict(source: dict) -> str:
     ).hexdigest()
 
 
+def gold_ingredient_vocab(recipes: list[GoldRecipe]) -> dict[str, str]:
+    vocab: dict[str, str] = {}
+    for r in recipes:
+        for line in r.lines:
+            for occ in line.occurrences:
+                if occ.canonical_name:
+                    vocab[fold(occ.canonical_name)] = occ.canonical_name
+    return vocab
+
+
+def build_gold_proposals(
+    gold: GoldRecipe, vocab: dict[str, str]
+) -> dict[str, DeterministicProposal]:
+    proposals: dict[str, DeterministicProposal] = {}
+    for line in gold.lines:
+        line_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{line.position}:{line.text}"))
+        p = parse_line(line_id, line.text)
+        if p and all(fold(occ.name) in vocab for occ in p.occurrences):
+            proposals[line_id] = p
+    return proposals
+
+
+def proposals_to_line_decisions(
+    proposals: dict[str, DeterministicProposal], vocab: dict[str, str]
+) -> list[LineDecision]:
+    lines = []
+    for line_id, proposal in proposals.items():
+        occurrences = [
+            OccurrenceDecision(
+                n=vocab.get(fold(occ.name), occ.name.title()),
+                q=occ.quantity,
+                u=occ.unit,
+                p=occ.preparation,
+                x=False,
+                a=None,
+                k=False,
+            )
+            for occ in proposal.occurrences
+        ]
+        lines.append(LineDecision(l=line_id, o=occurrences))
+    return lines
+
+
+def build_gold_stage1_context(
+    gold: GoldRecipe, proposals: dict[str, DeterministicProposal] | None = None
+) -> dict:
+    props = proposals or {}
+    ai_parse_line_ids = [
+        str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{line.position}:{line.text}"))
+        for line in gold.lines
+        if str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{line.position}:{line.text}")) not in props
+    ]
+    lines_payload = [
+        {"id": str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{line.position}:{line.text}")), "text": line.text}
+        for line in gold.lines
+        if str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{line.position}:{line.text}")) in ai_parse_line_ids
+    ]
+
+    return {
+        "recipe": {
+            "id": gold.id,
+            "name": gold.name,
+            "instructions": gold.instructions,
+            "lines": lines_payload,
+            "ai_parse_line_ids": ai_parse_line_ids,
+        }
+    }
+
+
+def build_gold_stage2_context(
+    gold: GoldRecipe, ingredient_names: list[str], *, include_description: bool = True
+) -> dict:
+    _, entries = facet_vocabulary()
+    methods = [
+        {"id": entry["id"], "name": entry["name"]} for entry in entries if entry["kind"] == "method"
+    ]
+    courses = [
+        {"id": entry["id"], "name": entry["name"]} for entry in entries if entry["kind"] == "course"
+    ]
+
+    recipe_payload = {
+        "id": gold.id,
+        "name": gold.name,
+        "instructions": gold.instructions,
+        "ingredients": ingredient_names,
+    }
+    if gold.book_title:
+        recipe_payload["book_title"] = gold.book_title
+    if gold.book_author:
+        recipe_payload["book_author"] = gold.book_author
+    if include_description and gold.description:
+        recipe_payload["description"] = gold.description
+    if gold.yields:
+        recipe_payload["yield"] = gold.yields
+
+    return {
+        "vocabulary": {
+            "cuisines": sorted(accepted_cuisine_ids()),
+            "methods": methods,
+            "courses": courses,
+        },
+        "recipe": recipe_payload,
+    }
+
+
 def build_gold_context(gold: GoldRecipe) -> dict:
     _, entries = facet_vocabulary()
     methods = [
@@ -466,22 +618,29 @@ def build_gold_context(gold: GoldRecipe) -> dict:
         lines_payload.append({"id": line_id, "text": line.text})
         ai_parse_line_ids.append(line_id)
 
+    recipe_payload = {
+        "id": gold.id,
+        "name": gold.name,
+        "instructions": gold.instructions,
+        "lines": lines_payload,
+        "ai_parse_line_ids": ai_parse_line_ids,
+    }
+    if gold.book_title:
+        recipe_payload["book_title"] = gold.book_title
+    if gold.book_author:
+        recipe_payload["book_author"] = gold.book_author
+    if gold.description:
+        recipe_payload["description"] = gold.description
+    if gold.yields:
+        recipe_payload["yield"] = gold.yields
+
     return {
         "vocabulary": {
             "cuisines": sorted(accepted_cuisine_ids()),
             "methods": methods,
             "courses": courses,
         },
-        "recipe": {
-            **{
-                "id": gold.id,
-                "name": gold.name,
-                "instructions": gold.instructions,
-                "lines": lines_payload,
-                "ai_parse_line_ids": ai_parse_line_ids,
-            },
-            **({"yield": gold.yields} if gold.yields else {}),
-        },
+        "recipe": recipe_payload,
     }
 
 
@@ -651,21 +810,63 @@ def evaluate_enrichment_recipe(
     timestamp: str,
     sha: str | None,
     run_dir: Path,
+    vocab: dict[str, str] | None = None,
+    include_description: bool = True,
 ) -> EnrichmentRecipeRecord:
-    """Evaluate one independent model and recipe pair."""
-    context = build_gold_context(gold)
+    """Evaluate one independent model and recipe pair using two-stage enrichment."""
     started = time.monotonic()
 
     try:
-        response, usage = provider.enrich_recipe(context, candidate.model)
+        active_vocab = vocab or {}
+        proposals = build_gold_proposals(gold, active_vocab)
+        stage1_context = build_gold_stage1_context(gold, proposals)
+
+        if not stage1_context["recipe"]["ai_parse_line_ids"]:
+            stage1_response = Stage1Response(p=[], n=[])
+            usage1 = Usage()
+        else:
+            stage1_response, usage1 = provider.enrich_recipe_stage1(stage1_context, candidate.model)
+
+        deterministic_lines = proposals_to_line_decisions(proposals, active_vocab)
+        deterministic_names = [
+            occ.canonical_name for line in deterministic_lines for occ in line.occurrences
+        ]
+        ai_names = [
+            occ.canonical_name for line in stage1_response.parsed_lines for occ in line.occurrences
+        ]
+        ingredient_names = deterministic_names + ai_names
+
+        stage2_context = build_gold_stage2_context(
+            gold, ingredient_names, include_description=include_description
+        )
+        stage2_response, usage2 = provider.enrich_recipe_stage2(stage2_context, candidate.model)
+
+        all_parsed_lines = deterministic_lines + stage1_response.parsed_lines
+        combined_stage1 = Stage1Response(
+            p=all_parsed_lines,
+            n=stage1_response.non_ingredient_lines,
+        )
+        response = EnrichmentResponse.from_stages(combined_stage1, stage2_response)
+        usage = usage1 + usage2
+
+        full_context = build_gold_context(gold)
         try:
-            validate_enrichment_response(context, response)
+            validate_enrichment_response(full_context, response)
         except ValueError as exc:
             artefact_path = (
-                run_dir / f"{gold.slug}_{candidate.provider}_{candidate.model.replace('/', '_')}.invalid.json"
+                run_dir
+                / f"{gold.slug}_{candidate.provider}_{candidate.model.replace('/', '_')}.invalid.json"
             )
             artefact_path.write_text(
-                json.dumps({"response": response.model_dump(), "gold": gold.model_dump()}, indent=2)
+                json.dumps(
+                    {
+                        "response": response.model_dump(),
+                        "stage1": stage1_response.model_dump(),
+                        "stage2": stage2_response.model_dump(),
+                        "gold": gold.model_dump(),
+                    },
+                    indent=2,
+                )
             )
             raise AIResponseError(f"Invalid recipe enrichment response: {exc}", usage) from exc
         duration = time.monotonic() - started
@@ -697,7 +898,10 @@ def evaluate_enrichment_recipe(
         artefact_data = {
             "record": record.model_dump(),
             "response": response.model_dump(),
+            "stage1": stage1_response.model_dump(),
+            "stage2": stage2_response.model_dump(),
             "gold": gold.model_dump(),
+            "include_description": include_description,
         }
         artefact_path.write_text(json.dumps(artefact_data, indent=2))
         return record
@@ -760,6 +964,7 @@ def run_enrichment_eval(
     config_path: Path = DEFAULT_CONFIG_PATH,
     model_ids: list[str] | None = None,
     recipe_slugs: list[str] | None = None,
+    include_description: bool = True,
 ) -> list[EnrichmentRecipeRecord]:
     cfg_models, gold_path = load_enrichment_config(config_path)
     models = cfg_models
@@ -796,6 +1001,8 @@ def run_enrichment_eval(
         provider = instantiate_provider(candidate, key)
         providers.append((candidate, provider))
 
+    vocab = gold_ingredient_vocab(gold_recipes)
+
     evaluations = [
         (candidate, provider, gold)
         for gold in gold_recipes
@@ -804,10 +1011,10 @@ def run_enrichment_eval(
 
     records: list[EnrichmentRecipeRecord] = []
     if not evaluations:
+        logger.warning("No enrichment evaluations to run.")
         return records
 
-    workers = min(MAX_CONCURRENT_ENRICHMENT_REQUESTS, len(evaluations))
-    with ThreadPoolExecutor(max_workers=workers) as executor:
+    with ThreadPoolExecutor(max_workers=MAX_CONCURRENT_ENRICHMENT_REQUESTS) as executor:
         futures = {
             executor.submit(
                 evaluate_enrichment_recipe,
@@ -818,7 +1025,9 @@ def run_enrichment_eval(
                 timestamp=timestamp,
                 sha=sha,
                 run_dir=run_dir,
-            ): (candidate, gold)
+                vocab=vocab,
+                include_description=include_description,
+            ): (candidate.id, gold.slug)
             for candidate, provider, gold in evaluations
         }
         for future in as_completed(futures):

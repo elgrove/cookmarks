@@ -75,26 +75,35 @@ def _resolve_book_in_calibre(calibre_id: int) -> dict[str, Any]:
     }
 
 
+_PROD_DB_PATH = Path("/home/aaron/docker/cookmarks/data/db.sqlite3")
+
+
 def _read_config_keys() -> dict[str, str]:
-    if not _CONFIG_DB_PATH.exists():
-        return {}
-    conn = sqlite3.connect(str(_CONFIG_DB_PATH))
-    try:
-        row = conn.execute(
-            "SELECT ai_provider, api_key, assistant_provider, assistant_api_key FROM config WHERE id = 1"
-        ).fetchone()
-    except sqlite3.OperationalError:
-        return {}
-    finally:
-        conn.close()
-    if not row:
-        return {}
-    keys: dict[str, str] = {}
-    if row[0] and row[1]:
-        keys[str(row[0])] = str(row[1])
-    if len(row) > 3 and row[2] and row[3]:
-        keys[str(row[2])] = str(row[3])
-    return keys
+    for db_path in (_CONFIG_DB_PATH, _PROD_DB_PATH):
+        if not db_path.exists():
+            continue
+        try:
+            conn = sqlite3.connect(str(db_path))
+            try:
+                row = conn.execute(
+                    "SELECT ai_provider, api_key, assistant_provider, assistant_api_key FROM config WHERE id = 1"
+                ).fetchone()
+            finally:
+                conn.close()
+        except sqlite3.OperationalError:
+            continue
+        if not row:
+            continue
+        keys: dict[str, str] = {}
+        if row[0] and row[1]:
+            keys[str(row[0])] = str(row[1])
+            keys[str(row[0]).lower()] = str(row[1])
+        if len(row) > 3 and row[2] and row[3]:
+            keys[str(row[2])] = str(row[3])
+            keys[str(row[2]).lower()] = str(row[3])
+        if keys:
+            return keys
+    return {}
 
 
 def resolve_api_key(provider: str) -> str:

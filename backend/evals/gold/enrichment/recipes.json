@@ -30,12 +30,12 @@
       },
       {
         "position": 1,
-        "text": "1\u00bd teaspoons kosher salt",
+        "text": "1½ teaspoons kosher salt",
         "kind": "ingredient",
         "occurrences": [
           {
             "canonical_name": "Kosher Salt",
-            "quantity": "1\u00bd",
+            "quantity": "1½",
             "unit": "tsp",
             "preparation": null,
             "optional": false,
@@ -178,7 +178,10 @@
       "Buri",
       "Pan Fried",
       "Glazed"
-    ]
+    ],
+    "description": "Gaijin love yellowtail. It’s a fish that’s mild in flavor and fatty, and it’s a mainstay at every sushi bar in America. For this preparation—another standard at any Japanese diner—I sear fillets of yellowtail (called hamachi or buri, depending on the size and species) in a hot pan, then simmer them in sake, mirin, and soy sauce. The fat renders from the fish and mingles with the liquid, creating a surprisingly rich sauce.",
+    "book_title": "The Gaijin Cookbook: Japanese Recipes From a Chef, Father, Eater, and Lifelong Outsider",
+    "book_author": "Ivan Orkin & Chris Ying"
   },
   {
     "id": "189c9f1e-7807-42dc-8f7b-5acfc650e903",
@@ -198,7 +201,7 @@
     "lines": [
       {
         "position": 0,
-        "text": "2 aubergines (eggplants), cut into rounds about 5 mm (\u00bc inch) thick",
+        "text": "2 aubergines (eggplants), cut into rounds about 5 mm (¼ inch) thick",
         "kind": "ingredient",
         "occurrences": [
           {
@@ -370,12 +373,12 @@
       },
       {
         "position": 12,
-        "text": "\u00bd teaspoon crushed garlic",
+        "text": "½ teaspoon crushed garlic",
         "kind": "ingredient",
         "occurrences": [
           {
             "canonical_name": "Garlic",
-            "quantity": "\u00bd",
+            "quantity": "½",
             "unit": "tsp",
             "preparation": "crushed",
             "optional": false,
@@ -440,12 +443,12 @@
       },
       {
         "position": 17,
-        "text": "\u00bd teaspoon cumin seeds",
+        "text": "½ teaspoon cumin seeds",
         "kind": "ingredient",
         "occurrences": [
           {
             "canonical_name": "Cumin Seeds",
-            "quantity": "\u00bd",
+            "quantity": "½",
             "unit": "tsp",
             "preparation": null,
             "optional": false,
@@ -552,7 +555,10 @@
       "Tempering",
       "Layered",
       "Yoghurt Dip"
-    ]
+    ],
+    "description": "This is one of the recipes I cooked when I returned to my mother’s kitchen: inspired by the Afghani dish of borani, it makes a lovely side (pictured here). As it is served at room temperature, it’s perfect for relaxed meals.",
+    "book_title": "Andaza: A Memoir of Food, Flavour and Freedom in the Pakistani Kitchen",
+    "book_author": "Sumayya Usmani"
   },
   {
     "id": "07bdd2a9-9df0-463a-be0b-8c688bbd9796",
@@ -564,7 +570,7 @@
       "Heat the oil in a saucepan over a medium heat and add the onion. Cook until lightly browned, then add the chilli, garlic and red pepper. Continue to cook until the garlic has softened and the pepper has started to brown.",
       "Remove the veg from the pan with a slotted spoon and reserve. Add the butter to the pan and let it melt, then whisk in the flour. Cook until the roux turns a light golden brown, stirring constantly. Add the curry powder and garam masala, reduce the heat to low and cook for a few minutes, stirring frequently. Add the stock or dashi in a thin stream, whisking constantly to prevent lumps, and bring to the boil. Add the soy sauce and ketchup or tonkatsu sauce and reduce to a simmer.",
       "If using a sweetcorn cob, blanch in boiling water then cut off the kernels, or heat up the tinned sweetcorn in a saucepan or the microwave.",
-      "Cook the udon according to the package instructions, then drain and portion into deep bowls. Pour over the curry broth and top with the sweetcorn kernels, saut\u00e9ed onion and pepper mixture, spring onions, eggs, chilli flakes, pickled ginger, cheese, if using, and sesame seeds."
+      "Cook the udon according to the package instructions, then drain and portion into deep bowls. Pour over the curry broth and top with the sweetcorn kernels, sautéed onion and pepper mixture, spring onions, eggs, chilli flakes, pickled ginger, cheese, if using, and sesame seeds."
     ],
     "lines": [
       {
@@ -649,7 +655,7 @@
       },
       {
         "position": 5,
-        "text": "60 g (2 oz/\u00bd stick) butter",
+        "text": "60 g (2 oz/½ stick) butter",
         "kind": "ingredient",
         "occurrences": [
           {
@@ -681,7 +687,7 @@
       },
       {
         "position": 7,
-        "text": "45 g (1\u00be oz) Madras curry powder (you can use hot or mild, or a combination of both)",
+        "text": "45 g (1¾ oz) Madras curry powder (you can use hot or mild, or a combination of both)",
         "kind": "ingredient",
         "occurrences": [
           {
@@ -893,12 +899,12 @@
       },
       {
         "position": 18,
-        "text": "40\u201350 g (1\u00bd\u20132 oz) red pickled ginger (optional)",
+        "text": "40–50 g (1½–2 oz) red pickled ginger (optional)",
         "kind": "ingredient",
         "occurrences": [
           {
             "canonical_name": "Red Pickled Ginger",
-            "quantity": "40\u201350",
+            "quantity": "40–50",
             "unit": "g",
             "preparation": null,
             "optional": true,
@@ -909,7 +915,7 @@
       },
       {
         "position": 19,
-        "text": "50 g (2 oz) Cheddar cheese, grated (optional \u2013 but it\u2019s DELICIOUS)",
+        "text": "50 g (2 oz) Cheddar cheese, grated (optional – but it’s DELICIOUS)",
         "kind": "ingredient",
         "occurrences": [
           {
@@ -980,7 +986,10 @@
       "Noodle Soup",
       "Japanese Curry",
       "Comfort Food"
-    ]
+    ],
+    "description": "Japanese curry and udon: a comfort food power couple. The addition of curry to hot udon doubles down on its warming, satisfying qualities – I love all kinds of udon, but this may be my favourite.",
+    "book_title": "JapanEasy: Classic and Modern Japanese Recipes to Cook at Home",
+    "book_author": "Tim Anderson"
   },
   {
     "id": "2b7a7175d7cf46efb5e855957efeafae",
@@ -1365,7 +1374,10 @@
       "Sweet-Sour",
       "Tangy",
       "Street Food"
-    ]
+    ],
+    "description": "Pad Thai is a popular Thai national dish with a sweet-sour-pungent-hot flavour profile, built with palm sugar, tamarind pulp, fish sauce, and chiles, reinforced with dried shrimp, shrimp paste, preserved radish, garlic, shallots, garlic chives, and fresh bean sprouts. It includes extra-firm tofu, crushed peanuts, scrambled egg, and shrimp, and is made with dried rice noodles that are partially rehydrated and then cooked in the wok to absorb the sauce.",
+    "book_title": "The Wok: Recipes and Techniques",
+    "book_author": "J. Kenji López-Alt"
   },
   {
     "id": "b6e8e90fff1a4b29b6146e0c7c000a8a",
@@ -1678,6 +1690,9 @@
       "Cake",
       "Sponge",
       "Sweet"
-    ]
+    ],
+    "description": null,
+    "book_title": "Dining In: Highly Cookable Recipes: A Cookbook",
+    "book_author": "Alison Roman"
   }
 ]
