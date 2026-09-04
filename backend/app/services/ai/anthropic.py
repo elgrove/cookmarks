@@ -44,10 +44,12 @@ class AnthropicProvider(AIProvider):
             ]
             kwargs["tool_choice"] = {"type": "tool", "name": "structured_output"}
 
+        extra_body: dict[str, Any] = {"temperature": temp}
         with self.client.messages.stream(
             model=model,
             max_tokens=32_000,
             messages=[{"role": "user", "content": prompt}],
+            extra_body=extra_body,
             **kwargs,
         ) as stream:
             response = stream.get_final_message()
