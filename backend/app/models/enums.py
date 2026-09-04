@@ -18,6 +18,7 @@ class TaskType(StrEnum):
     KEYWORD_DEDUP = "keyword_dedup"
     CALIBRE_SYNC = "calibre_sync"
     BOOK_INGEST = "book_ingest"
+    RECIPE_ENRICHMENT_PILOT = "recipe_enrichment_pilot"
 
 
 class TaskStatus(StrEnum):

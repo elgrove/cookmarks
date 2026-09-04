@@ -8,7 +8,12 @@
 	import TaskRunsPanel from '$lib/components/TaskRunsPanel.svelte';
 	import UsersPanel from '$lib/components/UsersPanel.svelte';
 	import { fetchConfig, updateConfig, type Config, type ConfigUpdate } from '$lib/api/config';
-	import { triggerBookKeywords, triggerDedupKeywords, triggerCalibreSync } from '$lib/api/tasks';
+	import {
+		triggerBookKeywords,
+		triggerDedupKeywords,
+		triggerCalibreSync,
+		triggerRecipeEnrichmentPilot
+	} from '$lib/api/tasks';
 	import { fetchTaskRuns, type TaskRun } from '$lib/api/task-runs';
 	import {
 		createUser,
@@ -155,6 +160,7 @@
 			onRun={({ regenerate }) => triggerBookKeywords(regenerate)}
 			onDedup={() => triggerDedupKeywords()}
 			onSync={() => triggerCalibreSync()}
+			onEnrichmentPilot={() => triggerRecipeEnrichmentPilot()}
 		/>
 	{:else if active === 'task-runs'}
 		{#if runsStatus === 'ready'}

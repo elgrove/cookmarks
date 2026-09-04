@@ -7,6 +7,7 @@ from typing import Any, ClassVar
 import httpx
 
 from app.services.ai.base import MAX_TIMEOUT, AIProvider, ModelRole, Usage
+from app.services.recipe_enrichment.schema import ENRICHMENT_JSON_SCHEMA
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +15,9 @@ _API_URL = "https://openrouter.ai/api/v1/chat/completions"
 _RETRYABLE_STATUS = (429, 500, 502, 503, 504)
 _MAX_RETRIES = 5
 _BACKOFF_FACTOR = 2
+_GEMMA_31B_MODEL = "google/gemma-4-31b-it"
+_GEMMA_31B_ENRICHMENT_MAX_TOKENS = 8_192
+_DEFAULT_STRUCTURED_MAX_TOKENS = 4_096
 
 
 class OpenRouterProvider(AIProvider):
@@ -26,6 +30,7 @@ class OpenRouterProvider(AIProvider):
         ModelRole.BOOK_KEYWORDS: "google/gemini-2.5-flash",
         ModelRole.KEYWORD_DEDUP: "google/gemini-2.5-flash",
         ModelRole.ASSISTANT: "google/gemini-2.5-flash",
+        ModelRole.RECIPE_ENRICHMENT: "google/gemini-2.5-flash",
     }
 
     def _complete(
@@ -36,7 +41,22 @@ class OpenRouterProvider(AIProvider):
             "messages": [{"role": "user", "content": prompt}],
             "temperature": temp,
         }
-        if model == "openai/gpt-oss-120b":
+        if schema is not None:
+            payload["response_format"] = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "cookmarks_response",
+                    "strict": True,
+                    "schema": schema,
+                },
+            }
+            payload["provider"] = {"require_parameters": True}
+            payload["max_tokens"] = (
+                _GEMMA_31B_ENRICHMENT_MAX_TOKENS
+                if model == _GEMMA_31B_MODEL and schema == ENRICHMENT_JSON_SCHEMA
+                else _DEFAULT_STRUCTURED_MAX_TOKENS
+            )
+        elif model == "openai/gpt-oss-120b":
             payload["max_tokens"] = 110_000
 
         result: dict[str, Any] = {}
@@ -75,13 +95,15 @@ class OpenRouterProvider(AIProvider):
                     raise ValueError(f"OpenRouter API error: {error_data}")
 
                 response.raise_for_status()
-                content = result["choices"][0]["message"]["content"]
+                choice = result["choices"][0]
+                content = choice["message"]["content"]
                 usage_data = result.get("usage", {})
                 raw_cost = usage_data.get("cost")
                 usage = Usage(
                     cost_usd=Decimal(str(raw_cost)) if raw_cost else None,
                     input_tokens=usage_data.get("prompt_tokens") or None,
                     output_tokens=usage_data.get("completion_tokens") or None,
+                    finish_reason=choice.get("finish_reason"),
                 )
                 return content or "", usage
 

@@ -8,6 +8,10 @@ from google.genai.types import ContentListUnion, GenerateContentConfigDict
 
 from app.services.ai.base import AIProvider, AIResponseError, EmbedTask, ModelRole, Usage
 from app.services.prompts import READ_PAGE_PROMPT
+from app.services.recipe_enrichment.schema import (
+    ENRICHMENT_JSON_SCHEMA,
+    GEMINI_ENRICHMENT_JSON_SCHEMA,
+)
 
 logger = logging.getLogger(__name__)
 logging.getLogger("google.genai").setLevel(logging.ERROR)
@@ -43,6 +47,7 @@ class GeminiProvider(AIProvider):
         ModelRole.BOOK_KEYWORDS: "gemini-2.5-flash",
         ModelRole.KEYWORD_DEDUP: "gemini-2.5-flash",
         ModelRole.ASSISTANT: "gemini-2.5-flash",
+        ModelRole.RECIPE_ENRICHMENT: "gemini-2.5-flash",
     }
     embedding_model: ClassVar[str] = "gemini-embedding-001"
     embedding_dimensions: ClassVar[int] = 3072
@@ -73,19 +78,26 @@ class GeminiProvider(AIProvider):
             "temperature": temp,
         }
         if schema:
-            config["response_json_schema"] = schema
+            config["response_json_schema"] = (
+                GEMINI_ENRICHMENT_JSON_SCHEMA if schema is ENRICHMENT_JSON_SCHEMA else schema
+            )
+            if schema is ENRICHMENT_JSON_SCHEMA:
+                config["thinking_config"] = {"thinking_budget": 0}
 
         response = self.client.models.generate_content(model=model, contents=prompt, config=config)
 
         usage = Usage()
         if response.usage_metadata:
             input_tokens = getattr(response.usage_metadata, "prompt_token_count", 0) or 0
-            total_tokens = getattr(response.usage_metadata, "total_token_count", 0) or 0
-            output_tokens = total_tokens - input_tokens
+            candidate_tokens = getattr(response.usage_metadata, "candidates_token_count", 0) or 0
+            thinking_tokens = getattr(response.usage_metadata, "thoughts_token_count", 0) or 0
+            output_tokens = candidate_tokens + thinking_tokens
             usage = Usage(
                 cost_usd=self._calculate_cost(model, input_tokens, output_tokens),
                 input_tokens=input_tokens,
                 output_tokens=output_tokens,
+                candidate_tokens=candidate_tokens,
+                thinking_tokens=thinking_tokens,
             )
 
         candidates = response.candidates or []

@@ -75,17 +75,26 @@ def _resolve_book_in_calibre(calibre_id: int) -> dict[str, Any]:
     }
 
 
-def _read_config_provider() -> tuple[str | None, str | None]:
+def _read_config_keys() -> dict[str, str]:
     if not _CONFIG_DB_PATH.exists():
-        return (None, None)
+        return {}
     conn = sqlite3.connect(str(_CONFIG_DB_PATH))
     try:
-        row = conn.execute("SELECT ai_provider, api_key FROM config WHERE id = 1").fetchone()
+        row = conn.execute(
+            "SELECT ai_provider, api_key, assistant_provider, assistant_api_key FROM config WHERE id = 1"
+        ).fetchone()
     except sqlite3.OperationalError:
-        return (None, None)
+        return {}
     finally:
         conn.close()
-    return (row[0], row[1]) if row else (None, None)
+    if not row:
+        return {}
+    keys: dict[str, str] = {}
+    if row[0] and row[1]:
+        keys[str(row[0])] = str(row[1])
+    if len(row) > 3 and row[2] and row[3]:
+        keys[str(row[2])] = str(row[3])
+    return keys
 
 
 def resolve_api_key(provider: str) -> str:
@@ -99,9 +108,9 @@ def resolve_api_key(provider: str) -> str:
     if env_var and os.environ.get(env_var):
         return os.environ[env_var]
 
-    config_provider, config_key = _read_config_provider()
-    if config_key and config_provider == provider:
-        return config_key
+    keys = _read_config_keys()
+    if provider in keys:
+        return keys[provider]
 
     hint = f"set {env_var}" if env_var else "configure it in the app DB"
     raise RuntimeError(f"No API key for provider {provider!r}; {hint} (or {_CONFIG_DB_PATH}).")

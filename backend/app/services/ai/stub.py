@@ -44,6 +44,7 @@ class StubProvider(AIProvider):
         ModelRole.BOOK_KEYWORDS: "stub-keywords",
         ModelRole.KEYWORD_DEDUP: "stub-dedup",
         ModelRole.ASSISTANT: "stub-assistant",
+        ModelRole.RECIPE_ENRICHMENT: "stub-enrichment",
     }
     # Matches the production (Gemini) width so stub vectors share the vec0 table.
     embedding_dimensions: ClassVar[int] = 3072
@@ -68,6 +69,26 @@ class StubProvider(AIProvider):
             # per-book token exercises the shared-vocabulary join either way.
             token = hashlib.blake2b(prompt.encode("utf-8"), digest_size=3).hexdigest()
             return json.dumps(["Cookbook", "Stub Cuisine", f"Theme {token}"]), usage
+
+        if prompt.startswith("Recipe enrichment prompt"):
+            recipe = json.loads(prompt.rsplit("Recipe-specific input:\n", 1)[1])
+            parsed_lines = []
+            token = recipe["id"].split("-")[0]
+            for index, line in enumerate(recipe["lines"], start=1):
+                parsed_lines.append(
+                    {
+                        "l": line["id"],
+                        "o": [
+                            {"canonical_name": f"Stub Ingredient {token} {index}", "is_key": False}
+                        ],
+                    }
+                )
+            return json.dumps(
+                {
+                    "p": parsed_lines,
+                    "w": ["Cosy", "Fresh", "Outdoor", "Summer", "Weeknight"],
+                }
+            ), usage
 
         suffix = hashlib.blake2b(prompt.encode("utf-8"), digest_size=4).hexdigest()
         recipe = {

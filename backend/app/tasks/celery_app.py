@@ -21,6 +21,7 @@ celery_app = Celery(
         "app.tasks.keyword_dedup",
         "app.tasks.calibre_sync",
         "app.tasks.ingest",
+        "app.tasks.recipe_enrichment",
     ],
 )
 

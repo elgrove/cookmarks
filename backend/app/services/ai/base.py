@@ -17,6 +17,8 @@ from app.services.prompts import (
     EXTRACT_RECIPES_PROMPT,
     IMAGE_MATCH_CHECK_PROMPT,
 )
+from app.services.recipe_enrichment.prompt import build_prompt
+from app.services.recipe_enrichment.schema import ENRICHMENT_JSON_SCHEMA, EnrichmentResponse
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +46,7 @@ class ModelRole(Enum):
     BOOK_KEYWORDS = "book_keywords"
     KEYWORD_DEDUP = "keyword_dedup"
     ASSISTANT = "assistant"
+    RECIPE_ENRICHMENT = "recipe_enrichment"
 
 
 class EmbedTask(Enum):
@@ -74,12 +77,18 @@ class Usage:
     cost_usd: Decimal | None = None
     input_tokens: int | None = None
     output_tokens: int | None = None
+    candidate_tokens: int | None = None
+    thinking_tokens: int | None = None
+    finish_reason: str | None = None
 
     def __add__(self, other: "Usage") -> "Usage":
         return Usage(
             cost_usd=_sum_optional(self.cost_usd, other.cost_usd),
             input_tokens=_sum_optional(self.input_tokens, other.input_tokens),
             output_tokens=_sum_optional(self.output_tokens, other.output_tokens),
+            candidate_tokens=_sum_optional(self.candidate_tokens, other.candidate_tokens),
+            thinking_tokens=_sum_optional(self.thinking_tokens, other.thinking_tokens),
+            finish_reason=other.finish_reason or self.finish_reason,
         )
 
 
@@ -222,6 +231,19 @@ class AIProvider(abc.ABC):
             except ValidationError as e:
                 logger.warning(f"Skipping invalid recipe at index {i}: {e}")
         return recipes, usage
+
+    def enrich_recipe(self, context: dict, model: str | None = None) -> tuple[EnrichmentResponse, Usage]:
+        """Run the separate structured enrichment request for one persisted recipe."""
+        model = model or self.model_for(ModelRole.RECIPE_ENRICHMENT)
+        response, usage = self._complete(
+            build_prompt(context), model, schema=ENRICHMENT_JSON_SCHEMA, temp=0
+        )
+        if not response:
+            raise AIResponseError("Recipe enrichment returned an empty response", usage)
+        try:
+            return EnrichmentResponse.model_validate_json(_strip_json_fence(response)), usage
+        except ValidationError as exc:
+            raise AIResponseError(f"Invalid recipe enrichment response: {exc}", usage) from exc
 
     def generate_book_keywords(
         self, digest: str, model: str | None = None
