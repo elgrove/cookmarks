@@ -1,12 +1,11 @@
 """Versioned wire contract for one enrichment completion."""
 
 import re
-from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-SCHEMA_VERSION = "v7"
-PROMPT_VERSION = "v22"
+SCHEMA_VERSION = "v8"
+PROMPT_VERSION = "v23"
 TAXONOMY_VERSION = "v1"
 
 _EN_GB_INGREDIENT_RULES: list[tuple[re.Pattern[str], str]] = [
@@ -132,45 +131,22 @@ class EnrichmentDecision(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
 
-class Stage1OccurrenceDecision(EnrichmentDecision):
-    canonical_name: str = Field(min_length=1, max_length=300, alias="n")
-    quantity: str | None = Field(default=None, max_length=100, alias="q")
-    unit: str | None = Field(default=None, max_length=50, alias="u")
-    preparation: str | None = Field(default=None, max_length=500, alias="p")
-    optional: bool = Field(default=False, alias="x")
-    alternative_group: int | None = Field(default=None, ge=0, alias="a")
+class Stage1Response(EnrichmentDecision):
+    """Stage 1 extracts singular UK-English canonical ingredient names."""
 
-    @field_validator("canonical_name", mode="before")
+    ingredients: list[str] = Field(default_factory=list, max_length=100, alias="i")
+
+    @field_validator("ingredients", mode="before")
     @classmethod
-    def normalize_name(cls, value: object) -> str:
-        if isinstance(value, str):
-            return normalize_ingredient_name(value)
-        return str(value)
-
-
-class OccurrenceDecision(Stage1OccurrenceDecision):
-    is_key: bool = Field(default=False, alias="k")
-
-
-class LineDecision(EnrichmentDecision):
-    """An AI replacement or an otherwise unresolved ingredient line."""
-
-    line_id: str = Field(alias="l")
-    occurrences: list[OccurrenceDecision] = Field(min_length=1, max_length=20, alias="o")
-
-
-class Stage1LineDecision(EnrichmentDecision):
-    """One complete ingredient-line parse, without recipe-level interpretation."""
-
-    line_id: str = Field(alias="l")
-    occurrences: list[Stage1OccurrenceDecision] = Field(min_length=1, max_length=20, alias="o")
-
-
-class NonIngredientLineDecision(EnrichmentDecision):
-    """Only exceptional heading/note lines need a decision; ingredient is the default."""
-
-    line_id: str = Field(alias="l")
-    kind: Literal["heading", "note"] = Field(alias="k")
+    def normalize_names(cls, value: object) -> list[str]:
+        if isinstance(value, list):
+            cleaned: list[str] = []
+            for item in value:
+                name = normalize_ingredient_name(str(item).strip())
+                if name:
+                    cleaned.append(name)
+            return cleaned
+        return []
 
 
 class MethodDecision(EnrichmentDecision):
@@ -178,28 +154,19 @@ class MethodDecision(EnrichmentDecision):
     is_primary: bool = Field(default=False, alias="p")
 
 
-class KeyIngredientDecision(EnrichmentDecision):
-    """A Stage 2 selection of one occurrence from the accepted Stage 1 result."""
-
-    line_id: str = Field(alias="l")
-    occurrence_index: int = Field(ge=0, alias="o")
-
-
-class Stage1Response(EnrichmentDecision):
-    parsed_lines: list[Stage1LineDecision] = Field(default_factory=list, max_length=100, alias="p")
-    non_ingredient_lines: list[NonIngredientLineDecision] = Field(
-        default_factory=list, max_length=100, alias="n"
-    )
-
-
 class Stage2Response(EnrichmentDecision):
-    key_ingredients: list[KeyIngredientDecision] = Field(
-        default_factory=list, max_length=3, alias="k"
-    )
+    key_ingredients: list[str] = Field(default_factory=list, max_length=3, alias="k")
     cuisines: list[str] = Field(default_factory=list, max_length=10, alias="c")
     methods: list[MethodDecision] = Field(default_factory=list, max_length=10, alias="m")
     courses: list[str] = Field(default_factory=list, max_length=10, alias="o")
     keywords: list[str] = Field(default_factory=list, max_length=5, alias="w")
+
+    @field_validator("key_ingredients", mode="before")
+    @classmethod
+    def normalize_key_ingredients(cls, value: object) -> list[str]:
+        if isinstance(value, list):
+            return [normalize_ingredient_name(str(item).strip()) for item in value if str(item).strip()]
+        return []
 
     @field_validator("cuisines", mode="before")
     @classmethod
@@ -215,10 +182,21 @@ class Stage2Response(EnrichmentDecision):
         return self
 
 
+class CanonicalIngredientDecision(EnrichmentDecision):
+    name: str = Field(min_length=1, max_length=300, alias="n")
+    is_key: bool = Field(default=False, alias="k")
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def normalize_name(cls, value: object) -> str:
+        if isinstance(value, str):
+            return normalize_ingredient_name(value)
+        return str(value)
+
+
 class EnrichmentResponse(EnrichmentDecision):
-    parsed_lines: list[LineDecision] = Field(default_factory=list, max_length=100, alias="p")
-    non_ingredient_lines: list[NonIngredientLineDecision] = Field(
-        default_factory=list, max_length=100, alias="n"
+    canonical_ingredients: list[CanonicalIngredientDecision] = Field(
+        default_factory=list, max_length=100, alias="i"
     )
     cuisines: list[str] = Field(default_factory=list, max_length=10, alias="c")
     methods: list[MethodDecision] = Field(default_factory=list, max_length=10, alias="m")
@@ -239,34 +217,25 @@ class EnrichmentResponse(EnrichmentDecision):
         return self
 
     @classmethod
-    def from_stages(cls, stage1: Stage1Response, stage2: Stage2Response) -> "EnrichmentResponse":
-        selected = {(item.line_id, item.occurrence_index) for item in stage2.key_ingredients}
-        if len(selected) != len(stage2.key_ingredients):
+    def from_stages(
+        cls, unique_ingredients: list[str], stage2: Stage2Response
+    ) -> "EnrichmentResponse":
+        selected = [normalize_ingredient_name(k).casefold() for k in stage2.key_ingredients]
+        if len(selected) != len(set(selected)):
             raise ValueError("Stage 2 contains duplicate key-ingredient selections")
-        available = {
-            (line.line_id, index)
-            for line in stage1.parsed_lines
-            for index, _ in enumerate(line.occurrences)
-        }
+        available = {normalize_ingredient_name(name).casefold() for name in unique_ingredients}
         if available and not selected:
             raise ValueError("Stage 2 must select at least one key ingredient")
-        if not selected <= available:
-            raise ValueError("Stage 2 refers to an unknown Stage 1 ingredient occurrence")
+        if not set(selected) <= available:
+            raise ValueError("Stage 2 refers to an unknown Stage 1 ingredient")
+        key_folded = set(selected)
+        ingredients: list[CanonicalIngredientDecision] = []
+        for name in unique_ingredients:
+            norm_name = normalize_ingredient_name(name)
+            is_key = norm_name.casefold() in key_folded
+            ingredients.append(CanonicalIngredientDecision(n=norm_name, k=is_key))
         return cls(
-            p=[
-                LineDecision(
-                    l=line.line_id,
-                    o=[
-                        OccurrenceDecision(
-                            **occurrence.model_dump(by_alias=True),
-                            k=(line.line_id, index) in selected,
-                        )
-                        for index, occurrence in enumerate(line.occurrences)
-                    ],
-                )
-                for line in stage1.parsed_lines
-            ],
-            n=stage1.non_ingredient_lines,
+            i=ingredients,
             c=stage2.cuisines,
             m=stage2.methods,
             o=stage2.courses,
@@ -292,8 +261,7 @@ def _without_stateful_constraints(value: object) -> object:
     return value
 
 
-# Gemini validates the returned JSON with this reduced schema. Pydantic still applies
-# the full constraints after the response is received.
 GEMINI_ENRICHMENT_JSON_SCHEMA = _without_stateful_constraints(ENRICHMENT_JSON_SCHEMA)
 GEMINI_STAGE1_JSON_SCHEMA = _without_stateful_constraints(STAGE1_JSON_SCHEMA)
 GEMINI_STAGE2_JSON_SCHEMA = _without_stateful_constraints(STAGE2_JSON_SCHEMA)
+

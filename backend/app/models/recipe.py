@@ -10,7 +10,7 @@ from app.text import fold
 
 if TYPE_CHECKING:
     from app.models.book import Book
-    from app.models.ingredient import IngredientLine
+    from app.models.ingredient import IngredientLine, RecipeCanonicalIngredient
     from app.models.recipe_enrichment import RecipeEnrichmentState
     from app.models.recipe_fact import RecipeCuisine, RecipeFacet
     from app.models.recipe_list import RecipeListItem
@@ -92,6 +92,9 @@ class Recipe(UUIDAuditBase):
     )
     ingredients_verbatim: Mapped[list["IngredientLine"]] = relationship(
         back_populates="recipe", cascade="all, delete-orphan", order_by="IngredientLine.position"
+    )
+    canonical_ingredients: Mapped[list["RecipeCanonicalIngredient"]] = relationship(
+        back_populates="recipe", cascade="all, delete-orphan"
     )
     facets: Mapped[list["RecipeFacet"]] = relationship(
         back_populates="recipe", cascade="all, delete-orphan"

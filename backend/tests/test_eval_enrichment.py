@@ -16,16 +16,16 @@ from evals.enrichment import (
     ENRICHMENT_GOLD_PATH,
     GoldFact,
     GoldLine,
-    GoldOccurrence,
     GoldRecipe,
     build_gold_context,
+    build_gold_stage1_context,
+    build_gold_stage2_context,
     evaluate_enrichment_recipe,
     load_gold_recipes,
-    score_alternative_groups,
+    score_canonical_ingredients,
     score_enrichment_response,
     score_facets,
-    score_ingredient_identity,
-    score_line_kinds,
+    score_key_ingredients,
     score_residual_keywords,
     validate_enrichment_response,
 )
@@ -41,55 +41,18 @@ def _sample_gold_recipe() -> GoldRecipe:
         yields="Serves 2",
         instructions=["Toss everything together."],
         lines=[
-            GoldLine(
-                position=0,
-                text="1 apple, sliced",
-                kind="ingredient",
-                occurrences=[
-                    GoldOccurrence(
-                        canonical_name="Apple",
-                        quantity="1",
-                        unit=None,
-                        preparation="sliced",
-                        optional=False,
-                        alternative_group=None,
-                        is_key=True,
-                    )
-                ],
-            ),
-            GoldLine(
-                position=1,
-                text="For the dressing:",
-                kind="heading",
-                occurrences=[],
-            ),
-            GoldLine(
-                position=2,
-                text="1 tbsp olive oil",
-                kind="ingredient",
-                occurrences=[
-                    GoldOccurrence(
-                        canonical_name="Olive Oil",
-                        quantity="1",
-                        unit="tbsp",
-                        preparation=None,
-                        optional=False,
-                        alternative_group=None,
-                        is_key=False,
-                    )
-                ],
-            ),
+            GoldLine(position=0, text="1 apple, sliced"),
+            GoldLine(position=1, text="For the dressing:"),
+            GoldLine(position=2, text="1 tbsp olive oil"),
         ],
+        canonical_ingredients=["apple", "olive oil"],
+        key_ingredients=["apple"],
         cuisines=[GoldFact(value_id="british")],
         methods=[],
         courses=[GoldFact(value_id="starter")],
         accepted_courses=["starter", "side"],
         residual_keywords=["Salad", "Fresh", "No Cook", "Raw", "Summer"],
     )
-
-
-def _gold_line_id(line: GoldLine) -> str:
-    return str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{line.position}:{line.text}"))
 
 
 def test_gold_dataset_loads_five_contrasting_recipes() -> None:
@@ -111,32 +74,23 @@ def test_gold_dataset_loads_five_contrasting_recipes() -> None:
     assert "brown-butter-buttermilk-cake" in slugs
 
 
-def test_score_ingredient_identity_exact_and_misses() -> None:
+def test_score_canonical_ingredients_exact_and_misses() -> None:
     gold = _sample_gold_recipe()
-    line0_id = _gold_line_id(gold.lines[0])
-    line2_id = _gold_line_id(gold.lines[2])
 
     # Perfect match
     resp_perfect = EnrichmentResponse.model_validate(
         {
-            "parsed_lines": [
-                {
-                    "line_id": line0_id,
-                    "occurrences": [{"canonical_name": "Apple"}],
-                },
-                {
-                    "line_id": line2_id,
-                    "occurrences": [{"canonical_name": "Olive Oil"}],
-                },
+            "canonical_ingredients": [
+                {"name": "apple", "is_key": True},
+                {"name": "olive oil", "is_key": False},
             ],
-            "non_ingredient_lines": [],
             "cuisines": [],
             "methods": [],
             "courses": [],
             "keywords": ["One", "Two", "Three", "Four", "Five"],
         }
     )
-    p, r, f1 = score_ingredient_identity(gold.lines, resp_perfect)
+    p, r, f1 = score_canonical_ingredients(gold.canonical_ingredients, resp_perfect)
     assert p == pytest.approx(1.0)
     assert r == pytest.approx(1.0)
     assert f1 == pytest.approx(1.0)
@@ -144,66 +98,65 @@ def test_score_ingredient_identity_exact_and_misses() -> None:
     # Partial match
     resp_partial = EnrichmentResponse.model_validate(
         {
-            "parsed_lines": [
-                {
-                    "line_id": line0_id,
-                    "occurrences": [{"canonical_name": "Apple"}],
-                },
-                {
-                    "line_id": line2_id,
-                    "occurrences": [{"canonical_name": "Butter"}],
-                },
+            "canonical_ingredients": [
+                {"name": "apple", "is_key": True},
+                {"name": "butter", "is_key": False},
             ],
-            "non_ingredient_lines": [],
             "cuisines": [],
             "methods": [],
             "courses": [],
             "keywords": ["One", "Two", "Three", "Four", "Five"],
         }
     )
-    p, r, f1 = score_ingredient_identity(gold.lines, resp_partial)
+    p, r, f1 = score_canonical_ingredients(gold.canonical_ingredients, resp_partial)
     assert p == pytest.approx(0.5)
     assert r == pytest.approx(0.5)
     assert f1 == pytest.approx(0.5)
 
 
-def test_score_line_kinds_detects_headings() -> None:
+def test_score_key_ingredients() -> None:
     gold = _sample_gold_recipe()
-    line1_id = _gold_line_id(gold.lines[1])
 
     resp_correct = EnrichmentResponse.model_validate(
         {
-            "parsed_lines": [],
-            "non_ingredient_lines": [{"line_id": line1_id, "kind": "heading"}],
+            "canonical_ingredients": [
+                {"name": "apple", "is_key": True},
+                {"name": "olive oil", "is_key": False},
+            ],
             "cuisines": [],
             "methods": [],
             "courses": [],
-            "keywords": ["One", "Two", "Three", "Four", "Five"],
+            "keywords": [],
         }
     )
-    acc = score_line_kinds(gold.lines, resp_correct)
-    assert acc == pytest.approx(1.0)
+    p, r, f1 = score_key_ingredients(gold.key_ingredients, resp_correct)
+    assert p == pytest.approx(1.0)
+    assert r == pytest.approx(1.0)
+    assert f1 == pytest.approx(1.0)
 
     resp_wrong = EnrichmentResponse.model_validate(
         {
-            "parsed_lines": [],
-            "non_ingredient_lines": [],
+            "canonical_ingredients": [
+                {"name": "apple", "is_key": False},
+                {"name": "olive oil", "is_key": True},
+            ],
             "cuisines": [],
             "methods": [],
             "courses": [],
-            "keywords": ["One", "Two", "Three", "Four", "Five"],
+            "keywords": [],
         }
     )
-    acc_wrong = score_line_kinds(gold.lines, resp_wrong)
-    assert acc_wrong == pytest.approx(2 / 3)
+    p, r, f1 = score_key_ingredients(gold.key_ingredients, resp_wrong)
+    assert p == pytest.approx(0.0)
+    assert r == pytest.approx(0.0)
+    assert f1 == pytest.approx(0.0)
 
 
 def test_score_facets() -> None:
     gold = _sample_gold_recipe()
     resp = EnrichmentResponse.model_validate(
         {
-            "parsed_lines": [],
-            "non_ingredient_lines": [],
+            "canonical_ingredients": [],
             "cuisines": ["british"],
             "methods": [],
             "courses": ["starter"],
@@ -221,8 +174,7 @@ def test_score_residual_keywords_validity() -> None:
     gold = _sample_gold_recipe()
     resp = EnrichmentResponse.model_validate(
         {
-            "parsed_lines": [],
-            "non_ingredient_lines": [],
+            "canonical_ingredients": [],
             "cuisines": [],
             "methods": [],
             "courses": [],
@@ -240,8 +192,7 @@ def test_score_residual_keywords_allows_an_empty_list() -> None:
     gold = _sample_gold_recipe()
     resp = EnrichmentResponse.model_validate(
         {
-            "parsed_lines": [],
-            "non_ingredient_lines": [],
+            "canonical_ingredients": [],
             "cuisines": [],
             "methods": [],
             "courses": [],
@@ -255,146 +206,12 @@ def test_score_residual_keywords_allows_an_empty_list() -> None:
     assert scores["keywords_count"] == 0
 
 
-def test_score_alternative_groups_checks_complete_relationships() -> None:
-    gold = _sample_gold_recipe()
-    gold.lines[0].occurrences.append(
-        GoldOccurrence(
-            canonical_name="Pear",
-            quantity="1",
-            unit=None,
-            preparation="sliced",
-            optional=False,
-            alternative_group=0,
-            is_key=False,
-        )
-    )
-    gold.lines[0].occurrences[0].alternative_group = 0
-    line_id = _gold_line_id(gold.lines[0])
-
-    correct = EnrichmentResponse.model_validate(
-        {
-            "parsed_lines": [
-                {
-                    "line_id": line_id,
-                    "occurrences": [
-                        {"canonical_name": "Apple", "alternative_group": 4},
-                        {"canonical_name": "Pear", "alternative_group": 4},
-                    ],
-                }
-            ]
-        }
-    )
-    missing = EnrichmentResponse.model_validate(
-        {
-            "parsed_lines": [
-                {
-                    "line_id": line_id,
-                    "occurrences": [
-                        {"canonical_name": "Apple"},
-                        {"canonical_name": "Pear"},
-                    ],
-                }
-            ]
-        }
-    )
-    inconsistent = EnrichmentResponse.model_validate(
-        {
-            "parsed_lines": [
-                {
-                    "line_id": line_id,
-                    "occurrences": [
-                        {"canonical_name": "Apple", "alternative_group": 1},
-                        {"canonical_name": "Pear", "alternative_group": 2},
-                    ],
-                }
-            ]
-        }
-    )
-
-    assert score_alternative_groups(gold.lines, correct) == 1.0
-    assert score_alternative_groups(gold.lines, missing) == 0.0
-    assert score_alternative_groups(gold.lines, inconsistent) == 0.0
-
-
-def test_score_alternative_groups_penalises_a_false_positive() -> None:
-    gold = _sample_gold_recipe()
-    line_id = _gold_line_id(gold.lines[0])
-    response = EnrichmentResponse.model_validate(
-        {
-            "parsed_lines": [
-                {
-                    "line_id": line_id,
-                    "occurrences": [
-                        {"canonical_name": "Apple", "alternative_group": 1},
-                    ],
-                }
-            ]
-        }
-    )
-
-    assert score_alternative_groups(gold.lines, response) == 0.0
-
-
-def test_score_ingredient_details_normalises_unit_spelling() -> None:
-    gold = _sample_gold_recipe()
-    line0_id = _gold_line_id(gold.lines[0])
-    line2_id = _gold_line_id(gold.lines[2])
-    response = EnrichmentResponse.model_validate(
-        {
-            "parsed_lines": [
-                {"line_id": line0_id, "occurrences": [{"canonical_name": "Apple"}]},
-                {
-                    "line_id": line2_id,
-                    "occurrences": [
-                        {"canonical_name": "Olive Oil", "quantity": "1", "unit": "tablespoon"}
-                    ],
-                },
-            ],
-            "non_ingredient_lines": [],
-            "cuisines": [],
-            "methods": [],
-            "courses": [],
-            "keywords": [],
-        }
-    )
-
-    scores = score_enrichment_response(gold, response)
-
-    assert scores.unit_accuracy == 1.0
-
-
-def test_score_ingredient_details_rejects_a_missing_quantity() -> None:
-    gold = _sample_gold_recipe()
-    line0_id = _gold_line_id(gold.lines[0])
-    response = EnrichmentResponse.model_validate(
-        {
-            "parsed_lines": [
-                {
-                    "line_id": line0_id,
-                    "occurrences": [{"canonical_name": "Apple"}],
-                }
-            ]
-        }
-    )
-
-    scores = score_enrichment_response(gold, response)
-
-    assert scores.quantity_accuracy == 0.0
-
-
 def test_validate_enrichment_response_rejects_a_course_in_cuisines() -> None:
     gold = _sample_gold_recipe()
     context = build_gold_context(gold)
     response = EnrichmentResponse.model_validate(
         {
-            "parsed_lines": [
-                {
-                    "line_id": line_id,
-                    "occurrences": [{"canonical_name": "Apple"}],
-                }
-                for line_id in context["recipe"]["ai_parse_line_ids"]
-            ],
-            "non_ingredient_lines": [],
+            "canonical_ingredients": [{"name": "apple", "is_key": True}],
             "cuisines": ["starter"],
             "methods": [],
             "courses": [],
@@ -411,14 +228,7 @@ def test_validate_enrichment_response_rejects_unknown_course() -> None:
     context = build_gold_context(gold)
     response = EnrichmentResponse.model_validate(
         {
-            "parsed_lines": [
-                {
-                    "line_id": line_id,
-                    "occurrences": [{"canonical_name": "Apple"}],
-                }
-                for line_id in context["recipe"]["ai_parse_line_ids"]
-            ],
-            "non_ingredient_lines": [],
+            "canonical_ingredients": [{"name": "apple", "is_key": True}],
             "cuisines": [],
             "methods": [],
             "courses": ["unknown-course"],
@@ -430,48 +240,28 @@ def test_validate_enrichment_response_rejects_unknown_course() -> None:
         validate_enrichment_response(context, response)
 
 
-def test_build_gold_context_structures_reusable_input() -> None:
+def test_build_gold_stage1_and_stage2_contexts() -> None:
     gold = _sample_gold_recipe()
-    context = build_gold_context(gold)
-    assert "vocabulary" in context
-    assert "recipe" in context
-    assert context["recipe"]["name"] == "Test Salad"
-    assert len(context["recipe"]["lines"]) == 3
-    assert len(context["recipe"]["ai_parse_line_ids"]) == 3
+    ctx1 = build_gold_stage1_context(gold)
+    assert "recipe" in ctx1
+    assert ctx1["recipe"]["name"] == "Test Salad"
+    assert len(ctx1["recipe"]["ingredients"]) == 3
+
+    ctx2 = build_gold_stage2_context(gold, ["apple", "olive oil"])
+    assert "vocabulary" in ctx2
+    assert "recipe" in ctx2
+    assert ctx2["recipe"]["ingredients"] == ["apple", "olive oil"]
 
 
 def test_score_enrichment_response_composite() -> None:
     gold = _sample_gold_recipe()
-    line0_id = _gold_line_id(gold.lines[0])
-    line1_id = _gold_line_id(gold.lines[1])
-    line2_id = _gold_line_id(gold.lines[2])
 
     resp = EnrichmentResponse.model_validate(
         {
-            "parsed_lines": [
-                {
-                    "line_id": line0_id,
-                    "occurrences": [
-                        {
-                            "canonical_name": "Apple",
-                            "quantity": "1",
-                            "preparation": "sliced",
-                            "is_key": True,
-                        }
-                    ],
-                },
-                {
-                    "line_id": line2_id,
-                    "occurrences": [
-                        {
-                            "canonical_name": "Olive Oil",
-                            "quantity": "1",
-                            "unit": "tbsp",
-                        }
-                    ],
-                },
+            "canonical_ingredients": [
+                {"name": "apple", "is_key": True},
+                {"name": "olive oil", "is_key": False},
             ],
-            "non_ingredient_lines": [{"line_id": line1_id, "kind": "heading"}],
             "cuisines": ["british"],
             "methods": [],
             "courses": ["starter"],
@@ -480,37 +270,20 @@ def test_score_enrichment_response_composite() -> None:
     )
     scores = score_enrichment_response(gold, resp)
     assert scores.composite >= 0.95
-    assert scores.line_kinds_accuracy == 1.0
-    assert scores.ingredient_identity_f1 == 1.0
+    assert scores.canonical_ingredients_f1 == 1.0
+    assert scores.key_ingredients_f1 == 1.0
 
 
 def test_mixed_model_eval_routes_stage_output_to_stage_two(tmp_path) -> None:
     gold = _sample_gold_recipe()
-    line0_id = _gold_line_id(gold.lines[0])
-    line1_id = _gold_line_id(gold.lines[1])
-    line2_id = _gold_line_id(gold.lines[2])
     stage1_provider = Mock()
     stage1_provider.enrich_recipe_stage1.return_value = (
-        Stage1Response.model_validate(
-            {
-                "parsed_lines": [
-                    {
-                        "line_id": line0_id,
-                        "occurrences": [{"canonical_name": "Apple"}],
-                    },
-                    {
-                        "line_id": line2_id,
-                        "occurrences": [{"canonical_name": "Olive Oil"}],
-                    },
-                ],
-                "non_ingredient_lines": [{"line_id": line1_id, "kind": "heading"}],
-            }
-        ),
+        Stage1Response(i=["apple", "olive oil"]),
         Usage(input_tokens=100, output_tokens=20, cost_usd=Decimal("0.001")),
     )
     stage2_provider = Mock()
     stage2_provider.enrich_recipe_stage2.return_value = (
-        Stage2Response(c=[], o=["starter"], w=["Fresh"]),
+        Stage2Response(k=["apple"], c=[], m=[], o=["starter"], w=["Fresh"]),
         Usage(input_tokens=50, output_tokens=10, cost_usd=Decimal("0.002")),
     )
 
@@ -528,36 +301,21 @@ def test_mixed_model_eval_routes_stage_output_to_stage_two(tmp_path) -> None:
     )
 
     stage2_context = stage2_provider.enrich_recipe_stage2.call_args.args[0]
-    assert [
-        item["occurrences"][0]["canonical_name"]
-        for item in stage2_context["recipe"]["ingredient_lines"]
-    ] == ["Apple", "Olive Oil"]
+    assert stage2_context["recipe"]["ingredients"] == ["apple", "olive oil"]
     assert record.model_id == "GEMINI:flash-lite -> ANTHROPIC:haiku"
     assert record.deterministic_enabled is False
     assert record.stage1_input_tokens == 100
     assert record.stage2_input_tokens == 50
     assert record.cost_usd == pytest.approx(0.003)
+    assert record.scores.canonical_ingredients_f1 == pytest.approx(1.0)
+    assert record.scores.key_ingredients_f1 == pytest.approx(1.0)
 
 
 def test_mixed_model_eval_keeps_stage_one_usage_when_stage_two_fails(tmp_path) -> None:
     gold = _sample_gold_recipe()
-    line0_id = _gold_line_id(gold.lines[0])
-    line1_id = _gold_line_id(gold.lines[1])
-    line2_id = _gold_line_id(gold.lines[2])
     stage1_provider = Mock()
     stage1_provider.enrich_recipe_stage1.return_value = (
-        Stage1Response.model_validate(
-            {
-                "parsed_lines": [
-                    {"line_id": line0_id, "occurrences": [{"canonical_name": "Apple"}]},
-                    {
-                        "line_id": line2_id,
-                        "occurrences": [{"canonical_name": "Olive Oil"}],
-                    },
-                ],
-                "non_ingredient_lines": [{"line_id": line1_id, "kind": "heading"}],
-            }
-        ),
+        Stage1Response(i=["apple", "olive oil"]),
         Usage(input_tokens=100, output_tokens=20, cost_usd=Decimal("0.001")),
     )
     stage2_provider = Mock()

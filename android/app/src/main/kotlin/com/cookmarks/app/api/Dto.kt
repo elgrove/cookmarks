@@ -33,25 +33,14 @@ data class RecipeNeighbour(val id: String, val name: String)
 data class IngredientLine(
     val id: String,
     val position: Int,
-    val kind: String?,
     val text: String,
 )
 
 @Serializable
-data class IngredientOccurrence(
-    val id: String,
-    val line_id: String,
-    val position: Int,
+data class RecipeCanonicalIngredient(
     val ingredient_id: String,
-    val ingredient_name: String,
-    val quantity: String?,
-    val unit: String?,
-    val preparation: String?,
-    val optional: Boolean,
-    val alternative_group: Int?,
+    val name: String,
     val is_key: Boolean,
-    val parse_method: String,
-    val resolution_method: String,
 )
 
 @Serializable
@@ -155,7 +144,7 @@ data class RecipeDetail(
     val name: String,
     val description: String?,
     val ingredients_verbatim: List<IngredientLine>,
-    val ingredients: List<IngredientOccurrence>,
+    val canonical_ingredients: List<RecipeCanonicalIngredient>,
     val enrichment_status: String,
     val cuisines: List<RecipeCuisine>,
     val methods: List<RecipeFact>,

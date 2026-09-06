@@ -4,12 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.enums import (
-    IngredientLineKind,
-    IngredientParseMethod,
-    IngredientResolutionMethod,
-    RecipeEnrichmentStatus,
-)
+from app.models.enums import RecipeEnrichmentStatus
 
 
 class RecipeRow(BaseModel):
@@ -119,26 +114,15 @@ class IngredientLineRead(BaseModel):
 
     id: uuid.UUID
     position: int
-    kind: IngredientLineKind | None
     text: str
 
 
-class IngredientOccurrenceRead(BaseModel):
+class RecipeCanonicalIngredientRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    id: uuid.UUID
-    line_id: uuid.UUID
-    position: int
     ingredient_id: uuid.UUID
-    ingredient_name: str
-    quantity: str | None
-    unit: str | None
-    preparation: str | None
-    optional: bool
-    alternative_group: int | None
+    name: str
     is_key: bool
-    parse_method: IngredientParseMethod
-    resolution_method: IngredientResolutionMethod
 
 
 class RecipeFactRead(BaseModel):
@@ -176,7 +160,7 @@ class RecipeDetail(BaseModel):
     name: str
     description: str | None
     ingredients_verbatim: list[IngredientLineRead]
-    ingredients: list[IngredientOccurrenceRead]
+    canonical_ingredients: list[RecipeCanonicalIngredientRead]
     enrichment_status: RecipeEnrichmentStatus
     cuisines: list[RecipeCuisineRead]
     methods: list[RecipeFactRead]

@@ -15,7 +15,7 @@ const recipeSchema = z.object({
 	bookHasCover: z.boolean(),
 	name: z.string(),
 	description: z.string().nullable(),
-	ingredientsVerbatim: z.array(z.object({ id: z.string(), position: z.number(), kind: z.enum(['ingredient', 'heading', 'note']).nullable(), text: z.string() })),
+	ingredientsVerbatim: z.array(z.object({ id: z.string(), position: z.number(), text: z.string() })),
 	instructions: z.array(z.string()),
 	yields: z.string().nullable(),
 	keywords: z.array(z.string()),
@@ -29,7 +29,7 @@ const recipeSchema = z.object({
 	next: z.object({ id: z.string(), name: z.string() }).nullable()
 });
 
-const lines = (texts: string[]): RecipeDetailData['ingredientsVerbatim'] => texts.map((text, position) => ({ id: `00000000-0000-4000-8000-${String(position + 1).padStart(12, '0')}`, position, kind: 'ingredient', text }));
+const lines = (texts: string[]): RecipeDetailData['ingredientsVerbatim'] => texts.map((text, position) => ({ id: `00000000-0000-4000-8000-${String(position + 1).padStart(12, '0')}`, position, text }));
 
 const trofie: RecipeDetailData = {
 	id: '7c9e6679-7425-40de-944b-e07fc1f90ae7',

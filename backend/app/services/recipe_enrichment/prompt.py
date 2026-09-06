@@ -5,107 +5,42 @@ import json
 from app.services.recipe_enrichment.schema import PROMPT_VERSION
 
 _INSTRUCTIONS = """You enrich one extracted recipe. Return only the JSON response.
-Ingredient is the default line kind. Return p only for an ingredient line listed in ai_parse_line_ids;
-each needs one or more complete occurrence decisions. Return n only for heading/note exceptions.
-Together p and n must cover every ai_parse_line_id.
-Before you return JSON, count p and n together: they must contain exactly one decision for every
-listed ai_parse_line_id. These are opaque IDs: copy each supplied ID exactly once, even for
-repeated ingredients, headings, or unmeasured food lines. Do not invent, shorten, or omit an ID.
-Keep every value to the shortest useful source fragment; do not repeat input text or list
-alternatives twice.
-In n, k must be exactly `heading` or `note`: no other value is valid. Use `heading` only for a
-short ingredient-list section label. Use `note` for a serving suggestion or an open-ended comment
-that is not a measured ingredient. A line that names a food remains an ingredient even when it is
-optional, has no quantity, or is served at the table. Do not classify a food item as a note.
-Use only supplied cuisine/method/course IDs. Timings and diets are out of scope. Choose zero to
-five Title Case UK-English residual keywords. Include only useful keywords that add information
-not represented by a selected fact, canonical ingredient or alias. Do not add filler keywords.
-Preserve culinary specificity.
-
-For every occurrence, output n with one singular UK-English canonical ingredient name. There is
-no ingredient ID field. The application resolves n to an existing canonical ingredient or alias
-locally, or creates it when it is genuinely new.
-
-For q and u, retain the first stated quantity and unit; do not convert measurements. When a line
-shows metric and imperial measures, use the first pair. Use common unit abbreviations: tsp, tbsp,
-cup, g, kg, ml, litre, oz, lb, clove and pinch. Put preparation, such as peeled, chopped or
-toasted, in p. Preserve a specific ingredient identity: do not turn a named variety, product or
-prepared ingredient into a generic parent. Mark x true only when the source explicitly says it is
-optional. For an either/or ingredient line, return one occurrence for each choice with the same a
-value. Preserve compound quantities and ranges exactly, such as `1 tbsp plus 2 tsp` or `2 to 3`;
-do not split them. Put `to taste` and a serving form such as `wedges` in p. Do not use an
-alternative group for an ingredient with several descriptive words.
-Mark k true for one to three core ingredients that define the identity of the dish (such as the
-main protein, star vegetable, or signature flavour). Mark false for secondary, supporting, or
-seasoning ingredients.
-
-Methods are optional. Select a method only for a central, intentional cooking technique that
-defines the prepared dish. Do not select a method for incidental preparation or handling such as
-chopping, slicing, mixing, whisking, seasoning, drying, arranging, or serving. Set primary only
-on the one method that is most central to the dish; send no primary flag when no method qualifies.
-
+Extract singular UK-English canonical food names in i {n canonical name, k key}.
+Mark k true for one to three core ingredients that define the identity of the dish (such as the main protein, star vegetable, or signature flavour). Mark false for secondary, supporting, or seasoning ingredients.
+Decide cuisines, methods, courses, and residual keywords using the recipe title, book title, author, instructions, and ingredients.
+Methods are optional. Select a method only for a central, intentional cooking technique that defines the prepared dish. Set primary only on the one method that is most central to the dish; send no primary flag when no method qualifies.
 Decide cuisines, methods and courses from the title and instructions before you choose keywords.
-Use an available cuisine ID only when the dish is explicitly named for, or is unmistakably from,
-that cuisine. Choose a course ID when the recipe clearly serves as one. A named cuisine, method,
-course, canonical ingredient, or close alias must not also be a residual keyword. When cooking
-actions include both a central technique and incidental actions, report only the central technique.
-The c list accepts only IDs from the supplied cuisine list, m only IDs from the method list, and o
-only IDs from the course list. Never put a course such as `starter` in c or a method in either c
-or o.
+Use an available cuisine ID only when the dish is explicitly named for, or is unmistakably from, that cuisine.
+Choose zero to five Title Case UK-English residual keywords. Include only useful keywords that add information not represented by a selected fact or canonical ingredient.
 
-Wire keys: p parsed lines {l line ID,o occurrences}; n non-ingredient lines {l,k}; occurrence n canonical name,q quantity,u unit,p preparation,x optional,a alternative group,k key; c cuisine IDs; m methods {v ID,p primary}; o course IDs; w keywords."""
+Wire keys: i canonical ingredients {n canonical name, k key}; c cuisine IDs; m methods {v ID, p primary}; o course IDs; w keywords."""
 
 
-_STAGE1_INSTRUCTIONS = """You structure recipe ingredient lines into parsed components. Return only valid JSON.
-Ingredient is the default line kind. Return p for each ingredient line listed in ai_parse_line_ids;
-each needs one or more complete occurrence decisions. Return n only for heading/note exceptions.
-Together p and n must cover every ai_parse_line_id exactly once.
+_STAGE1_INSTRUCTIONS = """You extract canonical food ingredient names from recipe ingredient lines. Return only valid JSON.
+Extract one singular UK-English canonical food name for each distinct ingredient item mentioned.
+Do not extract quantities, units, preparation methods, or line kinds.
+Exclude non-food section headings, notes, serving suggestions, or table condiments that are not ingredients.
 
-Line ID contract:
-- The l field must be the exact opaque ID string from ai_parse_line_ids (e.g. "894d5968-c679-5cbf-9c6c-5e99843f01d1").
-- NEVER use line text or section names as the l value.
-- NEVER invent new IDs or extra lines that are not listed in ai_parse_line_ids.
-
-In n:
-- k must be exactly `heading` or `note`.
-- Use `heading` only when an existing supplied line is a section label.
-- Use `note` for a serving suggestion, table condiment recommendation, or open-ended comment rather than a measured ingredient food item.
-- Any line that names a specific measured food item is an ingredient (p).
-
-For every occurrence in p:
-- Exactly ONE occurrence per ingredient item.
-  * When a line lists dual imperial and metric measurements (such as '6 ounces (170 g)' or '¼ cup (60 ml)'), output ONLY ONE occurrence using the FIRST stated measurement ('q: 6', 'u: oz'). NEVER create duplicate occurrences for metric conversions in parentheses.
-- n: singular UK-English canonical food name (e.g. `garlic`, `tofu`, `shrimp`, `peanut`, `lime`, `aubergine`, `coriander`, `chilli`, `egg`, `spring onion`, `noodle`).
+For every ingredient in i:
+- Singular UK-English canonical food name (e.g. `garlic`, `tofu`, `prawn`, `peanut`, `lime`, `aubergine`, `coriander`, `chilli`, `egg`, `spring onion`, `noodle`).
   * Use strictly British English (en-GB) vocabulary and spelling: write `chilli` never `chile` or `chili`, `coriander` never `cilantro`, `aubergine` never `eggplant`, `courgette` never `zucchini`, `spring onion` never `scallion` or `green onion`.
   * ALWAYS use strictly singular forms: write `egg` not `eggs`, `spring onion` not `spring onions`, `noodle` not `noodles`, `tomato` not `tomatoes`.
-  * Size adjectives (`large`, `small`, `medium`) and preparation/state adjectives (`roasted`, `baked`, `toasted`, `ground`, `steamed`, `peeled`, `crushed`) belong in `p` (preparation), NOT in `n`.
+  * Exclude size adjectives (`large`, `small`, `medium`) and preparation/state adjectives (`roasted`, `baked`, `toasted`, `ground`, `steamed`, `peeled`, `crushed`, `chopped`, `diced`).
   * Preserve culinary specificity. Do not strip distinct varieties, products, or compound foods into generic parents: keep `plain flour` (not `flour`), `cheddar cheese` (not `cheese`), `madras curry powder` (not `curry powder`), `chicken stock` / `beef stock` (not `stock`), `mung bean sprout` (not `bean sprout`), `preserved sweet radish` (not `radish`), `vegetable oil` (not `oil`), `red pickled ginger` (not `ginger`), `red pepper` (not `pepper`).
-  * Specific food forms like `fillet`, `breast`, `thigh` are part of the name (e.g. `yellowtail fillet`, `chicken breast`).
-  * `clove` is a unit of measurement (u: `clove`), NOT part of the food name: output n: `garlic`, u: `clove` (never `garlic clove`).
-  * Examples: 'large shrimp, peeled' -> n: `shrimp`, p: `large, peeled`; 'roasted peanuts' -> n: `peanut`, p: `roasted`; 'baked tofu' -> n: `tofu`, p: `baked`; 'lime wedges' -> n: `lime`, p: `wedges`; 'garlic cloves' -> n: `garlic`, u: `clove`; '4 eggs' -> n: `egg`, q: `4`.
-- q: first stated quantity (e.g. `1`, `2 1/2`, `200`, `2 to 3`). Keep compound amounts like `1 tbsp plus 2 tsp` intact.
-- u: common unit abbreviation (`tsp`, `tbsp`, `cup`, `g`, `kg`, `ml`, `litre`, `oz`, `lb`, `clove`, `pinch`).
-- p: preparation actions and descriptors (`chopped`, `diced`, `peeled`, `toasted`, `baked`, `roasted`, `to taste`, `for serving`).
-- x: true only when source explicitly states optional.
-- a: integer alternative group (`0`, `1`...) for substitute ingredient choices on the same line.
-  * Detect a choice by its meaning, not by one word. A source can use words such as `or`, `either`, `alternatively`, `instead of` or `substitute`, or separators such as `/`, `|`, `↔` or `<->` between ingredient names.
-  * For distinct substitute ingredients, output one occurrence for EACH choice with the SAME non-null `a` value. Examples: `cooking spray or butter`; `vanilla bean <-> vanilla extract`; `palm sugar / dark brown sugar`; `chicken stock, beef stock, or dashi`.
-  * Do not treat a fraction, measurement conversion, quantity range, or choice between descriptions of one ingredient as an ingredient alternative. Examples: `1/2 cup`, `170 g / 6 oz`, `5 or 6 garlic chives`, and `baked or super firm tofu` each produce one occurrence with a: null.
-  * A substitute choice does not mean optional. Set `x: true` only when the source separately says `optional`.
-Final alternative check: find every substitute relationship, whether it uses words or symbols. Verify that no ingredient choice is missing and every choice has the same non-null `a` value.
+  * Exclude units of measurement: `clove` is a unit of measurement, so extract `garlic` (never `garlic clove`).
+  * For substitute choices (e.g. `cooking spray or butter`, `palm sugar / dark brown sugar`), extract each distinct ingredient.
 
 Do not decide which ingredients are key. Stage 2 owns all recipe-level interpretation.
 
-Wire keys: p parsed lines {l line ID, o occurrences}; n non-ingredient lines {l, k}; occurrence {n canonical name, q quantity, u unit, p preparation, x optional, a alternative group}."""
+Wire keys: i list of singular UK-English canonical ingredient names."""
 
-_STAGE2_INSTRUCTIONS = """You make recipe-level semantic decisions from an accepted structured ingredient result. Return only valid JSON.
-Decide key ingredients, cuisines, cooking methods, courses, and residual keywords using the recipe title, book title, author, cooking instructions, and structured ingredient lines.
+_STAGE2_INSTRUCTIONS = """You make recipe-level semantic decisions from extracted canonical ingredients and cooking instructions. Return only valid JSON.
+Decide key ingredients, cuisines, cooking methods, courses, and residual keywords using the recipe title, book title, author, cooking instructions, and extracted ingredient list.
 
 Key ingredients (k):
-- Select one to three occurrences that define the dish identity, such as the main protein, star vegetable, or signature flavour.
+- Select one to three canonical ingredient names strictly from the supplied `ingredients` list that define the dish identity, such as the main protein, star vegetable, or signature flavour.
 - Do not select seasoning, cooking oil, or a supporting ingredient.
-- Each selection must copy one supplied ingredient line ID into l and use its zero-based occurrence position in o.
-- Do not refer to a heading, note, unknown line, or unknown occurrence position.
+- Every selected key ingredient MUST be an exact string from the supplied `ingredients` list.
 
 Cuisines (c):
 - Select zero or more matching IDs strictly from the supplied `cuisines` list.
@@ -135,7 +70,7 @@ Residual Keywords (w):
 - Do NOT repeat any cuisine, method, course, or ingredient name in keywords.
 - Do not add filler keywords.
 
-Wire keys: k key ingredients {l line ID, o occurrence position}; c cuisine IDs; m methods {v ID, p primary}; o course IDs; w keywords."""
+Wire keys: k key ingredient names; c cuisine IDs; m methods {v ID, p primary}; o course IDs; w keywords."""
 
 
 def build_stage1_prompt(context: dict) -> str:

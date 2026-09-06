@@ -130,10 +130,6 @@ def run_recipe_enrichment_pilot(run_id: str) -> dict:
                                 (datetime.now(UTC) - started).total_seconds(), 3
                             ),
                             "keywords": [keyword.name for keyword in recipe.keywords],
-                            "line_kinds": [
-                                line.kind.value if line.kind else None
-                                for line in recipe.ingredients_verbatim
-                            ],
                             "cuisines": [fact.cuisine_id for fact in recipe.cuisines],
                             "methods": [
                                 fact.facet_value.value_id
@@ -161,19 +157,16 @@ def run_recipe_enrichment_pilot(run_id: str) -> dict:
         statuses = Counter(item["status"] for item in outcomes)
         line_counts = Counter()
         fact_counts = {"cuisines": Counter(), "methods": Counter(), "courses": Counter()}
-        recipes_with_headings = 0
         keyword_validation_failures = 0
         for item in outcomes:
             for key in (
-                "ai_parsed_lines",
+                "canonical_ingredients",
+                "key_ingredients",
                 "stage1_fallback_used",
-                "headings",
                 "ingredients_created",
                 "existing_ingredients",
-                "aliases_created",
             ):
                 line_counts[key] += int(item.get(key, 0))
-            recipes_with_headings += int(bool(item.get("headings")))
             for key, values in fact_counts.items():
                 values.update(item.get(key, []))
             keyword_validation_failures += int("keyword" in item.get("error", "").lower())
@@ -184,10 +177,6 @@ def run_recipe_enrichment_pilot(run_id: str) -> dict:
             "failed": statuses["failed"],
             "stale_response": statuses["stale"],
             "outcomes": outcomes,
-            "recipes_with_headings": recipes_with_headings,
-            "recipes_with_headings_percent": round(recipes_with_headings / len(outcomes) * 100, 1)
-            if outcomes
-            else 0,
             "keyword_validation_failures": keyword_validation_failures,
             "cuisine_frequency": dict(fact_counts["cuisines"]),
             "method_frequency": dict(fact_counts["methods"]),

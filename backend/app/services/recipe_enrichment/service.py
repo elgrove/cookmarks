@@ -2,7 +2,6 @@
 
 import json
 import logging
-import re
 import uuid
 from collections import Counter
 from datetime import UTC, datetime
@@ -12,13 +11,10 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.models.enums import (
-    IngredientLineKind,
-    IngredientParseMethod,
-    IngredientResolutionMethod,
     RecipeEnrichmentStatus,
     RecipeFacetKind,
 )
-from app.models.ingredient import Ingredient, IngredientAlias, IngredientLine, IngredientOccurrence
+from app.models.ingredient import Ingredient, RecipeCanonicalIngredient
 from app.models.recipe import Recipe
 from app.models.recipe_fact import RecipeCuisine, RecipeFacet, RecipeFacetValue
 from app.services.ai import (
@@ -37,6 +33,7 @@ from app.services.recipe_enrichment.schema import (
     TAXONOMY_VERSION,
     EnrichmentResponse,
     Stage1Response,
+    normalize_ingredient_name,
 )
 from app.services.recipe_facts import (
     accepted_cuisine_ids,
@@ -85,8 +82,10 @@ def _recipe_with_facts(session: Session, recipe_id: uuid.UUID) -> Recipe:
         select(Recipe)
         .where(Recipe.id == recipe_id)
         .options(
-            selectinload(Recipe.ingredients_verbatim).selectinload(IngredientLine.occurrences),
             selectinload(Recipe.ingredients_verbatim),
+            selectinload(Recipe.canonical_ingredients).joinedload(
+                RecipeCanonicalIngredient.ingredient
+            ),
             selectinload(Recipe.enrichment_state),
             selectinload(Recipe.keywords),
             selectinload(Recipe.facets).selectinload(RecipeFacet.facet_value),
@@ -99,10 +98,8 @@ def _recipe_with_facts(session: Session, recipe_id: uuid.UUID) -> Recipe:
     return recipe
 
 
-def _ingredient_vocab(session: Session) -> tuple[dict[str, Ingredient], dict[str, IngredientAlias]]:
-    ingredients = {str(item.id): item for item in session.scalars(select(Ingredient))}
-    aliases = {str(item.id): item for item in session.scalars(select(IngredientAlias))}
-    return ingredients, aliases
+def _ingredient_vocab(session: Session) -> dict[str, Ingredient]:
+    return {str(item.id): item for item in session.scalars(select(Ingredient))}
 
 
 def build_context(session: Session, recipe: Recipe) -> dict:
@@ -147,23 +144,31 @@ def build_context(session: Session, recipe: Recipe) -> dict:
 def build_stage1_context(
     recipe: Recipe,
 ) -> dict:
-    ai_line_ids = [str(line.id) for line in recipe.ingredients_verbatim]
     return {
         "recipe": {
             "id": str(recipe.id),
-            "instructions": recipe.instructions,
-            "lines": [
-                {"id": str(line.id), "text": line.text} for line in recipe.ingredients_verbatim
-            ],
-            "ai_parse_line_ids": ai_line_ids,
+            "name": recipe.name,
+            "ingredients": [line.text for line in recipe.ingredients_verbatim],
         }
     }
+
+
+def deduplicate_ingredient_names(names: list[str]) -> list[str]:
+    seen: set[str] = set()
+    unique: list[str] = []
+    for name in names:
+        norm = normalize_ingredient_name(name)
+        folded = norm.casefold()
+        if folded and folded not in seen:
+            seen.add(folded)
+            unique.append(norm)
+    return unique
 
 
 def build_stage2_context(
     session: Session,
     recipe: Recipe,
-    stage1: Stage1Response,
+    ingredients: list[str],
     *,
     include_description: bool = True,
 ) -> dict:
@@ -189,20 +194,7 @@ def build_stage2_context(
             "name": recipe.name,
             "book_title": recipe.book.title if recipe.book else None,
             "book_author": recipe.book.author if recipe.book else None,
-            "ingredient_lines": [
-                {
-                    "line_id": line.line_id,
-                    "source": next(
-                        source.text
-                        for source in recipe.ingredients_verbatim
-                        if str(source.id) == line.line_id
-                    ),
-                    "occurrences": [
-                        occurrence.model_dump(by_alias=False) for occurrence in line.occurrences
-                    ],
-                }
-                for line in stage1.parsed_lines
-            ],
+            "ingredients": ingredients,
             "instructions": recipe.instructions,
         },
     }
@@ -211,69 +203,12 @@ def build_stage2_context(
     return ctx
 
 
-_FRACTION_TRANSLATION = str.maketrans(
-    {"½": " 1/2", "¼": " 1/4", "¾": " 3/4", "⅓": " 1/3", "⅔": " 2/3", "⅛": " 1/8"}
-)
-_UNIT_SOURCE_FORMS: dict[str, set[str]] = {
-    "tsp": {"tsp", "teaspoon", "teaspoons"},
-    "tbsp": {"tbsp", "tablespoon", "tablespoons"},
-    "cup": {"cup", "cups"},
-    "g": {"g", "gram", "grams"},
-    "kg": {"kg", "kilogram", "kilograms"},
-    "ml": {"ml", "millilitre", "millilitres", "milliliter", "milliliters"},
-    "litre": {"l", "litre", "litres", "liter", "liters"},
-    "oz": {"oz", "ounce", "ounces"},
-    "lb": {"lb", "lbs", "pound", "pounds"},
-    "clove": {"clove", "cloves"},
-    "pinch": {"pinch", "pinches"},
-}
-
-
-def _grounding_text(value: str) -> str:
-    return re.sub(r"\s+", " ", value.translate(_FRACTION_TRANSLATION).casefold()).strip()
-
-
-def _source_has_unit(source: str, unit: str) -> bool:
-    normalised_source = _grounding_text(source)
-    normalised_unit = _grounding_text(unit)
-    forms = _UNIT_SOURCE_FORMS.get(normalised_unit)
-    if forms is None:
-        forms = next(
-            (
-                known_forms
-                for known_forms in _UNIT_SOURCE_FORMS.values()
-                if normalised_unit in known_forms
-            ),
-            {normalised_unit},
-        )
-    return any(re.search(rf"(?<!\w){re.escape(form)}(?!\w)", normalised_source) for form in forms)
-
-
 def validate_stage1_response(context: dict, response: Stage1Response) -> None:
-    """Validate complete line ownership and source-grounded numeric fields."""
+    """Validate that Stage 1 extracted valid ingredients when ingredients exist."""
     recipe = context["recipe"]
-    lines = {str(line["id"]): str(line["text"]) for line in recipe["lines"]}
-    expected = {str(line_id) for line_id in recipe["ai_parse_line_ids"]}
-    parsed_ids = [decision.line_id for decision in response.parsed_lines]
-    non_ingredient_ids = [decision.line_id for decision in response.non_ingredient_lines]
-    decided = parsed_ids + non_ingredient_ids
-    if len(decided) != len(set(decided)):
-        raise EnrichmentValidationError("Stage 1 contains duplicate line decisions")
-    if set(decided) != expected or not expected <= set(lines):
-        raise EnrichmentValidationError("Stage 1 must decide every supplied line exactly once")
-    for decision in response.parsed_lines:
-        source = lines[decision.line_id]
-        for occurrence in decision.occurrences:
-            if occurrence.quantity and _grounding_text(occurrence.quantity) not in _grounding_text(
-                source
-            ):
-                raise EnrichmentValidationError(
-                    f"Stage 1 quantity is not grounded in line {decision.line_id}"
-                )
-            if occurrence.unit and not _source_has_unit(source, occurrence.unit):
-                raise EnrichmentValidationError(
-                    f"Stage 1 unit is not grounded in line {decision.line_id}"
-                )
+    ingredients = recipe.get("ingredients", [])
+    if ingredients and not response.ingredients:
+        raise EnrichmentValidationError("Stage 1 extracted no ingredients from recipe")
 
 
 def _validate_keyword(value: str) -> str:
@@ -288,25 +223,24 @@ def _validate_response(
     recipe: Recipe,
     response: EnrichmentResponse,
 ) -> None:
-    lines = {str(line.id): line for line in recipe.ingredients_verbatim}
-    parsed = {decision.line_id: decision for decision in response.parsed_lines}
-    non_ingredient = {decision.line_id: decision for decision in response.non_ingredient_lines}
-    if len(parsed) != len(response.parsed_lines) or len(non_ingredient) != len(
-        response.non_ingredient_lines
+    upsert_facet_vocabulary(session)
+    session.flush()
+    for item in response.canonical_ingredients:
+        if not item.name.strip():
+            raise EnrichmentValidationError("canonical ingredient name cannot be empty")
+    if sum(item.is_key for item in response.canonical_ingredients) > 3:
+        raise EnrichmentValidationError("response must contain at most three key ingredients")
+    if response.canonical_ingredients and not any(
+        item.is_key for item in response.canonical_ingredients
     ):
-        raise EnrichmentValidationError("response contains duplicate line decisions")
-    if not (set(parsed) | set(non_ingredient)) <= set(lines):
-        raise EnrichmentValidationError("response includes an unknown ingredient line")
-    if set(parsed) & set(non_ingredient):
-        raise EnrichmentValidationError("line cannot be both parsed and non-ingredient")
-    if set(parsed) | set(non_ingredient) != set(lines):
-        raise EnrichmentValidationError("response must decide every ingredient line")
-    if any(not decision.occurrences for decision in response.parsed_lines):
-        raise EnrichmentValidationError("parsed ingredient line has no occurrence")
+        raise EnrichmentValidationError("response must contain at least one key ingredient")
 
-    canonical, aliases = _ingredient_vocab(session)
-    proposed = [occ.canonical_name for line in response.parsed_lines for occ in line.occurrences]
-    proposed_folded = [fold(name) for name in proposed]
+    names = [item.name for item in response.canonical_ingredients]
+    folded_names = [fold(name) for name in names]
+    if len(folded_names) != len(set(folded_names)):
+        raise EnrichmentValidationError("response contains duplicate canonical ingredients")
+
+    canonical = {item.name_folded: item for item in session.scalars(select(Ingredient))}
 
     cuisine_ids = response.cuisines
     if len(cuisine_ids) != len(set(cuisine_ids)) or not set(cuisine_ids) <= accepted_cuisine_ids():
@@ -339,10 +273,8 @@ def _validate_response(
     forbidden |= {
         fold(values[(RecipeFacetKind.COURSE, value_id)].name) for value_id in response.courses
     }
-    forbidden |= {item.name_folded for item in canonical.values()} | {
-        item.name_folded for item in aliases.values()
-    }
-    forbidden |= set(proposed_folded)
+    forbidden |= set(canonical.keys())
+    forbidden |= set(folded_names)
     if set(folded_keywords) & forbidden:
         raise EnrichmentValidationError(
             "residual keyword duplicates a structured fact or ingredient"
@@ -363,59 +295,30 @@ def _apply_response(
     assert state is not None
     created: dict[str, Ingredient] = {}
     canonical_by_name = {item.name_folded: item for item in session.scalars(select(Ingredient))}
-    aliases_by_name = {item.name_folded: item for item in session.scalars(select(IngredientAlias))}
-    aliases_created = 0
     existing_ingredients = 0
-    occurrences_created = 0
-    ai_lines = 0
-    parsed_lines = {decision.line_id: decision for decision in response.parsed_lines}
-    non_ingredient_lines = {
-        decision.line_id: decision for decision in response.non_ingredient_lines
-    }
-    for line in recipe.ingredients_verbatim:
-        line_id = str(line.id)
-        session.execute(delete(IngredientOccurrence).where(IngredientOccurrence.line_id == line.id))
-        parsed = []
-        if line_id in non_ingredient_lines:
-            line.kind = IngredientLineKind(non_ingredient_lines[line_id].kind)
+
+    session.execute(
+        delete(RecipeCanonicalIngredient).where(RecipeCanonicalIngredient.recipe_id == recipe.id)
+    )
+
+    for item in response.canonical_ingredients:
+        name_folded = fold(item.name)
+        ingredient = canonical_by_name.get(name_folded)
+        if ingredient is not None:
+            existing_ingredients += 1
         else:
-            decision = parsed_lines[line_id]
-            line.kind = IngredientLineKind.INGREDIENT
-            ai_lines += 1
-            parsed = [(item, IngredientParseMethod.AI, item) for item in decision.occurrences]
-        for position, (_raw, parse_method, decision_occurrence) in enumerate(parsed):
-            assert decision_occurrence is not None
-            canonical_name = decision_occurrence.canonical_name
-            name_folded = fold(canonical_name)
-            ingredient = canonical_by_name.get(name_folded)
+            ingredient = created.get(name_folded)
             if ingredient is None:
-                alias = aliases_by_name.get(name_folded)
-                ingredient = alias.ingredient if alias is not None else None
-            if ingredient is not None:
-                resolution = IngredientResolutionMethod.AI_EXISTING
-                existing_ingredients += 1
-            else:
-                ingredient = created.get(name_folded)
-                if ingredient is None:
-                    ingredient = create_ingredient(session, canonical_name)
-                    created[name_folded] = ingredient
-                resolution = IngredientResolutionMethod.AI_CREATED
-            session.add(
-                IngredientOccurrence(
-                    line_id=line.id,
-                    ingredient_id=ingredient.id,
-                    position=position,
-                    quantity=decision_occurrence.quantity,
-                    unit=decision_occurrence.unit,
-                    preparation=decision_occurrence.preparation,
-                    optional=decision_occurrence.optional,
-                    alternative_group=decision_occurrence.alternative_group,
-                    is_key=decision_occurrence.is_key,
-                    parse_method=parse_method,
-                    resolution_method=resolution,
-                )
+                ingredient = create_ingredient(session, item.name)
+                created[name_folded] = ingredient
+                canonical_by_name[name_folded] = ingredient
+        session.add(
+            RecipeCanonicalIngredient(
+                recipe_id=recipe.id,
+                ingredient_id=ingredient.id,
+                is_key=item.is_key,
             )
-            occurrences_created += 1
+        )
 
     recipe.facets.clear()
     recipe.cuisines.clear()
@@ -450,14 +353,10 @@ def _apply_response(
     state.started_at = state.started_at or datetime.now(UTC)
     state.completed_at = datetime.now(UTC)
     return {
-        "occurrences": occurrences_created,
-        "ai_parsed_lines": ai_lines,
+        "canonical_ingredients": len(response.canonical_ingredients),
+        "key_ingredients": sum(item.is_key for item in response.canonical_ingredients),
         "ingredients_created": len(created),
         "existing_ingredients": existing_ingredients,
-        "aliases_created": aliases_created,
-        "headings": sum(
-            line.kind is IngredientLineKind.HEADING for line in recipe.ingredients_verbatim
-        ),
     }
 
 
@@ -555,8 +454,8 @@ def enrich_recipe(
     stage1_fallback_used = False
     try:
         stage1_context = build_stage1_context(recipe)
-        if not stage1_context["recipe"]["ai_parse_line_ids"]:
-            stage1_response = Stage1Response(p=[], n=[])
+        if not stage1_context["recipe"]["ingredients"]:
+            stage1_response = Stage1Response(i=[])
             usage1 = Usage()
         else:
             try:
@@ -581,14 +480,15 @@ def enrich_recipe(
                     ) from fallback_exc
                 usage1 = primary_exc.usage + fallback_usage
 
+        unique_ingredients = deduplicate_ingredient_names(stage1_response.ingredients)
         stage2_context = build_stage2_context(
-            session, recipe, stage1_response, include_description=include_description
+            session, recipe, unique_ingredients, include_description=include_description
         )
         stage2_response, usage2 = stage2_provider.enrich_recipe_stage2(stage2_context, stage2_model)
 
         usage = usage1 + usage2
         try:
-            response = EnrichmentResponse.from_stages(stage1_response, stage2_response)
+            response = EnrichmentResponse.from_stages(unique_ingredients, stage2_response)
         except ValueError as exc:
             raise AIResponseError(f"Invalid Stage 2 response: {exc}", usage) from exc
 

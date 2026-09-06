@@ -7,16 +7,13 @@ from app.models.config import Config
 from app.models.enums import (
     AIProvider,
     ExtractionMethod,
-    IngredientLineKind,
-    IngredientParseMethod,
-    IngredientResolutionMethod,
     RecipeEnrichmentStatus,
     RecipeFacetKind,
     TaskStatus,
     TaskType,
 )
 from app.models.game import GameDismissal
-from app.models.ingredient import Ingredient, IngredientAlias, IngredientLine, IngredientOccurrence
+from app.models.ingredient import Ingredient, IngredientLine, RecipeCanonicalIngredient
 from app.models.reading_queue import ReadingQueueItem
 from app.models.recipe import Keyword, Recipe, recipe_keywords
 from app.models.recipe_enrichment import RecipeEnrichmentState
@@ -38,15 +35,11 @@ __all__ = [
     "ExtractionMethod",
     "GameDismissal",
     "Ingredient",
-    "IngredientAlias",
     "IngredientLine",
-    "IngredientLineKind",
-    "IngredientOccurrence",
-    "IngredientParseMethod",
-    "IngredientResolutionMethod",
     "Keyword",
     "ReadingQueueItem",
     "Recipe",
+    "RecipeCanonicalIngredient",
     "RecipeCuisine",
     "RecipeEnrichmentState",
     "RecipeEnrichmentStatus",

@@ -14,7 +14,6 @@ import json
 import logging
 import time
 import tomllib
-import uuid
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime
@@ -35,7 +34,10 @@ from app.services.recipe_enrichment.schema import (
     EnrichmentResponse,
     Stage1Response,
 )
-from app.services.recipe_enrichment.service import validate_stage1_response
+from app.services.recipe_enrichment.service import (
+    deduplicate_ingredient_names,
+    validate_stage1_response,
+)
 from app.services.recipe_facts import accepted_cuisine_ids, facet_vocabulary
 from app.text import fold
 from evals.config import DEFAULT_CONFIG_PATH, EVALS_DIR, RUNS_DIR, git_sha
@@ -114,7 +116,7 @@ class GoldOccurrence(BaseModel):
 class GoldLine(BaseModel):
     position: int
     text: str
-    kind: str
+    kind: str | None = None
     occurrences: list[GoldOccurrence] = []
 
 
@@ -134,6 +136,8 @@ class GoldRecipe(BaseModel):
     book_author: str | None = None
     instructions: list[str]
     lines: list[GoldLine]
+    canonical_ingredients: list[str] = []
+    key_ingredients: list[str] = []
     cuisines: list[GoldFact] = []
     accepted_cuisines: list[str] = []
     methods: list[GoldFact] = []
@@ -143,31 +147,37 @@ class GoldRecipe(BaseModel):
 
 
 class EnrichmentDimensionScores(BaseModel):
-    ingredient_identity_precision: float
-    ingredient_identity_recall: float
-    ingredient_identity_f1: float
+    canonical_ingredients_precision: float = 0.0
+    canonical_ingredients_recall: float = 0.0
+    canonical_ingredients_f1: float = 0.0
+    key_ingredients_precision: float = 0.0
+    key_ingredients_recall: float = 0.0
+    key_ingredients_f1: float = 0.0
 
-    quantity_accuracy: float
-    unit_accuracy: float
-    preparation_accuracy: float
-    optional_accuracy: float
-    alternative_group_accuracy: float
-    ingredient_details_mean: float
+    # Historical fields preserved for past JSONL evaluation records
+    ingredient_identity_precision: float | None = None
+    ingredient_identity_recall: float | None = None
+    ingredient_identity_f1: float | None = None
+    quantity_accuracy: float | None = None
+    unit_accuracy: float | None = None
+    preparation_accuracy: float | None = None
+    optional_accuracy: float | None = None
+    alternative_group_accuracy: float | None = None
+    ingredient_details_mean: float | None = None
+    line_kinds_accuracy: float | None = None
 
-    line_kinds_accuracy: float
+    cuisine_score: float = 0.0
+    primary_method_score: float = 0.0
+    methods_jaccard: float = 0.0
+    course_score: float = 0.0
+    facets_mean: float = 0.0
 
-    cuisine_score: float
-    primary_method_score: float
-    methods_jaccard: float
-    course_score: float
-    facets_mean: float
+    keywords_validity: float = 0.0
+    keywords_count: int = 0
+    keywords_duplicates: int = 0
+    keywords_overlap: int = 0
 
-    keywords_validity: float
-    keywords_count: int
-    keywords_duplicates: int
-    keywords_overlap: int
-
-    composite: float
+    composite: float = 0.0
 
 
 class EnrichmentRecipeRecord(BaseModel):
@@ -248,19 +258,14 @@ def _norm_eval_ingredient(name: str) -> str:
     return " ".join(norm_tokens)
 
 
-def score_ingredient_identity(
-    gold_lines: list[GoldLine], response: EnrichmentResponse
+def score_canonical_ingredients(
+    gold_ingredients: list[str], response: EnrichmentResponse
 ) -> tuple[float, float, float]:
-    gold_names = {
-        _norm_eval_ingredient(occ.canonical_name)
-        for line in gold_lines
-        for occ in line.occurrences
-        if occ.canonical_name
-    }
+    gold_names = {_norm_eval_ingredient(name) for name in gold_ingredients if name}
     pred_names = {
-        _norm_eval_ingredient(occ.canonical_name)
-        for line in response.parsed_lines
-        for occ in line.occurrences
+        _norm_eval_ingredient(item.name)
+        for item in response.canonical_ingredients
+        if item.name
     }
 
     if not gold_names and not pred_names:
@@ -275,136 +280,32 @@ def score_ingredient_identity(
     return precision, recall, f1
 
 
-def score_ingredient_details(
-    gold_lines: list[GoldLine], response: EnrichmentResponse
-) -> dict[str, float]:
-    parsed_by_line = {line.line_id: line for line in response.parsed_lines}
+def score_ingredient_identity(
+    gold_ingredients: list[str], response: EnrichmentResponse
+) -> tuple[float, float, float]:
+    return score_canonical_ingredients(gold_ingredients, response)
 
-    qty_matches: list[float] = []
-    unit_matches: list[float] = []
-    prep_matches: list[float] = []
-    opt_matches: list[float] = []
 
-    for gold_line in gold_lines:
-        line_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{gold_line.position}:{gold_line.text}"))
-        pred_line = parsed_by_line.get(line_id)
-        if not pred_line or not gold_line.occurrences:
-            if not gold_line.occurrences and (not pred_line or not pred_line.occurrences):
-                continue
-            qty_matches.append(0.0)
-            unit_matches.append(0.0)
-            prep_matches.append(0.0)
-            opt_matches.append(0.0)
-            continue
-
-        gold_occs = gold_line.occurrences
-        pred_occs = pred_line.occurrences
-
-        for i, g_occ in enumerate(gold_occs):
-            if i < len(pred_occs):
-                p_occ = pred_occs[i]
-                g_qty = _norm_str(g_occ.quantity)
-                p_qty = _norm_str(p_occ.quantity)
-                if not g_qty or not p_qty:
-                    qty_matches.append(1.0 if g_qty == p_qty else 0.0)
-                else:
-                    qty_matches.append(
-                        1.0 if g_qty == p_qty or g_qty in p_qty or p_qty in g_qty else 0.0
-                    )
-
-                g_u = _norm_unit(g_occ.unit)
-                p_u = _norm_unit(p_occ.unit)
-                unit_matches.append(1.0 if g_u == p_u else 0.0)
-
-                g_p = _norm_str(g_occ.preparation)
-                p_p = _norm_str(p_occ.preparation)
-                if not g_p and not p_p:
-                    prep_matches.append(1.0)
-                elif not g_p or not p_p:
-                    prep_matches.append(0.0)
-                else:
-                    prep_matches.append(1.0 if (g_p in p_p or p_p in g_p) else 0.0)
-
-                opt_matches.append(1.0 if g_occ.optional == p_occ.optional else 0.0)
-            else:
-                qty_matches.append(0.0)
-                unit_matches.append(0.0)
-                prep_matches.append(0.0)
-                opt_matches.append(0.0)
-
-    qty_acc = sum(qty_matches) / len(qty_matches) if qty_matches else 1.0
-    unit_acc = sum(unit_matches) / len(unit_matches) if unit_matches else 1.0
-    prep_acc = sum(prep_matches) / len(prep_matches) if prep_matches else 1.0
-    opt_acc = sum(opt_matches) / len(opt_matches) if opt_matches else 1.0
-    alt_acc = score_alternative_groups(gold_lines, response)
-    details_mean = (qty_acc + unit_acc + prep_acc + opt_acc + alt_acc) / 5.0
-
-    return {
-        "quantity_accuracy": qty_acc,
-        "unit_accuracy": unit_acc,
-        "preparation_accuracy": prep_acc,
-        "optional_accuracy": opt_acc,
-        "alternative_group_accuracy": alt_acc,
-        "ingredient_details_mean": details_mean,
+def score_key_ingredients(
+    gold_key_ingredients: list[str], response: EnrichmentResponse
+) -> tuple[float, float, float]:
+    gold_names = {_norm_eval_ingredient(name) for name in gold_key_ingredients if name}
+    pred_names = {
+        _norm_eval_ingredient(item.name)
+        for item in response.canonical_ingredients
+        if item.is_key and item.name
     }
 
+    if not gold_names and not pred_names:
+        return 1.0, 1.0, 1.0
+    if not gold_names or not pred_names:
+        return 0.0, 0.0, 0.0
 
-def score_alternative_groups(gold_lines: list[GoldLine], response: EnrichmentResponse) -> float:
-    """Score complete line-local alternative relationships without ordinary-line dilution."""
-    parsed_by_line = {line.line_id: line for line in response.parsed_lines}
-    matches: list[float] = []
-
-    for gold_line in gold_lines:
-        line_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{gold_line.position}:{gold_line.text}"))
-        pred_line = parsed_by_line.get(line_id)
-        pred_occurrences = pred_line.occurrences if pred_line else []
-        gold_occurrences = gold_line.occurrences
-        occurrence_count = max(len(gold_occurrences), len(pred_occurrences))
-
-        for left in range(occurrence_count):
-            for right in range(left + 1, occurrence_count):
-                gold_same_group = (
-                    right < len(gold_occurrences)
-                    and gold_occurrences[left].alternative_group is not None
-                    and gold_occurrences[left].alternative_group
-                    == gold_occurrences[right].alternative_group
-                )
-                pred_same_group = (
-                    right < len(pred_occurrences)
-                    and pred_occurrences[left].alternative_group is not None
-                    and pred_occurrences[left].alternative_group
-                    == pred_occurrences[right].alternative_group
-                )
-                if gold_same_group or pred_same_group:
-                    matches.append(1.0 if gold_same_group == pred_same_group else 0.0)
-
-        predicted_groups: dict[int, list[int]] = defaultdict(list)
-        for index, occurrence in enumerate(pred_occurrences):
-            if occurrence.alternative_group is not None:
-                predicted_groups[occurrence.alternative_group].append(index)
-        for indices in predicted_groups.values():
-            index = indices[0]
-            if len(indices) == 1 and (
-                index >= len(gold_occurrences) or gold_occurrences[index].alternative_group is None
-            ):
-                matches.append(0.0)
-
-    return sum(matches) / len(matches) if matches else 1.0
-
-
-def score_line_kinds(gold_lines: list[GoldLine], response: EnrichmentResponse) -> float:
-    non_ing_lines = {item.line_id: item.kind for item in response.non_ingredient_lines}
-
-    matches = 0
-    total = len(gold_lines)
-
-    for gold_line in gold_lines:
-        line_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{gold_line.position}:{gold_line.text}"))
-        pred_kind = non_ing_lines.get(line_id, "ingredient")
-        if pred_kind == gold_line.kind:
-            matches += 1
-
-    return matches / total if total else 1.0
+    tp = len(gold_names & pred_names)
+    precision = tp / len(pred_names) if pred_names else 0.0
+    recall = tp / len(gold_names) if gold_names else 0.0
+    f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) else 0.0
+    return precision, recall, f1
 
 
 def score_facets(gold: GoldRecipe, response: EnrichmentResponse) -> dict[str, float]:
@@ -474,9 +375,7 @@ def score_residual_keywords(
     forbidden = {fold(c) for c in response.cuisines}
     forbidden |= {fold(m.value_id) for m in response.methods}
     forbidden |= {fold(o) for o in response.courses}
-    forbidden |= {
-        fold(occ.canonical_name) for line in response.parsed_lines for occ in line.occurrences
-    }
+    forbidden |= {fold(item.name) for item in response.canonical_ingredients}
 
     overlap = sum(1 for kw in keywords if fold(kw) in forbidden)
     overlap_score = max(0.0, 1.0 - overlap * 0.2)
@@ -493,16 +392,14 @@ def score_residual_keywords(
 
 def calculate_composite_score(scores: dict[str, Any]) -> float:
     weights = {
-        "ingredient_identity": 0.30,
-        "ingredient_details": 0.20,
-        "line_kinds": 0.15,
-        "facets": 0.20,
-        "residual_keywords": 0.15,
+        "canonical_ingredients": 0.35,
+        "key_ingredients": 0.15,
+        "facets": 0.30,
+        "residual_keywords": 0.20,
     }
     composite = (
-        weights["ingredient_identity"] * scores["ingredient_identity_f1"]
-        + weights["ingredient_details"] * scores["ingredient_details_mean"]
-        + weights["line_kinds"] * scores["line_kinds_accuracy"]
+        weights["canonical_ingredients"] * scores["canonical_ingredients_f1"]
+        + weights["key_ingredients"] * scores["key_ingredients_f1"]
         + weights["facets"] * scores["facets_mean"]
         + weights["residual_keywords"] * scores["keywords_validity"]
     )
@@ -512,18 +409,18 @@ def calculate_composite_score(scores: dict[str, Any]) -> float:
 def score_enrichment_response(
     gold: GoldRecipe, response: EnrichmentResponse
 ) -> EnrichmentDimensionScores:
-    p, r, f1 = score_ingredient_identity(gold.lines, response)
-    details = score_ingredient_details(gold.lines, response)
-    line_kinds_acc = score_line_kinds(gold.lines, response)
+    p_ing, r_ing, f1_ing = score_canonical_ingredients(gold.canonical_ingredients, response)
+    p_key, r_key, f1_key = score_key_ingredients(gold.key_ingredients, response)
     facets = score_facets(gold, response)
     kw = score_residual_keywords(response.keywords, gold, response)
 
     payload = {
-        "ingredient_identity_precision": p,
-        "ingredient_identity_recall": r,
-        "ingredient_identity_f1": f1,
-        "line_kinds_accuracy": line_kinds_acc,
-        **details,
+        "canonical_ingredients_precision": p_ing,
+        "canonical_ingredients_recall": r_ing,
+        "canonical_ingredients_f1": f1_ing,
+        "key_ingredients_precision": p_key,
+        "key_ingredients_recall": r_key,
+        "key_ingredients_f1": f1_key,
         **facets,
         **kw,
     }
@@ -540,38 +437,24 @@ def source_fingerprint_dict(source: dict) -> str:
 def gold_ingredient_vocab(recipes: list[GoldRecipe]) -> dict[str, str]:
     vocab: dict[str, str] = {}
     for r in recipes:
-        for line in r.lines:
-            for occ in line.occurrences:
-                if occ.canonical_name:
-                    vocab[fold(occ.canonical_name)] = occ.canonical_name
+        for name in r.canonical_ingredients:
+            if name:
+                vocab[fold(name)] = name
     return vocab
 
 
 def build_gold_stage1_context(gold: GoldRecipe) -> dict:
-    ai_parse_line_ids = [
-        str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{line.position}:{line.text}")) for line in gold.lines
-    ]
-    lines_payload = [
-        {
-            "id": str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{line.position}:{line.text}")),
-            "text": line.text,
-        }
-        for line in gold.lines
-    ]
-
     return {
         "recipe": {
             "id": gold.id,
             "name": gold.name,
-            "instructions": gold.instructions,
-            "lines": lines_payload,
-            "ai_parse_line_ids": ai_parse_line_ids,
+            "ingredients": [line.text for line in gold.lines],
         }
     }
 
 
 def build_gold_stage2_context(
-    gold: GoldRecipe, stage1: Stage1Response, *, include_description: bool = True
+    gold: GoldRecipe, ingredients: list[str], *, include_description: bool = True
 ) -> dict:
     _, entries = facet_vocabulary()
     methods = [
@@ -581,25 +464,11 @@ def build_gold_stage2_context(
         {"id": entry["id"], "name": entry["name"]} for entry in entries if entry["kind"] == "course"
     ]
 
-    recipe_payload = {
+    recipe_payload: dict[str, Any] = {
         "id": gold.id,
         "name": gold.name,
+        "ingredients": ingredients,
         "instructions": gold.instructions,
-        "ingredient_lines": [
-            {
-                "line_id": line.line_id,
-                "source": next(
-                    source.text
-                    for source in gold.lines
-                    if str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{source.position}:{source.text}"))
-                    == line.line_id
-                ),
-                "occurrences": [
-                    occurrence.model_dump(by_alias=False) for occurrence in line.occurrences
-                ],
-            }
-            for line in stage1.parsed_lines
-        ],
     }
     if gold.book_title:
         recipe_payload["book_title"] = gold.book_title
@@ -629,19 +498,11 @@ def build_gold_context(gold: GoldRecipe) -> dict:
         {"id": entry["id"], "name": entry["name"]} for entry in entries if entry["kind"] == "course"
     ]
 
-    lines_payload = []
-    ai_parse_line_ids = []
-    for line in gold.lines:
-        line_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{line.position}:{line.text}"))
-        lines_payload.append({"id": line_id, "text": line.text})
-        ai_parse_line_ids.append(line_id)
-
-    recipe_payload = {
+    recipe_payload: dict[str, Any] = {
         "id": gold.id,
         "name": gold.name,
+        "ingredients": [line.text for line in gold.lines],
         "instructions": gold.instructions,
-        "lines": lines_payload,
-        "ai_parse_line_ids": ai_parse_line_ids,
     }
     if gold.book_title:
         recipe_payload["book_title"] = gold.book_title
@@ -664,19 +525,20 @@ def build_gold_context(gold: GoldRecipe) -> dict:
 
 def validate_enrichment_response(context: dict, response: EnrichmentResponse) -> None:
     """Reject structured responses that the production application would not accept."""
-    recipe = context["recipe"]
-    expected_line_ids = set(recipe["ai_parse_line_ids"])
-    parsed_ids = [line.line_id for line in response.parsed_lines]
-    non_ingredient_ids = [line.line_id for line in response.non_ingredient_lines]
-    decision_ids = set(parsed_ids) | set(non_ingredient_ids)
-    if len(parsed_ids) != len(set(parsed_ids)) or len(non_ingredient_ids) != len(
-        set(non_ingredient_ids)
+    for item in response.canonical_ingredients:
+        if not item.name.strip():
+            raise ValueError("canonical ingredient name cannot be empty")
+    if sum(item.is_key for item in response.canonical_ingredients) > 3:
+        raise ValueError("response must contain at most three key ingredients")
+    if response.canonical_ingredients and not any(
+        item.is_key for item in response.canonical_ingredients
     ):
-        raise ValueError("response contains duplicate line decisions")
-    if set(parsed_ids) & set(non_ingredient_ids) or decision_ids != expected_line_ids:
-        raise ValueError("response must make one decision for every requested line")
-    if any(not line.occurrences for line in response.parsed_lines):
-        raise ValueError("response has an ingredient line without occurrences")
+        raise ValueError("response must contain at least one key ingredient")
+
+    names = [item.name for item in response.canonical_ingredients]
+    folded_names = [fold(name) for name in names]
+    if len(folded_names) != len(set(folded_names)):
+        raise ValueError("response contains duplicate canonical ingredients")
 
     vocabulary = context["vocabulary"]
     allowed = {
@@ -697,6 +559,19 @@ def validate_enrichment_response(context: dict, response: EnrichmentResponse) ->
         or not set(response.courses) <= allowed["course"]
     ):
         raise ValueError("response contains an unknown or duplicate course")
+    if sum(fact.is_primary for fact in response.methods) > 1:
+        raise ValueError("response has multiple primary methods")
+    if len(response.keywords) > 5:
+        raise ValueError("response must contain at most five residual keywords")
+    seen_kw = set()
+    for kw in response.keywords:
+        name = kw.strip()
+        if not name or not (name.istitle() or (name and name[0].isupper())):
+            raise ValueError(f"keyword is not Title Case: {kw!r}")
+        folded_kw = fold(name)
+        if folded_kw in seen_kw:
+            raise ValueError("response contains duplicate residual keywords")
+        seen_kw.add(folded_kw)
 
 
 def instantiate_provider(candidate: CandidateModel, api_key: str) -> AIProvider:
@@ -743,7 +618,6 @@ def leaderboard(records: list[EnrichmentRecipeRecord]) -> str:
                     "0.0%",
                     "0.0%",
                     "0.0%",
-                    "0.0%",
                     "—",
                     "—",
                     f"{len(items)} errors",
@@ -752,11 +626,18 @@ def leaderboard(records: list[EnrichmentRecipeRecord]) -> str:
             continue
 
         comp_mean = sum(item.scores.composite for item in valid_items) / len(valid_items)
-        f1_mean = sum(item.scores.ingredient_identity_f1 for item in valid_items) / len(valid_items)
-        details_mean = sum(item.scores.ingredient_details_mean for item in valid_items) / len(
-            valid_items
-        )
-        kinds_mean = sum(item.scores.line_kinds_accuracy for item in valid_items) / len(valid_items)
+        ing_f1 = sum(
+            item.scores.canonical_ingredients_f1
+            if item.scores.canonical_ingredients_f1 is not None
+            else (item.scores.ingredient_identity_f1 or 0.0)
+            for item in valid_items
+        ) / len(valid_items)
+        key_f1 = sum(
+            item.scores.key_ingredients_f1
+            if item.scores.key_ingredients_f1 is not None
+            else 0.0
+            for item in valid_items
+        ) / len(valid_items)
         facets_mean = sum(item.scores.facets_mean for item in valid_items) / len(valid_items)
         kw_mean = sum(item.scores.keywords_validity for item in valid_items) / len(valid_items)
 
@@ -767,9 +648,8 @@ def leaderboard(records: list[EnrichmentRecipeRecord]) -> str:
             [
                 model_id,
                 f"{comp_mean:.3f}",
-                f"{f1_mean * 100:.1f}%",
-                f"{details_mean * 100:.1f}%",
-                f"{kinds_mean * 100:.1f}%",
+                f"{ing_f1 * 100:.1f}%",
+                f"{key_f1 * 100:.1f}%",
                 f"{facets_mean * 100:.1f}%",
                 f"{kw_mean * 100:.1f}%",
                 f"${total_cost:.4f}",
@@ -783,8 +663,7 @@ def leaderboard(records: list[EnrichmentRecipeRecord]) -> str:
         "Model",
         "Composite",
         "Ing F1",
-        "Details",
-        "Kinds",
+        "Key F1",
         "Facets",
         "Keywords",
         "Cost",
@@ -796,16 +675,12 @@ def leaderboard(records: list[EnrichmentRecipeRecord]) -> str:
 
 def _zero_enrichment_scores() -> EnrichmentDimensionScores:
     return EnrichmentDimensionScores(
-        ingredient_identity_precision=0.0,
-        ingredient_identity_recall=0.0,
-        ingredient_identity_f1=0.0,
-        quantity_accuracy=0.0,
-        unit_accuracy=0.0,
-        preparation_accuracy=0.0,
-        optional_accuracy=0.0,
-        alternative_group_accuracy=0.0,
-        ingredient_details_mean=0.0,
-        line_kinds_accuracy=0.0,
+        canonical_ingredients_precision=0.0,
+        canonical_ingredients_recall=0.0,
+        canonical_ingredients_f1=0.0,
+        key_ingredients_precision=0.0,
+        key_ingredients_recall=0.0,
+        key_ingredients_f1=0.0,
         cuisine_score=0.0,
         primary_method_score=0.0,
         methods_jaccard=0.0,
@@ -850,8 +725,8 @@ def evaluate_enrichment_recipe(
     try:
         stage1_context = build_gold_stage1_context(gold)
 
-        if not stage1_context["recipe"]["ai_parse_line_ids"]:
-            stage1_response = Stage1Response(p=[], n=[])
+        if not stage1_context["recipe"]["ingredients"]:
+            stage1_response = Stage1Response(i=[])
             usage1 = Usage()
         else:
             try:
@@ -867,8 +742,10 @@ def evaluate_enrichment_recipe(
         except ValueError as exc:
             raise AIResponseError(f"Invalid Stage 1 response: {exc}", usage1) from exc
 
+        deduped_ingredients = deduplicate_ingredient_names(stage1_response.ingredients)
+
         stage2_context = build_gold_stage2_context(
-            gold, stage1_response, include_description=include_description
+            gold, deduped_ingredients, include_description=include_description
         )
         try:
             stage2_response, usage2 = stage2_provider.enrich_recipe_stage2(
@@ -880,7 +757,7 @@ def evaluate_enrichment_recipe(
 
         usage = usage1 + usage2
         try:
-            response = EnrichmentResponse.from_stages(stage1_response, stage2_response)
+            response = EnrichmentResponse.from_stages(deduped_ingredients, stage2_response)
         except ValueError as exc:
             raise AIResponseError(f"Invalid Stage 2 response: {exc}", usage) from exc
 

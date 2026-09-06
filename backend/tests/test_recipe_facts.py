@@ -3,20 +3,16 @@ import pytest
 from app.models import IngredientLine, Recipe, RecipeFacet, RecipeFacetKind
 from app.models.recipe_fact import RecipeFacetValue
 from app.services.recipe_facts import (
-    add_ingredient_alias,
     create_ingredient,
     upsert_facet_vocabulary,
     validate_recipe_facets,
 )
 
 
-def test_canonical_and_alias_names_share_one_folded_namespace(session) -> None:
-    olive_oil = create_ingredient(session, "Olive Oil")
-    add_ingredient_alias(session, olive_oil, "huile d'olive")
-    with pytest.raises(ValueError, match="alias"):
-        create_ingredient(session, "Huile d'olive")
-    with pytest.raises(ValueError, match="canonical"):
-        add_ingredient_alias(session, olive_oil, "OLIVE OIL")
+def test_canonical_names_share_one_folded_namespace(session) -> None:
+    create_ingredient(session, "Olive Oil")
+    with pytest.raises(ValueError, match="already exists"):
+        create_ingredient(session, "olive oil")
 
 
 def test_line_positions_allow_duplicate_verbatim_text(session) -> None:

@@ -43,24 +43,6 @@ class ExtractionMethod(StrEnum):
     PDF_OCR = "pdf_ocr"
 
 
-class IngredientLineKind(StrEnum):
-    INGREDIENT = "ingredient"
-    HEADING = "heading"
-    NOTE = "note"
-
-
-class IngredientParseMethod(StrEnum):
-    DETERMINISTIC = "deterministic"
-    AI = "ai"
-
-
-class IngredientResolutionMethod(StrEnum):
-    CANONICAL_NAME = "canonical_name"
-    ALIAS = "alias"
-    AI_EXISTING = "ai_existing"
-    AI_CREATED = "ai_created"
-
-
 class RecipeEnrichmentStatus(StrEnum):
     PENDING = "pending"
     RUNNING = "running"

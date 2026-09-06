@@ -75,23 +75,16 @@ class StubProvider(AIProvider):
 
         if prompt.startswith("Recipe ingredient structuring prompt"):
             recipe = json.loads(prompt.rsplit("Recipe ingredient input:\n", 1)[1])
-            parsed_lines = []
+            ingredients = []
             token = recipe["id"].split("-")[0]
-            for index, line in enumerate(recipe["lines"], start=1):
-                parsed_lines.append(
-                    {
-                        "l": line["id"],
-                        "o": [{"canonical_name": f"Stub Ingredient {token} {index}"}],
-                    }
-                )
-            return json.dumps({"p": parsed_lines}), usage
+            for index, _ in enumerate(recipe.get("ingredients", []), start=1):
+                ingredients.append(f"Stub Ingredient {token} {index}")
+            return json.dumps({"i": ingredients}), usage
 
         if prompt.startswith("Recipe facets prompt"):
             recipe = json.loads(prompt.rsplit("Recipe context:\n", 1)[1])
-            ingredient_lines = recipe.get("ingredient_lines", [])
-            key_ingredients = (
-                [{"l": ingredient_lines[0]["line_id"], "o": 0}] if ingredient_lines else []
-            )
+            ingredients = recipe.get("ingredients", [])
+            key_ingredients = [ingredients[0]] if ingredients else []
             return json.dumps(
                 {
                     "k": key_ingredients,
@@ -104,20 +97,13 @@ class StubProvider(AIProvider):
 
         if prompt.startswith("Recipe enrichment prompt"):
             recipe = json.loads(prompt.rsplit("Recipe-specific input:\n", 1)[1])
-            parsed_lines = []
+            ingredients = []
             token = recipe["id"].split("-")[0]
-            for index, line in enumerate(recipe["lines"], start=1):
-                parsed_lines.append(
-                    {
-                        "l": line["id"],
-                        "o": [
-                            {"canonical_name": f"Stub Ingredient {token} {index}", "is_key": False}
-                        ],
-                    }
-                )
+            for index, _ in enumerate(recipe.get("ingredients", []), start=1):
+                ingredients.append({"n": f"Stub Ingredient {token} {index}", "k": index == 1})
             return json.dumps(
                 {
-                    "p": parsed_lines,
+                    "i": ingredients,
                     "w": ["Cosy", "Fresh", "Outdoor", "Summer", "Weeknight"],
                 }
             ), usage

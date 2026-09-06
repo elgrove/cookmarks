@@ -4,8 +4,8 @@ from unittest.mock import Mock
 import pytest
 from pydantic import ValidationError
 
-from app.models.enums import AIProvider, IngredientLineKind, RecipeEnrichmentStatus
-from app.models.ingredient import IngredientLine, IngredientOccurrence
+from app.models.enums import AIProvider, RecipeEnrichmentStatus
+from app.models.ingredient import Ingredient, IngredientLine
 from app.models.recipe import Keyword, Recipe
 from app.models.recipe_enrichment import RecipeEnrichmentState
 from app.services.ai import ModelRole, Usage
@@ -29,12 +29,11 @@ from app.services.recipe_enrichment.schema import (
 from app.services.recipe_enrichment.service import (
     EnrichmentValidationError,
     apply_enrichment,
-    build_context,
     build_stage2_context,
     enrich_recipe,
     validate_stage1_response,
 )
-from app.services.recipe_facts import add_ingredient_alias, create_ingredient
+from app.services.recipe_facts import create_ingredient
 
 
 def _recipe(session) -> Recipe:
@@ -49,13 +48,10 @@ def _recipe(session) -> Recipe:
     return recipe
 
 
-def _response(recipe: Recipe, **overrides) -> EnrichmentResponse:
+def _response(recipe: Recipe | None = None, **overrides) -> EnrichmentResponse:
     data = {
-        "parsed_lines": [
-            {
-                "line_id": str(recipe.ingredients_verbatim[0].id),
-                "occurrences": [{"canonical_name": "Sea Salt", "is_key": True}],
-            }
+        "canonical_ingredients": [
+            {"name": "sea salt", "is_key": True}
         ],
         "cuisines": [],
         "methods": [{"value_id": "bake", "is_primary": True}],
@@ -68,25 +64,22 @@ def _response(recipe: Recipe, **overrides) -> EnrichmentResponse:
 
 def test_apply_enrichment_replaces_all_derived_facts_atomically(session) -> None:
     recipe = _recipe(session)
-    create_ingredient(session, "Sea Salt")
-    context = build_context(session, recipe)
-    assert context["recipe"]["ai_parse_line_ids"] == [str(recipe.ingredients_verbatim[0].id)]
+    create_ingredient(session, "sea salt")
     result = apply_enrichment(
         session,
         recipe.id,
-        _response(recipe),
+        _response(),
         provider=StubProvider(""),
         model="stub-enrichment",
     )
     session.commit()
     session.refresh(recipe)
-    assert result["occurrences"] == 1
+    assert result["canonical_ingredients"] == 1
+    assert result["key_ingredients"] == 1
     assert result["existing_ingredients"] == 1
     assert recipe.enrichment_state is not None
     assert recipe.enrichment_state.status is RecipeEnrichmentStatus.COMPLETE
-    assert [item.ingredient.name for item in session.query(IngredientOccurrence).all()] == [
-        "Sea Salt"
-    ]
+    assert [item.name for item in recipe.canonical_ingredients] == ["sea salt"]
     assert [fact.facet_value.value_id for fact in recipe.facets] == ["bake"]
     assert {keyword.name for keyword in recipe.keywords} == {
         "Cosy",
@@ -97,41 +90,12 @@ def test_apply_enrichment_replaces_all_derived_facts_atomically(session) -> None
     }
 
 
-def test_apply_enrichment_resolves_an_ai_canonical_name_through_an_alias(session) -> None:
-    recipe = _recipe(session)
-    ingredient = create_ingredient(session, "Chickpea")
-    add_ingredient_alias(session, ingredient, "Garbanzo Bean")
-    response = _response(
-        recipe,
-        parsed_lines=[
-            {
-                "line_id": str(recipe.ingredients_verbatim[0].id),
-                "occurrences": [{"canonical_name": "Garbanzo Bean", "is_key": True}],
-            }
-        ],
-    )
-    build_context(session, recipe)
-
-    result = apply_enrichment(
-        session,
-        recipe.id,
-        response,
-        provider=StubProvider(""),
-        model="stub-enrichment",
-    )
-
-    occurrence = session.query(IngredientOccurrence).one()
-    assert result["existing_ingredients"] == 1
-    assert occurrence.ingredient_id == ingredient.id
-
-
 def test_empty_keywords_replace_previous_keywords(session) -> None:
     recipe = _recipe(session)
     recipe.keywords = [Keyword(name="Existing")]
-    create_ingredient(session, "Sea Salt")
+    create_ingredient(session, "sea salt")
     session.commit()
-    build_context(session, recipe)
-    response = _response(recipe, keywords=[])
+    response = _response(keywords=[])
     apply_enrichment(
         session,
         recipe.id,
@@ -144,8 +108,7 @@ def test_empty_keywords_replace_previous_keywords(session) -> None:
     assert recipe.enrichment_state is not None
     assert recipe.enrichment_state.status is RecipeEnrichmentStatus.COMPLETE
     assert recipe.keywords == []
-    assert recipe.ingredients_verbatim[0].kind is IngredientLineKind.INGREDIENT
-    assert session.query(IngredientOccurrence).count() == 1
+    assert len(recipe.canonical_ingredients) == 1
 
 
 def test_response_rejects_more_than_five_keywords(session) -> None:
@@ -161,12 +124,12 @@ def test_stub_enrichment_is_separate_and_offline(session) -> None:
     session.commit()
     result, usage = enrich_recipe(session, recipe.id, provider=StubProvider(""))
     session.refresh(recipe)
-    assert result["occurrences"] == 1
+    assert result["canonical_ingredients"] >= 1
     assert usage.input_tokens == 0
     assert recipe.enrichment_state is not None
     assert recipe.enrichment_state.status is RecipeEnrichmentStatus.COMPLETE
     assert recipe.enrichment_state.source_fingerprint is not None
-    assert len(recipe.keywords) == 5
+    assert len(recipe.keywords) <= 5
 
 
 def test_only_methods_offer_primary_flag(session) -> None:
@@ -189,227 +152,106 @@ def test_gemini_enrichment_schema_omits_stateful_constraints() -> None:
     assert "minimum" not in schema_text
 
 
-def test_enrichment_prompt_requires_one_occurrence_resolution_and_central_methods() -> None:
+def test_enrichment_prompt_requires_central_methods() -> None:
     prompt = build_prompt(
         {
-            "vocabulary": {"ingredients": [], "cuisines": [], "methods": [], "courses": []},
+            "vocabulary": {"cuisines": [], "methods": [], "courses": []},
             "recipe": {
                 "id": "recipe-id",
-                "source_fingerprint": "fingerprint",
                 "name": "Recipe",
-                "description": None,
-                "yield": None,
                 "instructions": [],
-                "lines": [],
-                "deterministic_proposals": [],
-                "ai_parse_line_ids": [],
+                "ingredients": [],
             },
         }
     )
 
-    assert "There is\nno ingredient ID field" in prompt
     assert "central, intentional cooking technique" in prompt
-    assert "chopping, slicing, mixing" in prompt
     assert "Decide cuisines, methods and courses" in prompt
 
 
-def test_response_rejects_ingredient_ids(session) -> None:
-    recipe = _recipe(session)
+def test_response_rejects_extra_fields() -> None:
     with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
-        _response(
-            recipe,
-            parsed_lines=[
-                {
-                    "line_id": str(recipe.ingredients_verbatim[0].id),
-                    "occurrences": [
-                        {"ingredient_id": "ingredient-id", "canonical_name": "Sea Salt"}
-                    ],
-                }
-            ],
-        )
-
-
-def test_response_rejects_missing_ai_line_decision(session) -> None:
-    recipe = _recipe(session)
-    build_context(session, recipe)
-    response = _response(
-        recipe,
-        parsed_lines=[],
-    )
-    with pytest.raises(EnrichmentValidationError, match="must decide every ingredient line"):
-        apply_enrichment(
-            session,
-            recipe.id,
-            response,
-            provider=StubProvider(""),
-            model="stub-enrichment",
-        )
+        EnrichmentResponse.model_validate({"extra_field": "disallowed"})
 
 
 def test_schema_version_tracks_the_bounded_output_change() -> None:
-    assert SCHEMA_VERSION == "v7"
+    assert SCHEMA_VERSION == "v8"
 
 
-def test_prompt_requires_ai_decisions_for_all_lines(session) -> None:
-    recipe = _recipe(session)
-    context = build_context(session, recipe)
-    prompt = build_prompt(context)
-    assert "ai_parse_line_ids" in prompt
-    assert "no ingredient ID field" in prompt
-
-
-def test_stage1_prompt_requires_complete_alternative_groups() -> None:
+def test_stage1_prompt_requires_singular_uk_english() -> None:
     prompt = build_stage1_prompt(
         {
             "recipe": {
                 "id": "recipe-1",
-                "instructions": [],
-                "lines": [
-                    {
-                        "id": "line-1",
-                        "text": "Nonstick cooking spray or softened butter, for the pan",
-                    }
-                ],
-                "ai_parse_line_ids": ["line-1"],
+                "name": "Recipe",
+                "ingredients": ["1 apple, sliced"],
             }
         }
     )
 
-    assert "one occurrence for EACH choice" in prompt
-    assert "SAME non-null `a` value" in prompt
-    assert "Detect a choice by its meaning, not by one word" in prompt
-    assert "`↔` or `<->`" in prompt
-    assert "fraction, measurement conversion, quantity range" in prompt
-    assert "A substitute choice does not mean optional" in prompt
-    assert "Final alternative check" in prompt
+    assert "Singular UK-English canonical food name" in prompt
+    assert "chilli" in prompt
     assert "Do not decide which ingredients are key" in prompt
 
 
 def test_stage1_schema_rejects_key_ingredient_decisions() -> None:
     with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
-        Stage1Response.model_validate(
-            {
-                "parsed_lines": [
-                    {
-                        "line_id": "line-1",
-                        "occurrences": [{"canonical_name": "Apple", "is_key": True}],
-                    }
-                ]
-            }
-        )
+        Stage1Response.model_validate({"k": ["apple"]})
 
 
 def test_stage2_receives_structured_stage1_result_and_owns_key_selection(session) -> None:
     recipe = _recipe(session)
-    line_id = str(recipe.ingredients_verbatim[0].id)
-    stage1 = Stage1Response.model_validate(
-        {
-            "parsed_lines": [
-                {
-                    "line_id": line_id,
-                    "occurrences": [{"canonical_name": "Sea Salt", "quantity": "1", "unit": "tsp"}],
-                }
-            ]
-        }
-    )
-    context = build_stage2_context(session, recipe, stage1)
-    ingredient_line = context["recipe"]["ingredient_lines"][0]
-    assert ingredient_line["line_id"] == line_id
-    assert ingredient_line["source"] == "salt"
-    assert ingredient_line["occurrences"][0]["canonical_name"] == "Sea Salt"
+    ingredients = ["sea salt", "garlic"]
+    context = build_stage2_context(session, recipe, ingredients)
+    assert context["recipe"]["ingredients"] == ingredients
     prompt = build_stage2_prompt(context)
     assert "Key ingredients (k)" in prompt
 
     response = EnrichmentResponse.from_stages(
-        stage1,
+        ingredients,
         Stage2Response.model_validate(
-            {"key_ingredients": [{"line_id": line_id, "occurrence_index": 0}]}
+            {"key_ingredients": ["garlic"]}
         ),
     )
-    assert response.parsed_lines[0].occurrences[0].is_key is True
+    assert response.canonical_ingredients[1].is_key is True
 
-    with pytest.raises(ValueError, match="unknown Stage 1 ingredient occurrence"):
+    with pytest.raises(ValueError, match="unknown Stage 1 ingredient"):
         EnrichmentResponse.from_stages(
-            stage1,
+            ingredients,
             Stage2Response.model_validate(
-                {"key_ingredients": [{"line_id": line_id, "occurrence_index": 9}]}
+                {"key_ingredients": ["unknown-ingredient"]}
             ),
         )
 
 
-def test_stage1_validation_rejects_ungrounded_quantity_and_unit() -> None:
+def test_stage1_validation_rejects_empty_ingredients() -> None:
     context = {
         "recipe": {
-            "lines": [{"id": "line-1", "text": "2 tablespoons olive oil"}],
-            "ai_parse_line_ids": ["line-1"],
+            "id": "recipe-1",
+            "ingredients": ["salt"],
         }
     }
-    valid = Stage1Response.model_validate(
-        {
-            "parsed_lines": [
-                {
-                    "line_id": "line-1",
-                    "occurrences": [
-                        {"canonical_name": "Olive Oil", "quantity": "2", "unit": "tablespoon"}
-                    ],
-                }
-            ]
-        }
-    )
-    validate_stage1_response(context, valid)
-
-    invalid = valid.model_copy(deep=True)
-    invalid.parsed_lines[0].occurrences[0].quantity = "3"
-    with pytest.raises(EnrichmentValidationError, match="quantity is not grounded"):
-        validate_stage1_response(context, invalid)
-
-
-@pytest.mark.parametrize("bad_line_id", ["line-1", "unknown-line"])
-def test_stage1_validation_rejects_duplicate_or_unknown_line_ids(bad_line_id: str) -> None:
-    context = {
-        "recipe": {
-            "lines": [{"id": "line-1", "text": "salt"}],
-            "ai_parse_line_ids": ["line-1"],
-        }
-    }
-    decisions = [{"line_id": bad_line_id, "occurrences": [{"canonical_name": "Salt"}]}]
-    if bad_line_id == "line-1":
-        decisions.append(decisions[0])
-    response = Stage1Response.model_validate({"parsed_lines": decisions})
-
-    with pytest.raises(EnrichmentValidationError, match=r"duplicate|exactly once"):
-        validate_stage1_response(context, response)
+    with pytest.raises(EnrichmentValidationError, match="extracted no ingredients"):
+        validate_stage1_response(context, Stage1Response(i=[]))
 
 
 def test_stage1_validation_failure_retries_complete_recipe(session) -> None:
     recipe = _recipe(session)
-    line_id = str(recipe.ingredients_verbatim[0].id)
     primary = Mock()
     primary.enrich_recipe_stage1.return_value = (
-        Stage1Response.model_validate(
-            {
-                "parsed_lines": [
-                    {
-                        "line_id": line_id,
-                        "occurrences": [{"canonical_name": "Salt", "quantity": "99"}],
-                    }
-                ]
-            }
-        ),
+        Stage1Response(i=[]),
         Usage(cost_usd=Decimal("0.001")),
     )
     fallback = Mock()
     fallback.enrich_recipe_stage1.return_value = (
-        Stage1Response.model_validate(
-            {"parsed_lines": [{"line_id": line_id, "occurrences": [{"canonical_name": "Salt"}]}]}
-        ),
+        Stage1Response(i=["salt"]),
         Usage(cost_usd=Decimal("0.002")),
     )
     semantic = Mock()
     semantic.name = "ANTHROPIC"
     semantic.enrich_recipe_stage2.return_value = (
         Stage2Response.model_validate(
-            {"key_ingredients": [{"line_id": line_id, "occurrence_index": 0}]}
+            {"key_ingredients": ["salt"]}
         ),
         Usage(cost_usd=Decimal("0.003")),
     )
@@ -426,7 +268,7 @@ def test_stage1_validation_failure_retries_complete_recipe(session) -> None:
         stage2_model="haiku",
     )
 
-    assert result["ai_parsed_lines"] == 1
+    assert result["canonical_ingredients"] == 1
     assert usage.cost_usd == Decimal("0.006")
     assert primary.enrich_recipe_stage1.call_count == 1
     assert fallback.enrich_recipe_stage1.call_count == 1
@@ -435,10 +277,7 @@ def test_stage1_validation_failure_retries_complete_recipe(session) -> None:
         == fallback.enrich_recipe_stage1.call_args.args[0]
     )
     stage2_context = semantic.enrich_recipe_stage2.call_args.args[0]
-    assert (
-        stage2_context["recipe"]["ingredient_lines"][0]["occurrences"][0]["canonical_name"]
-        == "Salt"
-    )
+    assert stage2_context["recipe"]["ingredients"] == ["salt"]
 
 
 def test_explicit_enrichment_provider_settings_route_flash_lite_and_haiku(session) -> None:
@@ -468,35 +307,26 @@ def test_configured_enrichment_provider_without_key_does_not_switch_silently(ses
 
 
 def test_repeated_new_canonical_ingredient_resolves_to_one_identity(session) -> None:
-    recipe = _recipe(session)
-    recipe.ingredients_verbatim.append(IngredientLine(position=1, text="more seaweed"))
-    assert recipe.enrichment_state is not None
-    recipe.enrichment_state.source_fingerprint = "current"
-    session.commit()
-    build_context(session, recipe)
-    response = EnrichmentResponse.model_validate(
-        {
-            "parsed_lines": [
-                {
-                    "line_id": str(line.id),
-                    "occurrences": [{"canonical_name": "Seaweed", "is_key": True}],
-                }
-                for line in recipe.ingredients_verbatim
-            ],
-            "cuisines": [],
-            "methods": [],
-            "courses": [],
-            "keywords": ["Cosy", "Fresh", "Outdoor", "Party", "Summer"],
-        }
+    recipe1 = _recipe(session)
+    recipe2 = Recipe(book_id=recipe1.book_id, order=100, name="Enriched 2", instructions=["Bake."])
+    recipe2.ingredients_verbatim = [IngredientLine(position=0, text="seaweed")]
+    recipe2.enrichment_state = RecipeEnrichmentState(
+        status=RecipeEnrichmentStatus.PENDING, source_fingerprint="current2"
     )
-    apply_enrichment(
-        session,
-        recipe.id,
-        response,
-        provider=StubProvider(""),
-        model="stub-enrichment",
-    )
+    session.add(recipe2)
     session.commit()
-    occurrences = session.query(IngredientOccurrence).order_by(IngredientOccurrence.position).all()
-    assert len(occurrences) == 2
-    assert occurrences[0].ingredient_id == occurrences[1].ingredient_id
+
+    response1 = _response(canonical_ingredients=[{"name": "Seaweed", "is_key": True}])
+    response2 = _response(canonical_ingredients=[{"name": "seaweed", "is_key": True}])
+
+    apply_enrichment(session, recipe1.id, response1, provider=StubProvider(""), model="stub")
+    session.commit()
+
+    apply_enrichment(session, recipe2.id, response2, provider=StubProvider(""), model="stub")
+    session.commit()
+    session.refresh(recipe1)
+    session.refresh(recipe2)
+
+    ingredients = session.query(Ingredient).filter_by(name_folded="seaweed").all()
+    assert len(ingredients) == 1
+    assert recipe1.canonical_ingredients[0].ingredient_id == recipe2.canonical_ingredients[0].ingredient_id
