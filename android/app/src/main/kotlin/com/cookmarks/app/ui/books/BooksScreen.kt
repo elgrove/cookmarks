@@ -36,7 +36,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -127,7 +126,7 @@ fun BooksScreen(onOpenBook: (String) -> Unit, onOpenAdmin: () -> Unit) {
                 item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(2) }) {
                     Text(
                         text = "Nothing queued yet.",
-                        style = MaterialTheme.typography.bodyMedium.copy(fontStyle = FontStyle.Italic),
+                        style = MaterialTheme.typography.bodyMedium,
                         color = colors.muted,
                         modifier = Modifier.padding(vertical = 20.dp),
                     )

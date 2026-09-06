@@ -44,7 +44,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
@@ -297,7 +296,7 @@ private fun CardBack(source: GameSource, state: Result<RecipeDetail>?) {
             CardHeading(recipe, source)
             Text(
                 text = recipe.description?.takeIf { it.isNotBlank() } ?: "No description for this recipe.",
-                style = MaterialTheme.typography.bodyLarge.copy(fontStyle = FontStyle.Italic),
+                style = MaterialTheme.typography.bodyLarge,
                 color = if (recipe.description.isNullOrBlank()) colors.muted else colors.ink,
             )
         }

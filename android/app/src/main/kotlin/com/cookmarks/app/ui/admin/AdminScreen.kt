@@ -42,7 +42,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -223,7 +222,7 @@ private fun AccountSection(me: AuthMe) {
         Section("Password") {
             Text(
                 "Changing your password signs you out on every device.",
-                style = MaterialTheme.typography.bodyMedium.copy(fontStyle = FontStyle.Italic),
+                style = MaterialTheme.typography.bodyMedium,
                 color = colors.muted,
             )
             PasswordField(
@@ -341,7 +340,7 @@ private fun SettingsSection(config: ConfigRead, onSaved: () -> Unit) {
         error?.let { InlineError(it) }
         Text(
             "API keys are write-only. Saved keys are never shown here.",
-            style = MaterialTheme.typography.bodySmall.copy(fontStyle = FontStyle.Italic),
+            style = MaterialTheme.typography.bodySmall,
             color = colors.faint,
             modifier = Modifier.padding(top = 10.dp),
         )
@@ -535,7 +534,7 @@ private fun UsersSection(users: List<UserRead>, me: AuthMe, onChanged: () -> Uni
         if (users.isEmpty()) {
             Text(
                 "No accounts yet.",
-                style = MaterialTheme.typography.bodyMedium.copy(fontStyle = FontStyle.Italic),
+                style = MaterialTheme.typography.bodyMedium,
                 color = colors.muted,
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 20.dp),
             )
@@ -575,7 +574,7 @@ private fun UsersSection(users: List<UserRead>, me: AuthMe, onChanged: () -> Uni
                 deleteBlockedReason?.let {
                     Text(
                         it,
-                        style = MaterialTheme.typography.bodySmall.copy(fontStyle = FontStyle.Italic),
+                        style = MaterialTheme.typography.bodySmall,
                         color = colors.faint,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -694,7 +693,7 @@ private fun RunsSection(runs: List<TaskRun>) {
     if (runs.isEmpty()) {
         Text(
             "No task runs yet.",
-            style = MaterialTheme.typography.bodyMedium.copy(fontStyle = FontStyle.Italic),
+            style = MaterialTheme.typography.bodyMedium,
             color = colors.muted,
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 20.dp),
         )
@@ -808,7 +807,7 @@ private fun PrimaryButton(
 private fun InlineError(message: String) {
     Text(
         message,
-        style = MaterialTheme.typography.bodyMedium.copy(fontStyle = FontStyle.Italic),
+        style = MaterialTheme.typography.bodyMedium,
         color = CmTheme.colors.clayDeep,
         modifier = Modifier.padding(top = 12.dp),
     )
@@ -842,7 +841,7 @@ private fun TaskRunRow(run: TaskRun) {
         run.errors.forEach { error ->
             Text(
                 error,
-                style = MaterialTheme.typography.bodyMedium.copy(fontStyle = FontStyle.Italic),
+                style = MaterialTheme.typography.bodyMedium,
                 color = colors.clayDeep,
                 modifier = Modifier.padding(top = 4.dp),
             )

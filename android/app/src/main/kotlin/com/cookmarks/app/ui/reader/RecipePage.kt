@@ -34,7 +34,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.cookmarks.app.api.Api
@@ -97,7 +96,7 @@ fun RecipeContent(
             if (hasDescription) {
                 Text(
                     text = recipe.description.orEmpty(),
-                    style = MaterialTheme.typography.bodyLarge.copy(fontStyle = FontStyle.Italic),
+                    style = MaterialTheme.typography.bodyLarge,
                     color = colors.ink,
                     modifier = Modifier.padding(vertical = 8.dp),
                 )

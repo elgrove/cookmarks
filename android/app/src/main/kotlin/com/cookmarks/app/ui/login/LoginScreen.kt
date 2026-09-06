@@ -22,7 +22,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -105,7 +104,7 @@ fun LoginScreen() {
         if (error != null) {
             Text(
                 text = error!!,
-                style = MaterialTheme.typography.bodyMedium.copy(fontStyle = FontStyle.Italic),
+                style = MaterialTheme.typography.bodyMedium,
                 color = colors.clayDeep,
                 modifier = Modifier.padding(top = 16.dp),
             )

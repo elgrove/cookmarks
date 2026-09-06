@@ -17,13 +17,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cookmarks.app.ui.theme.CmTheme
-import com.cookmarks.app.ui.theme.Serif
+import com.cookmarks.app.ui.theme.Grotesk
 
 @Composable
 fun MonoLabel(text: String, modifier: Modifier = Modifier, colour: androidx.compose.ui.graphics.Color = CmTheme.colors.muted) {
@@ -48,16 +47,15 @@ fun NoImagePlate(name: String, openingLine: String?, modifier: Modifier = Modifi
     ) {
         Text(
             text = name.firstOrNull()?.uppercase() ?: "·",
-            fontFamily = Serif,
-            fontWeight = FontWeight.Light,
-            fontStyle = FontStyle.Italic,
+            fontFamily = Grotesk,
+            fontWeight = FontWeight.Bold,
             fontSize = 64.sp,
             color = colors.clay,
         )
         if (!openingLine.isNullOrBlank()) {
             Text(
                 text = openingLine,
-                style = MaterialTheme.typography.bodyMedium.copy(fontStyle = FontStyle.Italic),
+                style = MaterialTheme.typography.bodyMedium,
                 color = colors.muted,
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
@@ -80,8 +78,7 @@ fun CoverPlate(title: String, modifier: Modifier = Modifier) {
     ) {
         Text(
             text = title,
-            fontFamily = Serif,
-            fontStyle = FontStyle.Italic,
+            fontFamily = Grotesk,
             fontSize = 16.sp,
             lineHeight = 22.sp,
             color = colors.ink,
@@ -106,7 +103,7 @@ fun ErrorState(message: String, modifier: Modifier = Modifier, onRetry: (() -> U
             MonoLabel("Something went wrong")
             Text(
                 text = message,
-                style = MaterialTheme.typography.bodyMedium.copy(fontStyle = FontStyle.Italic),
+                style = MaterialTheme.typography.bodyMedium,
                 color = CmTheme.colors.muted,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 40.dp),
             )

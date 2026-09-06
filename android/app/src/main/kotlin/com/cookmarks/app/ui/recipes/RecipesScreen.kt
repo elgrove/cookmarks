@@ -6,8 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -44,7 +43,6 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -64,6 +62,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private const val PAGE_SIZE = 30
+private const val KEYWORD_CHIPS_PER_ROW = 4
+private const val KEYWORD_REQUEST_LIMIT = 24
+private val KeywordChipGap = 8.dp
+private val KeywordChipBorder = 1.dp
 
 private object RecipesState {
     var query by mutableStateOf("")
@@ -86,7 +88,7 @@ fun RecipesScreen(onOpenRecipe: (String, List<String>) -> Unit, onPlay: (GameSou
     var loading by remember { mutableStateOf(false) }
     var loadingMore by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-    val restingKeywords by rememberLoad(st.tick) { Api.service.keywords() }
+    val restingKeywords by rememberLoad(st.tick) { Api.service.keywords(limit = KEYWORD_REQUEST_LIMIT) }
 
     LaunchedEffect(st.query, st.selected, st.semantic, st.tick) {
         val key = listOf(st.query, st.selected, st.semantic, st.tick)
@@ -311,7 +313,6 @@ fun RecipesScreen(onOpenRecipe: (String, List<String>) -> Unit, onPlay: (GameSou
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun KeywordChips(
     resting: List<KeywordSummary>,
@@ -321,34 +322,65 @@ private fun KeywordChips(
 ) {
     val colors = CmTheme.colors
     val pool = facets.ifEmpty { resting }
-    val names = (selected + pool.map { it.name }).distinct().take(24)
+    val names = (selected + pool.map { it.name }).distinct().take(KEYWORD_REQUEST_LIMIT)
     if (names.isEmpty()) return
-    FlowRow(
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+    val rows = balancedKeywordRows(names)
+    Column(
+        verticalArrangement = Arrangement.spacedBy(KeywordChipGap),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
     ) {
-        names.forEach { name ->
-            val active = name in selected
-            MonoLabel(
-                name,
-                colour = if (active) colors.bg else colors.muted,
-                modifier = Modifier
-                    .border(1.dp, if (active) colors.clay else colors.line)
-                    .then(
-                        if (active) Modifier.background(colors.clay) else Modifier
+        rows.forEach { row ->
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(KeywordChipGap),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                row.forEach { name ->
+                    KeywordChip(
+                        name = name,
+                        active = name in selected,
+                        onToggle = onToggle,
+                        modifier = Modifier.weight(1f).defaultMinSize(minHeight = 48.dp),
                     )
-                    .clickable(
-                        role = Role.Checkbox,
-                        onClickLabel = if (active) "Remove keyword filter $name" else "Filter by keyword $name",
-                    ) { onToggle(name) }
-                    .semantics {
-                        this.selected = active
-                        this.stateDescription = if (active) "selected" else "not selected"
-                    }
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
-            )
+                }
+            }
         }
+    }
+}
+
+@Composable
+private fun KeywordChip(
+    name: String,
+    active: Boolean,
+    onToggle: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = CmTheme.colors
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .background(if (active) colors.clay else colors.bg)
+            .border(KeywordChipBorder, if (active) colors.clay else colors.line)
+            .clickable(
+                role = Role.Checkbox,
+                onClickLabel = if (active) "Remove keyword filter $name" else "Filter by keyword $name",
+            ) { onToggle(name) }
+            .semantics {
+                this.selected = active
+                this.stateDescription = if (active) "selected" else "not selected"
+            },
+    ) {
+        MonoLabel(name, colour = if (active) colors.bg else colors.muted)
+    }
+}
+
+private fun balancedKeywordRows(names: List<String>): List<List<String>> {
+    val rowCount = (names.size + KEYWORD_CHIPS_PER_ROW - 1) / KEYWORD_CHIPS_PER_ROW
+    val baseSize = names.size / rowCount
+    val largerRows = names.size % rowCount
+    var start = 0
+    return List(rowCount) { rowIndex ->
+        val size = baseSize + if (rowIndex < largerRows) 1 else 0
+        names.subList(start, start + size).also { start += size }
     }
 }
 
@@ -384,7 +416,7 @@ private fun RecipeRow(recipe: RecipeSummary, onClick: () -> Unit) {
 private fun StateLine(text: String) {
     Text(
         text = text,
-        style = MaterialTheme.typography.bodyMedium.copy(fontStyle = FontStyle.Italic),
+        style = MaterialTheme.typography.bodyMedium,
         color = CmTheme.colors.muted,
         modifier = Modifier.padding(horizontal = 20.dp, vertical = 32.dp),
     )

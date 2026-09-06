@@ -27,7 +27,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.cookmarks.app.api.Api
@@ -76,7 +75,7 @@ fun ReadingQueueScreen(onBack: () -> Unit, onOpenBook: (String) -> Unit) {
                     if (books.isEmpty()) {
                         Text(
                             text = "Nothing queued yet.",
-                            style = MaterialTheme.typography.bodyMedium.copy(fontStyle = FontStyle.Italic),
+                            style = MaterialTheme.typography.bodyMedium,
                             color = colors.muted,
                             modifier = Modifier.padding(vertical = 20.dp),
                         )

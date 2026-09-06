@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.Cookmarks" parent="android:Theme.Material.Light.NoActionBar">
-        <item name="android:windowBackground">#faf9f5</item>
+        <item name="android:windowBackground">#fafaf5</item>
     </style>
 </resources>

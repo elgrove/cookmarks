@@ -26,9 +26,9 @@ private fun ThemePreview() {
                     Box(modifier = Modifier.width(32.dp).height(32.dp).background(it))
                 }
             }
-            Text("Display serif italic", style = MaterialTheme.typography.displaySmall, modifier = Modifier.padding(top = 16.dp))
-            Text("Headline grotesk", style = MaterialTheme.typography.headlineMedium)
-            Text("Body reading copy in Source Serif 4.", style = MaterialTheme.typography.bodyLarge)
+            Text("Display Space Grotesk", style = MaterialTheme.typography.displaySmall, modifier = Modifier.padding(top = 16.dp))
+            Text("Headline Space Grotesk", style = MaterialTheme.typography.headlineMedium)
+            Text("Body reading copy in Space Grotesk.", style = MaterialTheme.typography.bodyLarge)
             Text("MONO LABEL · METADATA", style = MaterialTheme.typography.labelSmall)
         }
     }

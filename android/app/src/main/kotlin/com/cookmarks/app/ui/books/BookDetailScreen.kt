@@ -47,7 +47,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -152,7 +151,7 @@ private fun BookDetailContent(
                     if (subtitle.isNotEmpty()) {
                         Text(
                             text = subtitle,
-                            style = MaterialTheme.typography.bodyMedium.copy(fontStyle = FontStyle.Italic),
+                            style = MaterialTheme.typography.bodyMedium,
                             color = colors.muted,
                             modifier = Modifier.padding(top = 4.dp),
                         )
@@ -442,7 +441,7 @@ private fun BookDetailContent(
             item {
                 Text(
                     text = "No recipes extracted from this book yet.",
-                    style = MaterialTheme.typography.bodyMedium.copy(fontStyle = FontStyle.Italic),
+                    style = MaterialTheme.typography.bodyMedium,
                     color = colors.muted,
                     modifier = Modifier.padding(20.dp),
                 )
