@@ -146,6 +146,34 @@ def enrichment_pilot_dispatched(monkeypatch: pytest.MonkeyPatch) -> list[tuple[A
 
 
 @pytest.fixture(autouse=True)
+def enrichment_backfill_dispatched(monkeypatch: pytest.MonkeyPatch) -> list[tuple[Any, ...]]:
+    """Keep the admin backfill trigger off Redis while API tests record its dispatch."""
+    from app.tasks.enrichment_backfill import enrichment_backfill_task
+
+    calls: list[tuple[Any, ...]] = []
+
+    def _record(*args: Any, **_kwargs: Any) -> None:
+        calls.append(args)
+
+    monkeypatch.setattr(enrichment_backfill_task, "delay", _record)
+    return calls
+
+
+@pytest.fixture(autouse=True)
+def poll_backfill_dispatched(monkeypatch: pytest.MonkeyPatch) -> list[tuple[Any, ...]]:
+    """Keep poll re-enqueue off Redis; records (run_id, polls_done, countdown)."""
+    from app.tasks.enrichment_backfill import poll_enrichment_backfill_task
+
+    calls: list[tuple[Any, ...]] = []
+
+    def _record(*args: Any, **kwargs: Any) -> None:
+        calls.append((args, kwargs))
+
+    monkeypatch.setattr(poll_enrichment_backfill_task, "apply_async", _record)
+    return calls
+
+
+@pytest.fixture(autouse=True)
 def _reset_caches() -> Iterator[None]:
     # These caches are module-global; clear them so each test's fresh DB (with fresh
     # recipe ids / its own keyword set) never reads a previous test's cached values.

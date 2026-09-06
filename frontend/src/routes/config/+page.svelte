@@ -12,7 +12,9 @@
 		triggerBookKeywords,
 		triggerDedupKeywords,
 		triggerCalibreSync,
-		triggerRecipeEnrichmentPilot
+		triggerRecipeEnrichmentPilot,
+		triggerRecipeEnrichmentBackfill,
+		resumeRecipeEnrichmentBackfill
 	} from '$lib/api/tasks';
 	import { fetchTaskRuns, type TaskRun } from '$lib/api/task-runs';
 	import {
@@ -165,6 +167,9 @@
 			onDedup={() => triggerDedupKeywords()}
 			onSync={() => triggerCalibreSync()}
 			onEnrichmentPilot={() => triggerRecipeEnrichmentPilot()}
+			onBackfill={({ pilotRunId, confirm }) =>
+				triggerRecipeEnrichmentBackfill(pilotRunId, confirm)}
+			onBackfillResume={() => resumeRecipeEnrichmentBackfill()}
 		/>
 	{:else if active === 'task-runs'}
 		{#if runsStatus === 'ready'}

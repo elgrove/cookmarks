@@ -56,3 +56,31 @@ export async function triggerRecipeEnrichmentPilot(
 	if (!res.ok) throw new Error(`POST /api/tasks/recipe-enrichment-pilot → ${res.status}`);
 	return taskRunAckSchema.parse(await res.json());
 }
+
+/** Launch the durable Gemini Batch backfill. Needs the done pilot run ID and an
+ *  explicit confirmation its output was reviewed; the server rejects mismatched
+ *  versions, other providers (422) and a second active backfill (409). */
+export async function triggerRecipeEnrichmentBackfill(
+	pilotRunId: string,
+	confirmPilotReviewed: boolean,
+	fetchFn: typeof fetch = fetch
+): Promise<TaskRunAck> {
+	const res = await fetchFn('/api/tasks/recipe-enrichment-backfill', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ pilot_run_id: pilotRunId, confirm_pilot_reviewed: confirmPilotReviewed })
+	});
+	if (!res.ok) throw new Error(`POST /api/tasks/recipe-enrichment-backfill → ${res.status}`);
+	return taskRunAckSchema.parse(await res.json());
+}
+
+/** Resume idempotently after a terminal run: a fresh parent run picks up only the
+ *  recipes that are still outstanding. Safe to invoke repeatedly. */
+export async function resumeRecipeEnrichmentBackfill(
+	fetchFn: typeof fetch = fetch
+): Promise<TaskRunAck> {
+	const res = await fetchFn('/api/tasks/recipe-enrichment-backfill/resume', { method: 'POST' });
+	if (!res.ok)
+		throw new Error(`POST /api/tasks/recipe-enrichment-backfill/resume → ${res.status}`);
+	return taskRunAckSchema.parse(await res.json());
+}
