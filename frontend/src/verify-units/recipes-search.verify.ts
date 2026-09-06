@@ -381,6 +381,28 @@ const unit: VerifiableUnit<Props> = {
 				`mode=${contract.mode} query=${contract.query}`
 		},
 		{
+			id: 'ai-button-icon-only',
+			description:
+				'the AI-search button is icon-only without visible text, but keeps its accessible name',
+			onlyFixtures: ['resting', 'switch-to-ai'],
+			check: ({ root }) => {
+				const btn = root.querySelector<HTMLButtonElement>('.ib-ai');
+				if (!btn) return 'AI button (.ib-ai) not found';
+				if (btn.querySelector('.btn-text') !== null)
+					return 'AI button should not contain .btn-text';
+				const text = btn.textContent?.trim() ?? '';
+				if (text !== '')
+					return `AI button has visible text: "${text}"`;
+				const ariaLabel = btn.getAttribute('aria-label');
+				if (ariaLabel !== 'Ask the library')
+					return `AI button aria-label="${ariaLabel}", expected "Ask the library"`;
+				const title = btn.getAttribute('title');
+				if (!title || !title.includes('Ask the library'))
+					return `AI button title="${title}" missing or invalid`;
+				return true;
+			}
+		},
+		{
 			id: 'select-mode-rows',
 			description: 'select mode reports itself and puts a checkbox on every result row',
 			onlyFixtures: ['select-mode'],

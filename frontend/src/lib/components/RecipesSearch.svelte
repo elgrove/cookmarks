@@ -385,7 +385,6 @@
 			onclick={runSemantic}
 		>
 			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3-1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3L12 3Z" /></svg>
-			<span class="btn-text" aria-hidden="true">Ask the library</span>
 		</button>
 	</div>
 
@@ -598,7 +597,7 @@
 		margin: 0.2rem 0 0;
 	}
 
-	/* One box, two labelled triggers — search (keyword) + ask-the-library (idea). */
+	/* One box: keyword search trigger + icon-only spark control for semantic search. */
 	.searchrow {
 		display: flex;
 		align-items: stretch;
@@ -684,13 +683,15 @@
 		border-color: var(--accent-deep);
 	}
 
-	.ib-ai {
+	.iconbtn.ib-ai {
 		background: var(--card);
 		color: var(--ink);
 		border: 1px solid var(--ink);
+		padding: 0;
+		width: 2.85rem;
 	}
 
-	.ib-ai:hover {
+	.iconbtn.ib-ai:hover {
 		background: var(--chip-accent);
 	}
 
@@ -955,14 +956,14 @@
 			padding: var(--page-pt) var(--page-h) 3rem;
 		}
 
-		/* Tighter search row so the box keeps room beside the two icon triggers. */
+		/* Tighter search row so the box keeps room beside the search and spark triggers. */
 		.search-input {
 			font-size: 1rem;
 		}
 		.searchrow {
 			gap: 0.4rem;
 		}
-		/* Icon-only triggers on a phone — the labels don't fit beside the box. */
+		/* Search label hides on a phone — the label doesn't fit beside the box. */
 		.iconbtn {
 			padding: 0 0.75rem;
 		}
