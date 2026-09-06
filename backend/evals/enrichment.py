@@ -286,7 +286,6 @@ def score_ingredient_details(
     unit_matches: list[float] = []
     prep_matches: list[float] = []
     opt_matches: list[float] = []
-    alt_matches: list[float] = []
 
     for gold_line in gold_lines:
         line_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{gold_line.position}:{gold_line.text}"))
@@ -298,7 +297,6 @@ def score_ingredient_details(
             unit_matches.append(0.0)
             prep_matches.append(0.0)
             opt_matches.append(0.0)
-            alt_matches.append(0.0)
             continue
 
         gold_occs = gold_line.occurrences
@@ -309,9 +307,12 @@ def score_ingredient_details(
                 p_occ = pred_occs[i]
                 g_qty = _norm_str(g_occ.quantity)
                 p_qty = _norm_str(p_occ.quantity)
-                qty_matches.append(
-                    1.0 if g_qty == p_qty or (g_qty in p_qty) or (p_qty in g_qty) else 0.0
-                )
+                if not g_qty or not p_qty:
+                    qty_matches.append(1.0 if g_qty == p_qty else 0.0)
+                else:
+                    qty_matches.append(
+                        1.0 if g_qty == p_qty or g_qty in p_qty or p_qty in g_qty else 0.0
+                    )
 
                 g_u = _norm_unit(g_occ.unit)
                 p_u = _norm_unit(p_occ.unit)
@@ -327,22 +328,17 @@ def score_ingredient_details(
                     prep_matches.append(1.0 if (g_p in p_p or p_p in g_p) else 0.0)
 
                 opt_matches.append(1.0 if g_occ.optional == p_occ.optional else 0.0)
-
-                g_has_alt = g_occ.alternative_group is not None
-                p_has_alt = p_occ.alternative_group is not None
-                alt_matches.append(1.0 if g_has_alt == p_has_alt else 0.0)
             else:
                 qty_matches.append(0.0)
                 unit_matches.append(0.0)
                 prep_matches.append(0.0)
                 opt_matches.append(0.0)
-                alt_matches.append(0.0)
 
     qty_acc = sum(qty_matches) / len(qty_matches) if qty_matches else 1.0
     unit_acc = sum(unit_matches) / len(unit_matches) if unit_matches else 1.0
     prep_acc = sum(prep_matches) / len(prep_matches) if prep_matches else 1.0
     opt_acc = sum(opt_matches) / len(opt_matches) if opt_matches else 1.0
-    alt_acc = sum(alt_matches) / len(alt_matches) if alt_matches else 1.0
+    alt_acc = score_alternative_groups(gold_lines, response)
     details_mean = (qty_acc + unit_acc + prep_acc + opt_acc + alt_acc) / 5.0
 
     return {
@@ -353,6 +349,50 @@ def score_ingredient_details(
         "alternative_group_accuracy": alt_acc,
         "ingredient_details_mean": details_mean,
     }
+
+
+def score_alternative_groups(gold_lines: list[GoldLine], response: EnrichmentResponse) -> float:
+    """Score complete line-local alternative relationships without ordinary-line dilution."""
+    parsed_by_line = {line.line_id: line for line in response.parsed_lines}
+    matches: list[float] = []
+
+    for gold_line in gold_lines:
+        line_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{gold_line.position}:{gold_line.text}"))
+        pred_line = parsed_by_line.get(line_id)
+        pred_occurrences = pred_line.occurrences if pred_line else []
+        gold_occurrences = gold_line.occurrences
+        occurrence_count = max(len(gold_occurrences), len(pred_occurrences))
+
+        for left in range(occurrence_count):
+            for right in range(left + 1, occurrence_count):
+                gold_same_group = (
+                    right < len(gold_occurrences)
+                    and gold_occurrences[left].alternative_group is not None
+                    and gold_occurrences[left].alternative_group
+                    == gold_occurrences[right].alternative_group
+                )
+                pred_same_group = (
+                    right < len(pred_occurrences)
+                    and pred_occurrences[left].alternative_group is not None
+                    and pred_occurrences[left].alternative_group
+                    == pred_occurrences[right].alternative_group
+                )
+                if gold_same_group or pred_same_group:
+                    matches.append(1.0 if gold_same_group == pred_same_group else 0.0)
+
+        predicted_groups: dict[int, list[int]] = defaultdict(list)
+        for index, occurrence in enumerate(pred_occurrences):
+            if occurrence.alternative_group is not None:
+                predicted_groups[occurrence.alternative_group].append(index)
+        for indices in predicted_groups.values():
+            index = indices[0]
+            if len(indices) == 1 and (
+                index >= len(gold_occurrences)
+                or gold_occurrences[index].alternative_group is None
+            ):
+                matches.append(0.0)
+
+    return sum(matches) / len(matches) if matches else 1.0
 
 
 def score_line_kinds(gold_lines: list[GoldLine], response: EnrichmentResponse) -> float:
@@ -849,7 +889,13 @@ def evaluate_enrichment_recipe(
             stage1_response = Stage1Response(p=[], n=[])
             usage1 = Usage()
         else:
-            stage1_response, usage1 = provider.enrich_recipe_stage1(stage1_context, candidate.model)
+            try:
+                stage1_response, usage1 = provider.enrich_recipe_stage1(
+                    stage1_context, candidate.model
+                )
+            except AIResponseError as exc:
+                usage1 = exc.usage
+                raise
 
         deterministic_lines = proposals_to_line_decisions(proposals, active_vocab)
         deterministic_names = [
@@ -863,9 +909,13 @@ def evaluate_enrichment_recipe(
         stage2_context = build_gold_stage2_context(
             gold, ingredient_names, include_description=include_description
         )
-        stage2_response, usage2 = stage2_provider.enrich_recipe_stage2(
-            stage2_context, stage2_candidate.model
-        )
+        try:
+            stage2_response, usage2 = stage2_provider.enrich_recipe_stage2(
+                stage2_context, stage2_candidate.model
+            )
+        except AIResponseError as exc:
+            usage2 = exc.usage
+            raise AIResponseError(str(exc), usage1 + usage2) from exc
 
         all_parsed_lines = deterministic_lines + stage1_response.parsed_lines
         combined_stage1 = Stage1Response(
@@ -947,6 +997,7 @@ def evaluate_enrichment_recipe(
     except AIResponseError as exc:
         duration = time.monotonic() - started
         logger.error(f"{gold.slug} / {model_id} failed: {exc}")
+        usage = usage1 + usage2
         return EnrichmentRecipeRecord(
             run_id=run_id,
             timestamp=timestamp,
@@ -964,13 +1015,19 @@ def evaluate_enrichment_recipe(
             prompt_version=PROMPT_VERSION,
             schema_version=SCHEMA_VERSION,
             scores=_zero_enrichment_scores(),
-            input_tokens=exc.usage.input_tokens,
-            output_tokens=exc.usage.output_tokens,
-            candidate_tokens=exc.usage.candidate_tokens,
-            thinking_tokens=exc.usage.thinking_tokens,
-            cost_usd=float(exc.usage.cost_usd) if exc.usage.cost_usd is not None else None,
+            input_tokens=usage.input_tokens,
+            output_tokens=usage.output_tokens,
+            candidate_tokens=usage.candidate_tokens,
+            thinking_tokens=usage.thinking_tokens,
+            cost_usd=float(usage.cost_usd) if usage.cost_usd is not None else None,
+            stage1_input_tokens=usage1.input_tokens,
+            stage1_output_tokens=usage1.output_tokens,
+            stage1_cost_usd=(float(usage1.cost_usd) if usage1.cost_usd is not None else None),
+            stage2_input_tokens=usage2.input_tokens,
+            stage2_output_tokens=usage2.output_tokens,
+            stage2_cost_usd=(float(usage2.cost_usd) if usage2.cost_usd is not None else None),
             duration_s=round(duration, 3),
-            finish_reason=exc.usage.finish_reason,
+            finish_reason=usage.finish_reason,
             error=str(exc)[:500],
         )
 

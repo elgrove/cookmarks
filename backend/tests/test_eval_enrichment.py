@@ -6,7 +6,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from app.services.ai import Usage
+from app.services.ai import AIResponseError, Usage
 from app.services.recipe_enrichment.schema import (
     EnrichmentResponse,
     Stage1Response,
@@ -21,6 +21,7 @@ from evals.enrichment import (
     build_gold_context,
     evaluate_enrichment_recipe,
     load_gold_recipes,
+    score_alternative_groups,
     score_enrichment_response,
     score_facets,
     score_ingredient_identity,
@@ -254,6 +255,86 @@ def test_score_residual_keywords_allows_an_empty_list() -> None:
     assert scores["keywords_count"] == 0
 
 
+def test_score_alternative_groups_checks_complete_relationships() -> None:
+    gold = _sample_gold_recipe()
+    gold.lines[0].occurrences.append(
+        GoldOccurrence(
+            canonical_name="Pear",
+            quantity="1",
+            unit=None,
+            preparation="sliced",
+            optional=False,
+            alternative_group=0,
+            is_key=False,
+        )
+    )
+    gold.lines[0].occurrences[0].alternative_group = 0
+    line_id = _gold_line_id(gold.lines[0])
+
+    correct = EnrichmentResponse.model_validate(
+        {
+            "parsed_lines": [
+                {
+                    "line_id": line_id,
+                    "occurrences": [
+                        {"canonical_name": "Apple", "alternative_group": 4},
+                        {"canonical_name": "Pear", "alternative_group": 4},
+                    ],
+                }
+            ]
+        }
+    )
+    missing = EnrichmentResponse.model_validate(
+        {
+            "parsed_lines": [
+                {
+                    "line_id": line_id,
+                    "occurrences": [
+                        {"canonical_name": "Apple"},
+                        {"canonical_name": "Pear"},
+                    ],
+                }
+            ]
+        }
+    )
+    inconsistent = EnrichmentResponse.model_validate(
+        {
+            "parsed_lines": [
+                {
+                    "line_id": line_id,
+                    "occurrences": [
+                        {"canonical_name": "Apple", "alternative_group": 1},
+                        {"canonical_name": "Pear", "alternative_group": 2},
+                    ],
+                }
+            ]
+        }
+    )
+
+    assert score_alternative_groups(gold.lines, correct) == 1.0
+    assert score_alternative_groups(gold.lines, missing) == 0.0
+    assert score_alternative_groups(gold.lines, inconsistent) == 0.0
+
+
+def test_score_alternative_groups_penalises_a_false_positive() -> None:
+    gold = _sample_gold_recipe()
+    line_id = _gold_line_id(gold.lines[0])
+    response = EnrichmentResponse.model_validate(
+        {
+            "parsed_lines": [
+                {
+                    "line_id": line_id,
+                    "occurrences": [
+                        {"canonical_name": "Apple", "alternative_group": 1},
+                    ],
+                }
+            ]
+        }
+    )
+
+    assert score_alternative_groups(gold.lines, response) == 0.0
+
+
 def test_score_ingredient_details_normalises_unit_spelling() -> None:
     gold = _sample_gold_recipe()
     line0_id = _gold_line_id(gold.lines[0])
@@ -280,6 +361,25 @@ def test_score_ingredient_details_normalises_unit_spelling() -> None:
     scores = score_enrichment_response(gold, response)
 
     assert scores.unit_accuracy == 1.0
+
+
+def test_score_ingredient_details_rejects_a_missing_quantity() -> None:
+    gold = _sample_gold_recipe()
+    line0_id = _gold_line_id(gold.lines[0])
+    response = EnrichmentResponse.model_validate(
+        {
+            "parsed_lines": [
+                {
+                    "line_id": line0_id,
+                    "occurrences": [{"canonical_name": "Apple"}],
+                }
+            ]
+        }
+    )
+
+    scores = score_enrichment_response(gold, response)
+
+    assert scores.quantity_accuracy == 0.0
 
 
 def test_validate_enrichment_response_rejects_a_course_in_cuisines() -> None:
@@ -434,4 +534,35 @@ def test_mixed_model_eval_routes_stage_output_to_stage_two(tmp_path) -> None:
     assert record.deterministic_enabled is False
     assert record.stage1_input_tokens == 100
     assert record.stage2_input_tokens == 50
+    assert record.cost_usd == pytest.approx(0.003)
+
+
+def test_mixed_model_eval_keeps_stage_one_usage_when_stage_two_fails(tmp_path) -> None:
+    stage1_provider = Mock()
+    stage1_provider.enrich_recipe_stage1.return_value = (
+        Stage1Response(),
+        Usage(input_tokens=100, output_tokens=20, cost_usd=Decimal("0.001")),
+    )
+    stage2_provider = Mock()
+    stage2_provider.enrich_recipe_stage2.side_effect = AIResponseError(
+        "stage two failed",
+        Usage(input_tokens=50, output_tokens=10, cost_usd=Decimal("0.002")),
+    )
+
+    record = evaluate_enrichment_recipe(
+        CandidateModel.parse("GEMINI:flash-lite"),
+        stage1_provider,
+        _sample_gold_recipe(),
+        run_id="test-run",
+        timestamp="2026-09-06T00:00:00+00:00",
+        sha="abc1234",
+        run_dir=tmp_path,
+        use_deterministic=False,
+        stage2_candidate=CandidateModel.parse("ANTHROPIC:haiku"),
+        stage2_provider=stage2_provider,
+    )
+
+    assert record.error == "stage two failed"
+    assert record.stage1_cost_usd == pytest.approx(0.001)
+    assert record.stage2_cost_usd == pytest.approx(0.002)
     assert record.cost_usd == pytest.approx(0.003)
