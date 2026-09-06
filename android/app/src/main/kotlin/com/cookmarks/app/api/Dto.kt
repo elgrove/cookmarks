@@ -176,12 +176,10 @@ data class RecipeFact(
     val id: String,
     val name: String,
     val is_primary: Boolean,
-    val source: String,
-    val evidence: String?,
 )
 
 @Serializable
-data class RecipeCuisine(val id: String, val source: String, val evidence: String?)
+data class RecipeCuisine(val id: String)
 
 @Serializable
 data class SimilarRecipes(val basis: String, val items: List<RecipeSummary>)

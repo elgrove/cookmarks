@@ -149,24 +149,18 @@
     ],
     "cuisines": [
       {
-        "value_id": "japanese",
-        "source": "explicit",
-        "evidence": "Buri no Teriyaki"
+        "value_id": "japanese"
       }
     ],
     "methods": [
       {
         "value_id": "fry",
-        "source": "explicit",
-        "evidence": "cook until golden brown on the first side, about 2 minutes",
         "is_primary": true
       }
     ],
     "courses": [
       {
-        "value_id": "main",
-        "source": "inferred",
-        "evidence": "main dish with rice"
+        "value_id": "main"
       }
     ],
     "accepted_courses": [
@@ -514,9 +508,7 @@
     ],
     "cuisines": [
       {
-        "value_id": "pakistani",
-        "source": "explicit",
-        "evidence": "Pakistani kitchen memoir"
+        "value_id": "pakistani"
       }
     ],
     "accepted_cuisines": [
@@ -526,22 +518,16 @@
     "methods": [
       {
         "value_id": "grill",
-        "source": "explicit",
-        "evidence": "Heat an overhead grill (broiler) to high... grill (broil) until brown",
         "is_primary": true
       },
       {
         "value_id": "fry",
-        "source": "explicit",
-        "evidence": "fry for a few seconds",
         "is_primary": false
       }
     ],
     "courses": [
       {
-        "value_id": "side",
-        "source": "inferred",
-        "evidence": "layered aubergine vegetable dish"
+        "value_id": "side"
       }
     ],
     "accepted_courses": [
@@ -948,9 +934,7 @@
     ],
     "cuisines": [
       {
-        "value_id": "japanese",
-        "source": "explicit",
-        "evidence": "JapanEasy curry udon"
+        "value_id": "japanese"
       }
     ],
     "accepted_cuisines": [
@@ -959,22 +943,16 @@
     "methods": [
       {
         "value_id": "simmer",
-        "source": "explicit",
-        "evidence": "reduce to a simmer",
         "is_primary": true
       },
       {
         "value_id": "boil",
-        "source": "explicit",
-        "evidence": "bring to the boil",
         "is_primary": false
       }
     ],
     "courses": [
       {
-        "value_id": "main",
-        "source": "inferred",
-        "evidence": "noodle soup bowl"
+        "value_id": "main"
       }
     ],
     "accepted_courses": [
@@ -1347,24 +1325,18 @@
     ],
     "cuisines": [
       {
-        "value_id": "thai",
-        "source": "explicit",
-        "evidence": "Pad Thai"
+        "value_id": "thai"
       }
     ],
     "methods": [
       {
         "value_id": "stir-fry",
-        "source": "explicit",
-        "evidence": "For the Stir-Fry; stir-fry until the chives and bean sprouts are wilted",
         "is_primary": true
       }
     ],
     "courses": [
       {
-        "value_id": "main",
-        "source": "inferred",
-        "evidence": "Serves 2 to 3 as a complete noodle dish"
+        "value_id": "main"
       }
     ],
     "accepted_courses": [
@@ -1671,16 +1643,12 @@
     "methods": [
       {
         "value_id": "bake",
-        "source": "explicit",
-        "evidence": "Bake until the edges are golden brown",
         "is_primary": true
       }
     ],
     "courses": [
       {
-        "value_id": "dessert",
-        "source": "inferred",
-        "evidence": "A cake with icing"
+        "value_id": "dessert"
       }
     ],
     "accepted_courses": [

@@ -72,9 +72,9 @@ def _sample_gold_recipe() -> GoldRecipe:
                 ],
             ),
         ],
-        cuisines=[GoldFact(value_id="british", source="inferred")],
+        cuisines=[GoldFact(value_id="british")],
         methods=[],
-        courses=[GoldFact(value_id="starter", source="inferred")],
+        courses=[GoldFact(value_id="starter")],
         accepted_courses=["starter", "side"],
         residual_keywords=["Salad", "Fresh", "No Cook", "Raw", "Summer"],
     )
@@ -101,7 +101,6 @@ def test_gold_dataset_loads_five_contrasting_recipes() -> None:
     assert "curry-udon" in slugs
     assert "pad-thai" in slugs
     assert "brown-butter-buttermilk-cake" in slugs
-
 
 
 def test_score_ingredient_identity_exact_and_misses() -> None:

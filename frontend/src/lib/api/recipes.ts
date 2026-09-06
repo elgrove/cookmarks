@@ -30,12 +30,11 @@ export const ingredientOccurrenceSchema = z.object({
 });
 
 export const recipeFactSchema = z.object({
-	id: z.string(), name: z.string(), is_primary: z.boolean(),
-	source: z.enum(['explicit', 'inferred']), evidence: z.string().nullable()
+	id: z.string(), name: z.string(), is_primary: z.boolean()
 });
 
 export const recipeCuisineSchema = z.object({
-	id: z.string(), source: z.enum(['explicit', 'inferred']), evidence: z.string().nullable()
+	id: z.string()
 });
 
 // Mirrors the RecipeDetail wire shape from GET /api/recipes/{id} (snake_case).

@@ -16,7 +16,6 @@ from app.models.enums import (
     IngredientResolutionMethod,
     RecipeEnrichmentStatus,
     RecipeFacetKind,
-    RecipeFactSource,
 )
 from app.models.ingredient import Ingredient, IngredientAlias, IngredientLine, IngredientOccurrence
 from app.models.recipe import Recipe
@@ -172,9 +171,7 @@ def build_stage1_context(
     proposals: dict[str, DeterministicProposal],
 ) -> dict:
     ai_line_ids = [
-        str(line.id)
-        for line in recipe.ingredients_verbatim
-        if str(line.id) not in proposals
+        str(line.id) for line in recipe.ingredients_verbatim if str(line.id) not in proposals
     ]
     return {
         "recipe": {
@@ -329,9 +326,7 @@ def _apply_response(
     assert state is not None
     created: dict[str, Ingredient] = {}
     canonical_by_name = {item.name_folded: item for item in session.scalars(select(Ingredient))}
-    aliases_by_name = {
-        item.name_folded: item for item in session.scalars(select(IngredientAlias))
-    }
+    aliases_by_name = {item.name_folded: item for item in session.scalars(select(IngredientAlias))}
     aliases_created = 0
     existing_ingredients = 0
     occurrences_created = 0
@@ -420,8 +415,6 @@ def _apply_response(
             RecipeFacet(
                 facet_value_id=facet_values[(RecipeFacetKind.METHOD, fact.value_id)].id,
                 is_primary=fact.is_primary,
-                source=RecipeFactSource.INFERRED,
-                evidence=None,
             )
         )
     for course_id in response.courses:
@@ -429,16 +422,9 @@ def _apply_response(
             RecipeFacet(
                 facet_value_id=facet_values[(RecipeFacetKind.COURSE, course_id)].id,
                 is_primary=False,
-                source=RecipeFactSource.INFERRED,
-                evidence=None,
             )
         )
-    recipe.cuisines = [
-        RecipeCuisine(
-            cuisine_id=cuisine_id, source=RecipeFactSource.INFERRED, evidence=None
-        )
-        for cuisine_id in response.cuisines
-    ]
+    recipe.cuisines = [RecipeCuisine(cuisine_id=cuisine_id) for cuisine_id in response.cuisines]
     recipe.keywords = [get_or_create_keyword(session, value.strip()) for value in response.keywords]
     state.status = RecipeEnrichmentStatus.COMPLETE
     state.schema_version = SCHEMA_VERSION
@@ -532,9 +518,7 @@ def enrich_recipe(
         else:
             stage1_response, usage1 = provider.enrich_recipe_stage1(stage1_context, model)
 
-        deterministic_names = [
-            occ.name for p in proposals.values() for occ in p.occurrences
-        ]
+        deterministic_names = [occ.name for p in proposals.values() for occ in p.occurrences]
         ai_names = [
             occ.canonical_name for line in stage1_response.parsed_lines for occ in line.occurrences
         ]

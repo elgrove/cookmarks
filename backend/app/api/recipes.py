@@ -569,19 +569,12 @@ def get_recipe(
             if recipe.enrichment_state is not None
             else RecipeEnrichmentStatus.PENDING
         ),
-        cuisines=[
-            RecipeCuisineRead(
-                id=cuisine.cuisine_id, source=cuisine.source, evidence=cuisine.evidence
-            )
-            for cuisine in recipe.cuisines
-        ],
+        cuisines=[RecipeCuisineRead(id=cuisine.cuisine_id) for cuisine in recipe.cuisines],
         methods=[
             RecipeFactRead(
                 id=fact.facet_value.value_id,
                 name=fact.facet_value.name,
                 is_primary=fact.is_primary,
-                source=fact.source,
-                evidence=fact.evidence,
             )
             for fact in recipe.facets
             if fact.facet_value.kind is RecipeFacetKind.METHOD
@@ -591,8 +584,6 @@ def get_recipe(
                 id=fact.facet_value.value_id,
                 name=fact.facet_value.name,
                 is_primary=fact.is_primary,
-                source=fact.source,
-                evidence=fact.evidence,
             )
             for fact in recipe.facets
             if fact.facet_value.kind is RecipeFacetKind.COURSE

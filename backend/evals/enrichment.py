@@ -122,8 +122,6 @@ class GoldLine(BaseModel):
 
 class GoldFact(BaseModel):
     value_id: str
-    source: str = "explicit"
-    evidence: str | None = None
     is_primary: bool = False
 
 
@@ -144,8 +142,6 @@ class GoldRecipe(BaseModel):
     courses: list[GoldFact] = []
     accepted_courses: list[str] = []
     residual_keywords: list[str] = []
-
-
 
 
 class EnrichmentDimensionScores(BaseModel):
@@ -433,9 +429,7 @@ def score_residual_keywords(
     forbidden |= {fold(m.value_id) for m in response.methods}
     forbidden |= {fold(o) for o in response.courses}
     forbidden |= {
-        fold(occ.canonical_name)
-        for line in response.parsed_lines
-        for occ in line.occurrences
+        fold(occ.canonical_name) for line in response.parsed_lines for occ in line.occurrences
     }
 
     overlap = sum(1 for kw in keywords if fold(kw) in forbidden)
@@ -550,7 +544,10 @@ def build_gold_stage1_context(
         if str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{line.position}:{line.text}")) not in props
     ]
     lines_payload = [
-        {"id": str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{line.position}:{line.text}")), "text": line.text}
+        {
+            "id": str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{line.position}:{line.text}")),
+            "text": line.text,
+        }
         for line in gold.lines
         if str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{line.position}:{line.text}")) in ai_parse_line_ids
     ]
@@ -894,7 +891,9 @@ def evaluate_enrichment_recipe(
             finish_reason=usage.finish_reason,
         )
 
-        artefact_path = run_dir / f"{gold.slug}_{candidate.provider}_{candidate.model.replace('/', '_')}.json"
+        artefact_path = (
+            run_dir / f"{gold.slug}_{candidate.provider}_{candidate.model.replace('/', '_')}.json"
+        )
         artefact_data = {
             "record": record.model_dump(),
             "response": response.model_dump(),
@@ -1004,9 +1003,7 @@ def run_enrichment_eval(
     vocab = gold_ingredient_vocab(gold_recipes)
 
     evaluations = [
-        (candidate, provider, gold)
-        for gold in gold_recipes
-        for candidate, provider in providers
+        (candidate, provider, gold) for gold in gold_recipes for candidate, provider in providers
     ]
 
     records: list[EnrichmentRecipeRecord] = []
@@ -1038,7 +1035,9 @@ def run_enrichment_eval(
                 if record.error is None
                 else f"ERROR: {record.error[:40]}"
             )
-            print(f"  {record.recipe_slug:35s} {record.model_id:30s} {status_str} ({record.duration_s:.1f}s)")
+            print(
+                f"  {record.recipe_slug:35s} {record.model_id:30s} {status_str} ({record.duration_s:.1f}s)"
+            )
 
     # Append to ledger
     with open(ENRICHMENT_LEDGER_PATH, "a") as f:

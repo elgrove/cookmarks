@@ -9,7 +9,6 @@ from app.models.enums import (
     IngredientParseMethod,
     IngredientResolutionMethod,
     RecipeEnrichmentStatus,
-    RecipeFactSource,
 )
 
 
@@ -146,14 +145,10 @@ class RecipeFactRead(BaseModel):
     id: str
     name: str
     is_primary: bool
-    source: RecipeFactSource
-    evidence: str | None
 
 
 class RecipeCuisineRead(BaseModel):
     id: str
-    source: RecipeFactSource
-    evidence: str | None
 
 
 class RecipeDetail(BaseModel):

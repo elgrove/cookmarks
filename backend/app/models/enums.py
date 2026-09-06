@@ -61,11 +61,6 @@ class IngredientResolutionMethod(StrEnum):
     AI_CREATED = "ai_created"
 
 
-class RecipeFactSource(StrEnum):
-    EXPLICIT = "explicit"
-    INFERRED = "inferred"
-
-
 class RecipeEnrichmentStatus(StrEnum):
     PENDING = "pending"
     RUNNING = "running"

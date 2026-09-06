@@ -23,6 +23,10 @@ def test_alembic_check_ignores_application_owned_vec0_table(tmp_path: Path) -> N
     assert upgrade.returncode == 0, upgrade.stdout + upgrade.stderr
 
     connection = sqlite3.connect(database_path)
+    for table in ("recipe_facets", "recipe_cuisines"):
+        columns = {row[1] for row in connection.execute(f"PRAGMA table_info({table})")}
+        assert "source" not in columns
+        assert "evidence" not in columns
     connection.enable_load_extension(True)
     sqlite_vec.load(connection)
     connection.execute(

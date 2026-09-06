@@ -12,7 +12,6 @@ from app.models.enums import (
     IngredientResolutionMethod,
     RecipeEnrichmentStatus,
     RecipeFacetKind,
-    RecipeFactSource,
     TaskStatus,
     TaskType,
 )
@@ -54,7 +53,6 @@ __all__ = [
     "RecipeFacet",
     "RecipeFacetKind",
     "RecipeFacetValue",
-    "RecipeFactSource",
     "RecipeList",
     "RecipeListItem",
     "RecipeView",

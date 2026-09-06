@@ -13,9 +13,15 @@
   ],
   "ingredients": [],
   "enrichment_status": "pending",
-  "cuisines": [],
-  "methods": [],
-  "courses": [],
+  "cuisines": [
+    {"id": "american"}
+  ],
+  "methods": [
+    {"id": "roast", "name": "Roast", "is_primary": true}
+  ],
+  "courses": [
+    {"id": "main", "name": "Main", "is_primary": false}
+  ],
   "instructions": [
     "The day before, season the chicken generously and submerge it in the buttermilk.",
     "Roast at 220\u00b0C, turning once, until the juices run clear, about 50 minutes.",
