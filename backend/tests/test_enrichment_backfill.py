@@ -22,7 +22,7 @@ from app.models.enums import (
     TaskStatus,
     TaskType,
 )
-from app.models.ingredient import IngredientLine
+from app.models.ingredient import RecipeIngredient
 from app.models.recipe import Keyword, Recipe
 from app.models.recipe_enrichment import RecipeEnrichmentState
 from app.models.recipe_enrichment_batch import RecipeEnrichmentBatch
@@ -172,7 +172,7 @@ def _recipe(session, name: str = "Glorp Stew") -> Recipe:
     recipe = Recipe(
         book_id=book_id, order=99, name=name, instructions=["Simmer the glorp."]
     )
-    recipe.ingredients_verbatim = [IngredientLine(position=0, text="1 glorp of zzxxy")]
+    recipe.ingredients = [RecipeIngredient(position=0, text="1 glorp of zzxxy")]
     recipe.enrichment_state = RecipeEnrichmentState(status=RecipeEnrichmentStatus.PENDING)
     session.add(recipe)
     session.commit()
@@ -188,14 +188,12 @@ def _backfill_run(session, **detail) -> TaskRun:
 
 
 def _stage1_line(session, recipe: Recipe, key: str) -> str:
-    context_ids = [str(line.id) for line in recipe.ingredients_verbatim]
     response = Stage1Response.model_validate(
         {
-            "p": [
-                {"l": line_id, "o": [{"n": "Glorp", "q": "1"}]}
-                for line_id in context_ids
+            "i": [
+                {"id": f"{index:02d}", "n": "Glorp"}
+                for index, _line in enumerate(recipe.ingredients, start=1)
             ],
-            "n": [],
         }
     )
     text = response.model_dump_json(by_alias=True)
@@ -217,7 +215,7 @@ def _stage1_line(session, recipe: Recipe, key: str) -> str:
 def _stage2_line(session, recipe: Recipe, key: str) -> str:
     response = Stage2Response.model_validate(
         {
-            "k": [{"l": str(line.id), "o": 0} for line in recipe.ingredients_verbatim],
+            "k": ["Glorp"] if recipe.ingredients else [],
             "c": [],
             "m": [{"v": "bake", "p": True}],
             "o": ["main"],

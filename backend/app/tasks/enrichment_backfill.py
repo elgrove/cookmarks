@@ -78,6 +78,7 @@ from app.services.recipe_enrichment.service import (
     apply_enrichment,
     build_stage1_context,
     build_stage2_context,
+    deduplicate_ingredient_names,
     ensure_source_fingerprint,
     source_fingerprint,
 )
@@ -132,7 +133,7 @@ def select_backfill_recipe_ids(session: Session) -> list[uuid.UUID]:
     """
     recipes = session.scalars(
         select(Recipe)
-        .options(selectinload(Recipe.ingredients_verbatim), selectinload(Recipe.enrichment_state))
+        .options(selectinload(Recipe.ingredients), selectinload(Recipe.enrichment_state))
         .order_by(Recipe.id)
     ).all()
     return [recipe.id for recipe in recipes if not _is_current(recipe.enrichment_state, recipe)]
@@ -193,7 +194,7 @@ def _recipe_map(session: Session, ids: list[uuid.UUID]) -> dict[uuid.UUID, Recip
                     select(Recipe)
                     .where(Recipe.id.in_(page))
                     .options(
-                        selectinload(Recipe.ingredients_verbatim),
+                        selectinload(Recipe.ingredients),
                         selectinload(Recipe.enrichment_state),
                         selectinload(Recipe.book),
                     )
@@ -275,14 +276,15 @@ def build_stage2_payloads(
     """Build stage 2 JSONL rows for a batch from ingested stage 1 results.
 
     Eligible items hold an ingested stage 1 response (freshly promoted, or
-    retry items with stage1_response kept and stage2 stripped). Items already
-    APPLIED are never rebuilt.
+    retry items with stage1_response kept and stage2 stripped). The stored
+    names feed the stage 2 context exactly as the live path builds it. Items
+    already APPLIED are never rebuilt.
     """
     eligible = [
         item for item in batch.items
         if item.status in (EnrichmentBatchItemStatus.SUCCEEDED, EnrichmentBatchItemStatus.PENDING)
         and "stage2" not in (item.stage1_response or {})
-        and (item.stage1_response or {}).get("p") is not None
+        and (item.stage1_response or {}).get("i") is not None
     ]
     recipes = _recipe_map(session, [item.recipe_id for item in eligible])
     payloads: dict[str, str] = {}
@@ -292,9 +294,11 @@ def build_stage2_payloads(
             continue
         stored = {key: value for key, value in (item.stage1_response or {}).items()
                   if key != "stage2"}
-        stage2_context = build_stage2_context(
-            session, recipe, Stage1Response.model_validate(stored)
-        )
+        names = deduplicate_ingredient_names([
+            str(entry.get("n", "")) for entry in stored.get("i", [])
+            if isinstance(entry, dict) and entry.get("n")
+        ])
+        stage2_context = build_stage2_context(session, recipe, names)
         payloads[item.request_key] = stage2_row(item.request_key, stage2_context)
     return payloads
 
@@ -510,9 +514,7 @@ def ingest_succeeded_batch(
                 parsed = Stage1Response.model_validate_json(_strip_json_fence(text))
                 item.stage1_response = parsed.model_dump(mode="json", by_alias=True)
                 item.stage1_ingredients = [
-                    occ.canonical_name
-                    for line in parsed.parsed_lines
-                    for occ in line.occurrences
+                    line.name for line in parsed.ingredients if line.name
                 ]
             else:
                 parsed = Stage2Response.model_validate_json(_strip_json_fence(text))
@@ -1000,7 +1002,7 @@ def run_final_cutover(session: Session, run: TaskRun) -> dict:
     """
     recipes = session.scalars(
         select(Recipe).options(
-            selectinload(Recipe.ingredients_verbatim),
+            selectinload(Recipe.ingredients),
             selectinload(Recipe.enrichment_state),
         )
     ).all()
