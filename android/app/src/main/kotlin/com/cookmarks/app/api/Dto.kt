@@ -1,10 +1,16 @@
 package com.cookmarks.app.api
 
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
 @Serializable
 data class LoginRequest(val username: String, val password: String)
+
+@Serializable
+data class PasswordChange(val current_password: String, val new_password: String)
 
 @Serializable
 data class AuthMe(
@@ -12,7 +18,57 @@ data class AuthMe(
     val username: String,
     val is_admin: Boolean,
     val auth_mode: String,
+    val user_instructions: String? = null,
+    val book_grid_density: String = "standard",
 )
+
+@Serializable
+data class ProviderInfo(val name: String, val requires_api_key: Boolean)
+
+@Serializable
+data class ConfigRead(
+    val ai_provider: String?,
+    val api_key_set: Boolean,
+    val assistant_provider: String?,
+    val assistant_api_key_set: Boolean,
+    val extraction_rate_limit_per_minute: Int,
+    val providers: List<ProviderInfo>,
+)
+
+@OptIn(ExperimentalSerializationApi::class)
+@Serializable
+data class ConfigUpdate(
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val ai_provider: JsonElement? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val api_key: JsonElement? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val assistant_provider: JsonElement? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val assistant_api_key: JsonElement? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val extraction_rate_limit_per_minute: Int? = null,
+)
+
+@Serializable
+data class UserRead(
+    val id: String,
+    val username: String,
+    val is_admin: Boolean,
+    val created_at: String,
+)
+
+@Serializable
+data class UserCreate(val username: String, val password: String, val is_admin: Boolean)
+
+@Serializable
+data class PasswordReset(val password: String)
+
+@Serializable
+data class BookKeywordTaskRequest(val regenerate: Boolean = false)
+
+@Serializable
+data class TaskRunAck(val task: String, val status: String, val queued: Int)
 
 @Serializable
 data class BookSummary(

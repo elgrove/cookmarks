@@ -5,6 +5,8 @@ import com.cookmarks.app.api.AuthMe
 import com.cookmarks.app.api.BookDetail
 import com.cookmarks.app.api.BookReadState
 import com.cookmarks.app.api.BookSummary
+import com.cookmarks.app.api.ConfigRead
+import com.cookmarks.app.api.ConfigUpdate
 import com.cookmarks.app.api.DismissState
 import com.cookmarks.app.api.GameRecipeIds
 import com.cookmarks.app.api.KeywordSummary
@@ -18,7 +20,12 @@ import com.cookmarks.app.api.RecipeSearchResults
 import com.cookmarks.app.api.SemanticSearchResults
 import com.cookmarks.app.api.SimilarRecipes
 import com.cookmarks.app.api.TaskRun
+import com.cookmarks.app.api.TaskRunAck
+import com.cookmarks.app.api.UserRead
 import java.io.File
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonObject
 import org.junit.Assert.assertEquals
@@ -38,7 +45,44 @@ class ContractTest {
 
     @Test
     fun authme() {
-        assertEquals("aaron", pin<AuthMe>("authme").username)
+        val me = pin<AuthMe>("authme")
+        assertEquals("aaron", me.username)
+        assertEquals("standard", me.book_grid_density)
+    }
+
+    @Test
+    fun config() {
+        val config = pin<ConfigRead>("config")
+        assertEquals("GEMINI", config.ai_provider)
+        assertEquals(3, config.providers.size)
+    }
+
+    @Test
+    fun config_update_omits_unchanged_keys() {
+        val encoded = Api.json.encodeToString(
+            ConfigUpdate(
+                ai_provider = JsonPrimitive("GEMINI"),
+                extraction_rate_limit_per_minute = 120,
+            )
+        )
+        assertTrue("api_key" !in encoded)
+        assertTrue("assistant_api_key" !in encoded)
+    }
+
+    @Test
+    fun config_update_can_clear_a_provider() {
+        val encoded = Api.json.encodeToString(ConfigUpdate(ai_provider = JsonNull))
+        assertTrue("\"ai_provider\":null" in encoded)
+    }
+
+    @Test
+    fun user() {
+        assertTrue(pin<UserRead>("user").is_admin)
+    }
+
+    @Test
+    fun task_run_ack() {
+        assertEquals("queued", pin<TaskRunAck>("taskrunack").status)
     }
 
     @Test

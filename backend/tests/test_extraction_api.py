@@ -56,6 +56,27 @@ def test_list_runs_newest_first_with_book_title(client: TestClient, session: Ses
     assert by_id[newest]["pending_question"] is not None
 
 
+def test_list_runs_supports_optional_limit_and_offset(
+    client: TestClient, session: Session
+) -> None:
+    owner = _book_id(client, "With Recipes")
+    oldest = _make_run(session, owner, TaskStatus.DONE, datetime(2024, 1, 1, tzinfo=UTC))
+    middle = _make_run(session, owner, TaskStatus.FAILED, datetime(2024, 2, 1, tzinfo=UTC))
+    newest = _make_run(session, owner, TaskStatus.REVIEW, datetime(2024, 3, 1, tzinfo=UTC))
+
+    first_page = client.get("/api/task-runs", params={"limit": 2}).json()
+    second_page = client.get("/api/task-runs", params={"limit": 2, "offset": 2}).json()
+
+    assert [run["id"] for run in first_page] == [newest, middle]
+    assert [run["id"] for run in second_page] == [oldest]
+
+
+def test_list_runs_rejects_invalid_pagination(client: TestClient) -> None:
+    assert client.get("/api/task-runs", params={"limit": 0}).status_code == 422
+    assert client.get("/api/task-runs", params={"limit": 201}).status_code == 422
+    assert client.get("/api/task-runs", params={"offset": -1}).status_code == 422
+
+
 def test_trigger_creates_queued_run_and_dispatches(
     client: TestClient, session: Session, dispatched: list[tuple[Any, ...]], seeded_epubs: Path
 ) -> None:
