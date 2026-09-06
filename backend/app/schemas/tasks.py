@@ -1,4 +1,6 @@
-from pydantic import BaseModel
+import uuid
+
+from pydantic import BaseModel, Field
 
 
 class BookKeywordTaskRequest(BaseModel):
@@ -16,3 +18,20 @@ class TaskRunAck(BaseModel):
     task: str
     status: str
     queued: int
+
+
+class EnrichmentBackfillRequest(BaseModel):
+    """Launch the Gemini Batch backfill. Requires the ID of a done MY-174 live
+    pilot run, an explicit confirmation its output was reviewed, and matching
+    contract versions — all checked before anything is queued."""
+
+    pilot_run_id: uuid.UUID
+    confirm_pilot_reviewed: bool = False
+    max_active_jobs: int = Field(default=4, ge=1, le=10)
+
+
+class EnrichmentBackfillResumeRequest(BaseModel):
+    """Resume after a terminal run: a fresh parent run selects only recipes not
+    yet current, so repeated resumes never redo applied work."""
+
+    max_active_jobs: int = Field(default=4, ge=1, le=10)
