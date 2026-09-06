@@ -81,9 +81,9 @@ def test_score_canonical_ingredients_exact_and_misses() -> None:
     # Perfect match
     resp_perfect = EnrichmentResponse.model_validate(
         {
-            "canonical_ingredients": [
-                {"name": "apple", "is_key": True},
-                {"name": "olive oil", "is_key": False},
+            "ingredients": [
+                {"id": "01", "name": "apple", "is_key": True},
+                {"id": "03", "name": "olive oil", "is_key": False},
             ],
             "cuisines": [],
             "methods": [],
@@ -99,9 +99,9 @@ def test_score_canonical_ingredients_exact_and_misses() -> None:
     # Partial match
     resp_partial = EnrichmentResponse.model_validate(
         {
-            "canonical_ingredients": [
-                {"name": "apple", "is_key": True},
-                {"name": "butter", "is_key": False},
+            "ingredients": [
+                {"id": "01", "name": "apple", "is_key": True},
+                {"id": "03", "name": "butter", "is_key": False},
             ],
             "cuisines": [],
             "methods": [],
@@ -120,9 +120,9 @@ def test_score_key_ingredients() -> None:
 
     resp_correct = EnrichmentResponse.model_validate(
         {
-            "canonical_ingredients": [
-                {"name": "apple", "is_key": True},
-                {"name": "olive oil", "is_key": False},
+            "ingredients": [
+                {"id": "01", "name": "apple", "is_key": True},
+                {"id": "03", "name": "olive oil", "is_key": False},
             ],
             "cuisines": [],
             "methods": [],
@@ -137,9 +137,9 @@ def test_score_key_ingredients() -> None:
 
     resp_wrong = EnrichmentResponse.model_validate(
         {
-            "canonical_ingredients": [
-                {"name": "apple", "is_key": False},
-                {"name": "olive oil", "is_key": True},
+            "ingredients": [
+                {"id": "01", "name": "apple", "is_key": False},
+                {"id": "03", "name": "olive oil", "is_key": True},
             ],
             "cuisines": [],
             "methods": [],
@@ -157,7 +157,7 @@ def test_score_facets() -> None:
     gold = _sample_gold_recipe()
     resp = EnrichmentResponse.model_validate(
         {
-            "canonical_ingredients": [],
+            "ingredients": [],
             "cuisines": ["british"],
             "methods": [],
             "courses": ["starter"],
@@ -175,7 +175,7 @@ def test_score_residual_keywords_validity() -> None:
     gold = _sample_gold_recipe()
     resp = EnrichmentResponse.model_validate(
         {
-            "canonical_ingredients": [],
+            "ingredients": [],
             "cuisines": [],
             "methods": [],
             "courses": [],
@@ -193,7 +193,7 @@ def test_score_residual_keywords_allows_an_empty_list() -> None:
     gold = _sample_gold_recipe()
     resp = EnrichmentResponse.model_validate(
         {
-            "canonical_ingredients": [],
+            "ingredients": [],
             "cuisines": [],
             "methods": [],
             "courses": [],
@@ -212,7 +212,7 @@ def test_validate_enrichment_response_rejects_a_course_in_cuisines() -> None:
     context = build_gold_context(gold)
     response = EnrichmentResponse.model_validate(
         {
-            "canonical_ingredients": [{"name": "apple", "is_key": True}],
+            "ingredients": [{"id": "01", "name": "apple", "is_key": True}],
             "cuisines": ["starter"],
             "methods": [],
             "courses": [],
@@ -229,7 +229,7 @@ def test_validate_enrichment_response_rejects_unknown_course() -> None:
     context = build_gold_context(gold)
     response = EnrichmentResponse.model_validate(
         {
-            "canonical_ingredients": [{"name": "apple", "is_key": True}],
+            "ingredients": [{"id": "01", "name": "apple", "is_key": True}],
             "cuisines": [],
             "methods": [],
             "courses": ["unknown-course"],
@@ -246,7 +246,7 @@ def test_build_gold_stage1_and_stage2_contexts() -> None:
     ctx1 = build_gold_stage1_context(gold)
     assert "recipe" in ctx1
     assert ctx1["recipe"]["name"] == "Test Salad"
-    assert len(ctx1["recipe"]["ingredients"]) == 3
+    assert len(ctx1["recipe"]["lines"]) == 3
 
     ctx2 = build_gold_stage2_context(gold, ["apple", "olive oil"])
     assert "vocabulary" in ctx2
@@ -259,9 +259,9 @@ def test_score_enrichment_response_composite() -> None:
 
     resp = EnrichmentResponse.model_validate(
         {
-            "canonical_ingredients": [
-                {"name": "apple", "is_key": True},
-                {"name": "olive oil", "is_key": False},
+            "ingredients": [
+                {"id": "01", "name": "apple", "is_key": True},
+                {"id": "03", "name": "olive oil", "is_key": False},
             ],
             "cuisines": ["british"],
             "methods": [],
