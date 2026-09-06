@@ -18,6 +18,7 @@ class TaskType(StrEnum):
     KEYWORD_DEDUP = "keyword_dedup"
     CALIBRE_SYNC = "calibre_sync"
     BOOK_INGEST = "book_ingest"
+    RECIPE_ENRICHMENT_PILOT = "recipe_enrichment_pilot"
 
 
 class TaskStatus(StrEnum):
@@ -40,29 +41,6 @@ class ExtractionMethod(StrEnum):
     FILE = "file"
     BLOCK = "block"
     PDF_OCR = "pdf_ocr"
-
-
-class IngredientLineKind(StrEnum):
-    INGREDIENT = "ingredient"
-    HEADING = "heading"
-    NOTE = "note"
-
-
-class IngredientParseMethod(StrEnum):
-    DETERMINISTIC = "deterministic"
-    AI = "ai"
-
-
-class IngredientResolutionMethod(StrEnum):
-    CANONICAL_NAME = "canonical_name"
-    ALIAS = "alias"
-    AI_EXISTING = "ai_existing"
-    AI_CREATED = "ai_created"
-
-
-class RecipeFactSource(StrEnum):
-    EXPLICIT = "explicit"
-    INFERRED = "inferred"
 
 
 class RecipeEnrichmentStatus(StrEnum):

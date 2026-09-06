@@ -4,13 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.enums import (
-    IngredientLineKind,
-    IngredientParseMethod,
-    IngredientResolutionMethod,
-    RecipeEnrichmentStatus,
-    RecipeFactSource,
-)
+from app.models.enums import RecipeEnrichmentStatus
 
 
 class RecipeRow(BaseModel):
@@ -120,40 +114,31 @@ class IngredientLineRead(BaseModel):
 
     id: uuid.UUID
     position: int
-    kind: IngredientLineKind | None
     text: str
 
 
-class IngredientOccurrenceRead(BaseModel):
+class RecipeIngredientRead(IngredientLineRead):
+    canonical_ingredient_id: uuid.UUID | None = None
+    canonical_name: str | None = None
+    is_key: bool = False
+
+
+class RecipeCanonicalIngredientRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    id: uuid.UUID
-    line_id: uuid.UUID
-    position: int
     ingredient_id: uuid.UUID
-    ingredient_name: str
-    quantity: str | None
-    unit: str | None
-    preparation: str | None
-    optional: bool
-    alternative_group: int | None
+    name: str
     is_key: bool
-    parse_method: IngredientParseMethod
-    resolution_method: IngredientResolutionMethod
 
 
 class RecipeFactRead(BaseModel):
     id: str
     name: str
     is_primary: bool
-    source: RecipeFactSource
-    evidence: str | None
 
 
 class RecipeCuisineRead(BaseModel):
     id: str
-    source: RecipeFactSource
-    evidence: str | None
 
 
 class RecipeDetail(BaseModel):
@@ -181,7 +166,7 @@ class RecipeDetail(BaseModel):
     name: str
     description: str | None
     ingredients_verbatim: list[IngredientLineRead]
-    ingredients: list[IngredientOccurrenceRead]
+    canonical_ingredients: list[RecipeCanonicalIngredientRead]
     enrichment_status: RecipeEnrichmentStatus
     cuisines: list[RecipeCuisineRead]
     methods: list[RecipeFactRead]

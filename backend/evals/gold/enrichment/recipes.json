@@ -1,0 +1,713 @@
+[
+  {
+    "id": "ccdfd2a9-98d7-4369-bcef-ba707027266e",
+    "slug": "teriyaki-yellowtail",
+    "name": "Teriyaki Yellowtail (buri No Teriyaki)",
+    "archetype": "simple",
+    "yields": "Serves 4 as part of a larger meal",
+    "instructions": [
+      "1. Pat the yellowtail fillets dry with a paper towel, then season lightly with the salt. Set aside.",
+      "2. Whisk together the sake, mirin, soy sauce, and sugar in a bowl.",
+      "3. Heat a large nonstick skillet over medium heat, then coat with the vegetable oil. Carefully lay the yellowtail fillets in the pan and cook until golden brown on the first side, about 2 minutes. Flip and cook for 1 more minute. Add the sauce mixture and cook for about 3 minutes, flipping the fillets occasionally to coat them in sauce, until the fish is cooked through and the sauce is beginning to get syrupy.",
+      "4. Transfer the fillets to a plate and top with the sauce. Serve with steamed rice."
+    ],
+    "lines": [
+      {
+        "position": 0,
+        "text": "4 yellowtail (hamachi) fillets (about 12 ounces)"
+      },
+      {
+        "position": 1,
+        "text": "1½ teaspoons kosher salt"
+      },
+      {
+        "position": 2,
+        "text": "3 tablespoons sake"
+      },
+      {
+        "position": 3,
+        "text": "3 tablespoons mirin"
+      },
+      {
+        "position": 4,
+        "text": "3 tablespoons soy sauce"
+      },
+      {
+        "position": 5,
+        "text": "1 tablespoon plus 2 teaspoons sugar"
+      },
+      {
+        "position": 6,
+        "text": "2 teaspoons vegetable oil"
+      },
+      {
+        "position": 7,
+        "text": "For Serving"
+      },
+      {
+        "position": 8,
+        "text": "Steamed rice"
+      }
+    ],
+    "cuisines": [
+      {
+        "value_id": "japanese"
+      }
+    ],
+    "methods": [
+      {
+        "value_id": "fry",
+        "is_primary": true
+      }
+    ],
+    "courses": [
+      {
+        "value_id": "main"
+      }
+    ],
+    "accepted_courses": [
+      "main"
+    ],
+    "residual_keywords": [
+      "Teriyaki",
+      "Yellowtail",
+      "Buri",
+      "Pan Fried",
+      "Glazed"
+    ],
+    "description": "Gaijin love yellowtail. It’s a fish that’s mild in flavor and fatty, and it’s a mainstay at every sushi bar in America. For this preparation—another standard at any Japanese diner—I sear fillets of yellowtail (called hamachi or buri, depending on the size and species) in a hot pan, then simmer them in sake, mirin, and soy sauce. The fat renders from the fish and mingles with the liquid, creating a surprisingly rich sauce.",
+    "book_title": "The Gaijin Cookbook: Japanese Recipes From a Chef, Father, Eater, and Lifelong Outsider",
+    "book_author": "Ivan Orkin & Chris Ying",
+    "canonical_ingredients": [
+      "Yellowtail Fillet",
+      "Kosher Salt",
+      "Sake",
+      "Mirin",
+      "Soy Sauce",
+      "Sugar",
+      "Vegetable Oil",
+      "Steamed Rice"
+    ],
+    "key_ingredients": [
+      "Yellowtail Fillet"
+    ]
+  },
+  {
+    "id": "189c9f1e-7807-42dc-8f7b-5acfc650e903",
+    "slug": "aubergine-borani",
+    "name": "Aubergine Borani",
+    "archetype": "multi_step_compound",
+    "yields": null,
+    "instructions": [
+      "Sprinkle the aubergine slices with the salt and set aside for 5 minutes to draw out the moisture, then rinse and dry with paper towels.",
+      "Heat an overhead grill (broiler) to high. Drizzle the aubergine slices with the oil, place on a baking tray and grill (broil) until brown on one side, then flip and brown on the other. Set aside.",
+      "To make the tomato topping, heat the oil in a frying pan over medium heat. When it is hot, add the onion, garlic and ginger and cook, stirring, until light brown, then add the tomatoes and salt and cook until the tomatoes are soft and the oil rises to the surface. Set aside.",
+      "For the yoghurt and mint, mix all the ingredients together.",
+      "To assemble the dish, lay most of the aubergine slices on a serving plate and spoon over the tomato topping, then drizzle with the yoghurt and mint. Finish with the remaining aubergine slices.",
+      "For the tempering, heat the oil in a small frying pan over medium heat. When it is hot, add the cumin seeds and chillies and fry for a few seconds, then pour over the dish.",
+      "Serve at room temperature, garnished with dill and coriander."
+    ],
+    "lines": [
+      {
+        "position": 0,
+        "text": "2 aubergines (eggplants), cut into rounds about 5 mm (¼ inch) thick"
+      },
+      {
+        "position": 1,
+        "text": "1 tablespoon Himalayan pink salt"
+      },
+      {
+        "position": 2,
+        "text": "2 tablespoons sunflower oil"
+      },
+      {
+        "position": 3,
+        "text": "For the tomato topping"
+      },
+      {
+        "position": 4,
+        "text": "2 tablespoons sunflower oil"
+      },
+      {
+        "position": 5,
+        "text": "1 small red onion, finely chopped"
+      },
+      {
+        "position": 6,
+        "text": "2 garlic cloves, thinly sliced"
+      },
+      {
+        "position": 7,
+        "text": "1 teaspoon finely grated ginger"
+      },
+      {
+        "position": 8,
+        "text": "4 tomatoes, finely chopped"
+      },
+      {
+        "position": 9,
+        "text": "salt, to taste"
+      },
+      {
+        "position": 10,
+        "text": "For the yoghurt and mint"
+      },
+      {
+        "position": 11,
+        "text": "260 g (1 cup) full-fat Greek-style yoghurt"
+      },
+      {
+        "position": 12,
+        "text": "½ teaspoon crushed garlic"
+      },
+      {
+        "position": 13,
+        "text": "1 teaspoon dried mint"
+      },
+      {
+        "position": 14,
+        "text": "salt, to taste"
+      },
+      {
+        "position": 15,
+        "text": "For the tempering"
+      },
+      {
+        "position": 16,
+        "text": "1 tablespoon sunflower oil"
+      },
+      {
+        "position": 17,
+        "text": "½ teaspoon cumin seeds"
+      },
+      {
+        "position": 18,
+        "text": "2 dried red chillies"
+      },
+      {
+        "position": 19,
+        "text": "To garnish"
+      },
+      {
+        "position": 20,
+        "text": "1 tablespoon chopped dill"
+      },
+      {
+        "position": 21,
+        "text": "1 tablespoon coriander (cilantro) leaves"
+      }
+    ],
+    "cuisines": [
+      {
+        "value_id": "pakistani"
+      }
+    ],
+    "accepted_cuisines": [
+      "pakistani",
+      "afghan"
+    ],
+    "methods": [
+      {
+        "value_id": "grill",
+        "is_primary": true
+      },
+      {
+        "value_id": "fry",
+        "is_primary": false
+      }
+    ],
+    "courses": [
+      {
+        "value_id": "side"
+      }
+    ],
+    "accepted_courses": [
+      "side",
+      "main",
+      "starter"
+    ],
+    "residual_keywords": [
+      "Borani",
+      "Tarka",
+      "Tempering",
+      "Layered",
+      "Yoghurt Dip"
+    ],
+    "description": "This is one of the recipes I cooked when I returned to my mother’s kitchen: inspired by the Afghani dish of borani, it makes a lovely side (pictured here). As it is served at room temperature, it’s perfect for relaxed meals.",
+    "book_title": "Andaza: A Memoir of Food, Flavour and Freedom in the Pakistani Kitchen",
+    "book_author": "Sumayya Usmani",
+    "canonical_ingredients": [
+      "Aubergine",
+      "Pink Salt",
+      "Sunflower Oil",
+      "Red Onion",
+      "Garlic",
+      "Ginger",
+      "Tomato",
+      "Salt",
+      "Greek Yoghurt",
+      "Dried Mint",
+      "Cumin Seeds",
+      "Dried Red Chilli",
+      "Dill",
+      "Coriander"
+    ],
+    "key_ingredients": [
+      "Aubergine",
+      "Tomato",
+      "Greek Yoghurt"
+    ]
+  },
+  {
+    "id": "07bdd2a9-9df0-463a-be0b-8c688bbd9796",
+    "slug": "curry-udon",
+    "name": "Curry Udon",
+    "archetype": "heading_and_alternative_heavy",
+    "yields": "Serves 4",
+    "instructions": [
+      "Heat the oil in a saucepan over a medium heat and add the onion. Cook until lightly browned, then add the chilli, garlic and red pepper. Continue to cook until the garlic has softened and the pepper has started to brown.",
+      "Remove the veg from the pan with a slotted spoon and reserve. Add the butter to the pan and let it melt, then whisk in the flour. Cook until the roux turns a light golden brown, stirring constantly. Add the curry powder and garam masala, reduce the heat to low and cook for a few minutes, stirring frequently. Add the stock or dashi in a thin stream, whisking constantly to prevent lumps, and bring to the boil. Add the soy sauce and ketchup or tonkatsu sauce and reduce to a simmer.",
+      "If using a sweetcorn cob, blanch in boiling water then cut off the kernels, or heat up the tinned sweetcorn in a saucepan or the microwave.",
+      "Cook the udon according to the package instructions, then drain and portion into deep bowls. Pour over the curry broth and top with the sweetcorn kernels, sautéed onion and pepper mixture, spring onions, eggs, chilli flakes, pickled ginger, cheese, if using, and sesame seeds."
+    ],
+    "lines": [
+      {
+        "position": 0,
+        "text": "2 tablespoons vegetable oil"
+      },
+      {
+        "position": 1,
+        "text": "1 large onion, thinly sliced"
+      },
+      {
+        "position": 2,
+        "text": "1 green chilli, very finely chopped"
+      },
+      {
+        "position": 3,
+        "text": "2 garlic cloves, very finely chopped"
+      },
+      {
+        "position": 4,
+        "text": "1 red (bell) pepper, diced"
+      },
+      {
+        "position": 5,
+        "text": "60 g (2 oz/½ stick) butter"
+      },
+      {
+        "position": 6,
+        "text": "6 tablespoons plain (all-purpose) flour"
+      },
+      {
+        "position": 7,
+        "text": "45 g (1¾ oz) Madras curry powder (you can use hot or mild, or a combination of both)"
+      },
+      {
+        "position": 8,
+        "text": "2 tablespoons garam masala"
+      },
+      {
+        "position": 9,
+        "text": "1.2 litres (41 fl oz/5 cups) chicken or beef stock, dashi, or any combination of the three"
+      },
+      {
+        "position": 10,
+        "text": "4 tablespoons soy sauce, or more to taste"
+      },
+      {
+        "position": 11,
+        "text": "4 tablespoons ketchup or Tonkatsu Sauce"
+      },
+      {
+        "position": 12,
+        "text": "salt"
+      },
+      {
+        "position": 13,
+        "text": "1 sweetcorn cob, or 150 g (5 oz) tinned sweetcorn"
+      },
+      {
+        "position": 14,
+        "text": "4 portions of udon noodles"
+      },
+      {
+        "position": 15,
+        "text": "2 spring onions (scallions), finely sliced"
+      },
+      {
+        "position": 16,
+        "text": "4 eggs, poached or soft-boiled"
+      },
+      {
+        "position": 17,
+        "text": "pinch of dried chilli flakes (optional)"
+      },
+      {
+        "position": 18,
+        "text": "40–50 g (1½–2 oz) red pickled ginger (optional)"
+      },
+      {
+        "position": 19,
+        "text": "50 g (2 oz) Cheddar cheese, grated (optional – but it’s DELICIOUS)"
+      },
+      {
+        "position": 20,
+        "text": "toasted sesame seeds"
+      }
+    ],
+    "cuisines": [
+      {
+        "value_id": "japanese"
+      }
+    ],
+    "accepted_cuisines": [
+      "japanese"
+    ],
+    "methods": [
+      {
+        "value_id": "simmer",
+        "is_primary": true
+      },
+      {
+        "value_id": "boil",
+        "is_primary": false
+      }
+    ],
+    "courses": [
+      {
+        "value_id": "main"
+      }
+    ],
+    "accepted_courses": [
+      "main"
+    ],
+    "residual_keywords": [
+      "Curry Udon",
+      "Udon",
+      "Noodle Soup",
+      "Japanese Curry",
+      "Comfort Food"
+    ],
+    "description": "Japanese curry and udon: a comfort food power couple. The addition of curry to hot udon doubles down on its warming, satisfying qualities – I love all kinds of udon, but this may be my favourite.",
+    "book_title": "JapanEasy: Classic and Modern Japanese Recipes to Cook at Home",
+    "book_author": "Tim Anderson",
+    "canonical_ingredients": [
+      "Vegetable Oil",
+      "Onion",
+      "Green Chilli",
+      "Garlic",
+      "Red Pepper",
+      "Butter",
+      "Plain Flour",
+      "Madras Curry Powder",
+      "Garam Masala",
+      "Chicken Stock",
+      "Beef Stock",
+      "Dashi",
+      "Soy Sauce",
+      "Ketchup",
+      "Tonkatsu Sauce",
+      "Salt",
+      "Sweetcorn",
+      "Tinned Sweetcorn",
+      "Udon Noodles",
+      "Spring Onion",
+      "Egg",
+      "Chilli Flakes",
+      "Red Pickled Ginger",
+      "Cheddar Cheese",
+      "Sesame Seeds"
+    ],
+    "key_ingredients": [
+      "Udon Noodles"
+    ]
+  },
+  {
+    "id": "2b7a7175d7cf46efb5e855957efeafae",
+    "slug": "pad-thai",
+    "name": "Pad Thai",
+    "archetype": "stir_fry_with_optional_and_alternative_ingredients",
+    "yields": "Serves 2 to 3",
+    "instructions": [
+      "For the Noodles: Place the noodles in a bowl and cover with warm water. Let the noodles soak, agitating them occasionally, until they are soft enough to bend without breaking, but not mushy, about 20 minutes. Drain through a fine-mesh strainer and reserve.",
+      "For the Sauce: Place the palm sugar in a mortar and pestle and pound until it is fully crushed. Add the fish sauce, tamarind pulp, and ground chile and grind with a circular motion with the mortar and pestle until the sugar is dissolved. If you don’t have a mortar and pestle, you can crush the palm sugar on a firm countertop under a heavy pot, then stir it into the fish sauce and tamarind pulp to dissolve. (Also, get a mortar and pestle.)",
+      "BEFORE YOU STIR-FRY, GET YOUR BOWLS READY: a. Garlic and shallots b. Noodles c. Sauce, dried shrimp, shrimp paste, and preserved radish (if using) d. Raw shrimp e. Eggs f. Bean sprouts, Chinese garlic chives, and tofu g. Serving platter",
+      "For the Stir-Fry: Heat 2 tablespoons (30 ml) of the oil in a wok over high heat until shimmering. Add the garlic and shallots and cook, stirring, until fragrant and softened but not browned, about 30 seconds.",
+      "Add the noodles, followed by the sauce, dried shrimp, shrimp paste, and preserved radish. Stir and toss vigorously until the noodles have absorbed about half the sauce, about 45 seconds.",
+      "Push the noodles to the side of the wok, then position the wok so that the burner is mainly heating the now-empty space. Add the shrimp to the empty space and cook them, stirring and flipping occasionally, until they are no longer translucent on either side, about 45 seconds. Toss everything in the pan together.",
+      "Push the noodles and shrimp to the side of the wok again and position the wok so that the burner is mainly heating the now-empty space. Add the remaining 2 tablespoons (30 ml) of oil, then add the eggs. Let them cook until just starting to set, about 10 seconds, then break them up with the spatula and scramble them.",
+      "Add the bean sprouts, Chinese garlic chives, and tofu, toss everything together, and stir-fry until the chives and bean sprouts are wilted and the noodles have begun to crisp and char in spots, about 1 minute longer.",
+      "Transfer to a serving platter and sprinkle with the peanuts. Serve immediately, passing lime wedges, raw garlic chives and bean sprouts, and table condiments for each diner to customize the dish as desired."
+    ],
+    "lines": [
+      {
+        "position": 0,
+        "text": "6 ounces (170 g) pad Thai noodles (¼-inch-wide dry rice noodles)"
+      },
+      {
+        "position": 1,
+        "text": "2 ounces (60 g) palm sugar or dark brown sugar"
+      },
+      {
+        "position": 2,
+        "text": "3 tablespoons (45 ml) fish sauce"
+      },
+      {
+        "position": 3,
+        "text": "3 tablespoons (45 ml) prepared tamarind pulp (see here)"
+      },
+      {
+        "position": 4,
+        "text": "1 teaspoon ground Thai chile (optional; see Notes)"
+      },
+      {
+        "position": 5,
+        "text": "¼ cup (60 ml) vegetable oil"
+      },
+      {
+        "position": 6,
+        "text": "1 medium shallot (about 1½ ounces/45 g), thinly sliced"
+      },
+      {
+        "position": 7,
+        "text": "3 medium garlic cloves (8 g), smashed with the side of a knife and roughly chopped"
+      },
+      {
+        "position": 8,
+        "text": "2 tablespoons (5 g) dried small shrimp (optional; see Notes)"
+      },
+      {
+        "position": 9,
+        "text": "1 tablespoon (15 ml) shrimp paste (optional)"
+      },
+      {
+        "position": 10,
+        "text": "3 tablespoons (20 g) chopped preserved sweet radish (optional; see Notes)"
+      },
+      {
+        "position": 11,
+        "text": "8 ounces (225 g) large shrimp, peeled (see Notes)"
+      },
+      {
+        "position": 12,
+        "text": "2 large eggs"
+      },
+      {
+        "position": 13,
+        "text": "1 cup (about 3 ounces/90 g) mung bean sprouts"
+      },
+      {
+        "position": 14,
+        "text": "5 or 6 Chinese garlic chives (about 3 ounces/90 g), sliced on a sharp bias into 1- to 2-inch pieces (see Notes)"
+      },
+      {
+        "position": 15,
+        "text": "4 ounces (120 g) baked or super firm tofu, cut into ½- by ½- by 2-inch blocks"
+      },
+      {
+        "position": 16,
+        "text": "½ cup (80 g) roasted peanuts or Fried Peanuts (here), gently crushed in a mortar and pestle"
+      },
+      {
+        "position": 17,
+        "text": "Lime wedges"
+      },
+      {
+        "position": 18,
+        "text": "Raw Chinese garlic chives (Japanese nira)"
+      },
+      {
+        "position": 19,
+        "text": "Raw mung bean sprouts"
+      },
+      {
+        "position": 20,
+        "text": "Bangkok-style table condiments, such as Prik Nam Som (here), fish sauce (such as Nam Pla Prik on here), sugar, and Thai chile flakes"
+      }
+    ],
+    "cuisines": [
+      {
+        "value_id": "thai"
+      }
+    ],
+    "methods": [
+      {
+        "value_id": "stir-fry",
+        "is_primary": true
+      }
+    ],
+    "courses": [
+      {
+        "value_id": "main"
+      }
+    ],
+    "accepted_courses": [
+      "main"
+    ],
+    "residual_keywords": [
+      "Sweet-Sour",
+      "Tangy",
+      "Street Food"
+    ],
+    "description": "Pad Thai is a popular Thai national dish with a sweet-sour-pungent-hot flavour profile, built with palm sugar, tamarind pulp, fish sauce, and chiles, reinforced with dried shrimp, shrimp paste, preserved radish, garlic, shallots, garlic chives, and fresh bean sprouts. It includes extra-firm tofu, crushed peanuts, scrambled egg, and shrimp, and is made with dried rice noodles that are partially rehydrated and then cooked in the wok to absorb the sauce.",
+    "book_title": "The Wok: Recipes and Techniques",
+    "book_author": "J. Kenji López-Alt",
+    "canonical_ingredients": [
+      "Pad Thai Noodles",
+      "Palm Sugar",
+      "Dark Brown Sugar",
+      "Fish Sauce",
+      "Tamarind Pulp",
+      "Thai Chilli",
+      "Vegetable Oil",
+      "Shallot",
+      "Garlic",
+      "Dried Shrimp",
+      "Shrimp Paste",
+      "Preserved Sweet Radish",
+      "Shrimp",
+      "Egg",
+      "Mung Bean Sprouts",
+      "Chinese Garlic Chive",
+      "Tofu",
+      "Peanut",
+      "Lime"
+    ],
+    "key_ingredients": [
+      "Pad Thai Noodles",
+      "Tamarind Pulp",
+      "Shrimp"
+    ]
+  },
+  {
+    "id": "b6e8e90fff1a4b29b6146e0c7c000a8a",
+    "slug": "brown-butter-buttermilk-cake",
+    "name": "Brown Butter–buttermilk Cake",
+    "archetype": "baked_cake_with_sections_and_alternatives",
+    "yields": "Makes one 9–inch cake",
+    "instructions": [
+      "Preheat the oven to 350°F. Prepare a 9-inch round cake pan with nonstick spray or grease with softened butter. Line with parchment paper, leaving a bit of overhang, if you like (I do this if the cake pan is old and has lost all its nonstick mojo, but also because visually, I like the ridges it makes on the sides of the cake).",
+      "In a small saucepan, melt the butter with the vanilla bean seeds and pod (if you’re using vanilla extract, wait to add it when you mix the wet ingredients). Cook, swirling the pot every so often, until the butter is foamy and starting to brown on the bottom, about 5 minutes (it should smell like hazelnuts and marshmallows and everything good in the world). Use a whisk to scrape up the bottom bits, then remove the pan from the heat and set it aside to cool slightly.",
+      "Whisk the flour, granulated sugar, brown sugar, baking powder, baking soda, and salt in a large bowl.",
+      "Whisk the buttermilk, eggs, and vanilla extract (if using) in a medium bowl until no visible bits of egg remain. Add the buttermilk mixture to the flour mixture and whisk just to blend (a few streaks of flour are fine). Remove the vanilla bean pod from the butter and pour the butter into the batter, whisking just to blend (do not overmix; this cake is particularly sensitive to becoming tough). Save the pot used to make the brown butter; you’ll use it again for the glaze.",
+      "Pour the batter into the prepared pan and bake until the edges are golden brown and the top springs back when pressed slightly, 35 to 40 minutes (if you’re using a cake tester, insert it into the center of the cake; it should come out clean).",
+      "Remove the cake from the oven and let it cool completely before icing.",
+      "MAKE THE ICING: Melt the butter in the same small saucepan over medium heat. Cook, swirling the pot every so often, until the butter is foamy and starting to brown on the bottom, about 4 minutes. Use a whisk to scrape up the bottom bits, then remove the butter from the heat and set aside to cool slightly.",
+      "Whisk the confectioners’ sugar, buttermilk, and brown butter together until you’ve got a smooth, shiny, pourable, frosting-like icing. Pour the icing on top of the cake, using an offset spatula, if needed, to spread it to the edges and letting it drip down in spots. Sprinkle with flaky sea salt and let sit 10 to 15 minutes to set."
+    ],
+    "lines": [
+      {
+        "position": 0,
+        "text": "CAKE"
+      },
+      {
+        "position": 1,
+        "text": "Nonstick cooking spray or softened butter, for the pan"
+      },
+      {
+        "position": 2,
+        "text": "½ cup (1 stick) unsalted butter"
+      },
+      {
+        "position": 3,
+        "text": "1 vanilla bean, split and seeds scraped, or 1½ teaspoons vanilla extract"
+      },
+      {
+        "position": 4,
+        "text": "2 cups all-purpose flour"
+      },
+      {
+        "position": 5,
+        "text": "½ cup granulated sugar"
+      },
+      {
+        "position": 6,
+        "text": "½ cup light brown sugar"
+      },
+      {
+        "position": 7,
+        "text": "1½ teaspoons baking powder"
+      },
+      {
+        "position": 8,
+        "text": "½ teaspoon baking soda"
+      },
+      {
+        "position": 9,
+        "text": "¾ teaspoon kosher salt"
+      },
+      {
+        "position": 10,
+        "text": "1 cup buttermilk"
+      },
+      {
+        "position": 11,
+        "text": "2 large eggs"
+      },
+      {
+        "position": 12,
+        "text": "ICING"
+      },
+      {
+        "position": 13,
+        "text": "2 tablespoons (¼ stick) unsalted butter"
+      },
+      {
+        "position": 14,
+        "text": "1¼ cups confectioners’ sugar"
+      },
+      {
+        "position": 15,
+        "text": "2 to 3 tablespoons buttermilk"
+      },
+      {
+        "position": 16,
+        "text": "Flaky sea salt"
+      }
+    ],
+    "cuisines": [],
+    "methods": [
+      {
+        "value_id": "bake",
+        "is_primary": true
+      }
+    ],
+    "courses": [
+      {
+        "value_id": "dessert"
+      }
+    ],
+    "accepted_courses": [
+      "dessert"
+    ],
+    "residual_keywords": [
+      "Cake",
+      "Sponge",
+      "Sweet"
+    ],
+    "description": null,
+    "book_title": "Dining In: Highly Cookable Recipes: A Cookbook",
+    "book_author": "Alison Roman",
+    "canonical_ingredients": [
+      "Nonstick Cooking Spray",
+      "Butter",
+      "Vanilla Bean",
+      "Vanilla Extract",
+      "All-Purpose Flour",
+      "Granulated Sugar",
+      "Light Brown Sugar",
+      "Baking Powder",
+      "Baking Soda",
+      "Kosher Salt",
+      "Buttermilk",
+      "Egg",
+      "Confectioners' Sugar",
+      "Flaky Sea Salt"
+    ],
+    "key_ingredients": [
+      "Butter",
+      "Buttermilk"
+    ]
+  }
+]

@@ -16,15 +16,15 @@ from app.epub import read_epub_image
 from app.models.base import as_utc, utcnow
 from app.models.book import Book
 from app.models.enums import ReadingMode, RecipeEnrichmentStatus, RecipeFacetKind
-from app.models.ingredient import IngredientLine, IngredientOccurrence
+from app.models.ingredient import CanonicalIngredient, RecipeIngredient
 from app.models.recipe import Keyword, Recipe, recipe_keywords
 from app.models.recipe_fact import RecipeFacet
 from app.models.recipe_list import RecipeListItem
 from app.schemas.recipe import (
     EpubLocation,
     IngredientLineRead,
-    IngredientOccurrenceRead,
     KeywordSummary,
+    RecipeCanonicalIngredientRead,
     RecipeCuisineRead,
     RecipeDetail,
     RecipeFactRead,
@@ -150,13 +150,15 @@ def _search_conditions(
                 Book.title_folded.contains(term),
                 Book.author_folded.contains(term),
                 Recipe.id.in_(
-                    select(IngredientLine.recipe_id).where(IngredientLine.text.ilike(like))
+                    select(RecipeIngredient.recipe_id).where(RecipeIngredient.text.ilike(like))
                 ),
                 Recipe.id.in_(
-                    select(IngredientLine.recipe_id)
-                    .join(IngredientOccurrence, IngredientOccurrence.line_id == IngredientLine.id)
-                    .join(IngredientOccurrence.ingredient)
-                    .where(IngredientOccurrence.ingredient.has(name_folded=term))
+                    select(RecipeIngredient.recipe_id)
+                    .join(
+                        CanonicalIngredient,
+                        RecipeIngredient.canonical_ingredient_id == CanonicalIngredient.id,
+                    )
+                    .where(CanonicalIngredient.name_folded == term)
                 ),
                 _keyword_match(Keyword.name.ilike(like)),
             )
@@ -506,9 +508,9 @@ def get_recipe(
         .where(Recipe.id == recipe_id)
         .options(
             selectinload(Recipe.keywords),
-            selectinload(Recipe.ingredients_verbatim)
-            .selectinload(IngredientLine.occurrences)
-            .joinedload(IngredientOccurrence.ingredient),
+            selectinload(Recipe.ingredients).joinedload(
+                RecipeIngredient.canonical_ingredient
+            ),
             selectinload(Recipe.facets).joinedload(RecipeFacet.facet_value),
             selectinload(Recipe.cuisines),
             joinedload(Recipe.enrichment_state),
@@ -534,6 +536,24 @@ def get_recipe(
         )
     else:
         previous, next_ = _book_neighbours(session, recipe)
+
+    seen_canonical_ids: set[uuid.UUID] = set()
+    canonical_ingredients: list[RecipeCanonicalIngredientRead] = []
+    for line in recipe.ingredients:
+        if (
+            line.canonical_ingredient_id is not None
+            and line.canonical_name
+            and line.canonical_ingredient_id not in seen_canonical_ids
+        ):
+            seen_canonical_ids.add(line.canonical_ingredient_id)
+            canonical_ingredients.append(
+                RecipeCanonicalIngredientRead(
+                    ingredient_id=line.canonical_ingredient_id,
+                    name=line.canonical_name,
+                    is_key=line.is_key,
+                )
+            )
+
     return RecipeDetail(
         id=recipe.id,
         book_id=book.id,
@@ -543,45 +563,20 @@ def get_recipe(
         name=recipe.name,
         description=recipe.description,
         ingredients_verbatim=[
-            IngredientLineRead.model_validate(line) for line in recipe.ingredients_verbatim
+            IngredientLineRead.model_validate(line) for line in recipe.ingredients
         ],
-        ingredients=[
-            IngredientOccurrenceRead(
-                id=occurrence.id,
-                line_id=occurrence.line_id,
-                position=occurrence.position,
-                ingredient_id=occurrence.ingredient_id,
-                ingredient_name=occurrence.ingredient.name,
-                quantity=occurrence.quantity,
-                unit=occurrence.unit,
-                preparation=occurrence.preparation,
-                optional=occurrence.optional,
-                alternative_group=occurrence.alternative_group,
-                is_key=occurrence.is_key,
-                parse_method=occurrence.parse_method,
-                resolution_method=occurrence.resolution_method,
-            )
-            for line in recipe.ingredients_verbatim
-            for occurrence in line.occurrences
-        ],
+        canonical_ingredients=canonical_ingredients,
         enrichment_status=(
             recipe.enrichment_state.status
             if recipe.enrichment_state is not None
             else RecipeEnrichmentStatus.PENDING
         ),
-        cuisines=[
-            RecipeCuisineRead(
-                id=cuisine.cuisine_id, source=cuisine.source, evidence=cuisine.evidence
-            )
-            for cuisine in recipe.cuisines
-        ],
+        cuisines=[RecipeCuisineRead(id=cuisine.cuisine_id) for cuisine in recipe.cuisines],
         methods=[
             RecipeFactRead(
                 id=fact.facet_value.value_id,
                 name=fact.facet_value.name,
                 is_primary=fact.is_primary,
-                source=fact.source,
-                evidence=fact.evidence,
             )
             for fact in recipe.facets
             if fact.facet_value.kind is RecipeFacetKind.METHOD
@@ -591,8 +586,6 @@ def get_recipe(
                 id=fact.facet_value.value_id,
                 name=fact.facet_value.name,
                 is_primary=fact.is_primary,
-                source=fact.source,
-                evidence=fact.evidence,
             )
             for fact in recipe.facets
             if fact.facet_value.kind is RecipeFacetKind.COURSE

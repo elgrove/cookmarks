@@ -11,7 +11,7 @@ from app.db import SessionLocal
 from app.epub import epub_path, has_epub, has_pdf, pdf_path
 from app.models.book import Book
 from app.models.enums import RecipeEnrichmentStatus, TaskStatus, TaskType
-from app.models.ingredient import IngredientLine
+from app.models.ingredient import RecipeIngredient
 from app.models.recipe import Recipe
 from app.models.recipe_enrichment import RecipeEnrichmentState
 from app.models.task_run import TaskRun
@@ -21,7 +21,7 @@ from app.services.book_keywords import generate_book_keywords
 from app.services.embeddings import embed_recipes
 from app.services.extraction.graph import get_extraction_graph
 from app.services.extraction.review import VALID_HUMAN_RESPONSES
-from app.services.keywords import get_or_create_keyword
+from app.services.recipe_enrichment.service import aggregate_metrics, enrich_recipe
 from app.tasks.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
@@ -129,15 +129,16 @@ def _upsert_recipe(session: Session, book: Book, run: TaskRun, data: RecipeData)
     recipe.instructions = data.instructions
     recipe.yields = data.yields
     recipe.image = data.image or None
-    recipe.keywords = [get_or_create_keyword(session, name) for name in data.keywords]
+    # Structured enrichment owns recipe keywords. Re-extraction deliberately leaves
+    # the prior five visible until its replacement enrichment succeeds.
     if fingerprint != previous_fingerprint:
         # SQLite checks the (recipe_id, position) uniqueness while it flushes. Delete
         # the old rows first, before inserting replacement lines at the same positions.
-        if recipe.ingredients_verbatim:
-            recipe.ingredients_verbatim.clear()
+        if recipe.ingredients:
+            recipe.ingredients.clear()
             session.flush()
-        recipe.ingredients_verbatim = [
-            IngredientLine(position=position, text=text)
+        recipe.ingredients = [
+            RecipeIngredient(position=position, text=text, canonical_ingredient_id=None, is_key=False)
             for position, text in enumerate(source_text)
         ]
         recipe.facets.clear()
@@ -196,6 +197,41 @@ def save_recipes_from_graph_state(
     return len(saved)
 
 
+def enrich_extracted_recipes(session: Session, run: TaskRun) -> dict:
+    """Enrich every just-extracted recipe independently: one failure never loses a book."""
+    recipes = list(session.scalars(select(Recipe).where(Recipe.extraction_run_id == run.id)))
+    complete = failed = stale = 0
+    results: list[dict[str, int]] = []
+    for recipe in recipes:
+        try:
+            result, usage = enrich_recipe(session, recipe.id, task_run_id=run.id)
+            if result.get("skipped"):
+                continue
+            complete += 1
+            results.append(result)
+            if usage.cost_usd is not None:
+                run.cost_usd = (run.cost_usd or 0) + usage.cost_usd
+            if usage.input_tokens is not None:
+                run.input_tokens = (run.input_tokens or 0) + usage.input_tokens
+            if usage.output_tokens is not None:
+                run.output_tokens = (run.output_tokens or 0) + usage.output_tokens
+        except Exception as exc:
+            failed += 1
+            if "stale" in str(exc).lower():
+                stale += 1
+            logger.warning("Enrichment failed for recipe %s: %s", recipe.id, exc)
+    metrics = aggregate_metrics(results)
+    return {
+        "enrichment": {
+            "attempted": len(recipes),
+            "complete": complete,
+            "failed": failed,
+            "stale_response": stale,
+            **metrics,
+        }
+    }
+
+
 def _finalise_result(run_id: str, result: dict | None) -> str:
     """Inspect the run after a graph invocation: persist recipes when done, or report
     the review pause. `result` is the graph's final state (None never reaches here on
@@ -215,6 +251,8 @@ def _finalise_result(run_id: str, result: dict | None) -> str:
                 return "Book not found"
             raw_recipes = (result or {}).get("raw_recipes", [])
             created = save_recipes_from_graph_state(session, book, run, raw_recipes)
+            run.detail = {**run.detail, **enrich_extracted_recipes(session, run)}
+            session.commit()
             logger.info(f"Finished extraction for {book.title}. Processed {created} recipes.")
             return f"Extracted {created} recipes for {book.title}"
 

@@ -1,11 +1,11 @@
 import uuid
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, Enum, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, Enum, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import UUIDAuditBase
-from app.models.enums import RecipeFacetKind, RecipeFactSource, enum_values
+from app.models.enums import RecipeFacetKind, enum_values
 
 if TYPE_CHECKING:
     from app.models.recipe import Recipe
@@ -35,10 +35,6 @@ class RecipeFacet(UUIDAuditBase):
         ForeignKey("recipe_facet_values.id", ondelete="RESTRICT"), index=True
     )
     is_primary: Mapped[bool] = mapped_column(Boolean, default=False)
-    source: Mapped[RecipeFactSource] = mapped_column(
-        Enum(RecipeFactSource, values_callable=enum_values)
-    )
-    evidence: Mapped[str | None] = mapped_column(Text)
     recipe: Mapped["Recipe"] = relationship(back_populates="facets")
     facet_value: Mapped["RecipeFacetValue"] = relationship(back_populates="facts")
 
@@ -53,8 +49,4 @@ class RecipeCuisine(UUIDAuditBase):
         ForeignKey("recipes.id", ondelete="CASCADE"), index=True
     )
     cuisine_id: Mapped[str] = mapped_column(String(200), index=True)
-    source: Mapped[RecipeFactSource] = mapped_column(
-        Enum(RecipeFactSource, values_callable=enum_values)
-    )
-    evidence: Mapped[str | None] = mapped_column(Text)
     recipe: Mapped["Recipe"] = relationship(back_populates="cuisines")

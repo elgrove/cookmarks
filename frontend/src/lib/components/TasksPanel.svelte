@@ -12,6 +12,9 @@
 		/** Wired to POST /api/tasks/calibre-sync — re-reads the Calibre library and
 		 *  reconciles books. Same fire-and-forget lifecycle, with no options. */
 		onSync?: () => Promise<TaskRunAck | void>;
+		/** Starts the bounded normal-API enrichment pilot. Its outcomes are reviewed in
+		 * Task Runs before any later Batch backfill can be authorised. */
+		onEnrichmentPilot?: () => Promise<TaskRunAck | void>;
 	};
 
 	type State = 'idle' | 'running' | 'done' | 'error';
@@ -25,11 +28,12 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
 
-	let { onRun, onDedup, onSync }: TasksPanelProps = $props();
+	let { onRun, onDedup, onSync, onEnrichmentPilot }: TasksPanelProps = $props();
 
 	let book = $state<Runner>({ state: 'idle', queued: null });
 	let dedup = $state<Runner>({ state: 'idle', queued: null });
 	let calibre = $state<Runner>({ state: 'idle', queued: null });
+	let enrichment = $state<Runner>({ state: 'idle', queued: null });
 	let regenerate = $state(false);
 
 	// `run` may be absent (an unwired handler returns undefined), hence the widened
@@ -55,6 +59,7 @@
 		clearTimeout(book.timer);
 		clearTimeout(dedup.timer);
 		clearTimeout(calibre.timer);
+		clearTimeout(enrichment.timer);
 	});
 
 	function label(state: State): string {
@@ -95,6 +100,15 @@
 				? ERROR_NOTE
 				: ''
 	);
+	let enrichmentNote = $derived(
+		enrichment.state === 'done'
+			? enrichment.queued && enrichment.queued > 0
+				? `Queued ${enrichment.queued} recipes for the live enrichment pilot. Review the per-recipe results in Task Runs before any backfill.`
+				: 'No recipes are available for the enrichment pilot.'
+			: enrichment.state === 'error'
+				? ERROR_NOTE
+				: ''
+	);
 </script>
 
 <section
@@ -106,6 +120,8 @@
 	data-verify-dedup-state={dedup.state}
 	data-verify-dedup-queued={dedup.queued === null ? '' : String(dedup.queued)}
 	data-verify-calibre-state={calibre.state}
+	data-verify-enrichment-state={enrichment.state}
+	data-verify-enrichment-queued={enrichment.queued === null ? '' : String(enrichment.queued)}
 >
 	<article class="task">
 		<div class="copy">
@@ -205,6 +221,33 @@
 
 	{#if calibreNote}
 		<p class="note" class:err={calibre.state === 'error'} role="status">{calibreNote}</p>
+	{/if}
+
+	<article class="task">
+		<div class="copy">
+			<h2 class="name">Run recipe enrichment pilot</h2>
+			<p class="desc">
+				Enrich a reproducible, stratified sample through the configured live provider. This is a
+				reviewable pilot, not a Batch backfill: inspect failures and representative facts in Task Runs.
+			</p>
+		</div>
+		<div class="action">
+			<button
+				class="run enrichment-run"
+				class:done={enrichment.state === 'done'}
+				class:error={enrichment.state === 'error'}
+				type="button"
+				aria-busy={enrichment.state === 'running'}
+				disabled={enrichment.state === 'running'}
+				onclick={() => runTask(enrichment, () => onEnrichmentPilot?.())}
+			>
+				{label(enrichment.state)}
+			</button>
+		</div>
+	</article>
+
+	{#if enrichmentNote}
+		<p class="note" class:err={enrichment.state === 'error'} role="status">{enrichmentNote}</p>
 	{/if}
 </section>
 

@@ -73,6 +73,24 @@ def test_trigger_calibre_sync_records_run_and_dispatches(
     assert calibre_dispatched == [(str(run.id),)]
 
 
+def test_trigger_recipe_enrichment_pilot_records_reproducible_sample(
+    client: TestClient, session: Session, enrichment_pilot_dispatched: list[tuple[Any, ...]]
+) -> None:
+    res = client.post("/api/tasks/recipe-enrichment-pilot")
+
+    assert res.status_code == 202
+    run = _only_run(session)
+    assert run.task_type == TaskType.RECIPE_ENRICHMENT_PILOT
+    assert res.json() == {
+        "task": "recipe_enrichment_pilot",
+        "status": "queued",
+        "queued": len(run.detail["recipe_ids"]),
+    }
+    assert run.detail["seed"] == 172
+    assert run.detail["recipe_ids"]
+    assert enrichment_pilot_dispatched == [(str(run.id),)]
+
+
 # --- The sweep itself, against a throwaway DB the task's SessionLocal is patched onto.
 
 

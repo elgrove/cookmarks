@@ -26,7 +26,8 @@ export const taskTypeSchema = z.enum([
 	'book_keywords',
 	'keyword_dedup',
 	'calibre_sync',
-	'book_ingest'
+	'book_ingest',
+	'recipe_enrichment_pilot'
 ]);
 export const taskStatusSchema = z.enum(['queued', 'running', 'review', 'done', 'failed']);
 
@@ -113,6 +114,21 @@ export interface CalibreSyncDetail {
 	orphaned: string[];
 	deleted: string[];
 	excluded: string[];
+}
+export interface RecipeEnrichmentPilotDetail {
+	seed: number;
+	recipe_ids: string[];
+	attempted?: number;
+	complete?: number;
+	failed?: number;
+	stale_response?: number;
+	outcomes?: Array<{
+		recipe_id: string;
+		status: 'complete' | 'failed' | 'stale';
+		error?: string;
+		keywords?: string[];
+		line_kinds?: Array<'ingredient' | 'heading' | 'note' | null>;
+	}>;
 }
 
 /** Every task run, newest first — the unified admin reporting index. `type` filters to

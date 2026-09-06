@@ -8,7 +8,12 @@
 	import TaskRunsPanel from '$lib/components/TaskRunsPanel.svelte';
 	import UsersPanel from '$lib/components/UsersPanel.svelte';
 	import { fetchConfig, updateConfig, type Config, type ConfigUpdate } from '$lib/api/config';
-	import { triggerBookKeywords, triggerDedupKeywords, triggerCalibreSync } from '$lib/api/tasks';
+	import {
+		triggerBookKeywords,
+		triggerDedupKeywords,
+		triggerCalibreSync,
+		triggerRecipeEnrichmentPilot
+	} from '$lib/api/tasks';
 	import { fetchTaskRuns, type TaskRun } from '$lib/api/task-runs';
 	import {
 		createUser,
@@ -51,6 +56,10 @@
 						extractionApiKeySet: config.api_key_set,
 						assistantProvider: config.assistant_provider,
 						assistantApiKeySet: config.assistant_api_key_set,
+						enrichmentStage1Provider: config.enrichment_stage1_provider,
+						enrichmentStage1ApiKeySet: config.enrichment_stage1_api_key_set,
+						enrichmentStage2Provider: config.enrichment_stage2_provider,
+						enrichmentStage2ApiKeySet: config.enrichment_stage2_api_key_set,
 						rateLimit: config.extraction_rate_limit_per_minute,
 						providers: config.providers.map((p) => ({
 							name: p.name,
@@ -155,6 +164,7 @@
 			onRun={({ regenerate }) => triggerBookKeywords(regenerate)}
 			onDedup={() => triggerDedupKeywords()}
 			onSync={() => triggerCalibreSync()}
+			onEnrichmentPilot={() => triggerRecipeEnrichmentPilot()}
 		/>
 	{:else if active === 'task-runs'}
 		{#if runsStatus === 'ready'}

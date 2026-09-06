@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.enums import RecipeFacetKind
-from app.models.ingredient import Ingredient, IngredientAlias
+from app.models.ingredient import CanonicalIngredient
 from app.models.recipe_fact import RecipeFacet, RecipeFacetValue
 from app.text import fold
 
@@ -67,27 +67,29 @@ def validate_cuisine_id(cuisine_id: str) -> None:
         raise ValueError(f"unknown accepted cuisine: {cuisine_id}")
 
 
-def create_ingredient(session: Session, name: str) -> Ingredient:
-    """Create a canonical ingredient only when no alias already owns its folded name."""
+def create_canonical_ingredient(session: Session, name: str) -> CanonicalIngredient:
+    """Create a canonical ingredient, rejecting existing canonical names."""
     folded = fold(name)
-    if session.scalar(select(IngredientAlias).where(IngredientAlias.name_folded == folded)):
-        raise ValueError("canonical ingredient collides with an existing alias")
-    if session.scalar(select(Ingredient).where(Ingredient.name_folded == folded)):
+    if session.scalar(select(CanonicalIngredient).where(CanonicalIngredient.name_folded == folded)):
         raise ValueError("canonical ingredient already exists")
-    ingredient = Ingredient(name=name)
+    ingredient = CanonicalIngredient(name=name)
     session.add(ingredient)
     session.flush()
     return ingredient
 
 
-def add_ingredient_alias(session: Session, ingredient: Ingredient, name: str) -> IngredientAlias:
-    """Add an accepted synonym, rejecting canonical/alias namespace collisions."""
+def get_or_create_canonical_ingredient(session: Session, name: str) -> CanonicalIngredient:
+    """Get an existing canonical ingredient by folded name or create a new one."""
     folded = fold(name)
-    if session.scalar(select(Ingredient).where(Ingredient.name_folded == folded)):
-        raise ValueError("ingredient alias collides with a canonical ingredient")
-    if session.scalar(select(IngredientAlias).where(IngredientAlias.name_folded == folded)):
-        raise ValueError("ingredient alias already exists")
-    alias = IngredientAlias(ingredient_id=ingredient.id, name=name)
-    session.add(alias)
+    existing = session.scalar(select(CanonicalIngredient).where(CanonicalIngredient.name_folded == folded))
+    if existing is not None:
+        return existing
+    ingredient = CanonicalIngredient(name=name)
+    session.add(ingredient)
     session.flush()
-    return alias
+    return ingredient
+
+
+create_ingredient = create_canonical_ingredient
+get_or_create_ingredient = get_or_create_canonical_ingredient
+

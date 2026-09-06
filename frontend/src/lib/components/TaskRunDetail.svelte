@@ -6,7 +6,8 @@
 		BookKeywordsDetail,
 		KeywordDedupDetail,
 		CalibreSyncDetail,
-		BookIngestDetail
+		BookIngestDetail,
+		RecipeEnrichmentPilotDetail
 	} from '$lib/api/task-runs';
 
 	export type TaskRunDetailProps = {
@@ -31,13 +32,15 @@
 		book_keywords: 'Book keywords',
 		keyword_dedup: 'Keyword dedup',
 		calibre_sync: 'Calibre sync',
-		book_ingest: 'Add book'
+		book_ingest: 'Add book',
+		recipe_enrichment_pilot: 'Enrichment pilot'
 	};
 	const TYPE_TITLES: Record<Exclude<TaskType, 'extraction'>, string> = {
 		book_keywords: 'Book-keyword tagging',
 		keyword_dedup: 'Keyword vocabulary dedup',
 		calibre_sync: 'Calibre library sync',
-		book_ingest: 'Book added to the library'
+		book_ingest: 'Book added to the library',
+		recipe_enrichment_pilot: 'Recipe enrichment pilot'
 	};
 
 	const dateFmt = new Intl.DateTimeFormat('en-GB', {
@@ -166,6 +169,19 @@
 					}
 				];
 			}
+			case 'recipe_enrichment_pilot': {
+				const d = run.detail as unknown as RecipeEnrichmentPilotDetail;
+				return [
+					{ label: 'Sample', value: `${d.recipe_ids?.length ?? 0} recipes` },
+					{ label: 'Seed', value: count(d.seed) },
+					{ label: 'Attempted', value: count(d.attempted) },
+					{ label: 'Complete', value: count(d.complete) },
+					{ label: 'Failed', value: count(d.failed) },
+					{ label: 'Stale responses', value: count(d.stale_response) },
+					{ label: 'Cost', value: formatCost(run.cost_usd) },
+					{ label: 'Tokens', value: formatTokens(run.input_tokens, run.output_tokens) }
+				];
+			}
 		}
 	}
 </script>
@@ -244,6 +260,26 @@
 					{/each}
 				</ul>
 			</div>
+		{/if}
+
+		{#if run.task_type === 'recipe_enrichment_pilot'}
+			{@const outcomes = (run.detail as unknown as RecipeEnrichmentPilotDetail).outcomes ?? []}
+			<section class="outcomes" aria-label="Recipe enrichment pilot outcomes">
+				<h4>Pilot outcomes</h4>
+				{#if outcomes.length === 0}
+					<p>No per-recipe outcomes yet.</p>
+				{:else}
+					<ul>
+						{#each outcomes as outcome (outcome.recipe_id)}
+							<li>
+								<code>{outcome.recipe_id}</code> — {outcome.status}
+								{#if outcome.error}<span>: {outcome.error}</span>{/if}
+								{#if outcome.keywords}<span> · {outcome.keywords.join(', ')}</span>{/if}
+							</li>
+						{/each}
+					</ul>
+				{/if}
+			</section>
 		{/if}
 	{:else}
 		<p class="empty">Select a run to see its report.</p>

@@ -46,3 +46,13 @@ export async function triggerCalibreSync(fetchFn: typeof fetch = fetch): Promise
 	if (!res.ok) throw new Error(`POST /api/tasks/calibre-sync → ${res.status}`);
 	return taskRunAckSchema.parse(await res.json());
 }
+
+/** Queue the bounded, reviewed live-API recipe enrichment pilot. It never uses Gemini
+ * Batch: the response is only an acknowledgement; detailed outcomes land in Task Runs. */
+export async function triggerRecipeEnrichmentPilot(
+	fetchFn: typeof fetch = fetch
+): Promise<TaskRunAck> {
+	const res = await fetchFn('/api/tasks/recipe-enrichment-pilot', { method: 'POST' });
+	if (!res.ok) throw new Error(`POST /api/tasks/recipe-enrichment-pilot → ${res.status}`);
+	return taskRunAckSchema.parse(await res.json());
+}

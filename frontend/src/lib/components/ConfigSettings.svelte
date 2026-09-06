@@ -8,6 +8,10 @@
 		extractionApiKeySet?: boolean;
 		assistantProvider?: AiProvider | null;
 		assistantApiKeySet?: boolean;
+		enrichmentStage1Provider?: AiProvider | null;
+		enrichmentStage1ApiKeySet?: boolean;
+		enrichmentStage2Provider?: AiProvider | null;
+		enrichmentStage2ApiKeySet?: boolean;
 		rateLimit?: number;
 		providers?: { name: AiProvider; requiresApiKey: boolean }[];
 	};
@@ -40,22 +44,34 @@
 	}
 	let extractionProviderValue = $state('');
 	let assistantProviderValue = $state('');
+	let enrichmentStage1ProviderValue = $state('');
+	let enrichmentStage2ProviderValue = $state('');
 	let rateLimit = $state(0);
 	let extractionKeyMode = $state<KeyMode>('keep');
 	let assistantKeyMode = $state<KeyMode>('keep');
+	let enrichmentStage1KeyMode = $state<KeyMode>('keep');
+	let enrichmentStage2KeyMode = $state<KeyMode>('keep');
 	let extractionKeyInput = $state('');
 	let assistantKeyInput = $state('');
+	let enrichmentStage1KeyInput = $state('');
+	let enrichmentStage2KeyInput = $state('');
 	let userInstructionsInput = $state('');
 	let timer: ReturnType<typeof setTimeout> | undefined;
 
 	$effect(() => {
 		extractionProviderValue = config.extractionProvider ?? '';
 		assistantProviderValue = config.assistantProvider ?? '';
+		enrichmentStage1ProviderValue = config.enrichmentStage1Provider ?? '';
+		enrichmentStage2ProviderValue = config.enrichmentStage2Provider ?? '';
 		rateLimit = config.rateLimit ?? 0;
 		extractionKeyMode = config.extractionApiKeySet ? 'keep' : 'set';
 		assistantKeyMode = config.assistantApiKeySet ? 'keep' : 'set';
+		enrichmentStage1KeyMode = config.enrichmentStage1ApiKeySet ? 'keep' : 'set';
+		enrichmentStage2KeyMode = config.enrichmentStage2ApiKeySet ? 'keep' : 'set';
 		extractionKeyInput = '';
 		assistantKeyInput = '';
+		enrichmentStage1KeyInput = '';
+		enrichmentStage2KeyInput = '';
 		userInstructionsInput = config.userInstructions ?? '';
 	});
 
@@ -65,20 +81,46 @@
 	let assistantSelectedProvider = $derived(
 		config.providers?.find((p) => p.name === assistantProviderValue)
 	);
+	let enrichmentStage1SelectedProvider = $derived(
+		config.providers?.find((p) => p.name === enrichmentStage1ProviderValue)
+	);
+	let enrichmentStage2SelectedProvider = $derived(
+		config.providers?.find((p) => p.name === enrichmentStage2ProviderValue)
+	);
 	let showExtractionKeyField = $derived(
 		!!extractionSelectedProvider && extractionSelectedProvider.requiresApiKey
 	);
 	let showAssistantKeyField = $derived(
 		!!assistantSelectedProvider && assistantSelectedProvider.requiresApiKey
 	);
+	let showEnrichmentStage1KeyField = $derived(
+		!!enrichmentStage1SelectedProvider && enrichmentStage1SelectedProvider.requiresApiKey
+	);
+	let showEnrichmentStage2KeyField = $derived(
+		!!enrichmentStage2SelectedProvider && enrichmentStage2SelectedProvider.requiresApiKey
+	);
 	let extractionKeyAction = $derived(showExtractionKeyField ? extractionKeyMode : 'na');
 	let assistantKeyAction = $derived(showAssistantKeyField ? assistantKeyMode : 'na');
+	let enrichmentStage1KeyAction = $derived(
+		showEnrichmentStage1KeyField ? enrichmentStage1KeyMode : 'na'
+	);
+	let enrichmentStage2KeyAction = $derived(
+		showEnrichmentStage2KeyField ? enrichmentStage2KeyMode : 'na'
+	);
 
 	let extractionProviderChanged = $derived(
 		isAdmin && (extractionProviderValue || null) !== (config.extractionProvider ?? null)
 	);
 	let assistantProviderChanged = $derived(
 		isAdmin && (assistantProviderValue || null) !== (config.assistantProvider ?? null)
+	);
+	let enrichmentStage1ProviderChanged = $derived(
+		isAdmin &&
+			(enrichmentStage1ProviderValue || null) !== (config.enrichmentStage1Provider ?? null)
+	);
+	let enrichmentStage2ProviderChanged = $derived(
+		isAdmin &&
+			(enrichmentStage2ProviderValue || null) !== (config.enrichmentStage2Provider ?? null)
 	);
 	let rateChanged = $derived(
 		isAdmin && Number.isFinite(rateLimit) && rateLimit !== (config.rateLimit ?? 0)
@@ -95,6 +137,18 @@
 			((assistantKeyMode === 'set' && assistantKeyInput.length > 0) ||
 				assistantKeyMode === 'clear')
 	);
+	let enrichmentStage1KeyChanged = $derived(
+		isAdmin &&
+			showEnrichmentStage1KeyField &&
+			((enrichmentStage1KeyMode === 'set' && enrichmentStage1KeyInput.length > 0) ||
+				enrichmentStage1KeyMode === 'clear')
+	);
+	let enrichmentStage2KeyChanged = $derived(
+		isAdmin &&
+			showEnrichmentStage2KeyField &&
+			((enrichmentStage2KeyMode === 'set' && enrichmentStage2KeyInput.length > 0) ||
+				enrichmentStage2KeyMode === 'clear')
+	);
 
 	let normalisedInstructions = $derived(userInstructionsInput.trim() || null);
 	let instructionsChanged = $derived(
@@ -106,9 +160,13 @@
 		instructionsChanged ||
 			extractionProviderChanged ||
 			assistantProviderChanged ||
+			enrichmentStage1ProviderChanged ||
+			enrichmentStage2ProviderChanged ||
 			rateChanged ||
 			extractionKeyChanged ||
-			assistantKeyChanged
+			assistantKeyChanged ||
+			enrichmentStage1KeyChanged ||
+			enrichmentStage2KeyChanged
 	);
 
 	let saveLabel = $derived(
@@ -129,6 +187,16 @@
 		if (assistantProviderChanged) {
 			patch.assistant_provider = (assistantProviderValue || null) as AiProvider | null;
 		}
+		if (enrichmentStage1ProviderChanged) {
+			patch.enrichment_stage1_provider = (enrichmentStage1ProviderValue || null) as
+				| AiProvider
+				| null;
+		}
+		if (enrichmentStage2ProviderChanged) {
+			patch.enrichment_stage2_provider = (enrichmentStage2ProviderValue || null) as
+				| AiProvider
+				| null;
+		}
 		if (rateChanged) patch.extraction_rate_limit_per_minute = rateLimit;
 		if (showExtractionKeyField) {
 			if (extractionKeyMode === 'set' && extractionKeyInput.length > 0) {
@@ -139,6 +207,16 @@
 			if (assistantKeyMode === 'set' && assistantKeyInput.length > 0) {
 				patch.assistant_api_key = assistantKeyInput;
 			} else if (assistantKeyMode === 'clear') patch.assistant_api_key = '';
+		}
+		if (showEnrichmentStage1KeyField) {
+			if (enrichmentStage1KeyMode === 'set' && enrichmentStage1KeyInput.length > 0) {
+				patch.enrichment_stage1_api_key = enrichmentStage1KeyInput;
+			} else if (enrichmentStage1KeyMode === 'clear') patch.enrichment_stage1_api_key = '';
+		}
+		if (showEnrichmentStage2KeyField) {
+			if (enrichmentStage2KeyMode === 'set' && enrichmentStage2KeyInput.length > 0) {
+				patch.enrichment_stage2_api_key = enrichmentStage2KeyInput;
+			} else if (enrichmentStage2KeyMode === 'clear') patch.enrichment_stage2_api_key = '';
 		}
 		return patch;
 	}
@@ -156,9 +234,13 @@
 				isAdmin &&
 				(extractionProviderChanged ||
 					assistantProviderChanged ||
+					enrichmentStage1ProviderChanged ||
+					enrichmentStage2ProviderChanged ||
 					rateChanged ||
 					extractionKeyChanged ||
-					assistantKeyChanged) &&
+					assistantKeyChanged ||
+					enrichmentStage1KeyChanged ||
+					enrichmentStage2KeyChanged) &&
 				onSave
 			) {
 				promises.push(Promise.resolve(onSave(buildPatch())));
@@ -188,6 +270,12 @@
 	data-verify-assistant-provider={assistantProviderValue || 'none'}
 	data-verify-assistant-key-set={String(config.assistantApiKeySet ?? false)}
 	data-verify-assistant-key-action={assistantKeyAction}
+	data-verify-enrichment-stage1-provider={enrichmentStage1ProviderValue || 'none'}
+	data-verify-enrichment-stage1-key-set={String(config.enrichmentStage1ApiKeySet ?? false)}
+	data-verify-enrichment-stage1-key-action={enrichmentStage1KeyAction}
+	data-verify-enrichment-stage2-provider={enrichmentStage2ProviderValue || 'none'}
+	data-verify-enrichment-stage2-key-set={String(config.enrichmentStage2ApiKeySet ?? false)}
+	data-verify-enrichment-stage2-key-action={enrichmentStage2KeyAction}
 	data-verify-book-grid-density={density}
 	data-verify-dirty={String(dirty)}
 	data-verify-over-limit={String(overLimit)}
@@ -305,6 +393,98 @@
 							onclick={() => {
 								extractionKeyMode = 'keep';
 								extractionKeyInput = '';
+							}}>Cancel</button
+						>
+					{/if}
+				{/if}
+			</div>
+		</div>
+
+		<div class="field">
+			<label class="label" for="enrichment-stage1-provider">Ingredient parsing provider</label>
+			<div class="control">
+				<select id="enrichment-stage1-provider" bind:value={enrichmentStage1ProviderValue}>
+					<option value="">— Use extraction provider —</option>
+					{#each config.providers ?? [] as provider (provider.name)}
+						<option value={provider.name}>{provider.name}</option>
+					{/each}
+				</select>
+			</div>
+		</div>
+
+		<div class="field">
+			<label class="label" for="enrichment-stage1-api-key">Ingredient parsing API key</label>
+			<div class="control">
+				{#if !showEnrichmentStage1KeyField}
+					<p class="hint">Uses the extraction provider and API key.</p>
+				{:else if config.enrichmentStage1ApiKeySet && enrichmentStage1KeyMode === 'keep'}
+					<span class="key-status">•••• set</span>
+					<button class="link" type="button" onclick={() => (enrichmentStage1KeyMode = 'set')}>Replace</button>
+					<button class="link" type="button" onclick={() => (enrichmentStage1KeyMode = 'clear')}>Clear</button>
+				{:else if enrichmentStage1KeyMode === 'clear'}
+					<span class="key-status">Will be cleared on save</span>
+					<button class="link" type="button" onclick={() => (enrichmentStage1KeyMode = 'keep')}>Undo</button>
+				{:else}
+					<input
+						id="enrichment-stage1-api-key"
+						type="password"
+						autocomplete="off"
+						placeholder="Paste API key"
+						bind:value={enrichmentStage1KeyInput}
+					/>
+					{#if config.enrichmentStage1ApiKeySet}
+						<button
+							class="link"
+							type="button"
+							onclick={() => {
+								enrichmentStage1KeyMode = 'keep';
+								enrichmentStage1KeyInput = '';
+							}}>Cancel</button
+						>
+					{/if}
+				{/if}
+			</div>
+		</div>
+
+		<div class="field">
+			<label class="label" for="enrichment-stage2-provider">Recipe semantics and fallback provider</label>
+			<div class="control">
+				<select id="enrichment-stage2-provider" bind:value={enrichmentStage2ProviderValue}>
+					<option value="">— Use extraction provider —</option>
+					{#each config.providers ?? [] as provider (provider.name)}
+						<option value={provider.name}>{provider.name}</option>
+					{/each}
+				</select>
+			</div>
+		</div>
+
+		<div class="field">
+			<label class="label" for="enrichment-stage2-api-key">Recipe semantics and fallback API key</label>
+			<div class="control">
+				{#if !showEnrichmentStage2KeyField}
+					<p class="hint">Uses the extraction provider and API key.</p>
+				{:else if config.enrichmentStage2ApiKeySet && enrichmentStage2KeyMode === 'keep'}
+					<span class="key-status">•••• set</span>
+					<button class="link" type="button" onclick={() => (enrichmentStage2KeyMode = 'set')}>Replace</button>
+					<button class="link" type="button" onclick={() => (enrichmentStage2KeyMode = 'clear')}>Clear</button>
+				{:else if enrichmentStage2KeyMode === 'clear'}
+					<span class="key-status">Will be cleared on save</span>
+					<button class="link" type="button" onclick={() => (enrichmentStage2KeyMode = 'keep')}>Undo</button>
+				{:else}
+					<input
+						id="enrichment-stage2-api-key"
+						type="password"
+						autocomplete="off"
+						placeholder="Paste API key"
+						bind:value={enrichmentStage2KeyInput}
+					/>
+					{#if config.enrichmentStage2ApiKeySet}
+						<button
+							class="link"
+							type="button"
+							onclick={() => {
+								enrichmentStage2KeyMode = 'keep';
+								enrichmentStage2KeyInput = '';
 							}}>Cancel</button
 						>
 					{/if}
