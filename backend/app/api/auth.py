@@ -8,6 +8,7 @@ from app.models.user import User
 from app.schemas.auth import (
     AuthMe,
     LoginRequest,
+    PasswordChange,
     UserPreferencesUpdate,
     UserUpdate,
 )
@@ -19,6 +20,7 @@ from app.services.auth import (
     verify_dummy_password,
     verify_password,
 )
+from app.services.users import UserError, set_password
 
 router = APIRouter(tags=["auth"])
 
@@ -65,6 +67,21 @@ def logout(request: Request, session: SessionDep) -> Response:
     token = request.cookies.get(COOKIE_NAME)
     if token:
         delete_session(session, token)
+    response = Response(status_code=status.HTTP_204_NO_CONTENT)
+    response.delete_cookie(COOKIE_NAME, path="/")
+    return response
+
+
+@router.post("/auth/change-password", status_code=status.HTTP_204_NO_CONTENT)
+def change_password(
+    body: PasswordChange, user: CurrentUser, session: SessionDep
+) -> Response:
+    if not verify_password(body.current_password, user.password_hash):
+        raise HTTPException(status_code=400, detail="Current password is incorrect.")
+    try:
+        set_password(session, user, body.new_password)
+    except UserError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     response = Response(status_code=status.HTTP_204_NO_CONTENT)
     response.delete_cookie(COOKIE_NAME, path="/")
     return response

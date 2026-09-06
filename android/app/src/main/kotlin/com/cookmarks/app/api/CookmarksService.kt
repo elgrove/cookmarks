@@ -3,6 +3,7 @@ package com.cookmarks.app.api
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.PUT
 import retrofit2.http.Path
@@ -15,11 +16,44 @@ interface CookmarksService {
     @POST("api/auth/logout")
     suspend fun logout()
 
+    @POST("api/auth/change-password")
+    suspend fun changePassword(@Body body: PasswordChange)
+
     @GET("api/auth/me")
     suspend fun me(): AuthMe
 
+    @GET("api/config")
+    suspend fun config(): ConfigRead
+
+    @PATCH("api/config")
+    suspend fun updateConfig(@Body body: ConfigUpdate): ConfigRead
+
+    @POST("api/tasks/book-keywords")
+    suspend fun triggerBookKeywords(@Body body: BookKeywordTaskRequest): TaskRunAck
+
+    @POST("api/tasks/dedup-keywords")
+    suspend fun triggerKeywordDedup(): TaskRunAck
+
+    @POST("api/tasks/calibre-sync")
+    suspend fun triggerCalibreSync(): TaskRunAck
+
+    @GET("api/users")
+    suspend fun users(): List<UserRead>
+
+    @POST("api/users")
+    suspend fun createUser(@Body body: UserCreate): UserRead
+
+    @DELETE("api/users/{id}")
+    suspend fun deleteUser(@Path("id") id: String)
+
+    @POST("api/users/{id}/password")
+    suspend fun resetPassword(@Path("id") id: String, @Body body: PasswordReset)
+
     @GET("api/task-runs")
-    suspend fun taskRuns(): List<TaskRun>
+    suspend fun taskRuns(
+        @Query("limit") limit: Int = 50,
+        @Query("offset") offset: Int = 0,
+    ): List<TaskRun>
 
     @GET("api/books")
     suspend fun books(): List<BookSummary>

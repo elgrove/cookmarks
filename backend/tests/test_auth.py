@@ -83,6 +83,44 @@ def test_logout_invalidates_the_session(anon: TestClient) -> None:
     assert anon.get("/api/auth/me").status_code == 401
 
 
+def test_member_can_change_own_password(anon: TestClient, session: Session) -> None:
+    create_user(session, "plain", "old-password", is_admin=False)
+    anon.post("/api/auth/login", json={"username": "plain", "password": "old-password"})
+
+    changed = anon.post(
+        "/api/auth/change-password",
+        json={"current_password": "old-password", "new_password": "new-password"},
+    )
+
+    assert changed.status_code == 204
+    assert anon.get("/api/auth/me").status_code == 401
+    assert anon.post(
+        "/api/auth/login", json={"username": "plain", "password": "old-password"}
+    ).status_code == 401
+    assert anon.post(
+        "/api/auth/login", json={"username": "plain", "password": "new-password"}
+    ).status_code == 200
+
+
+def test_change_password_rejects_wrong_current_password(anon: TestClient) -> None:
+    anon.post("/api/auth/login", json={"username": "tester", "password": TESTER_PASSWORD})
+    changed = anon.post(
+        "/api/auth/change-password",
+        json={"current_password": "wrong-password", "new_password": "new-password"},
+    )
+    assert changed.status_code == 400
+    assert changed.json()["detail"] == "Current password is incorrect."
+
+
+def test_change_password_enforces_minimum_length(anon: TestClient) -> None:
+    anon.post("/api/auth/login", json={"username": "tester", "password": TESTER_PASSWORD})
+    changed = anon.post(
+        "/api/auth/change-password",
+        json={"current_password": TESTER_PASSWORD, "new_password": "short"},
+    )
+    assert changed.status_code == 409
+
+
 def test_auth_mode_none_needs_no_cookie(
     anon: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -186,4 +224,3 @@ def test_user_instructions_are_private_between_users(
     users = anon.get("/api/users").json()
     for u in users:
         assert "user_instructions" not in u
-
