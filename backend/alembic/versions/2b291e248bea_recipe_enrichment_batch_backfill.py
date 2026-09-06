@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = '2b291e248bea'
-down_revision: Union[str, Sequence[str], None] = 'e4b1c2d3a4f5'
+down_revision: Union[str, Sequence[str], None] = 'f5c2d3e4a6b7'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -81,12 +81,6 @@ def upgrade() -> None:
         batch_op.create_index(batch_op.f('ix_recipe_enrichment_batch_items_recipe_id'), ['recipe_id'], unique=False)
         batch_op.create_index(batch_op.f('ix_recipe_enrichment_batch_items_request_key'), ['request_key'], unique=False)
 
-    with op.batch_alter_table('config', schema=None) as batch_op:
-        batch_op.alter_column('assistant_provider',
-               existing_type=sa.VARCHAR(length=20),
-               type_=sa.Enum('ANTHROPIC', 'GEMINI', 'OPENROUTER', 'STUB', name='aiprovider'),
-               existing_nullable=True)
-
     with op.batch_alter_table('task_runs', schema=None) as batch_op:
         batch_op.alter_column('task_type',
                existing_type=sa.VARCHAR(length=13),
@@ -102,14 +96,8 @@ def downgrade() -> None:
     with op.batch_alter_table('task_runs', schema=None) as batch_op:
         batch_op.alter_column('task_type',
                existing_type=sa.Enum('extraction', 'book_keywords', 'keyword_dedup', 'calibre_sync', 'book_ingest', 'recipe_enrichment_pilot', 'recipe_enrichment_backfill', name='tasktype'),
-               type_=sa.VARCHAR(length=13),
+               type_=sa.VARCHAR(length=30),
                existing_nullable=False)
-
-    with op.batch_alter_table('config', schema=None) as batch_op:
-        batch_op.alter_column('assistant_provider',
-               existing_type=sa.Enum('ANTHROPIC', 'GEMINI', 'OPENROUTER', 'STUB', name='aiprovider'),
-               type_=sa.VARCHAR(length=20),
-               existing_nullable=True)
 
     with op.batch_alter_table('recipe_enrichment_batch_items', schema=None) as batch_op:
         batch_op.drop_index(batch_op.f('ix_recipe_enrichment_batch_items_request_key'))

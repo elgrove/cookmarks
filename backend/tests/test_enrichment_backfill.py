@@ -27,12 +27,15 @@ from app.models.recipe import Keyword, Recipe
 from app.models.recipe_enrichment import RecipeEnrichmentState
 from app.models.recipe_enrichment_batch import RecipeEnrichmentBatch
 from app.models.task_run import TaskRun
+from app.services.ai import get_config
 from app.services.ai.gemini_batch import RemoteBatchJob
 from app.services.ai.stub import StubProvider
 from app.services.recipe_enrichment.batch import (
     BATCH_CHUNK_MAX_BYTES,
     BATCH_MAX_ATTEMPTS,
+    BATCH_PRICING,
     BATCH_PRICING_SNAPSHOT_VERSION,
+    batch_cost_usd,
     correlate_results,
     display_name,
     job_key,
@@ -47,10 +50,11 @@ from app.services.recipe_enrichment.schema import (
     Stage1Response,
     Stage2Response,
 )
-from app.services.recipe_enrichment.service import build_context
+from app.services.recipe_enrichment.service import source_fingerprint
 from app.tasks.enrichment_backfill import (
+    _delete_orphan_keywords,
+    _recipe_map,
     build_retry_chunks,
-    delete_orphan_keywords,
     ingest_succeeded_batch,
     poll_backfill,
     prepare_stage_chunks,
@@ -145,15 +149,18 @@ def fake_client(monkeypatch):
     monkeypatch.setattr(
         "app.tasks.enrichment_backfill.GeminiBatchClient", lambda api_key: fake
     )
+    stub = StubProvider("")
     monkeypatch.setattr(
-        "app.tasks.enrichment_backfill.get_ai_provider", lambda session: StubProvider("")
+        "app.tasks.enrichment_backfill.get_ai_provider", lambda session: stub
+    )
+    monkeypatch.setattr(
+        "app.tasks.enrichment_backfill.get_recipe_enrichment_providers",
+        lambda session: (stub, stub),
     )
     return fake
 
 
 def _gemini_config(session) -> None:
-    from app.services.ai import get_config
-
     config = get_config(session)
     config.ai_provider = AIProvider.GEMINI
     config.api_key = "test-key"
@@ -181,14 +188,11 @@ def _backfill_run(session, **detail) -> TaskRun:
 
 
 def _stage1_line(session, recipe: Recipe, key: str) -> str:
-    _, proposals = build_context(session, recipe)
-    context_ids = [line_id for line_id in
-                   [str(line.id) for line in recipe.ingredients_verbatim]
-                   if line_id not in proposals]
+    context_ids = [str(line.id) for line in recipe.ingredients_verbatim]
     response = Stage1Response.model_validate(
         {
             "p": [
-                {"l": line_id, "o": [{"n": "Glorp", "q": "1", "k": True}]}
+                {"l": line_id, "o": [{"n": "Glorp", "q": "1"}]}
                 for line_id in context_ids
             ],
             "n": [],
@@ -210,9 +214,10 @@ def _stage1_line(session, recipe: Recipe, key: str) -> str:
     )
 
 
-def _stage2_line(key: str) -> str:
+def _stage2_line(session, recipe: Recipe, key: str) -> str:
     response = Stage2Response.model_validate(
         {
+            "k": [{"l": str(line.id), "o": 0} for line in recipe.ingredients_verbatim],
             "c": [],
             "m": [{"v": "bake", "p": True}],
             "o": ["main"],
@@ -248,10 +253,6 @@ def test_plan_chunks_splits_by_bytes() -> None:
 
 def test_batch_pricing_snapshot_is_half_live() -> None:
     from app.services.ai.gemini import _PRICING
-    from app.services.recipe_enrichment.batch import (
-        BATCH_PRICING,
-        batch_cost_usd,
-    )
 
     live_in, live_out = _PRICING["gemini-2.5-flash"]
     snap_in, snap_out = BATCH_PRICING["gemini-2.5-flash"]
@@ -318,8 +319,6 @@ def test_resume_selection_skips_current_recipes(worker_session) -> None:
     assert recipe.id in select_backfill_recipe_ids(session)
     state = recipe.enrichment_state
     assert state is not None
-    from app.services.recipe_enrichment.service import source_fingerprint
-
     state.status = RecipeEnrichmentStatus.COMPLETE
     state.source_fingerprint = source_fingerprint(recipe)
     state.schema_version = SCHEMA_VERSION
@@ -354,7 +353,7 @@ def test_submit_adopts_existing_remote_job(worker_session, fake_client) -> None:
     stray = fake_client.create_job(
         model="m", input_file_id="files/old", display_name=batch.display_name
     )
-    submitted = submit_prepared(session, run, fake_client, "stub-enrichment")
+    submitted = submit_prepared(session, run, fake_client, "stub-ingredients", "stub-semantics")
     assert submitted == 1
     session.refresh(batch)
     assert batch.provider_batch_id == stray.name
@@ -369,7 +368,7 @@ def test_submit_adopts_one_duplicate_and_cancels_extras(worker_session, fake_cli
     batch = session.scalars(select(RecipeEnrichmentBatch)).one()
     first = fake_client.create_job(model="m", input_file_id="f1", display_name=batch.display_name)
     second = fake_client.create_job(model="m", input_file_id="f2", display_name=batch.display_name)
-    submit_prepared(session, run, fake_client, "stub-enrichment")
+    submit_prepared(session, run, fake_client, "stub-ingredients", "stub-semantics")
     session.refresh(batch)
     assert batch.provider_batch_id == first.name
     assert batch.duplicate_ids == [second.name]
@@ -387,7 +386,7 @@ def test_submit_respects_max_active_jobs(worker_session, fake_client, monkeypatc
         session, run, [recipe.id for recipe in recipes],
         stage="stage1", attempt=1, first_chunk=0,
     )
-    submitted = submit_prepared(session, run, fake_client, "stub-enrichment", max_active=2)
+    submitted = submit_prepared(session, run, fake_client, "stub-ingredients", "stub-semantics", max_active=2)
     assert submitted == 2
     preparing = session.scalar(
         select(RecipeEnrichmentBatch).where(
@@ -456,6 +455,67 @@ def test_stale_items_never_retry_in_same_run(worker_session) -> None:
     assert build_retry_chunks(session, run) == 0
 
 
+def test_split_moves_every_item_off_the_deleted_batch(worker_session) -> None:
+    from app.tasks.enrichment_backfill import _split_oversized
+
+    session = worker_session
+    recipe = _recipe(session)
+    run = _backfill_run(session)
+    prepare_stage_chunks(session, run, [recipe.id], stage="stage1", attempt=1, first_chunk=0)
+    batch = session.scalars(select(RecipeEnrichmentBatch)).one()
+    rows: dict[str, str] = {
+        item.request_key: "x" * (BATCH_CHUNK_MAX_BYTES + 1) for item in batch.items
+    }
+    batch_id = batch.id
+    _split_oversized(session, batch, rows)
+    assert session.get(RecipeEnrichmentBatch, batch_id) is None
+    survivors = session.scalars(
+        select(RecipeEnrichmentBatch).where(RecipeEnrichmentBatch.task_run_id == run.id)
+    ).all()
+    assert len(survivors) == len(rows)
+    assert {item.recipe_id for sibling in survivors for item in sibling.items} == {recipe.id}
+
+
+def test_empty_selection_finishes_done_without_cutover(
+    worker_session, fake_client, monkeypatch
+) -> None:
+    session = worker_session
+    _gemini_config(session)
+    monkeypatch.setattr(
+        "app.tasks.enrichment_backfill.select_backfill_recipe_ids", lambda session: []
+    )
+    run = _backfill_run(session, max_active_jobs=4)
+    _settle(session)
+    progress = run_backfill_prepare_and_submit(str(run.id))
+    session.refresh(run)
+    assert run.status is TaskStatus.DONE
+    assert progress["selected"] == 0
+    assert "cutover_orphan_keywords_removed" not in progress
+    assert fake_client.created == []
+
+
+def test_repeated_poll_errors_fail_the_batch(worker_session, fake_client, monkeypatch) -> None:
+    from app.tasks.enrichment_backfill import MAX_CONSECUTIVE_POLL_ERRORS, _refresh_submitted
+
+    session = worker_session
+    _gemini_config(session)
+    _recipe(session)
+    run = _backfill_run(session, max_active_jobs=4)
+    _settle(session)
+    run_backfill_prepare_and_submit(str(run.id))
+    batch = session.scalars(select(RecipeEnrichmentBatch)).one()
+    assert batch.provider_batch_id is not None
+    monkeypatch.setattr(fake_client, "download_lines", lambda file_id: (_ for _ in ()).throw(
+        RuntimeError("bad payload")))
+    fake_client.complete_job(batch.provider_batch_id, ["{}"])
+    for _ in range(MAX_CONSECUTIVE_POLL_ERRORS):
+        _settle(session)
+        _refresh_submitted(session, run, fake_client)
+    session.refresh(batch)
+    assert batch.status is EnrichmentBatchStatus.FAILED
+    assert "poll failed" in (batch.last_error or "")
+
+
 # --------------------------------------------------------------------------- #
 # End to end against the fake
 # --------------------------------------------------------------------------- #
@@ -473,11 +533,15 @@ def _complete_stage1(session, fake_client, batch) -> None:
     fake_client.complete_job(batch.provider_batch_id, lines)
 
 
-def _complete_stage2(fake_client, batch) -> None:
+def _complete_stage2(session, fake_client, batch) -> None:
+    items = {item.request_key: item for item in batch.items}
+    lines = []
+    for key in batch.submitted_keys:
+        recipe = session.get(Recipe, items[key].recipe_id)
+        assert recipe is not None
+        lines.append(_stage2_line(session, recipe, key))
     assert batch.provider_batch_id is not None
-    fake_client.complete_job(
-        batch.provider_batch_id, [_stage2_line(key) for key in batch.submitted_keys]
-    )
+    fake_client.complete_job(batch.provider_batch_id, lines)
 
 
 def test_full_backfill_applies_two_waves_and_finishes_done(
@@ -502,7 +566,7 @@ def test_full_backfill_applies_two_waves_and_finishes_done(
         select(RecipeEnrichmentBatch).where(RecipeEnrichmentBatch.stage == "stage2")
     ).one()
     assert stage2.status is EnrichmentBatchStatus.SUBMITTED
-    _complete_stage2(fake_client, stage2)
+    _complete_stage2(session, fake_client, stage2)
     _settle(session)
     poll_backfill(str(run.id))
 
@@ -540,7 +604,7 @@ def test_source_change_mid_flight_marks_item_stale(worker_session, fake_client) 
     stage2 = session.scalars(
         select(RecipeEnrichmentBatch).where(RecipeEnrichmentBatch.stage == "stage2")
     ).one()
-    _complete_stage2(fake_client, stage2)
+    _complete_stage2(session, fake_client, stage2)
     _settle(session)
     poll_backfill(str(run.id))
     session.refresh(run)
@@ -556,24 +620,23 @@ def test_terminal_failure_keeps_successes_and_reports_ids(
 ) -> None:
     session = worker_session
     _gemini_config(session)
-    good, bad = _recipe(session, "Good"), _recipe(session, "Bad")
+    _recipe(session, "Good")
+    bad = _recipe(session, "Bad")
     run = _backfill_run(session, max_active_jobs=4)
     _settle(session)
     run_backfill_prepare_and_submit(str(run.id))
     stage1 = session.scalars(
         select(RecipeEnrichmentBatch).where(RecipeEnrichmentBatch.stage == "stage1")
     ).one()
-    items = {str(item.recipe_id): item for item in stage1.items}
-    seeded = next(recipe for recipe in session.scalars(select(Recipe)).all()
-                  if recipe.id not in (good.id, bad.id)
-                  and recipe.ingredients_verbatim)
-    lines = [
-        _stage1_line(session, good, items[str(good.id)].request_key),
-        _stage1_line(session, seeded, items[str(seeded.id)].request_key),
-        json.dumps(
-            {"key": items[str(bad.id)].request_key, "error": {"message": "arrant nonsense"}}
-        ),
-    ]
+    recipes = _recipe_map(session, [item.recipe_id for item in stage1.items])
+    lines = []
+    for item in stage1.items:
+        if item.recipe_id == bad.id:
+            lines.append(
+                json.dumps({"key": item.request_key, "error": {"message": "arrant nonsense"}})
+            )
+        else:
+            lines.append(_stage1_line(session, recipes[item.recipe_id], item.request_key))
     assert stage1.provider_batch_id is not None
     fake_client.complete_job(stage1.provider_batch_id, lines)
     _settle(session)
@@ -592,7 +655,7 @@ def test_terminal_failure_keeps_successes_and_reports_ids(
             RecipeEnrichmentBatch.status == EnrichmentBatchStatus.SUBMITTED,
         )
     ).one()
-    _complete_stage2(fake_client, stage2)
+    _complete_stage2(session, fake_client, stage2)
     fake_client.complete_job(
         retry.provider_batch_id,
         [json.dumps({"key": key, "error": {"message": "still nonsense"}})
@@ -626,8 +689,9 @@ def _done_pilot(session, **overrides) -> TaskRun:
     detail = {
         "seed": 172,
         "recipe_ids": [],
-        "provider": "GEMINI",
-        "model": "gemini-2.5-flash",
+        "provider": "GEMINI->GEMINI",
+        "stage1_model": "gemini-2.5-flash-lite",
+        "stage2_model": "gemini-2.5-flash",
         "prompt_version": PROMPT_VERSION,
         "schema_version": SCHEMA_VERSION,
         "taxonomy_version": TAXONOMY_VERSION,
@@ -645,11 +709,15 @@ def _done_pilot(session, **overrides) -> TaskRun:
     return run
 
 
-def test_trigger_rejects_non_gemini_provider(client, session) -> None:
-    from app.services.ai import get_config
-
-    get_config(session).ai_provider = AIProvider.ANTHROPIC
+def _gateway_config(session, provider: AIProvider = AIProvider.GEMINI) -> None:
+    config = get_config(session)
+    config.ai_provider = provider
+    config.api_key = "test-key"
     session.commit()
+
+
+def test_trigger_rejects_non_gemini_provider(client, session) -> None:
+    _gateway_config(session, AIProvider.ANTHROPIC)
     pilot = _done_pilot(session)
     response = client.post(
         "/api/tasks/recipe-enrichment-backfill",
@@ -659,10 +727,7 @@ def test_trigger_rejects_non_gemini_provider(client, session) -> None:
 
 
 def test_trigger_requires_review_confirmation(client, session) -> None:
-    from app.services.ai import get_config
-
-    get_config(session).ai_provider = AIProvider.GEMINI
-    session.commit()
+    _gateway_config(session)
     pilot = _done_pilot(session)
     response = client.post(
         "/api/tasks/recipe-enrichment-backfill",
@@ -672,11 +737,18 @@ def test_trigger_requires_review_confirmation(client, session) -> None:
 
 
 def test_trigger_rejects_version_mismatch(client, session) -> None:
-    from app.services.ai import get_config
-
-    get_config(session).ai_provider = AIProvider.GEMINI
-    session.commit()
+    _gateway_config(session)
     pilot = _done_pilot(session, prompt_version="v0")
+    response = client.post(
+        "/api/tasks/recipe-enrichment-backfill",
+        json={"pilot_run_id": str(pilot.id), "confirm_pilot_reviewed": True},
+    )
+    assert response.status_code == 422
+
+
+def test_trigger_rejects_model_mismatch(client, session) -> None:
+    _gateway_config(session)
+    pilot = _done_pilot(session, stage2_model="gemini-2.5-flash-lite")
     response = client.post(
         "/api/tasks/recipe-enrichment-backfill",
         json={"pilot_run_id": str(pilot.id), "confirm_pilot_reviewed": True},
@@ -687,10 +759,7 @@ def test_trigger_rejects_version_mismatch(client, session) -> None:
 def test_trigger_queues_and_resume_rejects_while_active(
     client, session, enrichment_backfill_dispatched
 ) -> None:
-    from app.services.ai import get_config
-
-    get_config(session).ai_provider = AIProvider.GEMINI
-    session.commit()
+    _gateway_config(session)
     pilot = _done_pilot(session)
     response = client.post(
         "/api/tasks/recipe-enrichment-backfill",
@@ -703,12 +772,48 @@ def test_trigger_queues_and_resume_rejects_while_active(
     assert conflict.status_code == 409
 
 
+def test_resume_without_prior_backfill_requires_pilot_approval(
+    client, session, enrichment_backfill_dispatched
+) -> None:
+    _gateway_config(session)
+    refused = client.post("/api/tasks/recipe-enrichment-backfill/resume", json={})
+    assert refused.status_code == 422
+    pilot = _done_pilot(session)
+    response = client.post(
+        "/api/tasks/recipe-enrichment-backfill/resume",
+        json={"pilot_run_id": str(pilot.id), "confirm_pilot_reviewed": True},
+    )
+    assert response.status_code == 202
+    assert len(enrichment_backfill_dispatched) == 1
+
+
+def test_resume_after_terminal_prior_needs_no_new_approval(
+    client, session, enrichment_backfill_dispatched
+) -> None:
+    _gateway_config(session)
+    prior = TaskRun(
+        task_type=TaskType.RECIPE_ENRICHMENT_BACKFILL,
+        status=TaskStatus.FAILED,
+        detail={},
+        started_at=datetime.now(UTC),
+        completed_at=datetime.now(UTC),
+    )
+    session.add(prior)
+    session.commit()
+    response = client.post("/api/tasks/recipe-enrichment-backfill/resume", json={})
+    assert response.status_code == 202
+    body = response.json()
+    assert body["task"] == "recipe_enrichment_backfill"
+
+
 # --------------------------------------------------------------------------- #
 # Orphan pruning
 # --------------------------------------------------------------------------- #
 
 
 def test_orphan_prune_keeps_recipe_and_book_keywords(worker_session) -> None:
+    from app.models.book import Book
+
     session = worker_session
     recipe = session.scalars(select(Recipe)).first()
     assert recipe is not None
@@ -716,14 +821,12 @@ def test_orphan_prune_keeps_recipe_and_book_keywords(worker_session) -> None:
     kept_book = Keyword(name="KeptBook")
     orphan = Keyword(name="OrphanTag")
     recipe.keywords.append(kept_recipe)
-    from app.models.book import Book
-
     book = session.scalars(select(Book)).first()
     assert book is not None
     book.keywords.append(kept_book)
     session.add(orphan)
     session.commit()
-    assert delete_orphan_keywords(session) == 1
+    assert _delete_orphan_keywords(session) == 1
     remaining = {keyword.name for keyword in session.scalars(select(Keyword)).all()}
     assert "OrphanTag" not in remaining
     assert {"KeptRecipe", "KeptBook"} <= remaining

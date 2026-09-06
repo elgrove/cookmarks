@@ -98,6 +98,11 @@ def plan_chunks(sizes: list[int]) -> list[list[int]]:
     return chunks
 
 
+def jsonl_size(rows: dict[str, str]) -> int:
+    """Encoded byte size of a chunk payload as uploaded (one row per line)."""
+    return sum(len(row.encode()) + 1 for row in rows.values())
+
+
 def stage1_row(key: str, context: dict) -> str:
     """One JSONL line for a stage 1 (ingredient structuring) Batch request."""
     return json.dumps(

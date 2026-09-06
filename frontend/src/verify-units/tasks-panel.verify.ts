@@ -35,14 +35,14 @@ const fixedEnrichment =
 
 const fixedBackfill =
 	(queued: number) =>
-	(opts: { pilotRunId: string; confirm: boolean }): Promise<TaskRunAck> =>
+	(_opts: { pilotRunId: string; confirm: boolean }): Promise<TaskRunAck> =>
 		Promise.resolve({ task: 'recipe_enrichment_backfill', status: 'queued', queued });
 
 const unit: VerifiableUnit<Props> = {
 	id: 'tasks-panel',
 	title: 'Tasks panel',
 	description:
-		'The admin Tasks tab: on-demand "Generate book keywords" (with a regenerate-all toggle) and "Deduplicate keywords" triggers, each driving idle → running → queued (fire-and-forget), or → error if the dispatch rejects.',
+		'The admin Tasks tab: on-demand book keywords (with regenerate-all), keyword dedup, Calibre sync, the live enrichment pilot and the Batch backfill launch/resume — each driving idle → running → queued (fire-and-forget), or → error if the dispatch rejects.',
 	kind: 'component',
 	component: TasksPanel,
 	fixtures: [

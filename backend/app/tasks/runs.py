@@ -140,3 +140,18 @@ def fail_run(run_id: str, exc: Exception) -> None:
             session.commit()
     except Exception:
         logger.exception(f"Failed to mark task run {run_id} as failed")
+
+
+def fail_with_detail(run_id: str, detail: dict, exc: Exception) -> None:
+    """Finish a run FAILED in one session: merge the final metrics, record the
+    error and stamp completion — for jobs whose partial results must survive
+    alongside the terminal state (the backfill keeps applied recipes)."""
+    with SessionLocal() as session:
+        run = session.get(TaskRun, uuid.UUID(run_id))
+        if run is None:
+            return
+        run.status = TaskStatus.FAILED
+        run.errors = [*run.errors, str(exc)]
+        run.completed_at = datetime.now(UTC)
+        run.detail = {**run.detail, **detail}
+        session.commit()

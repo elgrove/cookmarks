@@ -51,16 +51,16 @@ def test_alembic_check_ignores_application_owned_vec0_table(tmp_path: Path) -> N
     assert "no such module: vec0" not in output
     assert "recipe_embeddings" not in output
     if check.returncode:
+        # Known SQLite-only drift: the Enum-typed columns read back as VARCHAR,
+        # so autogenerate always wants to re-apply them. The task-type widening
+        # for the enrichment backfill ships in its own migration, leaving only
+        # the assistant-provider alter as accepted drift.
         expected_drift = (
             "FAILED: New upgrade operations detected: "
             "[[('modify_type', None, 'config', 'assistant_provider', "
             "{'existing_nullable': True, 'existing_server_default': False, "
             "'existing_comment': None}, VARCHAR(length=20), "
-            "Enum('ANTHROPIC', 'GEMINI', 'OPENROUTER', 'STUB', name='aiprovider'))], "
-            "[('modify_type', None, 'task_runs', 'task_type', {'existing_nullable': False, "
-            "'existing_server_default': False, 'existing_comment': None}, VARCHAR(length=13), "
-            "Enum('extraction', 'book_keywords', 'keyword_dedup', 'calibre_sync', 'book_ingest', "
-            "'recipe_enrichment_pilot', name='tasktype'))]]"
+            "Enum('ANTHROPIC', 'GEMINI', 'OPENROUTER', 'STUB', name='aiprovider'))]]"
         )
         assert [line for line in output.splitlines() if line.startswith("FAILED:")] == [
             expected_drift

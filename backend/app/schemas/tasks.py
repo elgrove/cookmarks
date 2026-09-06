@@ -32,6 +32,10 @@ class EnrichmentBackfillRequest(BaseModel):
 
 class EnrichmentBackfillResumeRequest(BaseModel):
     """Resume after a terminal run: a fresh parent run selects only recipes not
-    yet current, so repeated resumes never redo applied work."""
+    yet current, so repeated resumes never redo applied work. Resuming a
+    previous backfill needs no new approval; a first-ever launch through this
+    endpoint requires the same reviewed pilot approval as the trigger."""
 
     max_active_jobs: int = Field(default=4, ge=1, le=10)
+    pilot_run_id: uuid.UUID | None = None
+    confirm_pilot_reviewed: bool = False

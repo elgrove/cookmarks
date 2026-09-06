@@ -2,15 +2,17 @@
 
 Two sequential waves reuse exactly the MY-174 stage prompts, Gemini schemas,
 validator and atomic apply service: stage 1 (ingredient structuring) first,
-then stage 2 (facet/keyword assignment) whose contexts need stage 1 AI
-ingredient names. Each wave chunks recipes at 500 items / 50 MiB of JSONL and
-keeps at most four remote jobs active; further chunks wait locally prepared.
+then stage 2 (facet/keyword assignment) whose contexts are built from the
+stored stage 1 responses. Each wave chunks recipes at 500 items / 50 MiB of
+JSONL and keeps at most four remote jobs active; further chunks wait locally
+prepared.
 
 Lifecycle on the parent TaskRun:
 queued → running (prepare/submit) → waiting (remote jobs) → running
-(download/apply) → done | failed. Failed items get one bounded retry; stale
-items (source changed mid-flight) wait for a later run. Resume creates a new
-parent run selecting only recipes not yet current.
+(download/apply) → done | failed. Failed items get one bounded retry shared
+across both waves (a recipe retried at stage 1 spends its retry there);
+stale items (source changed mid-flight) wait for a later run. Resume creates
+a new parent run selecting only recipes not yet current.
 """
 
 import logging
@@ -20,10 +22,11 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 from pydantic import ValidationError
-from sqlalchemy import delete, func, select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.db import SessionLocal
+from app.models.base import as_utc
 from app.models.enums import (
     EnrichmentBatchItemStatus,
     EnrichmentBatchStatus,
@@ -31,12 +34,17 @@ from app.models.enums import (
     TaskStatus,
     TaskType,
 )
-from app.models.ingredient import IngredientLine
 from app.models.recipe import Keyword, Recipe
 from app.models.recipe_enrichment import RecipeEnrichmentState
 from app.models.recipe_enrichment_batch import RecipeEnrichmentBatch, RecipeEnrichmentBatchItem
 from app.models.task_run import TaskRun
-from app.services.ai import Usage, get_ai_provider, get_config
+from app.services.ai import (
+    AIProvider,
+    Usage,
+    get_ai_provider,
+    get_config,
+    get_recipe_enrichment_providers,
+)
 from app.services.ai.base import ModelRole, _strip_json_fence
 from app.services.ai.gemini_batch import ACTIVE_STATES, SUCCEEDED_STATES, GeminiBatchClient
 from app.services.embeddings import backfill as backfill_embeddings
@@ -51,6 +59,7 @@ from app.services.recipe_enrichment.batch import (
     correlate_results,
     display_name,
     job_key,
+    jsonl_size,
     plan_chunks,
     poll_countdown,
     request_key,
@@ -67,24 +76,32 @@ from app.services.recipe_enrichment.schema import (
 )
 from app.services.recipe_enrichment.service import (
     apply_enrichment,
-    build_context,
     build_stage1_context,
     build_stage2_context,
     ensure_source_fingerprint,
     source_fingerprint,
 )
 from app.tasks.celery_app import celery_app
-from app.tasks.runs import complete_run, fail_run, set_running, set_waiting, start_run
+from app.tasks.keyword_dedup import enqueue_dedup_keywords
+from app.tasks.runs import (
+    complete_run,
+    create_task_run,
+    fail_run,
+    fail_with_detail,
+    set_running,
+    set_waiting,
+    start_run,
+)
 
 logger = logging.getLogger(__name__)
 
-TERMINAL_ITEM_STATES = frozenset(
-    {
-        EnrichmentBatchItemStatus.APPLIED,
-        EnrichmentBatchItemStatus.STALE,
-        EnrichmentBatchItemStatus.FAILED,
-    }
-)
+# Consecutive poll errors on one batch before it fails outright: transient
+# download/lookup failures stay on the 15-minute ceiling, a deterministically
+# broken payload stops parking the run in WAITING.
+MAX_CONSECUTIVE_POLL_ERRORS = 10
+
+# SQLite caps a statement at 999 bind parameters — page large selections.
+ID_PAGE_SIZE = 500
 
 
 def _versions() -> dict[str, str]:
@@ -131,35 +148,59 @@ def _ensure_state(session: Session, recipe: Recipe) -> RecipeEnrichmentState:
     return state
 
 
-def _batch_client(session: Session) -> tuple[GeminiBatchClient, str]:
-    """Build the Batch client from the configured Gemini API key plus model name."""
+def _stage_providers(session: Session) -> tuple[AIProvider, AIProvider]:
+    """Effective ingredient + semantic providers: explicit per-stage config first,
+    falling back to the default provider for stages left unconfigured."""
+    default = get_ai_provider(session)
+    stage1, stage2 = get_recipe_enrichment_providers(session)
+    stage1 = stage1 or default
+    stage2 = stage2 or default
+    if stage1 is None or stage2 is None:
+        raise RuntimeError("No usable AI provider is configured")
+    return stage1, stage2
+
+
+def _batch_client(
+    session: Session,
+) -> tuple[GeminiBatchClient, AIProvider, AIProvider, str, str]:
+    """Build the Batch client plus the stage providers and their model names.
+
+    The Gemini-only gate lives at the API entry points (trigger/resume return
+    422 otherwise); the worker trusts the run row it was launched from.
+    """
+    stage1, stage2 = _stage_providers(session)
     config = get_config(session)
-    if config.ai_provider != "GEMINI":
-        raise RuntimeError("Recipe-enrichment backfill requires the Gemini provider")
-    if not config.api_key:
+    api_key = config.enrichment_stage1_api_key or config.api_key
+    if not api_key:
         raise RuntimeError("Gemini provider is configured without an API key")
-    provider = get_ai_provider(session)
-    model = (
-        provider.model_for(ModelRole.RECIPE_ENRICHMENT)
-        if provider is not None
-        else "gemini-2.5-flash"
+    return (
+        GeminiBatchClient(api_key),
+        stage1,
+        stage2,
+        stage1.model_for(ModelRole.RECIPE_INGREDIENTS),
+        stage2.model_for(ModelRole.RECIPE_SEMANTICS),
     )
-    return GeminiBatchClient(config.api_key), model
 
 
 def _recipe_map(session: Session, ids: list[uuid.UUID]) -> dict[uuid.UUID, Recipe]:
-    return {
-        recipe.id: recipe
-        for recipe in session.scalars(
-            select(Recipe)
-            .where(Recipe.id.in_(ids))
-            .options(
-                selectinload(Recipe.ingredients_verbatim),
-                selectinload(Recipe.enrichment_state),
-                selectinload(Recipe.book),
-            )
+    found: dict[uuid.UUID, Recipe] = {}
+    for offset in range(0, len(ids), ID_PAGE_SIZE):
+        page = ids[offset : offset + ID_PAGE_SIZE]
+        found.update(
+            {
+                recipe.id: recipe
+                for recipe in session.scalars(
+                    select(Recipe)
+                    .where(Recipe.id.in_(page))
+                    .options(
+                        selectinload(Recipe.ingredients_verbatim),
+                        selectinload(Recipe.enrichment_state),
+                        selectinload(Recipe.book),
+                    )
+                )
+            }
         )
-    }
+    return found
 
 
 def prepare_stage_chunks(
@@ -171,15 +212,16 @@ def prepare_stage_chunks(
     attempt: int,
     first_chunk: int,
 ) -> list[RecipeEnrichmentBatch]:
-    """Persist preparing batch rows + items for one wave, returning the chunks.
+    """Persist preparing batch rows + items for the stage 1 wave.
 
-    Recipes whose lines resolve fully deterministically skip the remote stage 1
-    call: their items are marked succeeded locally with the deterministic
-    ingredient names captured. Everything else becomes one JSONL row per recipe.
+    Only the stage 1 wave is ever prepared here: one PENDING item and one
+    JSONL row per recipe, using exactly the MY-174 stage 1 prompt and schema.
+    Stage 2 waves are born in `_promote_stage2` from ingested stage 1 results,
+    which is what guarantees their contexts carry real AI ingredient data.
     """
+    assert stage == "stage1"
     recipes = _recipe_map(session, recipe_ids)
     rows: list[tuple[uuid.UUID, str]] = []
-    deterministic: dict[uuid.UUID, list[str]] = {}
     for recipe_id in recipe_ids:
         recipe = recipes.get(recipe_id)
         if recipe is None:
@@ -187,19 +229,8 @@ def prepare_stage_chunks(
         state = _ensure_state(session, recipe)
         ensure_source_fingerprint(recipe)
         key = request_key(str(recipe_id), state.source_fingerprint)
-        if stage == "stage1":
-            _context, proposals = build_context(session, recipe)
-            stage1_context = build_stage1_context(recipe, proposals)
-            if not stage1_context["recipe"]["ai_parse_line_ids"]:
-                deterministic[recipe_id] = [
-                    occ.name for proposal in proposals.values() for occ in proposal.occurrences
-                ]
-                rows.append((recipe_id, ""))
-                continue
-            rows.append((recipe_id, stage1_row(key, stage1_context)))
-        else:
-            rows.append((recipe_id, ""))
-    sizes = [len(content.encode()) if content else 1 for _, content in rows]
+        rows.append((recipe_id, stage1_row(key, build_stage1_context(recipe))))
+    sizes = [len(content.encode()) for _, content in rows]
     groups = plan_chunks(sizes)
     batches: list[RecipeEnrichmentBatch] = []
     for offset, group in enumerate(groups):
@@ -220,20 +251,6 @@ def prepare_stage_chunks(
             recipe_id, _content = rows[index]
             recipe = recipes[recipe_id]
             assert recipe.enrichment_state is not None
-            if recipe_id in deterministic:
-                item = RecipeEnrichmentBatchItem(
-                    batch_id=batch.id,
-                    recipe_id=recipe_id,
-                    source_fingerprint=recipe.enrichment_state.source_fingerprint,
-                    request_key=request_key(
-                        str(recipe_id), recipe.enrichment_state.source_fingerprint
-                    ),
-                    status=EnrichmentBatchItemStatus.SUCCEEDED,
-                    attempt=attempt,
-                    stage1_ingredients=deterministic[recipe_id],
-                )
-                session.add(item)
-                continue
             session.add(
                 RecipeEnrichmentBatchItem(
                     batch_id=batch.id,
@@ -257,16 +274,15 @@ def build_stage2_payloads(
 ) -> dict[str, str]:
     """Build stage 2 JSONL rows for a batch from ingested stage 1 results.
 
-    Eligible items already hold stage 1 data (freshly promoted or retry items
-    with stage1_response kept and stage2 stripped) — or resolved fully
-    deterministically with no remote stage 1 call, in which case the stored
-    response is empty and facet assignment still runs. Items already APPLIED
-    are never rebuilt.
+    Eligible items hold an ingested stage 1 response (freshly promoted, or
+    retry items with stage1_response kept and stage2 stripped). Items already
+    APPLIED are never rebuilt.
     """
     eligible = [
         item for item in batch.items
         if item.status in (EnrichmentBatchItemStatus.SUCCEEDED, EnrichmentBatchItemStatus.PENDING)
         and "stage2" not in (item.stage1_response or {})
+        and (item.stage1_response or {}).get("p") is not None
     ]
     recipes = _recipe_map(session, [item.recipe_id for item in eligible])
     payloads: dict[str, str] = {}
@@ -274,12 +290,10 @@ def build_stage2_payloads(
         recipe = recipes.get(item.recipe_id)
         if recipe is None:
             continue
-        _context, proposals = build_context(session, recipe)
-        deterministic_names = [
-            occ.name for proposal in proposals.values() for occ in proposal.occurrences
-        ]
+        stored = {key: value for key, value in (item.stage1_response or {}).items()
+                  if key != "stage2"}
         stage2_context = build_stage2_context(
-            session, recipe, [*deterministic_names, *item.stage1_ingredients]
+            session, recipe, Stage1Response.model_validate(stored)
         )
         payloads[item.request_key] = stage2_row(item.request_key, stage2_context)
     return payloads
@@ -289,15 +303,17 @@ def submit_prepared(
     session: Session,
     run: TaskRun,
     client: GeminiBatchClient,
-    model: str,
+    stage1_model: str,
+    stage2_model: str,
     *,
     max_active: int = BATCH_DEFAULT_MAX_ACTIVE_JOBS,
 ) -> int:
     """Upload + create remote jobs for preparing batches while a slot is free.
 
-    Stage 1 rows rebuild deterministically from the recipes; stage 2 rows build
-    from ingested stage 1 data at submit time. Submitted keys persist on the
-    batch so ingest correlates exactly what was sent. Returns submitted count.
+    Each wave submits under its own stage model. Stage 1 rows rebuild
+    deterministically from the recipes; stage 2 rows build from ingested stage
+    1 data at submit time. Submitted keys persist on the batch so ingest
+    correlates exactly what was sent. Returns submitted count.
     """
     active = session.scalar(
         select(func.count())
@@ -329,11 +345,12 @@ def submit_prepared(
             session.commit()
             continue
         content = "".join(f"{rows[key]}\n" for key in sorted(rows))
-        if len(content.encode()) > BATCH_CHUNK_MAX_BYTES or len(rows) > BATCH_CHUNK_MAX_RECIPES:
+        if jsonl_size(rows) > BATCH_CHUNK_MAX_BYTES or len(rows) > BATCH_CHUNK_MAX_RECIPES:
             _split_oversized(session, batch, rows)
             continue
         # Non-idempotent create: reconcile by display name before creating.
         existing = client.find_by_display_name(batch.display_name)
+        wave_model = stage2_model if batch.stage == "stage2" else stage1_model
         if existing:
             adopted = sorted(existing, key=lambda job: job.name)[0]
             batch.provider_batch_id = adopted.name
@@ -349,13 +366,13 @@ def submit_prepared(
             # Crash window: remote job may exist while the local ID is not yet
             # saved — the next poll reconciles by display name, adopting it.
             created = client.create_job(
-                model=model, input_file_id=input_file_id, display_name=batch.display_name
+                model=wave_model, input_file_id=input_file_id, display_name=batch.display_name
             )
             batch.provider_batch_id = created.name
         batch.status = EnrichmentBatchStatus.SUBMITTED
         batch.request_count = len(rows)
         batch.submitted_keys = sorted(rows)
-        batch.model = model
+        batch.model = wave_model
         batch.submitted_at = datetime.now(UTC)
         session.commit()
         active += 1
@@ -375,15 +392,7 @@ def _rebuild_stage1_payloads(session: Session, batch: RecipeEnrichmentBatch) -> 
             item.status = EnrichmentBatchItemStatus.FAILED
             item.provider_error = "recipe missing at submit"
             continue
-        _context, proposals = build_context(session, recipe)
-        stage1_context = build_stage1_context(recipe, proposals)
-        if not stage1_context["recipe"]["ai_parse_line_ids"]:
-            item.status = EnrichmentBatchItemStatus.SUCCEEDED
-            item.stage1_ingredients = [
-                occ.name for proposal in proposals.values() for occ in proposal.occurrences
-            ]
-            continue
-        payloads[item.request_key] = stage1_row(item.request_key, stage1_context)
+        payloads[item.request_key] = stage1_row(item.request_key, build_stage1_context(recipe))
     session.commit()
     return payloads
 
@@ -391,11 +400,16 @@ def _rebuild_stage1_payloads(session: Session, batch: RecipeEnrichmentBatch) -> 
 def _split_oversized(
     session: Session, batch: RecipeEnrichmentBatch, rows: dict[str, str]
 ) -> None:
-    """Split an oversized preparing batch into smaller preparing batches."""
+    """Split an oversized preparing batch into smaller preparing batches.
+
+    Every item moves — including ones with no row in this payload (already
+    resolved or failed) — so deleting the old batch orphans nothing.
+    """
     keys = sorted(rows)
     sizes = [len(rows[key].encode()) + 1 for key in keys]
     groups = plan_chunks(sizes)
     items = {item.request_key: item for item in batch.items}
+    leftovers = [item for key, item in items.items() if key not in rows]
     run_id = batch.task_run_id
     base_chunk = len(
         session.scalars(
@@ -404,6 +418,7 @@ def _split_oversized(
             )
         ).all()
     )
+    siblings = []
     for offset, group in enumerate(groups):
         sibling = RecipeEnrichmentBatch(
             task_run_id=run_id,
@@ -419,9 +434,11 @@ def _split_oversized(
         )
         session.add(sibling)
         session.flush()
+        siblings.append(sibling)
         for index in group:
-            item = items[keys[index]]
-            item.batch_id = sibling.id
+            sibling.items.append(items[keys[index]])
+    for item in leftovers:
+        siblings[0].items.append(item)
     session.delete(batch)
     session.commit()
 
@@ -435,9 +452,10 @@ def _extract_text(response: dict) -> str | None:
         return None
 
 
-def _response_usage(response: dict) -> dict:
+def _response_usage(response: dict, model: str | None) -> dict:
     meta = response.get("usageMetadata") or {}
     return {
+        "model": model,
         "input_tokens": int(meta.get("promptTokenCount") or 0),
         "output_tokens": int(
             (meta.get("candidatesTokenCount") or 0) + (meta.get("thoughtsTokenCount") or 0)
@@ -459,7 +477,12 @@ def ingest_succeeded_batch(
     for problem in problems:
         logger.warning("Batch %s result problem: %s", batch.job_key, problem)
     for key in sorted(expected):
-        item = items[key]
+        item = items.get(key)
+        if item is None:
+            # The recipe was deleted mid-flight and its item row cascaded away:
+            # one lost row, not a lost poll cycle.
+            logger.warning("Batch %s result for deleted recipe: %s", batch.job_key, key)
+            continue
         row = by_key.get(key)
         if row is None:
             item.status = EnrichmentBatchItemStatus.FAILED
@@ -476,7 +499,7 @@ def ingest_succeeded_batch(
             item.status = EnrichmentBatchItemStatus.FAILED
             item.provider_error = "provider row has no response"
             continue
-        item.usage = _response_usage(response)
+        item.usage = _response_usage(response, batch.model)
         text = _extract_text(response)
         if not text:
             item.status = EnrichmentBatchItemStatus.FAILED
@@ -508,16 +531,19 @@ def ingest_succeeded_batch(
 
 
 def apply_ready_stage2(
-    session: Session, run: TaskRun, provider_model: str
+    session: Session,
+    run: TaskRun,
+    stage1_provider: AIProvider,
+    stage2_provider: AIProvider,
+    stage1_model: str,
+    stage2_model: str,
 ) -> dict[str, int]:
     """Apply every succeeded stage 2 item through the MY-174 atomic service.
 
     Each recipe commits independently: one bad response never rolls back good
     recipes. A source change since capture marks the item stale for a later run.
+    Mirrors the live path's stamping (stage 2 provider, combined model label).
     """
-    provider = get_ai_provider(session)
-    if provider is None:
-        raise RuntimeError("No usable AI provider is configured")
     counts = Counter(applied=0, stale=0, failed=0)
     items = session.scalars(
         select(RecipeEnrichmentBatchItem)
@@ -553,19 +579,17 @@ def apply_ready_stage2(
                 {k: v for k, v in stored.items() if k != "stage2"})
             stage2 = Stage2Response.model_validate(stage2_payload)
             response = EnrichmentResponse.from_stages(stage1, stage2)
-            _context, proposals = build_context(session, recipe)
             metrics = apply_enrichment(
                 session,
                 recipe.id,
                 response,
-                proposals,
-                provider=provider,
-                model=provider_model,
+                provider=stage2_provider,
+                model=f"{stage1_model} -> {stage2_model}",
                 task_run_id=run.id,
             )
             session.commit()
             try:
-                embed_recipes(session, [recipe], provider)
+                embed_recipes(session, [recipe], stage2_provider)
                 session.commit()
             except Exception:
                 logger.warning("Post-apply embedding failed for %s", recipe.id)
@@ -573,7 +597,7 @@ def apply_ready_stage2(
             item.status = EnrichmentBatchItemStatus.APPLIED
             item.applied_at = datetime.now(UTC)
             item.usage = {**item.usage, **{k: metrics.get(k, 0) for k in (
-                "deterministic_accepted", "ai_parsed_lines", "headings",
+                "occurrences", "ai_parsed_lines", "headings",
                 "ingredients_created", "existing_ingredients", "aliases_created")}}
             session.commit()
             counts["applied"] += 1
@@ -626,11 +650,12 @@ def build_retry_chunks(session: Session, run: TaskRun) -> int:
         session.flush()
         for item in items:
             # A re-queued stage 2 item must go remote again: drop its previous
-            # stage 2 payload so only a fresh response can apply.
+            # stage 2 payload so only a fresh response can apply. Appends move
+            # the row between the batches' collections, never raw FK writes.
             stored = dict(item.stage1_response or {})
             stored.pop("stage2", None)
             item.stage1_response = stored
-            item.batch_id = batch.id
+            batch.items.append(item)
             item.attempt = attempt
             item.status = EnrichmentBatchItemStatus.PENDING
             item.provider_error = None
@@ -641,7 +666,14 @@ def build_retry_chunks(session: Session, run: TaskRun) -> int:
 
 
 def build_progress_detail(session: Session, run: TaskRun) -> dict:
-    """Aggregate Task Runs progress: counts, chunks, metrics, usage, cost, poll."""
+    """Aggregate Task Runs progress: counts, chunks, metrics, usage, cost, poll.
+
+    Counts are per recipe, not per item row: stage 1 items are copied into
+    stage 2 sibling batches on promotion, so raw row counts would double-count.
+    Each recipe reports its furthest state with APPLIED > FAILED > STALE >
+    SUCCEEDED > PENDING precedence; `submitted` counts recipes with a key in
+    any submitted payload.
+    """
     batches = session.scalars(
         select(RecipeEnrichmentBatch).where(RecipeEnrichmentBatch.task_run_id == run.id)
     ).all()
@@ -650,20 +682,29 @@ def build_progress_detail(session: Session, run: TaskRun) -> dict:
         .join(RecipeEnrichmentBatch, RecipeEnrichmentBatchItem.batch_id == RecipeEnrichmentBatch.id)
         .where(RecipeEnrichmentBatch.task_run_id == run.id)
     ).all()
-    item_states = Counter(item.status.value for item in items)
+    precedence = {
+        EnrichmentBatchItemStatus.APPLIED: 4,
+        EnrichmentBatchItemStatus.FAILED: 3,
+        EnrichmentBatchItemStatus.STALE: 2,
+        EnrichmentBatchItemStatus.SUCCEEDED: 1,
+        EnrichmentBatchItemStatus.PENDING: 0,
+    }
+    recipe_state: dict[uuid.UUID, EnrichmentBatchItemStatus] = {}
+    for item in items:
+        current = recipe_state.get(item.recipe_id)
+        if current is None or precedence[item.status] > precedence[current]:
+            recipe_state[item.recipe_id] = item.status
+    recipe_states = Counter(state.value for state in recipe_state.values())
+    key_to_recipe = {item.request_key: item.recipe_id for item in items}
+    submitted_recipes = {
+        key_to_recipe[key]
+        for batch in batches
+        for key in (batch.submitted_keys or [])
+        if key in key_to_recipe
+    }
     chunks_by_state = Counter(batch.status.value for batch in batches)
     attempts = Counter(f"attempt_{batch.attempt}" for batch in batches)
-    submitted_batch_ids = {
-        batch.id for batch in batches
-        if batch.status
-        in (EnrichmentBatchStatus.SUBMITTED, EnrichmentBatchStatus.SUCCEEDED,
-            EnrichmentBatchStatus.APPLIED)
-    }
-    submitted_items = sum(1 for item in items if item.batch_id in submitted_batch_ids)
-    input_tokens = sum((item.usage or {}).get("input_tokens", 0) for item in items)
-    output_tokens = sum((item.usage or {}).get("output_tokens", 0) for item in items)
-    cached_tokens = sum((item.usage or {}).get("cached_tokens", 0) for item in items)
-    model = next((b.model for b in batches if b.model), None)
+    tokens_by_model: dict[str, Counter[str]] = {}
     line_counts = Counter()
     cuisines: Counter[str] = Counter()
     methods: Counter[str] = Counter()
@@ -671,28 +712,46 @@ def build_progress_detail(session: Session, run: TaskRun) -> dict:
     keyword_failures = 0
     for item in items:
         usage = item.usage or {}
+        model_usage = tokens_by_model.setdefault(str(usage.get("model") or "unknown"), Counter())
+        for key in ("input_tokens", "output_tokens", "cached_tokens"):
+            model_usage[key] += int(usage.get(key, 0) or 0)
         for key in (
-            "deterministic_accepted", "ai_parsed_lines", "headings",
+            "occurrences", "ai_parsed_lines", "headings",
             "ingredients_created", "existing_ingredients", "aliases_created",
         ):
             line_counts[key] += int(usage.get(key, 0) or 0)
+        stage2 = (item.stage1_response or {}).get("stage2")
+        if isinstance(stage2, dict):
+            cuisines.update(str(cuisine) for cuisine in stage2.get("c", []))
+            methods.update(
+                str(method.get("v", method)) if isinstance(method, dict) else str(method)
+                for method in stage2.get("m", [])
+            )
+            courses.update(str(course) for course in stage2.get("o", []))
         if item.provider_error and "keyword" in item.provider_error.lower():
             keyword_failures += 1
+    input_tokens = sum(counter["input_tokens"] for counter in tokens_by_model.values())
+    output_tokens = sum(counter["output_tokens"] for counter in tokens_by_model.values())
+    cached_tokens = sum(counter["cached_tokens"] for counter in tokens_by_model.values())
+    cost = sum(
+        batch_cost_usd(model, counter["input_tokens"], counter["output_tokens"])
+        for model, counter in tokens_by_model.items()
+    )
     started = run.started_at
     elapsed = (datetime.now(UTC) - started.replace(tzinfo=UTC)).total_seconds() if started else 0
     last_error = next(
-        (b.last_error for b in sorted(batches, key=lambda b: b.created_at, reverse=True)
+        (b.last_error for b in sorted(batches, key=lambda b: as_utc(b.created_at), reverse=True)
          if b.last_error),
         next((i.provider_error for i in items if i.provider_error), None),
     )
     return {
         "selected": run.detail.get("selected", 0),
-        "prepared": len(items),
-        "submitted": submitted_items,
-        "succeeded": item_states.get("succeeded", 0),
-        "applied": item_states.get("applied", 0),
-        "stale": item_states.get("stale", 0),
-        "terminal_failed": item_states.get("failed", 0),
+        "prepared": len(recipe_state),
+        "submitted": len(submitted_recipes),
+        "succeeded": recipe_states.get("succeeded", 0),
+        "applied": recipe_states.get("applied", 0),
+        "stale": recipe_states.get("stale", 0),
+        "terminal_failed": recipe_states.get("failed", 0),
         "chunks_by_state": dict(chunks_by_state),
         "attempts": dict(attempts),
         "polls_done": run.detail.get("polls_done", 0),
@@ -706,7 +765,7 @@ def build_progress_detail(session: Session, run: TaskRun) -> dict:
         "input_tokens": input_tokens,
         "output_tokens": output_tokens,
         "cached_tokens": cached_tokens,
-        "cost_estimate_usd": round(batch_cost_usd(model or "", input_tokens, output_tokens), 4),
+        "cost_estimate_usd": round(cost, 4),
         "pricing_snapshot_version": BATCH_PRICING_SNAPSHOT_VERSION,
         "elapsed_seconds": round(elapsed, 1),
         **_versions(),
@@ -716,7 +775,12 @@ def build_progress_detail(session: Session, run: TaskRun) -> dict:
 def _refresh_submitted(
     session: Session, run: TaskRun, client: GeminiBatchClient
 ) -> tuple[int, str | None]:
-    """Poll every submitted batch; ingest completions. Returns (active, error)."""
+    """Poll every submitted batch; ingest completions. Returns (active, error).
+
+    Lookup/download failures are transient up to MAX_CONSECUTIVE_POLL_ERRORS per
+    batch (tracked on the run detail); beyond that the batch fails outright so
+    a deterministically broken payload cannot park the run in WAITING forever.
+    """
     submitted = session.scalars(
         select(RecipeEnrichmentBatch)
         .where(
@@ -724,6 +788,7 @@ def _refresh_submitted(
             RecipeEnrichmentBatch.status == EnrichmentBatchStatus.SUBMITTED,
         )
     ).all()
+    error_budget: dict[str, int] = dict(run.detail.get("consecutive_poll_errors") or {})
     active = 0
     last_error: str | None = None
     for batch in submitted:
@@ -731,10 +796,12 @@ def _refresh_submitted(
         try:
             remote = client.get_job(batch.provider_batch_id)
         except Exception as exc:
-            last_error = str(exc)[:500]
-            active += 1
+            last_error = _note_poll_error(session, run, batch, error_budget, str(exc)[:500])
+            if batch.status is EnrichmentBatchStatus.SUBMITTED:
+                active += 1
             continue
         if remote.state in ACTIVE_STATES:
+            error_budget.pop(batch.job_key, None)
             active += 1
         elif remote.state in SUCCEEDED_STATES:
             if not remote.output_file_id:
@@ -747,10 +814,11 @@ def _refresh_submitted(
                 batch.result_file_id = remote.output_file_id
                 lines = client.download_lines(remote.output_file_id)
             except Exception as exc:
-                # Transient download: stay submitted and retry next poll.
-                last_error = str(exc)[:500]
-                active += 1
+                last_error = _note_poll_error(session, run, batch, error_budget, str(exc)[:500])
+                if batch.status is EnrichmentBatchStatus.SUBMITTED:
+                    active += 1
                 continue
+            error_budget.pop(batch.job_key, None)
             ingest_succeeded_batch(session, batch, lines)
         else:
             error_text = remote.error or f"remote job state {remote.state}"
@@ -762,14 +830,42 @@ def _refresh_submitted(
                     item.status = EnrichmentBatchItemStatus.FAILED
                     item.provider_error = error_text[:1000]
             session.commit()
+    run.detail = {**run.detail, "consecutive_poll_errors": error_budget}
+    session.commit()
     return active, last_error
+
+
+def _note_poll_error(
+    session: Session,
+    run: TaskRun,
+    batch: RecipeEnrichmentBatch,
+    error_budget: dict[str, int],
+    message: str,
+) -> str:
+    """Record one transient poll error; fail the batch once the budget is spent."""
+    strikes = error_budget.get(batch.job_key, 0) + 1
+    if strikes >= MAX_CONSECUTIVE_POLL_ERRORS:
+        error_budget.pop(batch.job_key, None)
+        error_text = f"poll failed {strikes} times in a row: {message}"
+        batch.status = EnrichmentBatchStatus.FAILED
+        batch.last_error = error_text
+        for item in batch.items:
+            if item.status is EnrichmentBatchItemStatus.PENDING:
+                item.status = EnrichmentBatchItemStatus.FAILED
+                item.provider_error = error_text[:1000]
+        session.commit()
+        return error_text
+    error_budget[batch.job_key] = strikes
+    return message
 
 
 def _promote_stage2(session: Session, run: TaskRun) -> None:
     """Create stage 2 preparing chunks for stage 1 batches that just succeeded.
 
     A promoted stage 1 batch moves to APPLIED (consumed into the stage 2 wave)
-    so each source batch promotes exactly once, however often polls run.
+    so each source batch promotes exactly once, however often polls run. The
+    sibling inherits the source attempt: the single retry is a budget shared
+    across both waves, so a recipe retried at stage 1 has none left at stage 2.
     """
     stage1_done = session.scalars(
         select(RecipeEnrichmentBatch).where(
@@ -850,96 +946,83 @@ def _is_terminal(session: Session, run: TaskRun) -> bool:
 
 
 def _finalise(session: Session, run: TaskRun, usage: Usage) -> dict:
-    applied = session.scalar(
-        select(func.count())
-        .select_from(RecipeEnrichmentBatchItem)
-        .join(RecipeEnrichmentBatch, RecipeEnrichmentBatchItem.batch_id == RecipeEnrichmentBatch.id)
-        .where(
-            RecipeEnrichmentBatch.task_run_id == run.id,
-            RecipeEnrichmentBatchItem.status == EnrichmentBatchItemStatus.APPLIED,
-        )
-    ) or 0
-    failed = session.scalar(
-        select(func.count())
-        .select_from(RecipeEnrichmentBatchItem)
-        .join(RecipeEnrichmentBatch, RecipeEnrichmentBatchItem.batch_id == RecipeEnrichmentBatch.id)
-        .where(
-            RecipeEnrichmentBatch.task_run_id == run.id,
-            RecipeEnrichmentBatchItem.status == EnrichmentBatchItemStatus.FAILED,
-        )
-    ) or 0
-    stale = session.scalar(
-        select(func.count())
-        .select_from(RecipeEnrichmentBatchItem)
-        .join(RecipeEnrichmentBatch, RecipeEnrichmentBatchItem.batch_id == RecipeEnrichmentBatch.id)
-        .where(
-            RecipeEnrichmentBatch.task_run_id == run.id,
-            RecipeEnrichmentBatchItem.status == EnrichmentBatchItemStatus.STALE,
-        )
-    ) or 0
-    failures = [
-        {"recipe_id": str(item.recipe_id), "error": (item.provider_error or "")[:300]}
-        for item in session.scalars(
-            select(RecipeEnrichmentBatchItem)
-            .join(RecipeEnrichmentBatch,
-                  RecipeEnrichmentBatchItem.batch_id == RecipeEnrichmentBatch.id)
-            .where(
-                RecipeEnrichmentBatch.task_run_id == run.id,
-                RecipeEnrichmentBatchItem.status == EnrichmentBatchItemStatus.FAILED,
-            )
-        ).all()
-    ]
     progress = build_progress_detail(session, run)
+    applied = progress["applied"]
+    failed = progress["terminal_failed"]
+    stale = progress["stale"]
     if failed or stale:
-        detail = {**progress, "applied": applied, "failures": failures}
-        complete_run(str(run.id), detail, usage)
-        session.refresh(run)
-        run.status = TaskStatus.FAILED
-        session.commit()
+        failures = [
+            {"recipe_id": str(item.recipe_id), "error": (item.provider_error or "")[:300]}
+            for item in session.scalars(
+                select(RecipeEnrichmentBatchItem)
+                .join(RecipeEnrichmentBatch,
+                      RecipeEnrichmentBatchItem.batch_id == RecipeEnrichmentBatch.id)
+                .where(
+                    RecipeEnrichmentBatch.task_run_id == run.id,
+                    RecipeEnrichmentBatchItem.status == EnrichmentBatchItemStatus.FAILED,
+                )
+            ).all()
+        ]
+        detail = {**progress, "failures": failures}
+        fail_with_detail(str(run.id), detail, RuntimeError(
+            f"backfill finished with {failed} terminal failures and {stale} stale recipes; "
+            f"{applied} applied and kept"
+        ))
         return detail
     cutover = run_final_cutover(session, run)
-    detail = {**progress, "applied": applied, **cutover}
+    detail = {**progress, **cutover}
     complete_run(str(run.id), detail, usage)
     return detail
+
+
+def _delete_orphan_keywords(session: Session) -> int:
+    """Delete Keyword rows with neither recipe nor book associations.
+
+    Book keyword links are never touched: only rows with no associations at
+    all are removed. Returns how many were deleted.
+    """
+    orphans = session.scalars(
+        select(Keyword).where(~Keyword.recipes.any(), ~Keyword.books.any())
+    ).all()
+    for keyword in orphans:
+        session.delete(keyword)
+    session.commit()
+    return len(orphans)
 
 
 def run_final_cutover(session: Session, run: TaskRun) -> dict:
     """Library cut-over after full coverage: checks, orphan prune, dedup, embeddings.
 
-    Only runs when every item applied. Verifies each enriched recipe carries
-    exactly five keywords with no structured-field duplicates (via the stored
-    responses), deletes orphan Keyword rows that have neither recipe nor book
-    associations — never touching book keywords — enqueues the keyword-dedup
-    task through its existing seam, and regenerates missing embeddings.
+    Only runs when every recipe is current for this source fingerprint and
+    these versions. Deletes genuinely orphan Keyword rows — never touching
+    book keyword associations — enqueues the keyword-dedup task through its
+    existing seam, and regenerates missing embeddings.
     """
-    from app.tasks.keyword_dedup import enqueue_dedup_keywords
-
-    states = session.scalars(
-        select(RecipeEnrichmentState).where(
-            RecipeEnrichmentState.status.in_(
-                [RecipeEnrichmentStatus.PENDING, RecipeEnrichmentStatus.RUNNING,
-                 RecipeEnrichmentStatus.FAILED]
-            ),
-            RecipeEnrichmentState.schema_version == SCHEMA_VERSION,
+    recipes = session.scalars(
+        select(Recipe).options(
+            selectinload(Recipe.ingredients_verbatim),
+            selectinload(Recipe.enrichment_state),
         )
     ).all()
-    if states:
-        raise RuntimeError(f"cut-over blocked: {len(states)} enrichment states not complete")
-    orphans = session.scalars(
-        select(Keyword).where(~Keyword.recipes.any(), ~Keyword.books.any())
-    ).all()
-    orphan_count = len(orphans)
-    for keyword in orphans:
-        session.delete(keyword)
-    session.commit()
-    dedup_run = None
+    not_current = [
+        recipe.id for recipe in recipes
+        if not _is_current(recipe.enrichment_state, recipe)
+    ]
+    if not_current:
+        raise RuntimeError(
+            f"cut-over blocked: {len(not_current)} recipes not current for these versions"
+        )
+    orphan_count = _delete_orphan_keywords(session)
+    dedup_run = create_task_run(session, TaskType.KEYWORD_DEDUP)
     try:
-        from app.tasks.runs import create_task_run
-
-        dedup_run = create_task_run(session, TaskType.KEYWORD_DEDUP)
         enqueue_dedup_keywords(str(dedup_run.id))
     except Exception:
-        logger.warning("Cut-over could not enqueue keyword dedup")
+        # Never leave a QUEUED run no worker will pick up: drop the row and
+        # report the dedup as not queued instead.
+        logger.warning("Cut-over could not enqueue keyword dedup; dropping its run")
+        session.delete(dedup_run)
+        session.commit()
+        dedup_run = None
     provider = get_ai_provider(session)
     embedded = backfill_embeddings(session, provider) if provider is not None else 0
     return {
@@ -955,33 +1038,51 @@ def _run_usage(session: Session, run: TaskRun) -> Usage:
         .join(RecipeEnrichmentBatch, RecipeEnrichmentBatchItem.batch_id == RecipeEnrichmentBatch.id)
         .where(RecipeEnrichmentBatch.task_run_id == run.id)
     ).all()
-    input_tokens = sum((item.usage or {}).get("input_tokens", 0) for item in items)
-    output_tokens = sum((item.usage or {}).get("output_tokens", 0) for item in items)
-    model = run.model_name or "gemini-2.5-flash"
+    tokens: dict[str, Counter[str]] = {}
+    for item in items:
+        usage = item.usage or {}
+        counter = tokens.setdefault(str(usage.get("model") or "unknown"), Counter())
+        counter["input_tokens"] += int(usage.get("input_tokens", 0) or 0)
+        counter["output_tokens"] += int(usage.get("output_tokens", 0) or 0)
+    input_tokens = sum(counter["input_tokens"] for counter in tokens.values())
+    output_tokens = sum(counter["output_tokens"] for counter in tokens.values())
+    cost = sum(
+        batch_cost_usd(model, counter["input_tokens"], counter["output_tokens"])
+        for model, counter in tokens.items()
+    )
     return Usage(
-        cost_usd=Decimal(str(batch_cost_usd(model, input_tokens, output_tokens))),
+        cost_usd=Decimal(str(cost)),
         input_tokens=input_tokens,
         output_tokens=output_tokens,
     )
 
 
 def run_backfill_prepare_and_submit(run_id: str) -> dict:
-    """Start the backfill: select, prepare stage 1 chunks, submit, go waiting."""
+    """Start the backfill: select, prepare stage 1 chunks, submit, go waiting.
+
+    An empty selection finishes DONE immediately: there is nothing to enrich,
+    and the cut-over side effects (orphan prune, dedup, embeddings) stay
+    reserved for runs that actually applied work.
+    """
     start_run(run_id)
     with SessionLocal() as session:
         run = session.get(TaskRun, uuid.UUID(run_id))
         if run is None:
             raise ValueError("enrichment backfill run not found")
-        client, model = _batch_client(session)
+        client, _stage1, _stage2, stage1_model, stage2_model = _batch_client(session)
         run.provider_name = "GEMINI"
-        run.model_name = model
+        run.model_name = f"{stage1_model} -> {stage2_model}"
         session.commit()
         recipe_ids = select_backfill_recipe_ids(session)
         run.detail = {**run.detail, "selected": len(recipe_ids), **_versions()}
         session.commit()
+        if not recipe_ids:
+            detail = build_progress_detail(session, run)
+            complete_run(str(run.id), {**detail, "note": "nothing outstanding"}, Usage())
+            return detail
         prepare_stage_chunks(session, run, recipe_ids, stage="stage1", attempt=1, first_chunk=0)
         max_active = int(run.detail.get("max_active_jobs", BATCH_DEFAULT_MAX_ACTIVE_JOBS))
-        submit_prepared(session, run, client, model, max_active=max_active)
+        submit_prepared(session, run, client, stage1_model, stage2_model, max_active=max_active)
         progress = build_progress_detail(session, run)
         polls_done = 0
         countdown = poll_countdown(polls_done)
@@ -1001,15 +1102,21 @@ def poll_backfill(run_id: str, polls_done: int = 0) -> dict:
         if run.status not in (TaskStatus.WAITING, TaskStatus.RUNNING, TaskStatus.QUEUED):
             return dict(run.detail)
         set_running(run_id)
-        client, model = _batch_client(session)
+        client, stage1_provider, stage2_provider, stage1_model, stage2_model = _batch_client(
+            session
+        )
         _active, last_error = _refresh_submitted(session, run, client)
         _promote_stage2(session, run)
         max_active = int(run.detail.get("max_active_jobs", BATCH_DEFAULT_MAX_ACTIVE_JOBS))
-        submit_prepared(session, run, client, model, max_active=max_active)
-        apply_counts = apply_ready_stage2(session, run, model)
+        submit_prepared(session, run, client, stage1_model, stage2_model, max_active=max_active)
+        apply_counts = apply_ready_stage2(
+            session, run, stage1_provider, stage2_provider, stage1_model, stage2_model
+        )
         built = build_retry_chunks(session, run)
         if built:
-            submit_prepared(session, run, client, model, max_active=max_active)
+            submit_prepared(
+                session, run, client, stage1_model, stage2_model, max_active=max_active
+            )
         progress = build_progress_detail(session, run)
         progress["applied_now"] = apply_counts.get("applied", 0)
         if last_error:
@@ -1049,27 +1156,3 @@ def poll_enrichment_backfill_task(run_id: str, polls_done: int = 0) -> dict:
     except Exception as exc:
         fail_run(run_id, exc)
         raise
-
-
-def delete_orphan_keywords(session: Session) -> int:
-    """Delete Keyword rows with neither recipe nor book associations. Returns count."""
-    orphans = session.scalars(
-        select(Keyword).where(~Keyword.recipes.any(), ~Keyword.books.any())
-    ).all()
-    for keyword in orphans:
-        session.delete(keyword)
-    session.commit()
-    return len(orphans)
-
-
-def _clear_recipe_enrichment_data(session: Session, recipe_id: uuid.UUID) -> None:
-    """Test helper: reset one recipe's enrichment artefacts for replay tests."""
-    recipe = session.get(Recipe, recipe_id)
-    if recipe is None:
-        return
-    if recipe.enrichment_state is not None:
-        session.delete(recipe.enrichment_state)
-    session.execute(
-        delete(IngredientLine).where(IngredientLine.recipe_id == recipe_id)
-    )
-    session.commit()
