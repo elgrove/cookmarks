@@ -6,7 +6,7 @@ from app.models.ingredient import IngredientLine, IngredientOccurrence
 from app.models.recipe import Keyword, Recipe
 from app.models.recipe_enrichment import RecipeEnrichmentState
 from app.services.ai.stub import StubProvider
-from app.services.recipe_enrichment.prompt import build_prompt
+from app.services.recipe_enrichment.prompt import build_prompt, build_stage1_prompt
 from app.services.recipe_enrichment.schema import (
     ENRICHMENT_JSON_SCHEMA,
     GEMINI_ENRICHMENT_JSON_SCHEMA,
@@ -246,6 +246,32 @@ def test_prompt_distinguishes_deterministic_and_ai_line_decisions(session) -> No
     prompt = build_prompt(context)
     assert "ai_parse_line_ids" in prompt
     assert "no ingredient ID field" in prompt
+
+
+def test_stage1_prompt_requires_complete_alternative_groups() -> None:
+    prompt = build_stage1_prompt(
+        {
+            "recipe": {
+                "id": "recipe-1",
+                "instructions": [],
+                "lines": [
+                    {
+                        "id": "line-1",
+                        "text": "Nonstick cooking spray or softened butter, for the pan",
+                    }
+                ],
+                "ai_parse_line_ids": ["line-1"],
+            }
+        }
+    )
+
+    assert "one occurrence for EACH choice" in prompt
+    assert "SAME non-null `a` value" in prompt
+    assert "Detect a choice by its meaning, not by one word" in prompt
+    assert "`↔` or `<->`" in prompt
+    assert "fraction, measurement conversion, quantity range" in prompt
+    assert "A substitute choice does not mean optional" in prompt
+    assert "Final alternative check" in prompt
 
 
 def test_repeated_new_canonical_ingredient_resolves_to_one_identity(session) -> None:

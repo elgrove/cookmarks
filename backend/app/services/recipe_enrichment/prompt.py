@@ -87,9 +87,14 @@ For every occurrence in p:
 - u: common unit abbreviation (`tsp`, `tbsp`, `cup`, `g`, `kg`, `ml`, `litre`, `oz`, `lb`, `clove`, `pinch`).
 - p: preparation actions and descriptors (`chopped`, `diced`, `peeled`, `toasted`, `baked`, `roasted`, `to taste`, `for serving`).
 - x: true only when source explicitly states optional.
-- a: integer alternative group (`0`, `1`...) for either/or choices on the same line.
-  * When a line offers choices joined by 'or' (e.g. 'palm sugar or dark brown sugar'; 'chicken or beef stock, or dashi'; 'ketchup or tonkatsu sauce'; 'sweetcorn cob, or tinned sweetcorn'), output one occurrence for EACH distinct alternative ingredient with the SAME `a` value (e.g. `a: 0`).
+- a: integer alternative group (`0`, `1`...) for substitute ingredient choices on the same line.
+  * Detect a choice by its meaning, not by one word. A source can use words such as `or`, `either`, `alternatively`, `instead of` or `substitute`, or separators such as `/`, `|`, `↔` or `<->` between ingredient names.
+  * For distinct substitute ingredients, output one occurrence for EACH choice with the SAME non-null `a` value. Examples: `cooking spray or butter`; `vanilla bean <-> vanilla extract`; `palm sugar / dark brown sugar`; `chicken stock, beef stock, or dashi`.
+  * Do not treat a fraction, measurement conversion, quantity range, or choice between descriptions of one ingredient as an ingredient alternative. Examples: `1/2 cup`, `170 g / 6 oz`, `5 or 6 garlic chives`, and `baked or super firm tofu` each produce one occurrence with a: null.
+  * A substitute choice does not mean optional. Set `x: true` only when the source separately says `optional`.
 - k: true for 1 to 3 core star ingredients that define the dish identity (e.g. main protein, key vegetable, star flavour). False for seasoning, oil, or supporting ingredients.
+
+Final alternative check: find every substitute relationship, whether it uses words or symbols. Verify that no ingredient choice is missing and every choice has the same non-null `a` value.
 
 Wire keys: p parsed lines {l line ID, o occurrences}; n non-ingredient lines {l, k}; occurrence {n canonical name, q quantity, u unit, p preparation, x optional, a alternative group, k key}."""
 
