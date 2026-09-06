@@ -534,11 +534,14 @@ def validate_enrichment_response(context: dict, response: EnrichmentResponse) ->
     for item in response.canonical_ingredients:
         if not item.name or not item.name.strip():
             raise ValueError("canonical ingredient name cannot be empty")
-    if sum(item.is_key for item in response.canonical_ingredients) > 3:
+    distinct_keys = {
+        item.name.casefold()
+        for item in response.canonical_ingredients
+        if item.name and item.is_key
+    }
+    if len(distinct_keys) > 3:
         raise ValueError("response must contain at most three key ingredients")
-    if response.canonical_ingredients and not any(
-        item.is_key for item in response.canonical_ingredients
-    ):
+    if response.canonical_ingredients and not distinct_keys:
         raise ValueError("response must contain at least one key ingredient")
 
 

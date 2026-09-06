@@ -228,9 +228,14 @@ def _validate_response(
     upsert_facet_vocabulary(session)
     session.flush()
     canonical_items = [item for item in response.ingredients if item.name]
-    if sum(item.is_key for item in canonical_items) > 3:
+    distinct_keys = {
+        item.name.casefold()
+        for item in canonical_items
+        if item.name and item.is_key
+    }
+    if len(distinct_keys) > 3:
         raise EnrichmentValidationError("response must contain at most three key ingredients")
-    if canonical_items and not any(item.is_key for item in canonical_items):
+    if canonical_items and not distinct_keys:
         raise EnrichmentValidationError("response must contain at least one key ingredient")
 
     names = [item.name for item in canonical_items if item.name]
