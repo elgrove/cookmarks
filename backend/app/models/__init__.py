@@ -13,7 +13,7 @@ from app.models.enums import (
     TaskType,
 )
 from app.models.game import GameDismissal
-from app.models.ingredient import Ingredient, IngredientLine, RecipeCanonicalIngredient
+from app.models.ingredient import CanonicalIngredient, RecipeIngredient
 from app.models.reading_queue import ReadingQueueItem
 from app.models.recipe import Keyword, Recipe, recipe_keywords
 from app.models.recipe_enrichment import RecipeEnrichmentState
@@ -31,21 +31,20 @@ __all__ = [
     "Book",
     "BookReading",
     "CalibreExclusion",
+    "CanonicalIngredient",
     "Config",
     "ExtractionMethod",
     "GameDismissal",
-    "Ingredient",
-    "IngredientLine",
     "Keyword",
     "ReadingQueueItem",
     "Recipe",
-    "RecipeCanonicalIngredient",
     "RecipeCuisine",
     "RecipeEnrichmentState",
     "RecipeEnrichmentStatus",
     "RecipeFacet",
     "RecipeFacetKind",
     "RecipeFacetValue",
+    "RecipeIngredient",
     "RecipeList",
     "RecipeListItem",
     "RecipeView",

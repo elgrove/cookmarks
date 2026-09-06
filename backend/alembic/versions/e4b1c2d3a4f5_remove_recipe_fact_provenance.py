@@ -32,11 +32,29 @@ def upgrade() -> None:
     op.drop_index("ix_ingredient_aliases_ingredient_id", table_name="ingredient_aliases")
     op.drop_table("ingredient_aliases")
 
-    with op.batch_alter_table("ingredient_lines") as batch_op:
-        batch_op.drop_column("kind")
+    op.drop_index("ix_ingredient_lines_recipe_id", table_name="ingredient_lines")
+    op.drop_table("ingredient_lines")
+
+    op.drop_index("ix_ingredients_name_folded", table_name="ingredients")
+    op.drop_table("ingredients")
 
     op.create_table(
-        "recipe_canonical_ingredients",
+        "canonical_ingredients",
+        sa.Column("id", sa.Uuid(), primary_key=True, nullable=False),
+        sa.Column("name", sa.String(300), nullable=False, unique=True),
+        sa.Column("name_folded", sa.String(300), nullable=False, unique=True),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+    )
+    op.create_index(
+        "ix_canonical_ingredients_name_folded",
+        "canonical_ingredients",
+        ["name_folded"],
+        unique=True,
+    )
+
+    op.create_table(
+        "recipe_ingredients",
         sa.Column("id", sa.Uuid(), primary_key=True, nullable=False),
         sa.Column(
             "recipe_id",
@@ -44,48 +62,79 @@ def upgrade() -> None:
             sa.ForeignKey("recipes.id", ondelete="CASCADE"),
             nullable=False,
         ),
+        sa.Column("position", sa.Integer(), nullable=False),
+        sa.Column("text", sa.Text(), nullable=False),
         sa.Column(
-            "ingredient_id",
+            "canonical_ingredient_id",
             sa.Uuid(),
-            sa.ForeignKey("ingredients.id", ondelete="RESTRICT"),
-            nullable=False,
+            sa.ForeignKey("canonical_ingredients.id", ondelete="RESTRICT"),
+            nullable=True,
         ),
         sa.Column("is_key", sa.Boolean(), nullable=False, server_default=sa.false()),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
-        sa.UniqueConstraint("recipe_id", "ingredient_id"),
+        sa.UniqueConstraint("recipe_id", "position"),
     )
     op.create_index(
-        "ix_recipe_canonical_ingredients_recipe_id",
-        "recipe_canonical_ingredients",
+        "ix_recipe_ingredients_recipe_id",
+        "recipe_ingredients",
         ["recipe_id"],
     )
     op.create_index(
-        "ix_recipe_canonical_ingredients_ingredient_id",
-        "recipe_canonical_ingredients",
-        ["ingredient_id"],
+        "ix_recipe_ingredients_canonical_ingredient_id",
+        "recipe_ingredients",
+        ["canonical_ingredient_id"],
     )
 
 
 def downgrade() -> None:
     op.drop_index(
-        "ix_recipe_canonical_ingredients_ingredient_id",
-        table_name="recipe_canonical_ingredients",
+        "ix_recipe_ingredients_canonical_ingredient_id",
+        table_name="recipe_ingredients",
     )
     op.drop_index(
-        "ix_recipe_canonical_ingredients_recipe_id",
-        table_name="recipe_canonical_ingredients",
+        "ix_recipe_ingredients_recipe_id",
+        table_name="recipe_ingredients",
     )
-    op.drop_table("recipe_canonical_ingredients")
+    op.drop_table("recipe_ingredients")
 
-    with op.batch_alter_table("ingredient_lines") as batch_op:
-        batch_op.add_column(
-            sa.Column(
-                "kind",
-                sa.Enum("ingredient", "heading", "note", name="ingredientlinekind"),
-                nullable=True,
-            )
-        )
+    op.drop_index(
+        "ix_canonical_ingredients_name_folded",
+        table_name="canonical_ingredients",
+    )
+    op.drop_table("canonical_ingredients")
+
+    op.create_table(
+        "ingredients",
+        sa.Column("id", sa.Uuid(), primary_key=True, nullable=False),
+        sa.Column("name", sa.String(300), nullable=False, unique=True),
+        sa.Column("name_folded", sa.String(300), nullable=False, unique=True),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+    )
+    op.create_index("ix_ingredients_name_folded", "ingredients", ["name_folded"], unique=True)
+
+    op.create_table(
+        "ingredient_lines",
+        sa.Column(
+            "recipe_id",
+            sa.Uuid(),
+            sa.ForeignKey("recipes.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
+        sa.Column("position", sa.Integer(), nullable=False),
+        sa.Column("text", sa.Text(), nullable=False),
+        sa.Column(
+            "kind",
+            sa.Enum("ingredient", "heading", "note", name="ingredientlinekind"),
+            nullable=True,
+        ),
+        sa.Column("id", sa.Uuid(), primary_key=True, nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+        sa.UniqueConstraint("recipe_id", "position"),
+    )
+    op.create_index("ix_ingredient_lines_recipe_id", "ingredient_lines", ["recipe_id"])
 
     op.create_table(
         "ingredient_aliases",

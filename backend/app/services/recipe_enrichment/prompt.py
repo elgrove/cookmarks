@@ -5,34 +5,36 @@ import json
 from app.services.recipe_enrichment.schema import PROMPT_VERSION
 
 _INSTRUCTIONS = """You enrich one extracted recipe. Return only the JSON response.
-Extract singular UK-English canonical food names in i {n canonical name, k key}.
+For each line in the input, return an entry in i with the line id, singular UK-English canonical food name (n or null), and key ingredient flag (k).
 Mark k true for one to three core ingredients that define the identity of the dish (such as the main protein, star vegetable, or signature flavour). Mark false for secondary, supporting, or seasoning ingredients.
+If a line is a section heading, note, or contains no food ingredient, return null for n and false for k.
+Always take the first ingredient when alternatives are listed.
 Decide cuisines, methods, courses, and residual keywords using the recipe title, book title, author, instructions, and ingredients.
 Methods are optional. Select a method only for a central, intentional cooking technique that defines the prepared dish. Set primary only on the one method that is most central to the dish; send no primary flag when no method qualifies.
 Decide cuisines, methods and courses from the title and instructions before you choose keywords.
 Use an available cuisine ID only when the dish is explicitly named for, or is unmistakably from, that cuisine.
 Choose zero to five Title Case UK-English residual keywords. Include only useful keywords that add information not represented by a selected fact or canonical ingredient.
 
-Wire keys: i canonical ingredients {n canonical name, k key}; c cuisine IDs; m methods {v ID, p primary}; o course IDs; w keywords."""
+Wire keys: i list of {id: line ID, n: canonical name or null, k: key boolean}; c cuisine IDs; m methods {v ID, p primary}; o course IDs; w keywords."""
 
 
 _STAGE1_INSTRUCTIONS = """You extract canonical food ingredient names from recipe ingredient lines. Return only valid JSON.
-Extract one singular UK-English canonical food name for each distinct ingredient item mentioned.
-Do not extract quantities, units, preparation methods, or line kinds.
-Exclude non-food section headings, notes, serving suggestions, or table condiments that are not ingredients.
+For each line in the input, return an entry in i with the line id and the singular UK-English canonical food name (n).
+If a line is a section heading, note, or contains no food ingredient, return null for n.
+Always take the first ingredient. If a line mentions alternatives (e.g. "butter or vegetable oil", "cooking spray or butter"), extract only the first mentioned ingredient ("butter", "cooking spray").
+Do not extract quantities, units, or preparation methods.
 
-For every ingredient in i:
+For n:
 - Singular UK-English canonical food name (e.g. `garlic`, `tofu`, `prawn`, `peanut`, `lime`, `aubergine`, `coriander`, `chilli`, `egg`, `spring onion`, `noodle`).
   * Use strictly British English (en-GB) vocabulary and spelling: write `chilli` never `chile` or `chili`, `coriander` never `cilantro`, `aubergine` never `eggplant`, `courgette` never `zucchini`, `spring onion` never `scallion` or `green onion`.
   * ALWAYS use strictly singular forms: write `egg` not `eggs`, `spring onion` not `spring onions`, `noodle` not `noodles`, `tomato` not `tomatoes`.
   * Exclude size adjectives (`large`, `small`, `medium`) and preparation/state adjectives (`roasted`, `baked`, `toasted`, `ground`, `steamed`, `peeled`, `crushed`, `chopped`, `diced`).
   * Preserve culinary specificity. Do not strip distinct varieties, products, or compound foods into generic parents: keep `plain flour` (not `flour`), `cheddar cheese` (not `cheese`), `madras curry powder` (not `curry powder`), `chicken stock` / `beef stock` (not `stock`), `mung bean sprout` (not `bean sprout`), `preserved sweet radish` (not `radish`), `vegetable oil` (not `oil`), `red pickled ginger` (not `ginger`), `red pepper` (not `pepper`).
   * Exclude units of measurement: `clove` is a unit of measurement, so extract `garlic` (never `garlic clove`).
-  * For substitute choices (e.g. `cooking spray or butter`, `palm sugar / dark brown sugar`), extract each distinct ingredient.
 
 Do not decide which ingredients are key. Stage 2 owns all recipe-level interpretation.
 
-Wire keys: i list of singular UK-English canonical ingredient names."""
+Wire keys: i list of {id: line ID, n: canonical ingredient name or null}."""
 
 _STAGE2_INSTRUCTIONS = """You make recipe-level semantic decisions from extracted canonical ingredients and cooking instructions. Return only valid JSON.
 Decide key ingredients, cuisines, cooking methods, courses, and residual keywords using the recipe title, book title, author, cooking instructions, and extracted ingredient list.

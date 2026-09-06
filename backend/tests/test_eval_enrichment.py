@@ -9,6 +9,7 @@ import pytest
 from app.services.ai import AIResponseError, Usage
 from app.services.recipe_enrichment.schema import (
     EnrichmentResponse,
+    Stage1LineDecision,
     Stage1Response,
     Stage2Response,
 )
@@ -278,7 +279,13 @@ def test_mixed_model_eval_routes_stage_output_to_stage_two(tmp_path) -> None:
     gold = _sample_gold_recipe()
     stage1_provider = Mock()
     stage1_provider.enrich_recipe_stage1.return_value = (
-        Stage1Response(i=["apple", "olive oil"]),
+        Stage1Response(
+            i=[
+                Stage1LineDecision(id="01", n="apple"),
+                Stage1LineDecision(id="02", n=None),
+                Stage1LineDecision(id="03", n="olive oil"),
+            ]
+        ),
         Usage(input_tokens=100, output_tokens=20, cost_usd=Decimal("0.001")),
     )
     stage2_provider = Mock()
@@ -315,7 +322,13 @@ def test_mixed_model_eval_keeps_stage_one_usage_when_stage_two_fails(tmp_path) -
     gold = _sample_gold_recipe()
     stage1_provider = Mock()
     stage1_provider.enrich_recipe_stage1.return_value = (
-        Stage1Response(i=["apple", "olive oil"]),
+        Stage1Response(
+            i=[
+                Stage1LineDecision(id="01", n="apple"),
+                Stage1LineDecision(id="02", n=None),
+                Stage1LineDecision(id="03", n="olive oil"),
+            ]
+        ),
         Usage(input_tokens=100, output_tokens=20, cost_usd=Decimal("0.001")),
     )
     stage2_provider = Mock()

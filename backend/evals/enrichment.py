@@ -448,7 +448,10 @@ def build_gold_stage1_context(gold: GoldRecipe) -> dict:
         "recipe": {
             "id": gold.id,
             "name": gold.name,
-            "ingredients": [line.text for line in gold.lines],
+            "lines": [
+                {"id": f"{i:02d}", "text": line.text}
+                for i, line in enumerate(gold.lines, start=1)
+            ],
         }
     }
 
@@ -501,7 +504,10 @@ def build_gold_context(gold: GoldRecipe) -> dict:
     recipe_payload: dict[str, Any] = {
         "id": gold.id,
         "name": gold.name,
-        "ingredients": [line.text for line in gold.lines],
+        "lines": [
+            {"id": f"{i:02d}", "text": line.text}
+            for i, line in enumerate(gold.lines, start=1)
+        ],
         "instructions": gold.instructions,
     }
     if gold.book_title:
@@ -526,7 +532,7 @@ def build_gold_context(gold: GoldRecipe) -> dict:
 def validate_enrichment_response(context: dict, response: EnrichmentResponse) -> None:
     """Reject structured responses that the production application would not accept."""
     for item in response.canonical_ingredients:
-        if not item.name.strip():
+        if not item.name or not item.name.strip():
             raise ValueError("canonical ingredient name cannot be empty")
     if sum(item.is_key for item in response.canonical_ingredients) > 3:
         raise ValueError("response must contain at most three key ingredients")
@@ -535,10 +541,6 @@ def validate_enrichment_response(context: dict, response: EnrichmentResponse) ->
     ):
         raise ValueError("response must contain at least one key ingredient")
 
-    names = [item.name for item in response.canonical_ingredients]
-    folded_names = [fold(name) for name in names]
-    if len(folded_names) != len(set(folded_names)):
-        raise ValueError("response contains duplicate canonical ingredients")
 
     vocabulary = context["vocabulary"]
     allowed = {
@@ -725,7 +727,7 @@ def evaluate_enrichment_recipe(
     try:
         stage1_context = build_gold_stage1_context(gold)
 
-        if not stage1_context["recipe"]["ingredients"]:
+        if not stage1_context["recipe"]["lines"]:
             stage1_response = Stage1Response(i=[])
             usage1 = Usage()
         else:
@@ -742,7 +744,8 @@ def evaluate_enrichment_recipe(
         except ValueError as exc:
             raise AIResponseError(f"Invalid Stage 1 response: {exc}", usage1) from exc
 
-        deduped_ingredients = deduplicate_ingredient_names(stage1_response.ingredients)
+        stage1_names = [item.name for item in stage1_response.ingredients if item.name]
+        deduped_ingredients = deduplicate_ingredient_names(stage1_names)
 
         stage2_context = build_gold_stage2_context(
             gold, deduped_ingredients, include_description=include_description
@@ -757,7 +760,7 @@ def evaluate_enrichment_recipe(
 
         usage = usage1 + usage2
         try:
-            response = EnrichmentResponse.from_stages(deduped_ingredients, stage2_response)
+            response = EnrichmentResponse.from_stages(stage1_response, stage2_response)
         except ValueError as exc:
             raise AIResponseError(f"Invalid Stage 2 response: {exc}", usage) from exc
 

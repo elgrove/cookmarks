@@ -11,15 +11,15 @@ if TYPE_CHECKING:
     from app.models.recipe import Recipe
 
 
-class Ingredient(UUIDAuditBase):
+class CanonicalIngredient(UUIDAuditBase):
     """A canonical, library-wide ingredient identity."""
 
-    __tablename__ = "ingredients"
+    __tablename__ = "canonical_ingredients"
 
     name: Mapped[str] = mapped_column(String(300), unique=True)
     name_folded: Mapped[str] = mapped_column(String(300), unique=True, index=True)
-    recipe_associations: Mapped[list["RecipeCanonicalIngredient"]] = relationship(
-        back_populates="ingredient", cascade="all, delete-orphan"
+    recipe_ingredients: Mapped[list["RecipeIngredient"]] = relationship(
+        back_populates="canonical_ingredient"
     )
 
     @validates("name")
@@ -28,10 +28,10 @@ class Ingredient(UUIDAuditBase):
         return value
 
 
-class IngredientLine(UUIDAuditBase):
-    """One ordered, verbatim source line from a recipe's ingredients section."""
+class RecipeIngredient(UUIDAuditBase):
+    """One ordered verbatim ingredient line for a recipe, linked to a canonical ingredient."""
 
-    __tablename__ = "ingredient_lines"
+    __tablename__ = "recipe_ingredients"
     __table_args__ = (UniqueConstraint("recipe_id", "position"),)
 
     recipe_id: Mapped[uuid.UUID] = mapped_column(
@@ -39,27 +39,18 @@ class IngredientLine(UUIDAuditBase):
     )
     position: Mapped[int] = mapped_column(Integer)
     text: Mapped[str] = mapped_column(Text)
-    recipe: Mapped["Recipe"] = relationship(back_populates="ingredients_verbatim")
-
-
-class RecipeCanonicalIngredient(UUIDAuditBase):
-    """A canonical ingredient associated with a recipe, with an optional key flag."""
-
-    __tablename__ = "recipe_canonical_ingredients"
-    __table_args__ = (UniqueConstraint("recipe_id", "ingredient_id"),)
-
-    recipe_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("recipes.id", ondelete="CASCADE"), index=True
-    )
-    ingredient_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("ingredients.id", ondelete="RESTRICT"), index=True
+    canonical_ingredient_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("canonical_ingredients.id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
     )
     is_key: Mapped[bool] = mapped_column(Boolean, default=False)
 
-    recipe: Mapped["Recipe"] = relationship(back_populates="canonical_ingredients")
-    ingredient: Mapped["Ingredient"] = relationship(back_populates="recipe_associations")
+    recipe: Mapped["Recipe"] = relationship(back_populates="ingredients")
+    canonical_ingredient: Mapped[CanonicalIngredient | None] = relationship(
+        back_populates="recipe_ingredients"
+    )
 
     @property
-    def name(self) -> str:
-        return self.ingredient.name
-
+    def canonical_name(self) -> str | None:
+        return self.canonical_ingredient.name if self.canonical_ingredient else None

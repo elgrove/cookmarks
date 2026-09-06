@@ -7,14 +7,14 @@ from collections import Counter
 from datetime import UTC, datetime
 from hashlib import sha256
 
-from sqlalchemy import delete, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.models.enums import (
     RecipeEnrichmentStatus,
     RecipeFacetKind,
 )
-from app.models.ingredient import Ingredient, RecipeCanonicalIngredient
+from app.models.ingredient import CanonicalIngredient, RecipeIngredient
 from app.models.recipe import Recipe
 from app.models.recipe_fact import RecipeCuisine, RecipeFacet, RecipeFacetValue
 from app.services.ai import (
@@ -37,7 +37,7 @@ from app.services.recipe_enrichment.schema import (
 )
 from app.services.recipe_facts import (
     accepted_cuisine_ids,
-    create_ingredient,
+    create_canonical_ingredient,
     upsert_facet_vocabulary,
 )
 from app.text import fold
@@ -82,9 +82,8 @@ def _recipe_with_facts(session: Session, recipe_id: uuid.UUID) -> Recipe:
         select(Recipe)
         .where(Recipe.id == recipe_id)
         .options(
-            selectinload(Recipe.ingredients_verbatim),
-            selectinload(Recipe.canonical_ingredients).joinedload(
-                RecipeCanonicalIngredient.ingredient
+            selectinload(Recipe.ingredients).joinedload(
+                RecipeIngredient.canonical_ingredient
             ),
             selectinload(Recipe.enrichment_state),
             selectinload(Recipe.keywords),
@@ -98,8 +97,8 @@ def _recipe_with_facts(session: Session, recipe_id: uuid.UUID) -> Recipe:
     return recipe
 
 
-def _ingredient_vocab(session: Session) -> dict[str, Ingredient]:
-    return {str(item.id): item for item in session.scalars(select(Ingredient))}
+def _ingredient_vocab(session: Session) -> dict[str, CanonicalIngredient]:
+    return {str(item.id): item for item in session.scalars(select(CanonicalIngredient))}
 
 
 def build_context(session: Session, recipe: Recipe) -> dict:
@@ -148,7 +147,10 @@ def build_stage1_context(
         "recipe": {
             "id": str(recipe.id),
             "name": recipe.name,
-            "ingredients": [line.text for line in recipe.ingredients_verbatim],
+            "lines": [
+                {"id": f"{i:02d}", "text": line.text}
+                for i, line in enumerate(recipe.ingredients, start=1)
+            ],
         }
     }
 
@@ -204,11 +206,11 @@ def build_stage2_context(
 
 
 def validate_stage1_response(context: dict, response: Stage1Response) -> None:
-    """Validate that Stage 1 extracted valid ingredients when ingredients exist."""
+    """Validate that Stage 1 extracted valid decisions when lines exist."""
     recipe = context["recipe"]
-    ingredients = recipe.get("ingredients", [])
-    if ingredients and not response.ingredients:
-        raise EnrichmentValidationError("Stage 1 extracted no ingredients from recipe")
+    lines = recipe.get("lines", [])
+    if lines and not response.ingredients:
+        raise EnrichmentValidationError("Stage 1 extracted no ingredient decisions from recipe")
 
 
 def _validate_keyword(value: str) -> str:
@@ -225,22 +227,16 @@ def _validate_response(
 ) -> None:
     upsert_facet_vocabulary(session)
     session.flush()
-    for item in response.canonical_ingredients:
-        if not item.name.strip():
-            raise EnrichmentValidationError("canonical ingredient name cannot be empty")
-    if sum(item.is_key for item in response.canonical_ingredients) > 3:
+    canonical_items = [item for item in response.ingredients if item.name]
+    if sum(item.is_key for item in canonical_items) > 3:
         raise EnrichmentValidationError("response must contain at most three key ingredients")
-    if response.canonical_ingredients and not any(
-        item.is_key for item in response.canonical_ingredients
-    ):
+    if canonical_items and not any(item.is_key for item in canonical_items):
         raise EnrichmentValidationError("response must contain at least one key ingredient")
 
-    names = [item.name for item in response.canonical_ingredients]
+    names = [item.name for item in canonical_items if item.name]
     folded_names = [fold(name) for name in names]
-    if len(folded_names) != len(set(folded_names)):
-        raise EnrichmentValidationError("response contains duplicate canonical ingredients")
 
-    canonical = {item.name_folded: item for item in session.scalars(select(Ingredient))}
+    canonical = {item.name_folded: item for item in session.scalars(select(CanonicalIngredient))}
 
     cuisine_ids = response.cuisines
     if len(cuisine_ids) != len(set(cuisine_ids)) or not set(cuisine_ids) <= accepted_cuisine_ids():
@@ -293,32 +289,36 @@ def _apply_response(
     _validate_response(session, recipe, response)
     state = recipe.enrichment_state
     assert state is not None
-    created: dict[str, Ingredient] = {}
-    canonical_by_name = {item.name_folded: item for item in session.scalars(select(Ingredient))}
+    created: dict[str, CanonicalIngredient] = {}
+    canonical_by_name = {
+        item.name_folded: item for item in session.scalars(select(CanonicalIngredient))
+    }
     existing_ingredients = 0
 
-    session.execute(
-        delete(RecipeCanonicalIngredient).where(RecipeCanonicalIngredient.recipe_id == recipe.id)
-    )
+    decisions_by_id = {item.line_id: item for item in response.ingredients}
 
-    for item in response.canonical_ingredients:
-        name_folded = fold(item.name)
-        ingredient = canonical_by_name.get(name_folded)
-        if ingredient is not None:
+    for i, line in enumerate(recipe.ingredients, start=1):
+        line_id = f"{i:02d}"
+        decision = decisions_by_id.get(line_id)
+        if decision is None or not decision.name:
+            line.canonical_ingredient_id = None
+            line.is_key = False
+            continue
+
+        canonical_name = decision.name
+        name_folded = fold(canonical_name)
+        canonical = canonical_by_name.get(name_folded)
+        if canonical is not None:
             existing_ingredients += 1
         else:
-            ingredient = created.get(name_folded)
-            if ingredient is None:
-                ingredient = create_ingredient(session, item.name)
-                created[name_folded] = ingredient
-                canonical_by_name[name_folded] = ingredient
-        session.add(
-            RecipeCanonicalIngredient(
-                recipe_id=recipe.id,
-                ingredient_id=ingredient.id,
-                is_key=item.is_key,
-            )
-        )
+            canonical = created.get(name_folded)
+            if canonical is None:
+                canonical = create_canonical_ingredient(session, canonical_name)
+                created[name_folded] = canonical
+                canonical_by_name[name_folded] = canonical
+
+        line.canonical_ingredient_id = canonical.id
+        line.is_key = decision.is_key
 
     recipe.facets.clear()
     recipe.cuisines.clear()
@@ -353,8 +353,10 @@ def _apply_response(
     state.started_at = state.started_at or datetime.now(UTC)
     state.completed_at = datetime.now(UTC)
     return {
-        "canonical_ingredients": len(response.canonical_ingredients),
-        "key_ingredients": sum(item.is_key for item in response.canonical_ingredients),
+        "canonical_ingredients": sum(
+            line.canonical_ingredient_id is not None for line in recipe.ingredients
+        ),
+        "key_ingredients": sum(line.is_key for line in recipe.ingredients),
         "ingredients_created": len(created),
         "existing_ingredients": existing_ingredients,
     }
@@ -454,7 +456,7 @@ def enrich_recipe(
     stage1_fallback_used = False
     try:
         stage1_context = build_stage1_context(recipe)
-        if not stage1_context["recipe"]["ingredients"]:
+        if not stage1_context["recipe"]["lines"]:
             stage1_response = Stage1Response(i=[])
             usage1 = Usage()
         else:
@@ -480,7 +482,8 @@ def enrich_recipe(
                     ) from fallback_exc
                 usage1 = primary_exc.usage + fallback_usage
 
-        unique_ingredients = deduplicate_ingredient_names(stage1_response.ingredients)
+        stage1_names = [item.name for item in stage1_response.ingredients if item.name]
+        unique_ingredients = deduplicate_ingredient_names(stage1_names)
         stage2_context = build_stage2_context(
             session, recipe, unique_ingredients, include_description=include_description
         )
@@ -488,7 +491,7 @@ def enrich_recipe(
 
         usage = usage1 + usage2
         try:
-            response = EnrichmentResponse.from_stages(unique_ingredients, stage2_response)
+            response = EnrichmentResponse.from_stages(stage1_response, stage2_response)
         except ValueError as exc:
             raise AIResponseError(f"Invalid Stage 2 response: {exc}", usage) from exc
 

@@ -14,7 +14,7 @@ from app.api.recipes import _clear_keyword_cache, _clear_search_order_cache
 from app.config import settings
 from app.db import get_session
 from app.main import app
-from app.models import Base, Book, IngredientLine, Keyword, Recipe, User
+from app.models import Base, Book, Keyword, Recipe, RecipeIngredient, User
 from app.services.auth import hash_password
 from app.services.embeddings import _clear_query_embed_cache
 from app.tasks.recipe_enrichment import recipe_enrichment_pilot_task
@@ -212,10 +212,10 @@ def _seed(session: Session) -> None:
             recipe.keywords = [pasta, quick]
             recipe.description = "A quick weeknight pasta."
             recipe.yields = "Serves 2"
-            recipe.ingredients_verbatim = [
-                IngredientLine(position=0, text="200g pasta"),
-                IngredientLine(position=1, text="100g anchovy"),
-                IngredientLine(position=2, text="2 tbsp olive oil"),
+            recipe.ingredients = [
+                RecipeIngredient(position=0, text="200g pasta"),
+                RecipeIngredient(position=1, text="100g anchovy"),
+                RecipeIngredient(position=2, text="2 tbsp olive oil"),
             ]
             recipe.instructions = ["Boil the pasta.", "Toss with the oil and serve."]
             recipe.image = "OPS/images/recipe-0.jpg"

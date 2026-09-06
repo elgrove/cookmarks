@@ -77,8 +77,8 @@ class StubProvider(AIProvider):
             recipe = json.loads(prompt.rsplit("Recipe ingredient input:\n", 1)[1])
             ingredients = []
             token = recipe["id"].split("-")[0]
-            for index, _ in enumerate(recipe.get("ingredients", []), start=1):
-                ingredients.append(f"Stub Ingredient {token} {index}")
+            for index, line in enumerate(recipe.get("lines", []), start=1):
+                ingredients.append({"id": line["id"], "n": f"Stub Ingredient {token} {index}"})
             return json.dumps({"i": ingredients}), usage
 
         if prompt.startswith("Recipe facets prompt"):
@@ -99,8 +99,9 @@ class StubProvider(AIProvider):
             recipe = json.loads(prompt.rsplit("Recipe-specific input:\n", 1)[1])
             ingredients = []
             token = recipe["id"].split("-")[0]
-            for index, _ in enumerate(recipe.get("ingredients", []), start=1):
-                ingredients.append({"n": f"Stub Ingredient {token} {index}", "k": index == 1})
+            lines = recipe.get("lines", [])
+            for index, line in enumerate(lines, start=1):
+                ingredients.append({"id": line["id"], "n": f"Stub Ingredient {token} {index}", "k": index == 1})
             return json.dumps(
                 {
                     "i": ingredients,

@@ -1,6 +1,6 @@
 import pytest
 
-from app.models import IngredientLine, Recipe, RecipeFacet, RecipeFacetKind
+from app.models import Recipe, RecipeFacet, RecipeFacetKind, RecipeIngredient
 from app.models.recipe_fact import RecipeFacetValue
 from app.services.recipe_facts import (
     create_ingredient,
@@ -19,13 +19,13 @@ def test_line_positions_allow_duplicate_verbatim_text(session) -> None:
     recipe = Recipe(
         book_id=session.query(Recipe).first().book_id, order=99, name="Duplicate", instructions=[]
     )
-    recipe.ingredients_verbatim = [
-        IngredientLine(position=0, text="salt"),
-        IngredientLine(position=1, text="salt"),
+    recipe.ingredients = [
+        RecipeIngredient(position=0, text="salt"),
+        RecipeIngredient(position=1, text="salt"),
     ]
     session.add(recipe)
     session.commit()
-    assert [line.text for line in recipe.ingredients_verbatim] == ["salt", "salt"]
+    assert [line.text for line in recipe.ingredients] == ["salt", "salt"]
 
 
 def test_recipe_facet_primary_rules(session) -> None:

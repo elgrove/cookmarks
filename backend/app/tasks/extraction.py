@@ -11,7 +11,7 @@ from app.db import SessionLocal
 from app.epub import epub_path, has_epub, has_pdf, pdf_path
 from app.models.book import Book
 from app.models.enums import RecipeEnrichmentStatus, TaskStatus, TaskType
-from app.models.ingredient import IngredientLine
+from app.models.ingredient import RecipeIngredient
 from app.models.recipe import Recipe
 from app.models.recipe_enrichment import RecipeEnrichmentState
 from app.models.task_run import TaskRun
@@ -134,11 +134,11 @@ def _upsert_recipe(session: Session, book: Book, run: TaskRun, data: RecipeData)
     if fingerprint != previous_fingerprint:
         # SQLite checks the (recipe_id, position) uniqueness while it flushes. Delete
         # the old rows first, before inserting replacement lines at the same positions.
-        if recipe.ingredients_verbatim:
-            recipe.ingredients_verbatim.clear()
+        if recipe.ingredients:
+            recipe.ingredients.clear()
             session.flush()
-        recipe.ingredients_verbatim = [
-            IngredientLine(position=position, text=text)
+        recipe.ingredients = [
+            RecipeIngredient(position=position, text=text, canonical_ingredient_id=None, is_key=False)
             for position, text in enumerate(source_text)
         ]
         recipe.facets.clear()

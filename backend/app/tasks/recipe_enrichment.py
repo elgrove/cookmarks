@@ -30,7 +30,7 @@ _COMMON_FACT = re.compile(
 def _recipe_rows(session) -> list[Recipe]:
     return list(
         session.scalars(
-            select(Recipe).options(selectinload(Recipe.ingredients_verbatim)).order_by(Recipe.id)
+            select(Recipe).options(selectinload(Recipe.ingredients)).order_by(Recipe.id)
         )
     )
 

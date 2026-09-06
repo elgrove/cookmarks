@@ -131,22 +131,25 @@ class EnrichmentDecision(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
 
-class Stage1Response(EnrichmentDecision):
-    """Stage 1 extracts singular UK-English canonical ingredient names."""
+class Stage1LineDecision(EnrichmentDecision):
+    line_id: str = Field(alias="id")
+    name: str | None = Field(default=None, alias="n")
 
-    ingredients: list[str] = Field(default_factory=list, max_length=100, alias="i")
-
-    @field_validator("ingredients", mode="before")
+    @field_validator("name", mode="before")
     @classmethod
-    def normalize_names(cls, value: object) -> list[str]:
-        if isinstance(value, list):
-            cleaned: list[str] = []
-            for item in value:
-                name = normalize_ingredient_name(str(item).strip())
-                if name:
-                    cleaned.append(name)
-            return cleaned
-        return []
+    def normalize_name(cls, value: object) -> str | None:
+        if value is None:
+            return None
+        text = str(value).strip()
+        if not text:
+            return None
+        return normalize_ingredient_name(text)
+
+
+class Stage1Response(EnrichmentDecision):
+    """Stage 1 extracts singular UK-English canonical ingredient names per line."""
+
+    ingredients: list[Stage1LineDecision] = Field(default_factory=list, max_length=200, alias="i")
 
 
 class MethodDecision(EnrichmentDecision):
@@ -182,26 +185,34 @@ class Stage2Response(EnrichmentDecision):
         return self
 
 
-class CanonicalIngredientDecision(EnrichmentDecision):
-    name: str = Field(min_length=1, max_length=300, alias="n")
+class RecipeIngredientDecision(EnrichmentDecision):
+    line_id: str = Field(alias="id")
+    name: str | None = Field(default=None, alias="n")
     is_key: bool = Field(default=False, alias="k")
 
     @field_validator("name", mode="before")
     @classmethod
-    def normalize_name(cls, value: object) -> str:
-        if isinstance(value, str):
-            return normalize_ingredient_name(value)
-        return str(value)
+    def normalize_name(cls, value: object) -> str | None:
+        if value is None:
+            return None
+        text = str(value).strip()
+        if not text:
+            return None
+        return normalize_ingredient_name(text)
 
 
 class EnrichmentResponse(EnrichmentDecision):
-    canonical_ingredients: list[CanonicalIngredientDecision] = Field(
-        default_factory=list, max_length=100, alias="i"
+    ingredients: list[RecipeIngredientDecision] = Field(
+        default_factory=list, max_length=200, alias="i"
     )
     cuisines: list[str] = Field(default_factory=list, max_length=10, alias="c")
     methods: list[MethodDecision] = Field(default_factory=list, max_length=10, alias="m")
     courses: list[str] = Field(default_factory=list, max_length=10, alias="o")
     keywords: list[str] = Field(default_factory=list, max_length=5, alias="w")
+
+    @property
+    def canonical_ingredients(self) -> list[RecipeIngredientDecision]:
+        return [item for item in self.ingredients if item.name]
 
     @field_validator("cuisines", mode="before")
     @classmethod
@@ -218,22 +229,31 @@ class EnrichmentResponse(EnrichmentDecision):
 
     @classmethod
     def from_stages(
-        cls, unique_ingredients: list[str], stage2: Stage2Response
+        cls, stage1: Stage1Response, stage2: Stage2Response
     ) -> "EnrichmentResponse":
-        selected = [normalize_ingredient_name(k).casefold() for k in stage2.key_ingredients]
+        available = {
+            item.name.casefold()
+            for item in stage1.ingredients
+            if item.name
+        }
+        selected = [k.casefold() for k in stage2.key_ingredients]
         if len(selected) != len(set(selected)):
             raise ValueError("Stage 2 contains duplicate key-ingredient selections")
-        available = {normalize_ingredient_name(name).casefold() for name in unique_ingredients}
         if available and not selected:
             raise ValueError("Stage 2 must select at least one key ingredient")
         if not set(selected) <= available:
             raise ValueError("Stage 2 refers to an unknown Stage 1 ingredient")
         key_folded = set(selected)
-        ingredients: list[CanonicalIngredientDecision] = []
-        for name in unique_ingredients:
-            norm_name = normalize_ingredient_name(name)
-            is_key = norm_name.casefold() in key_folded
-            ingredients.append(CanonicalIngredientDecision(n=norm_name, k=is_key))
+        ingredients: list[RecipeIngredientDecision] = []
+        for line in stage1.ingredients:
+            is_key = line.name is not None and line.name.casefold() in key_folded
+            ingredients.append(
+                RecipeIngredientDecision(
+                    id=line.line_id,
+                    n=line.name,
+                    k=is_key,
+                )
+            )
         return cls(
             i=ingredients,
             c=stage2.cuisines,

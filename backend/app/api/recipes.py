@@ -16,7 +16,7 @@ from app.epub import read_epub_image
 from app.models.base import as_utc, utcnow
 from app.models.book import Book
 from app.models.enums import ReadingMode, RecipeEnrichmentStatus, RecipeFacetKind
-from app.models.ingredient import Ingredient, IngredientLine, RecipeCanonicalIngredient
+from app.models.ingredient import CanonicalIngredient, RecipeIngredient
 from app.models.recipe import Keyword, Recipe, recipe_keywords
 from app.models.recipe_fact import RecipeFacet
 from app.models.recipe_list import RecipeListItem
@@ -150,12 +150,15 @@ def _search_conditions(
                 Book.title_folded.contains(term),
                 Book.author_folded.contains(term),
                 Recipe.id.in_(
-                    select(IngredientLine.recipe_id).where(IngredientLine.text.ilike(like))
+                    select(RecipeIngredient.recipe_id).where(RecipeIngredient.text.ilike(like))
                 ),
                 Recipe.id.in_(
-                    select(RecipeCanonicalIngredient.recipe_id)
-                    .join(Ingredient, RecipeCanonicalIngredient.ingredient_id == Ingredient.id)
-                    .where(Ingredient.name_folded == term)
+                    select(RecipeIngredient.recipe_id)
+                    .join(
+                        CanonicalIngredient,
+                        RecipeIngredient.canonical_ingredient_id == CanonicalIngredient.id,
+                    )
+                    .where(CanonicalIngredient.name_folded == term)
                 ),
                 _keyword_match(Keyword.name.ilike(like)),
             )
@@ -505,9 +508,8 @@ def get_recipe(
         .where(Recipe.id == recipe_id)
         .options(
             selectinload(Recipe.keywords),
-            selectinload(Recipe.ingredients_verbatim),
-            selectinload(Recipe.canonical_ingredients).joinedload(
-                RecipeCanonicalIngredient.ingredient
+            selectinload(Recipe.ingredients).joinedload(
+                RecipeIngredient.canonical_ingredient
             ),
             selectinload(Recipe.facets).joinedload(RecipeFacet.facet_value),
             selectinload(Recipe.cuisines),
@@ -534,6 +536,24 @@ def get_recipe(
         )
     else:
         previous, next_ = _book_neighbours(session, recipe)
+
+    seen_canonical_ids: set[uuid.UUID] = set()
+    canonical_ingredients: list[RecipeCanonicalIngredientRead] = []
+    for line in recipe.ingredients:
+        if (
+            line.canonical_ingredient_id is not None
+            and line.canonical_name
+            and line.canonical_ingredient_id not in seen_canonical_ids
+        ):
+            seen_canonical_ids.add(line.canonical_ingredient_id)
+            canonical_ingredients.append(
+                RecipeCanonicalIngredientRead(
+                    ingredient_id=line.canonical_ingredient_id,
+                    name=line.canonical_name,
+                    is_key=line.is_key,
+                )
+            )
+
     return RecipeDetail(
         id=recipe.id,
         book_id=book.id,
@@ -543,16 +563,9 @@ def get_recipe(
         name=recipe.name,
         description=recipe.description,
         ingredients_verbatim=[
-            IngredientLineRead.model_validate(line) for line in recipe.ingredients_verbatim
+            IngredientLineRead.model_validate(line) for line in recipe.ingredients
         ],
-        canonical_ingredients=[
-            RecipeCanonicalIngredientRead(
-                ingredient_id=ci.ingredient_id,
-                name=ci.ingredient.name,
-                is_key=ci.is_key,
-            )
-            for ci in recipe.canonical_ingredients
-        ],
+        canonical_ingredients=canonical_ingredients,
         enrichment_status=(
             recipe.enrichment_state.status
             if recipe.enrichment_state is not None

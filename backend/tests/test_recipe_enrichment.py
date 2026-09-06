@@ -5,7 +5,7 @@ import pytest
 from pydantic import ValidationError
 
 from app.models.enums import AIProvider, RecipeEnrichmentStatus
-from app.models.ingredient import Ingredient, IngredientLine
+from app.models.ingredient import CanonicalIngredient, RecipeIngredient
 from app.models.recipe import Keyword, Recipe
 from app.models.recipe_enrichment import RecipeEnrichmentState
 from app.services.ai import ModelRole, Usage
@@ -23,6 +23,7 @@ from app.services.recipe_enrichment.schema import (
     GEMINI_ENRICHMENT_JSON_SCHEMA,
     SCHEMA_VERSION,
     EnrichmentResponse,
+    Stage1LineDecision,
     Stage1Response,
     Stage2Response,
 )
@@ -33,13 +34,13 @@ from app.services.recipe_enrichment.service import (
     enrich_recipe,
     validate_stage1_response,
 )
-from app.services.recipe_facts import create_ingredient
+from app.services.recipe_facts import create_canonical_ingredient
 
 
 def _recipe(session) -> Recipe:
     book_id = session.query(Recipe).first().book_id
     recipe = Recipe(book_id=book_id, order=99, name="Enriched", instructions=["Bake it."])
-    recipe.ingredients_verbatim = [IngredientLine(position=0, text="salt")]
+    recipe.ingredients = [RecipeIngredient(position=0, text="salt")]
     recipe.enrichment_state = RecipeEnrichmentState(
         status=RecipeEnrichmentStatus.PENDING, source_fingerprint="current"
     )
@@ -49,22 +50,30 @@ def _recipe(session) -> Recipe:
 
 
 def _response(recipe: Recipe | None = None, **overrides) -> EnrichmentResponse:
-    data = {
-        "canonical_ingredients": [
-            {"name": "sea salt", "is_key": True}
+    fields = {
+        "ingredients": [
+            {"id": "01", "name": "sea salt", "is_key": True}
         ],
         "cuisines": [],
         "methods": [{"value_id": "bake", "is_primary": True}],
         "courses": [],
         "keywords": ["Cosy", "Fresh", "Outdoor", "Party", "Summer"],
     }
-    data.update(overrides)
-    return EnrichmentResponse.model_validate(data)
+    alias_map = {
+        "i": "ingredients",
+        "c": "cuisines",
+        "m": "methods",
+        "o": "courses",
+        "w": "keywords",
+    }
+    for k, v in overrides.items():
+        fields[alias_map.get(k, k)] = v
+    return EnrichmentResponse.model_validate(fields)
 
 
 def test_apply_enrichment_replaces_all_derived_facts_atomically(session) -> None:
     recipe = _recipe(session)
-    create_ingredient(session, "sea salt")
+    create_canonical_ingredient(session, "sea salt")
     result = apply_enrichment(
         session,
         recipe.id,
@@ -79,7 +88,7 @@ def test_apply_enrichment_replaces_all_derived_facts_atomically(session) -> None
     assert result["existing_ingredients"] == 1
     assert recipe.enrichment_state is not None
     assert recipe.enrichment_state.status is RecipeEnrichmentStatus.COMPLETE
-    assert [item.name for item in recipe.canonical_ingredients] == ["sea salt"]
+    assert [item.canonical_name for item in recipe.ingredients if item.canonical_name] == ["sea salt"]
     assert [fact.facet_value.value_id for fact in recipe.facets] == ["bake"]
     assert {keyword.name for keyword in recipe.keywords} == {
         "Cosy",
@@ -93,7 +102,7 @@ def test_apply_enrichment_replaces_all_derived_facts_atomically(session) -> None
 def test_empty_keywords_replace_previous_keywords(session) -> None:
     recipe = _recipe(session)
     recipe.keywords = [Keyword(name="Existing")]
-    create_ingredient(session, "sea salt")
+    create_canonical_ingredient(session, "sea salt")
     session.commit()
     response = _response(keywords=[])
     apply_enrichment(
@@ -201,6 +210,9 @@ def test_stage1_schema_rejects_key_ingredient_decisions() -> None:
 
 def test_stage2_receives_structured_stage1_result_and_owns_key_selection(session) -> None:
     recipe = _recipe(session)
+    stage1 = Stage1Response.model_validate(
+        {"i": [{"id": "01", "n": "sea salt"}, {"id": "02", "n": "garlic"}]}
+    )
     ingredients = ["sea salt", "garlic"]
     context = build_stage2_context(session, recipe, ingredients)
     assert context["recipe"]["ingredients"] == ingredients
@@ -208,7 +220,7 @@ def test_stage2_receives_structured_stage1_result_and_owns_key_selection(session
     assert "Key ingredients (k)" in prompt
 
     response = EnrichmentResponse.from_stages(
-        ingredients,
+        stage1,
         Stage2Response.model_validate(
             {"key_ingredients": ["garlic"]}
         ),
@@ -217,7 +229,7 @@ def test_stage2_receives_structured_stage1_result_and_owns_key_selection(session
 
     with pytest.raises(ValueError, match="unknown Stage 1 ingredient"):
         EnrichmentResponse.from_stages(
-            ingredients,
+            stage1,
             Stage2Response.model_validate(
                 {"key_ingredients": ["unknown-ingredient"]}
             ),
@@ -228,10 +240,10 @@ def test_stage1_validation_rejects_empty_ingredients() -> None:
     context = {
         "recipe": {
             "id": "recipe-1",
-            "ingredients": ["salt"],
+            "lines": [{"id": "01", "text": "salt"}],
         }
     }
-    with pytest.raises(EnrichmentValidationError, match="extracted no ingredients"):
+    with pytest.raises(EnrichmentValidationError, match="extracted no ingredient decisions"):
         validate_stage1_response(context, Stage1Response(i=[]))
 
 
@@ -244,7 +256,7 @@ def test_stage1_validation_failure_retries_complete_recipe(session) -> None:
     )
     fallback = Mock()
     fallback.enrich_recipe_stage1.return_value = (
-        Stage1Response(i=["salt"]),
+        Stage1Response(i=[Stage1LineDecision(id="01", n="salt")]),
         Usage(cost_usd=Decimal("0.002")),
     )
     semantic = Mock()
@@ -309,15 +321,15 @@ def test_configured_enrichment_provider_without_key_does_not_switch_silently(ses
 def test_repeated_new_canonical_ingredient_resolves_to_one_identity(session) -> None:
     recipe1 = _recipe(session)
     recipe2 = Recipe(book_id=recipe1.book_id, order=100, name="Enriched 2", instructions=["Bake."])
-    recipe2.ingredients_verbatim = [IngredientLine(position=0, text="seaweed")]
+    recipe2.ingredients = [RecipeIngredient(position=0, text="seaweed")]
     recipe2.enrichment_state = RecipeEnrichmentState(
         status=RecipeEnrichmentStatus.PENDING, source_fingerprint="current2"
     )
     session.add(recipe2)
     session.commit()
 
-    response1 = _response(canonical_ingredients=[{"name": "Seaweed", "is_key": True}])
-    response2 = _response(canonical_ingredients=[{"name": "seaweed", "is_key": True}])
+    response1 = _response(i=[{"id": "01", "n": "Seaweed", "k": True}])
+    response2 = _response(i=[{"id": "01", "n": "seaweed", "k": True}])
 
     apply_enrichment(session, recipe1.id, response1, provider=StubProvider(""), model="stub")
     session.commit()
@@ -327,6 +339,6 @@ def test_repeated_new_canonical_ingredient_resolves_to_one_identity(session) -> 
     session.refresh(recipe1)
     session.refresh(recipe2)
 
-    ingredients = session.query(Ingredient).filter_by(name_folded="seaweed").all()
+    ingredients = session.query(CanonicalIngredient).filter_by(name_folded="seaweed").all()
     assert len(ingredients) == 1
-    assert recipe1.canonical_ingredients[0].ingredient_id == recipe2.canonical_ingredients[0].ingredient_id
+    assert recipe1.ingredients[0].canonical_ingredient_id == recipe2.ingredients[0].canonical_ingredient_id

@@ -109,12 +109,18 @@ class RecipeNeighbour(BaseModel):
     name: str
 
 
-class IngredientLineRead(BaseModel):
+class RecipeIngredientRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
     position: int
     text: str
+    canonical_ingredient_id: uuid.UUID | None = None
+    canonical_name: str | None = None
+    is_key: bool = False
+
+
+IngredientLineRead = RecipeIngredientRead
 
 
 class RecipeCanonicalIngredientRead(BaseModel):
