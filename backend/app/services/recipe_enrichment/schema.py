@@ -5,8 +5,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-SCHEMA_VERSION = "v6"
-PROMPT_VERSION = "v21"
+SCHEMA_VERSION = "v7"
+PROMPT_VERSION = "v22"
 TAXONOMY_VERSION = "v1"
 
 _EN_GB_INGREDIENT_RULES: list[tuple[re.Pattern[str], str]] = [
@@ -21,6 +21,7 @@ _EN_GB_INGREDIENT_RULES: list[tuple[re.Pattern[str], str]] = [
 def normalize_ingredient_name(name: str) -> str:
     cleaned = name.strip()
     for pattern, replacement in _EN_GB_INGREDIENT_RULES:
+
         def _replace_match(match: re.Match[str], repl: str = replacement) -> str:
             val = match.group(0)
             if val.istitle():
@@ -31,6 +32,7 @@ def normalize_ingredient_name(name: str) -> str:
 
         cleaned = pattern.sub(_replace_match, cleaned)
     return cleaned
+
 
 _CUISINE_ALIASES: dict[str, str] = {
     "afghanistan": "afghan",
@@ -130,14 +132,13 @@ class EnrichmentDecision(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
 
-class OccurrenceDecision(EnrichmentDecision):
+class Stage1OccurrenceDecision(EnrichmentDecision):
     canonical_name: str = Field(min_length=1, max_length=300, alias="n")
     quantity: str | None = Field(default=None, max_length=100, alias="q")
     unit: str | None = Field(default=None, max_length=50, alias="u")
     preparation: str | None = Field(default=None, max_length=500, alias="p")
     optional: bool = Field(default=False, alias="x")
     alternative_group: int | None = Field(default=None, ge=0, alias="a")
-    is_key: bool = Field(default=False, alias="k")
 
     @field_validator("canonical_name", mode="before")
     @classmethod
@@ -147,11 +148,22 @@ class OccurrenceDecision(EnrichmentDecision):
         return str(value)
 
 
+class OccurrenceDecision(Stage1OccurrenceDecision):
+    is_key: bool = Field(default=False, alias="k")
+
+
 class LineDecision(EnrichmentDecision):
     """An AI replacement or an otherwise unresolved ingredient line."""
 
     line_id: str = Field(alias="l")
     occurrences: list[OccurrenceDecision] = Field(min_length=1, max_length=20, alias="o")
+
+
+class Stage1LineDecision(EnrichmentDecision):
+    """One complete ingredient-line parse, without recipe-level interpretation."""
+
+    line_id: str = Field(alias="l")
+    occurrences: list[Stage1OccurrenceDecision] = Field(min_length=1, max_length=20, alias="o")
 
 
 class NonIngredientLineDecision(EnrichmentDecision):
@@ -166,14 +178,24 @@ class MethodDecision(EnrichmentDecision):
     is_primary: bool = Field(default=False, alias="p")
 
 
+class KeyIngredientDecision(EnrichmentDecision):
+    """A Stage 2 selection of one occurrence from the accepted Stage 1 result."""
+
+    line_id: str = Field(alias="l")
+    occurrence_index: int = Field(ge=0, alias="o")
+
+
 class Stage1Response(EnrichmentDecision):
-    parsed_lines: list[LineDecision] = Field(default_factory=list, max_length=100, alias="p")
+    parsed_lines: list[Stage1LineDecision] = Field(default_factory=list, max_length=100, alias="p")
     non_ingredient_lines: list[NonIngredientLineDecision] = Field(
         default_factory=list, max_length=100, alias="n"
     )
 
 
 class Stage2Response(EnrichmentDecision):
+    key_ingredients: list[KeyIngredientDecision] = Field(
+        default_factory=list, max_length=3, alias="k"
+    )
     cuisines: list[str] = Field(default_factory=list, max_length=10, alias="c")
     methods: list[MethodDecision] = Field(default_factory=list, max_length=10, alias="m")
     courses: list[str] = Field(default_factory=list, max_length=10, alias="o")
@@ -218,8 +240,32 @@ class EnrichmentResponse(EnrichmentDecision):
 
     @classmethod
     def from_stages(cls, stage1: Stage1Response, stage2: Stage2Response) -> "EnrichmentResponse":
+        selected = {(item.line_id, item.occurrence_index) for item in stage2.key_ingredients}
+        if len(selected) != len(stage2.key_ingredients):
+            raise ValueError("Stage 2 contains duplicate key-ingredient selections")
+        available = {
+            (line.line_id, index)
+            for line in stage1.parsed_lines
+            for index, _ in enumerate(line.occurrences)
+        }
+        if available and not selected:
+            raise ValueError("Stage 2 must select at least one key ingredient")
+        if not selected <= available:
+            raise ValueError("Stage 2 refers to an unknown Stage 1 ingredient occurrence")
         return cls(
-            p=stage1.parsed_lines,
+            p=[
+                LineDecision(
+                    l=line.line_id,
+                    o=[
+                        OccurrenceDecision(
+                            **occurrence.model_dump(by_alias=True),
+                            k=(line.line_id, index) in selected,
+                        )
+                        for index, occurrence in enumerate(line.occurrences)
+                    ],
+                )
+                for line in stage1.parsed_lines
+            ],
             n=stage1.non_ingredient_lines,
             c=stage2.cuisines,
             m=stage2.methods,

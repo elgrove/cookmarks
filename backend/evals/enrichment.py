@@ -29,15 +29,13 @@ from app.services.ai.anthropic import AnthropicProvider
 from app.services.ai.gemini import GeminiProvider
 from app.services.ai.openrouter import OpenRouterProvider
 from app.services.ai.stub import StubProvider
-from app.services.recipe_enrichment.parser import DeterministicProposal, parse_line
 from app.services.recipe_enrichment.schema import (
     PROMPT_VERSION,
     SCHEMA_VERSION,
     EnrichmentResponse,
-    LineDecision,
-    OccurrenceDecision,
     Stage1Response,
 )
+from app.services.recipe_enrichment.service import validate_stage1_response
 from app.services.recipe_facts import accepted_cuisine_ids, facet_vocabulary
 from app.text import fold
 from evals.config import DEFAULT_CONFIG_PATH, EVALS_DIR, RUNS_DIR, git_sha
@@ -387,8 +385,7 @@ def score_alternative_groups(gold_lines: list[GoldLine], response: EnrichmentRes
         for indices in predicted_groups.values():
             index = indices[0]
             if len(indices) == 1 and (
-                index >= len(gold_occurrences)
-                or gold_occurrences[index].alternative_group is None
+                index >= len(gold_occurrences) or gold_occurrences[index].alternative_group is None
             ):
                 matches.append(0.0)
 
@@ -550,47 +547,9 @@ def gold_ingredient_vocab(recipes: list[GoldRecipe]) -> dict[str, str]:
     return vocab
 
 
-def build_gold_proposals(
-    gold: GoldRecipe, vocab: dict[str, str]
-) -> dict[str, DeterministicProposal]:
-    proposals: dict[str, DeterministicProposal] = {}
-    for line in gold.lines:
-        line_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{line.position}:{line.text}"))
-        p = parse_line(line_id, line.text)
-        if p and all(fold(occ.name) in vocab for occ in p.occurrences):
-            proposals[line_id] = p
-    return proposals
-
-
-def proposals_to_line_decisions(
-    proposals: dict[str, DeterministicProposal], vocab: dict[str, str]
-) -> list[LineDecision]:
-    lines = []
-    for line_id, proposal in proposals.items():
-        occurrences = [
-            OccurrenceDecision(
-                n=vocab.get(fold(occ.name), occ.name.title()),
-                q=occ.quantity,
-                u=occ.unit,
-                p=occ.preparation,
-                x=False,
-                a=None,
-                k=False,
-            )
-            for occ in proposal.occurrences
-        ]
-        lines.append(LineDecision(l=line_id, o=occurrences))
-    return lines
-
-
-def build_gold_stage1_context(
-    gold: GoldRecipe, proposals: dict[str, DeterministicProposal] | None = None
-) -> dict:
-    props = proposals or {}
+def build_gold_stage1_context(gold: GoldRecipe) -> dict:
     ai_parse_line_ids = [
-        str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{line.position}:{line.text}"))
-        for line in gold.lines
-        if str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{line.position}:{line.text}")) not in props
+        str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{line.position}:{line.text}")) for line in gold.lines
     ]
     lines_payload = [
         {
@@ -598,7 +557,6 @@ def build_gold_stage1_context(
             "text": line.text,
         }
         for line in gold.lines
-        if str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{line.position}:{line.text}")) in ai_parse_line_ids
     ]
 
     return {
@@ -613,7 +571,7 @@ def build_gold_stage1_context(
 
 
 def build_gold_stage2_context(
-    gold: GoldRecipe, ingredient_names: list[str], *, include_description: bool = True
+    gold: GoldRecipe, stage1: Stage1Response, *, include_description: bool = True
 ) -> dict:
     _, entries = facet_vocabulary()
     methods = [
@@ -627,7 +585,21 @@ def build_gold_stage2_context(
         "id": gold.id,
         "name": gold.name,
         "instructions": gold.instructions,
-        "ingredients": ingredient_names,
+        "ingredient_lines": [
+            {
+                "line_id": line.line_id,
+                "source": next(
+                    source.text
+                    for source in gold.lines
+                    if str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{source.position}:{source.text}"))
+                    == line.line_id
+                ),
+                "occurrences": [
+                    occurrence.model_dump(by_alias=False) for occurrence in line.occurrences
+                ],
+            }
+            for line in stage1.parsed_lines
+        ],
     }
     if gold.book_title:
         recipe_payload["book_title"] = gold.book_title
@@ -858,7 +830,6 @@ def evaluate_enrichment_recipe(
     run_dir: Path,
     vocab: dict[str, str] | None = None,
     include_description: bool = True,
-    use_deterministic: bool = True,
     stage2_candidate: CandidateModel | None = None,
     stage2_provider: AIProvider | None = None,
 ) -> EnrichmentRecipeRecord:
@@ -869,21 +840,15 @@ def evaluate_enrichment_recipe(
     mixed_models = stage2_candidate.id != candidate.id
     model_id = f"{candidate.id} -> {stage2_candidate.id}" if mixed_models else candidate.id
     provider_id = (
-        f"{candidate.provider}->{stage2_candidate.provider}"
-        if mixed_models
-        else candidate.provider
+        f"{candidate.provider}->{stage2_candidate.provider}" if mixed_models else candidate.provider
     )
-    model_name = (
-        f"{candidate.model}->{stage2_candidate.model}" if mixed_models else candidate.model
-    )
+    model_name = f"{candidate.model}->{stage2_candidate.model}" if mixed_models else candidate.model
     artefact_model = model_id.replace("/", "_").replace(":", "_").replace(" -> ", "__to__")
     usage1 = Usage()
     usage2 = Usage()
 
     try:
-        active_vocab = vocab or {}
-        proposals = build_gold_proposals(gold, active_vocab) if use_deterministic else {}
-        stage1_context = build_gold_stage1_context(gold, proposals)
+        stage1_context = build_gold_stage1_context(gold)
 
         if not stage1_context["recipe"]["ai_parse_line_ids"]:
             stage1_response = Stage1Response(p=[], n=[])
@@ -897,17 +862,13 @@ def evaluate_enrichment_recipe(
                 usage1 = exc.usage
                 raise
 
-        deterministic_lines = proposals_to_line_decisions(proposals, active_vocab)
-        deterministic_names = [
-            occ.canonical_name for line in deterministic_lines for occ in line.occurrences
-        ]
-        ai_names = [
-            occ.canonical_name for line in stage1_response.parsed_lines for occ in line.occurrences
-        ]
-        ingredient_names = deterministic_names + ai_names
+        try:
+            validate_stage1_response(stage1_context, stage1_response)
+        except ValueError as exc:
+            raise AIResponseError(f"Invalid Stage 1 response: {exc}", usage1) from exc
 
         stage2_context = build_gold_stage2_context(
-            gold, ingredient_names, include_description=include_description
+            gold, stage1_response, include_description=include_description
         )
         try:
             stage2_response, usage2 = stage2_provider.enrich_recipe_stage2(
@@ -917,22 +878,17 @@ def evaluate_enrichment_recipe(
             usage2 = exc.usage
             raise AIResponseError(str(exc), usage1 + usage2) from exc
 
-        all_parsed_lines = deterministic_lines + stage1_response.parsed_lines
-        combined_stage1 = Stage1Response(
-            p=all_parsed_lines,
-            n=stage1_response.non_ingredient_lines,
-        )
-        response = EnrichmentResponse.from_stages(combined_stage1, stage2_response)
         usage = usage1 + usage2
+        try:
+            response = EnrichmentResponse.from_stages(stage1_response, stage2_response)
+        except ValueError as exc:
+            raise AIResponseError(f"Invalid Stage 2 response: {exc}", usage) from exc
 
         full_context = build_gold_context(gold)
         try:
             validate_enrichment_response(full_context, response)
         except ValueError as exc:
-            artefact_path = (
-                run_dir
-                / f"{gold.slug}_{artefact_model}.invalid.json"
-            )
+            artefact_path = run_dir / f"{gold.slug}_{artefact_model}.invalid.json"
             artefact_path.write_text(
                 json.dumps(
                     {
@@ -960,7 +916,7 @@ def evaluate_enrichment_recipe(
             model=model_name,
             stage1_model_id=candidate.id,
             stage2_model_id=stage2_candidate.id,
-            deterministic_enabled=use_deterministic,
+            deterministic_enabled=False,
             prompt_version=PROMPT_VERSION,
             schema_version=SCHEMA_VERSION,
             scores=scores,
@@ -979,9 +935,7 @@ def evaluate_enrichment_recipe(
             finish_reason=usage.finish_reason,
         )
 
-        artefact_path = (
-            run_dir / f"{gold.slug}_{artefact_model}.json"
-        )
+        artefact_path = run_dir / f"{gold.slug}_{artefact_model}.json"
         artefact_data = {
             "record": record.model_dump(),
             "response": response.model_dump(),
@@ -989,7 +943,7 @@ def evaluate_enrichment_recipe(
             "stage2": stage2_response.model_dump(),
             "gold": gold.model_dump(),
             "include_description": include_description,
-            "deterministic_enabled": use_deterministic,
+            "deterministic_enabled": False,
         }
         artefact_path.write_text(json.dumps(artefact_data, indent=2))
         return record
@@ -1011,7 +965,7 @@ def evaluate_enrichment_recipe(
             model=model_name,
             stage1_model_id=candidate.id,
             stage2_model_id=stage2_candidate.id,
-            deterministic_enabled=use_deterministic,
+            deterministic_enabled=False,
             prompt_version=PROMPT_VERSION,
             schema_version=SCHEMA_VERSION,
             scores=_zero_enrichment_scores(),
@@ -1047,7 +1001,7 @@ def evaluate_enrichment_recipe(
             model=model_name,
             stage1_model_id=candidate.id,
             stage2_model_id=stage2_candidate.id,
-            deterministic_enabled=use_deterministic,
+            deterministic_enabled=False,
             prompt_version=PROMPT_VERSION,
             schema_version=SCHEMA_VERSION,
             scores=_zero_enrichment_scores(),
@@ -1066,7 +1020,6 @@ def run_enrichment_eval(
     model_ids: list[str] | None = None,
     recipe_slugs: list[str] | None = None,
     include_description: bool = True,
-    use_deterministic: bool = True,
     stage1_model_id: str | None = None,
     stage2_model_id: str | None = None,
 ) -> list[EnrichmentRecipeRecord]:
@@ -1146,7 +1099,6 @@ def run_enrichment_eval(
                 run_dir=run_dir,
                 vocab=vocab,
                 include_description=include_description,
-                use_deterministic=use_deterministic,
                 stage2_candidate=stage2_candidate,
                 stage2_provider=stage2_provider,
             ): (f"{candidate.id} -> {stage2_candidate.id}", gold.slug)

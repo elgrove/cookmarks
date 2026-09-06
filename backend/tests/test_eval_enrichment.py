@@ -523,13 +523,15 @@ def test_mixed_model_eval_routes_stage_output_to_stage_two(tmp_path) -> None:
         sha="abc1234",
         run_dir=tmp_path,
         vocab={},
-        use_deterministic=False,
         stage2_candidate=CandidateModel.parse("ANTHROPIC:haiku"),
         stage2_provider=stage2_provider,
     )
 
     stage2_context = stage2_provider.enrich_recipe_stage2.call_args.args[0]
-    assert stage2_context["recipe"]["ingredients"] == ["Apple", "Olive Oil"]
+    assert [
+        item["occurrences"][0]["canonical_name"]
+        for item in stage2_context["recipe"]["ingredient_lines"]
+    ] == ["Apple", "Olive Oil"]
     assert record.model_id == "GEMINI:flash-lite -> ANTHROPIC:haiku"
     assert record.deterministic_enabled is False
     assert record.stage1_input_tokens == 100
@@ -538,9 +540,24 @@ def test_mixed_model_eval_routes_stage_output_to_stage_two(tmp_path) -> None:
 
 
 def test_mixed_model_eval_keeps_stage_one_usage_when_stage_two_fails(tmp_path) -> None:
+    gold = _sample_gold_recipe()
+    line0_id = _gold_line_id(gold.lines[0])
+    line1_id = _gold_line_id(gold.lines[1])
+    line2_id = _gold_line_id(gold.lines[2])
     stage1_provider = Mock()
     stage1_provider.enrich_recipe_stage1.return_value = (
-        Stage1Response(),
+        Stage1Response.model_validate(
+            {
+                "parsed_lines": [
+                    {"line_id": line0_id, "occurrences": [{"canonical_name": "Apple"}]},
+                    {
+                        "line_id": line2_id,
+                        "occurrences": [{"canonical_name": "Olive Oil"}],
+                    },
+                ],
+                "non_ingredient_lines": [{"line_id": line1_id, "kind": "heading"}],
+            }
+        ),
         Usage(input_tokens=100, output_tokens=20, cost_usd=Decimal("0.001")),
     )
     stage2_provider = Mock()
@@ -552,12 +569,11 @@ def test_mixed_model_eval_keeps_stage_one_usage_when_stage_two_fails(tmp_path) -
     record = evaluate_enrichment_recipe(
         CandidateModel.parse("GEMINI:flash-lite"),
         stage1_provider,
-        _sample_gold_recipe(),
+        gold,
         run_id="test-run",
         timestamp="2026-09-06T00:00:00+00:00",
         sha="abc1234",
         run_dir=tmp_path,
-        use_deterministic=False,
         stage2_candidate=CandidateModel.parse("ANTHROPIC:haiku"),
         stage2_provider=stage2_provider,
     )

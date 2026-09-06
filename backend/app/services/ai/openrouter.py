@@ -31,6 +31,9 @@ class OpenRouterProvider(AIProvider):
         ModelRole.KEYWORD_DEDUP: "google/gemini-2.5-flash",
         ModelRole.ASSISTANT: "google/gemini-2.5-flash",
         ModelRole.RECIPE_ENRICHMENT: "google/gemini-2.5-flash",
+        ModelRole.RECIPE_INGREDIENTS: "google/gemini-2.5-flash-lite",
+        ModelRole.RECIPE_INGREDIENTS_FALLBACK: "anthropic/claude-haiku-4.5",
+        ModelRole.RECIPE_SEMANTICS: "anthropic/claude-haiku-4.5",
     }
 
     def _complete(

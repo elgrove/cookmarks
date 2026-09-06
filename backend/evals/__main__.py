@@ -90,11 +90,6 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="omit recipe descriptions from Stage 2 input context",
     )
-    enrich_p.add_argument(
-        "--no-deterministic",
-        action="store_true",
-        help="send every ingredient line to the Stage 1 model",
-    )
 
     rep_p = sub.add_parser("report", help="summarise the ledger (no run)")
     rep_p.add_argument(
@@ -130,7 +125,6 @@ def main(argv: list[str] | None = None) -> int:
             args.models,
             args.recipes,
             include_description=not args.no_description,
-            use_deterministic=not args.no_deterministic,
             stage1_model_id=args.stage_1_model,
             stage2_model_id=args.stage_2_model,
         )

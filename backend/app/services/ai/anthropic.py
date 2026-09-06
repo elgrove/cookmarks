@@ -24,6 +24,9 @@ class AnthropicProvider(AIProvider):
         ModelRole.KEYWORD_DEDUP: "claude-sonnet-5",
         ModelRole.ASSISTANT: "claude-sonnet-5",
         ModelRole.RECIPE_ENRICHMENT: "claude-sonnet-5",
+        ModelRole.RECIPE_INGREDIENTS: "claude-haiku-4-5-20251001",
+        ModelRole.RECIPE_INGREDIENTS_FALLBACK: "claude-haiku-4-5-20251001",
+        ModelRole.RECIPE_SEMANTICS: "claude-haiku-4-5-20251001",
     }
 
     def __init__(self, api_key: str, model_overrides: dict[str, str] | None = None) -> None:
@@ -70,4 +73,6 @@ class AnthropicProvider(AIProvider):
         for block in response.content:
             if isinstance(block, ToolUseBlock):
                 return json.dumps(block.input), usage
-        return "".join(block.text for block in response.content if isinstance(block, TextBlock)), usage
+        return "".join(
+            block.text for block in response.content if isinstance(block, TextBlock)
+        ), usage

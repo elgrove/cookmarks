@@ -27,8 +27,6 @@ from app.services.recipe_enrichment.schema import (
     STAGE1_JSON_SCHEMA,
     STAGE2_JSON_SCHEMA,
     EnrichmentResponse,
-    LineDecision,
-    NonIngredientLineDecision,
     Stage1Response,
     Stage2Response,
 )
@@ -60,6 +58,9 @@ class ModelRole(Enum):
     KEYWORD_DEDUP = "keyword_dedup"
     ASSISTANT = "assistant"
     RECIPE_ENRICHMENT = "recipe_enrichment"
+    RECIPE_INGREDIENTS = "recipe_ingredients"
+    RECIPE_INGREDIENTS_FALLBACK = "recipe_ingredients_fallback"
+    RECIPE_SEMANTICS = "recipe_semantics"
 
 
 class EmbedTask(Enum):
@@ -158,53 +159,6 @@ def _clean_keywords(raw: list[object], limit: int) -> list[str]:
     return cleaned
 
 
-def _resolve_stage1_line_ids(stage1: Stage1Response, context: dict) -> Stage1Response:
-    recipe = context.get("recipe", {})
-    lines = recipe.get("lines", [])
-    valid_ids = {str(item["id"]) for item in lines if "id" in item}
-    text_to_id = {
-        str(item["text"]).strip().lower(): str(item["id"])
-        for item in lines
-        if "text" in item and "id" in item
-    }
-
-    parsed: list[LineDecision] = []
-    seen_parsed_ids: set[str] = set()
-    for decision in stage1.parsed_lines:
-        resolved_id = decision.line_id
-        if resolved_id not in valid_ids and resolved_id.strip().lower() in text_to_id:
-            resolved_id = text_to_id[resolved_id.strip().lower()]
-        if resolved_id in valid_ids and resolved_id not in seen_parsed_ids:
-            seen_parsed_ids.add(resolved_id)
-            parsed.append(
-                LineDecision(
-                    l=resolved_id,
-                    o=decision.occurrences,
-                )
-            )
-
-    non_ingredient: list[NonIngredientLineDecision] = []
-    seen_non_ids: set[str] = set()
-    for decision in stage1.non_ingredient_lines:
-        resolved_id = decision.line_id
-        if resolved_id not in valid_ids and resolved_id.strip().lower() in text_to_id:
-            resolved_id = text_to_id[resolved_id.strip().lower()]
-        if (
-            resolved_id in valid_ids
-            and resolved_id not in seen_parsed_ids
-            and resolved_id not in seen_non_ids
-        ):
-            seen_non_ids.add(resolved_id)
-            non_ingredient.append(
-                NonIngredientLineDecision(
-                    l=resolved_id,
-                    k=decision.kind,
-                )
-            )
-
-    return Stage1Response(p=parsed, n=non_ingredient)
-
-
 class AIProvider(abc.ABC):
     """A pluggable AI backend. To add a provider: subclass this, set `name` and the
     `models` map, and implement `_complete`. The recipe-extraction and image-match
@@ -292,7 +246,9 @@ class AIProvider(abc.ABC):
                 logger.warning(f"Skipping invalid recipe at index {i}: {e}")
         return recipes, usage
 
-    def enrich_recipe(self, context: dict, model: str | None = None) -> tuple[EnrichmentResponse, Usage]:
+    def enrich_recipe(
+        self, context: dict, model: str | None = None
+    ) -> tuple[EnrichmentResponse, Usage]:
         """Run the separate structured enrichment request for one persisted recipe."""
         model = model or self.model_for(ModelRole.RECIPE_ENRICHMENT)
         response, usage = self._complete(
@@ -309,15 +265,14 @@ class AIProvider(abc.ABC):
         self, context: dict, model: str | None = None
     ) -> tuple[Stage1Response, Usage]:
         """Run Stage 1 ingredient structuring for one recipe."""
-        model = model or self.model_for(ModelRole.RECIPE_ENRICHMENT)
+        model = model or self.model_for(ModelRole.RECIPE_INGREDIENTS)
         response, usage = self._complete(
             build_stage1_prompt(context), model, schema=STAGE1_JSON_SCHEMA, temp=0
         )
         if not response:
             raise AIResponseError("Recipe ingredient structuring returned an empty response", usage)
         try:
-            raw_stage1 = Stage1Response.model_validate_json(_strip_json_fence(response))
-            return _resolve_stage1_line_ids(raw_stage1, context), usage
+            return Stage1Response.model_validate_json(_strip_json_fence(response)), usage
         except ValidationError as exc:
             raise AIResponseError(
                 f"Invalid recipe ingredient structuring response: {exc}", usage
@@ -327,7 +282,7 @@ class AIProvider(abc.ABC):
         self, context: dict, model: str | None = None
     ) -> tuple[Stage2Response, Usage]:
         """Run Stage 2 facet & keyword assignment for one recipe."""
-        model = model or self.model_for(ModelRole.RECIPE_ENRICHMENT)
+        model = model or self.model_for(ModelRole.RECIPE_SEMANTICS)
         response, usage = self._complete(
             build_stage2_prompt(context), model, schema=STAGE2_JSON_SCHEMA, temp=0
         )

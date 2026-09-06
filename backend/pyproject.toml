@@ -22,7 +22,6 @@ dependencies = [
     "pillow>=12.3.0",
     "pydantic-ai-slim[anthropic,google,openai]>=2.35.0",
     "pymupdf>=1.28.2",
-    "ingredient-parser-nlp>=2.7,<2.8",
 ]
 
 [dependency-groups]

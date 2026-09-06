@@ -92,14 +92,20 @@ For every occurrence in p:
   * For distinct substitute ingredients, output one occurrence for EACH choice with the SAME non-null `a` value. Examples: `cooking spray or butter`; `vanilla bean <-> vanilla extract`; `palm sugar / dark brown sugar`; `chicken stock, beef stock, or dashi`.
   * Do not treat a fraction, measurement conversion, quantity range, or choice between descriptions of one ingredient as an ingredient alternative. Examples: `1/2 cup`, `170 g / 6 oz`, `5 or 6 garlic chives`, and `baked or super firm tofu` each produce one occurrence with a: null.
   * A substitute choice does not mean optional. Set `x: true` only when the source separately says `optional`.
-- k: true for 1 to 3 core star ingredients that define the dish identity (e.g. main protein, key vegetable, star flavour). False for seasoning, oil, or supporting ingredients.
-
 Final alternative check: find every substitute relationship, whether it uses words or symbols. Verify that no ingredient choice is missing and every choice has the same non-null `a` value.
 
-Wire keys: p parsed lines {l line ID, o occurrences}; n non-ingredient lines {l, k}; occurrence {n canonical name, q quantity, u unit, p preparation, x optional, a alternative group, k key}."""
+Do not decide which ingredients are key. Stage 2 owns all recipe-level interpretation.
 
-_STAGE2_INSTRUCTIONS = """You classify recipe facets and select descriptive residual keywords. Return only valid JSON.
-Decide cuisines, cooking methods, and courses using the recipe title, book title, author, cooking instructions, and ingredients list.
+Wire keys: p parsed lines {l line ID, o occurrences}; n non-ingredient lines {l, k}; occurrence {n canonical name, q quantity, u unit, p preparation, x optional, a alternative group}."""
+
+_STAGE2_INSTRUCTIONS = """You make recipe-level semantic decisions from an accepted structured ingredient result. Return only valid JSON.
+Decide key ingredients, cuisines, cooking methods, courses, and residual keywords using the recipe title, book title, author, cooking instructions, and structured ingredient lines.
+
+Key ingredients (k):
+- Select one to three occurrences that define the dish identity, such as the main protein, star vegetable, or signature flavour.
+- Do not select seasoning, cooking oil, or a supporting ingredient.
+- Each selection must copy one supplied ingredient line ID into l and use its zero-based occurrence position in o.
+- Do not refer to a heading, note, unknown line, or unknown occurrence position.
 
 Cuisines (c):
 - Select zero or more matching IDs strictly from the supplied `cuisines` list.
@@ -129,7 +135,7 @@ Residual Keywords (w):
 - Do NOT repeat any cuisine, method, course, or ingredient name in keywords.
 - Do not add filler keywords.
 
-Wire keys: c cuisine IDs; m methods {v ID, p primary}; o course IDs; w keywords."""
+Wire keys: k key ingredients {l line ID, o occurrence position}; c cuisine IDs; m methods {v ID, p primary}; o course IDs; w keywords."""
 
 
 def build_stage1_prompt(context: dict) -> str:
@@ -137,8 +143,7 @@ def build_stage1_prompt(context: dict) -> str:
         [
             f"Recipe ingredient structuring prompt {PROMPT_VERSION}",
             _STAGE1_INSTRUCTIONS,
-            "Recipe ingredient input:\n"
-            + json.dumps(context["recipe"], ensure_ascii=False),
+            "Recipe ingredient input:\n" + json.dumps(context["recipe"], ensure_ascii=False),
         ]
     )
 
@@ -148,10 +153,8 @@ def build_stage2_prompt(context: dict) -> str:
         [
             f"Recipe facets prompt {PROMPT_VERSION}",
             _STAGE2_INSTRUCTIONS,
-            "Reusable vocabulary:\n"
-            + json.dumps(context["vocabulary"], ensure_ascii=False),
-            "Recipe context:\n"
-            + json.dumps(context["recipe"], ensure_ascii=False),
+            "Reusable vocabulary:\n" + json.dumps(context["vocabulary"], ensure_ascii=False),
+            "Recipe context:\n" + json.dumps(context["recipe"], ensure_ascii=False),
         ]
     )
 
@@ -161,9 +164,7 @@ def build_prompt(context: dict) -> str:
         [
             f"Recipe enrichment prompt {PROMPT_VERSION}",
             _INSTRUCTIONS,
-            "Reusable vocabulary:\n"
-            + json.dumps(context["vocabulary"], ensure_ascii=False),
-            "Recipe-specific input:\n"
-            + json.dumps(context["recipe"], ensure_ascii=False),
+            "Reusable vocabulary:\n" + json.dumps(context["vocabulary"], ensure_ascii=False),
+            "Recipe-specific input:\n" + json.dumps(context["recipe"], ensure_ascii=False),
         ]
     )

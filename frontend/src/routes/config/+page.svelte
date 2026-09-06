@@ -56,6 +56,10 @@
 						extractionApiKeySet: config.api_key_set,
 						assistantProvider: config.assistant_provider,
 						assistantApiKeySet: config.assistant_api_key_set,
+						enrichmentStage1Provider: config.enrichment_stage1_provider,
+						enrichmentStage1ApiKeySet: config.enrichment_stage1_api_key_set,
+						enrichmentStage2Provider: config.enrichment_stage2_provider,
+						enrichmentStage2ApiKeySet: config.enrichment_stage2_api_key_set,
 						rateLimit: config.extraction_rate_limit_per_minute,
 						providers: config.providers.map((p) => ({
 							name: p.name,

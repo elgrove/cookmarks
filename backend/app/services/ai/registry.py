@@ -64,6 +64,43 @@ def get_ai_provider(session: Session) -> AIProvider | None:
     return provider_cls(config.api_key or "", config.model_overrides)
 
 
+def _configured_provider(
+    name: str | None,
+    api_key: str | None,
+    model_overrides: dict[str, str] | None,
+    purpose: str,
+) -> AIProvider | None:
+    if name is None:
+        return None
+    provider_cls = _PROVIDERS.get(name)
+    if provider_cls is None:
+        raise RuntimeError(f"Unknown {purpose} provider configured: {name}")
+    if provider_cls.requires_api_key and not api_key:
+        raise RuntimeError(f"{purpose} provider {name} is configured without an API key")
+    return provider_cls(api_key or "", model_overrides)
+
+
+def get_recipe_enrichment_providers(
+    session: Session,
+) -> tuple[AIProvider | None, AIProvider | None]:
+    """Return the explicit ingredient and semantic providers, if configured."""
+    config = get_config(session)
+    return (
+        _configured_provider(
+            config.enrichment_stage1_provider,
+            config.enrichment_stage1_api_key,
+            config.model_overrides,
+            "recipe Stage 1",
+        ),
+        _configured_provider(
+            config.enrichment_stage2_provider,
+            config.enrichment_stage2_api_key,
+            config.model_overrides,
+            "recipe Stage 2",
+        ),
+    )
+
+
 def get_assistant_provider(session: Session) -> AIProvider | None:
     config = get_config(session)
     if config.assistant_provider is None:
@@ -75,7 +112,9 @@ def get_assistant_provider(session: Session) -> AIProvider | None:
         return None
 
     if provider_cls.requires_api_key and not config.assistant_api_key:
-        logger.warning(f"Assistant provider {config.assistant_provider} configured without an API key")
+        logger.warning(
+            f"Assistant provider {config.assistant_provider} configured without an API key"
+        )
         return None
 
     return provider_cls(config.assistant_api_key or "", config.model_overrides)

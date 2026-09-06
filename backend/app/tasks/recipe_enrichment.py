@@ -12,7 +12,7 @@ from sqlalchemy.orm import selectinload
 from app.db import SessionLocal
 from app.models.recipe import Recipe
 from app.models.task_run import TaskRun
-from app.services.ai import AIResponseError, Usage, get_ai_provider
+from app.services.ai import AIResponseError, Usage
 from app.services.recipe_enrichment.service import enrich_recipe
 from app.tasks.celery_app import celery_app
 from app.tasks.runs import complete_run, fail_run, start_run
@@ -30,9 +30,7 @@ _COMMON_FACT = re.compile(
 def _recipe_rows(session) -> list[Recipe]:
     return list(
         session.scalars(
-            select(Recipe)
-            .options(selectinload(Recipe.ingredients_verbatim))
-            .order_by(Recipe.id)
+            select(Recipe).options(selectinload(Recipe.ingredients_verbatim)).order_by(Recipe.id)
         )
     )
 
@@ -56,12 +54,16 @@ def choose_pilot_sample(session, seed: int = PILOT_SEED, size: int = PILOT_SAMPL
     common_fact_recipes = [
         recipe
         for recipe in recipes
-        if _COMMON_FACT.search(" ".join([recipe.name, recipe.description or "", *recipe.instructions]))
+        if _COMMON_FACT.search(
+            " ".join([recipe.name, recipe.description or "", *recipe.instructions])
+        )
     ]
     sparse_recipes = [
         recipe
         for recipe in recipes
-        if len(recipe.ingredients_verbatim) <= 1 or not recipe.description or len(recipe.instructions) <= 1
+        if len(recipe.ingredients_verbatim) <= 1
+        or not recipe.description
+        or len(recipe.instructions) <= 1
     ]
     strata = {
         "complex": _take(complex_recipes, chosen, PILOT_STRATUM_SIZE),
@@ -75,11 +77,13 @@ def choose_pilot_sample(session, seed: int = PILOT_SEED, size: int = PILOT_SAMPL
     remaining = [recipe for recipe in recipes if recipe.id not in {item.id for item in chosen}]
     random.Random(seed).shuffle(remaining)
     strata["random"] = _take(remaining, chosen, PILOT_STRATUM_SIZE)
-    strata["random"].extend(
-        _take(recipes, chosen, PILOT_STRATUM_SIZE - len(strata["random"]))
-    )
+    strata["random"].extend(_take(recipes, chosen, PILOT_STRATUM_SIZE - len(strata["random"])))
     # Fill every stratum's shortfall deterministically without duplicates, then cap.
-    _take([recipe for recipe in recipes if recipe.id not in {item.id for item in chosen}], chosen, size - len(chosen))
+    _take(
+        [recipe for recipe in recipes if recipe.id not in {item.id for item in chosen}],
+        chosen,
+        size - len(chosen),
+    )
     return {
         "seed": seed,
         "recipe_ids": [str(recipe.id) for recipe in chosen[:size]],
@@ -100,21 +104,21 @@ def run_recipe_enrichment_pilot(run_id: str) -> dict:
             run = session.get(TaskRun, uuid.UUID(run_id))
             if run is None:
                 raise ValueError("recipe enrichment pilot run not found")
-            provider = get_ai_provider(session)
-            if provider is None:
-                raise RuntimeError("No usable AI provider is configured")
             ids = [uuid.UUID(value) for value in run.detail["recipe_ids"]]
-            recipes = {recipe.id: recipe for recipe in session.scalars(select(Recipe).where(Recipe.id.in_(ids)))}
+            recipes = {
+                recipe.id: recipe
+                for recipe in session.scalars(select(Recipe).where(Recipe.id.in_(ids)))
+            }
             for recipe_id in ids:
                 recipe = recipes.get(recipe_id)
                 if recipe is None:
-                    outcomes.append({"recipe_id": str(recipe_id), "status": "failed", "error": "missing"})
+                    outcomes.append(
+                        {"recipe_id": str(recipe_id), "status": "failed", "error": "missing"}
+                    )
                     continue
                 started = datetime.now(UTC)
                 try:
-                    metrics, call_usage = enrich_recipe(
-                        session, recipe_id, provider=provider, task_run_id=run.id
-                    )
+                    metrics, call_usage = enrich_recipe(session, recipe_id, task_run_id=run.id)
                     usage += call_usage
                     session.refresh(recipe)
                     status = "skipped" if metrics.get("skipped") else "complete"
@@ -122,9 +126,14 @@ def run_recipe_enrichment_pilot(run_id: str) -> dict:
                         {
                             "recipe_id": str(recipe_id),
                             "status": status,
-                            "elapsed_seconds": round((datetime.now(UTC) - started).total_seconds(), 3),
+                            "elapsed_seconds": round(
+                                (datetime.now(UTC) - started).total_seconds(), 3
+                            ),
                             "keywords": [keyword.name for keyword in recipe.keywords],
-                            "line_kinds": [line.kind.value if line.kind else None for line in recipe.ingredients_verbatim],
+                            "line_kinds": [
+                                line.kind.value if line.kind else None
+                                for line in recipe.ingredients_verbatim
+                            ],
                             "cuisines": [fact.cuisine_id for fact in recipe.cuisines],
                             "methods": [
                                 fact.facet_value.value_id
@@ -156,8 +165,8 @@ def run_recipe_enrichment_pilot(run_id: str) -> dict:
         keyword_validation_failures = 0
         for item in outcomes:
             for key in (
-                "deterministic_accepted",
                 "ai_parsed_lines",
+                "stage1_fallback_used",
                 "headings",
                 "ingredients_created",
                 "existing_ingredients",
@@ -176,9 +185,9 @@ def run_recipe_enrichment_pilot(run_id: str) -> dict:
             "stale_response": statuses["stale"],
             "outcomes": outcomes,
             "recipes_with_headings": recipes_with_headings,
-            "recipes_with_headings_percent": round(
-                recipes_with_headings / len(outcomes) * 100, 1
-            ) if outcomes else 0,
+            "recipes_with_headings_percent": round(recipes_with_headings / len(outcomes) * 100, 1)
+            if outcomes
+            else 0,
             "keyword_validation_failures": keyword_validation_failures,
             "cuisine_frequency": dict(fact_counts["cuisines"]),
             "method_frequency": dict(fact_counts["methods"]),
