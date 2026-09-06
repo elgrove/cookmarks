@@ -185,6 +185,7 @@ class EnrichmentRecipeRecord(BaseModel):
     model: str
     stage1_model_id: str | None = None
     stage2_model_id: str | None = None
+    deterministic_enabled: bool | None = None
     prompt_version: str | None = None
     schema_version: str | None = None
     scores: EnrichmentDimensionScores
@@ -817,6 +818,7 @@ def evaluate_enrichment_recipe(
     run_dir: Path,
     vocab: dict[str, str] | None = None,
     include_description: bool = True,
+    use_deterministic: bool = True,
     stage2_candidate: CandidateModel | None = None,
     stage2_provider: AIProvider | None = None,
 ) -> EnrichmentRecipeRecord:
@@ -840,7 +842,7 @@ def evaluate_enrichment_recipe(
 
     try:
         active_vocab = vocab or {}
-        proposals = build_gold_proposals(gold, active_vocab)
+        proposals = build_gold_proposals(gold, active_vocab) if use_deterministic else {}
         stage1_context = build_gold_stage1_context(gold, proposals)
 
         if not stage1_context["recipe"]["ai_parse_line_ids"]:
@@ -908,6 +910,7 @@ def evaluate_enrichment_recipe(
             model=model_name,
             stage1_model_id=candidate.id,
             stage2_model_id=stage2_candidate.id,
+            deterministic_enabled=use_deterministic,
             prompt_version=PROMPT_VERSION,
             schema_version=SCHEMA_VERSION,
             scores=scores,
@@ -936,6 +939,7 @@ def evaluate_enrichment_recipe(
             "stage2": stage2_response.model_dump(),
             "gold": gold.model_dump(),
             "include_description": include_description,
+            "deterministic_enabled": use_deterministic,
         }
         artefact_path.write_text(json.dumps(artefact_data, indent=2))
         return record
@@ -956,6 +960,7 @@ def evaluate_enrichment_recipe(
             model=model_name,
             stage1_model_id=candidate.id,
             stage2_model_id=stage2_candidate.id,
+            deterministic_enabled=use_deterministic,
             prompt_version=PROMPT_VERSION,
             schema_version=SCHEMA_VERSION,
             scores=_zero_enrichment_scores(),
@@ -985,6 +990,7 @@ def evaluate_enrichment_recipe(
             model=model_name,
             stage1_model_id=candidate.id,
             stage2_model_id=stage2_candidate.id,
+            deterministic_enabled=use_deterministic,
             prompt_version=PROMPT_VERSION,
             schema_version=SCHEMA_VERSION,
             scores=_zero_enrichment_scores(),
@@ -1003,6 +1009,7 @@ def run_enrichment_eval(
     model_ids: list[str] | None = None,
     recipe_slugs: list[str] | None = None,
     include_description: bool = True,
+    use_deterministic: bool = True,
     stage1_model_id: str | None = None,
     stage2_model_id: str | None = None,
 ) -> list[EnrichmentRecipeRecord]:
@@ -1082,6 +1089,7 @@ def run_enrichment_eval(
                 run_dir=run_dir,
                 vocab=vocab,
                 include_description=include_description,
+                use_deterministic=use_deterministic,
                 stage2_candidate=stage2_candidate,
                 stage2_provider=stage2_provider,
             ): (f"{candidate.id} -> {stage2_candidate.id}", gold.slug)

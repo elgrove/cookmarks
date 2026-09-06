@@ -423,6 +423,7 @@ def test_mixed_model_eval_routes_stage_output_to_stage_two(tmp_path) -> None:
         sha="abc1234",
         run_dir=tmp_path,
         vocab={},
+        use_deterministic=False,
         stage2_candidate=CandidateModel.parse("ANTHROPIC:haiku"),
         stage2_provider=stage2_provider,
     )
@@ -430,6 +431,7 @@ def test_mixed_model_eval_routes_stage_output_to_stage_two(tmp_path) -> None:
     stage2_context = stage2_provider.enrich_recipe_stage2.call_args.args[0]
     assert stage2_context["recipe"]["ingredients"] == ["Apple", "Olive Oil"]
     assert record.model_id == "GEMINI:flash-lite -> ANTHROPIC:haiku"
+    assert record.deterministic_enabled is False
     assert record.stage1_input_tokens == 100
     assert record.stage2_input_tokens == 50
     assert record.cost_usd == pytest.approx(0.003)
