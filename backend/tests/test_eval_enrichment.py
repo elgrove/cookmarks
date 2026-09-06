@@ -1,11 +1,16 @@
 """Unit tests for the recipe enrichment evaluation suite."""
 
 import uuid
+from decimal import Decimal
+from unittest.mock import Mock
 
 import pytest
 
+from app.services.ai import Usage
 from app.services.recipe_enrichment.schema import (
     EnrichmentResponse,
+    Stage1Response,
+    Stage2Response,
 )
 from evals.enrichment import (
     ENRICHMENT_GOLD_PATH,
@@ -14,6 +19,7 @@ from evals.enrichment import (
     GoldOccurrence,
     GoldRecipe,
     build_gold_context,
+    evaluate_enrichment_recipe,
     load_gold_recipes,
     score_enrichment_response,
     score_facets,
@@ -22,6 +28,7 @@ from evals.enrichment import (
     score_residual_keywords,
     validate_enrichment_response,
 )
+from evals.models import CandidateModel
 
 
 def _sample_gold_recipe() -> GoldRecipe:
@@ -375,3 +382,54 @@ def test_score_enrichment_response_composite() -> None:
     assert scores.composite >= 0.95
     assert scores.line_kinds_accuracy == 1.0
     assert scores.ingredient_identity_f1 == 1.0
+
+
+def test_mixed_model_eval_routes_stage_output_to_stage_two(tmp_path) -> None:
+    gold = _sample_gold_recipe()
+    line0_id = _gold_line_id(gold.lines[0])
+    line1_id = _gold_line_id(gold.lines[1])
+    line2_id = _gold_line_id(gold.lines[2])
+    stage1_provider = Mock()
+    stage1_provider.enrich_recipe_stage1.return_value = (
+        Stage1Response.model_validate(
+            {
+                "parsed_lines": [
+                    {
+                        "line_id": line0_id,
+                        "occurrences": [{"canonical_name": "Apple"}],
+                    },
+                    {
+                        "line_id": line2_id,
+                        "occurrences": [{"canonical_name": "Olive Oil"}],
+                    },
+                ],
+                "non_ingredient_lines": [{"line_id": line1_id, "kind": "heading"}],
+            }
+        ),
+        Usage(input_tokens=100, output_tokens=20, cost_usd=Decimal("0.001")),
+    )
+    stage2_provider = Mock()
+    stage2_provider.enrich_recipe_stage2.return_value = (
+        Stage2Response(c=[], o=["starter"], w=["Fresh"]),
+        Usage(input_tokens=50, output_tokens=10, cost_usd=Decimal("0.002")),
+    )
+
+    record = evaluate_enrichment_recipe(
+        CandidateModel.parse("GEMINI:flash-lite"),
+        stage1_provider,
+        gold,
+        run_id="test-run",
+        timestamp="2026-09-06T00:00:00+00:00",
+        sha="abc1234",
+        run_dir=tmp_path,
+        vocab={},
+        stage2_candidate=CandidateModel.parse("ANTHROPIC:haiku"),
+        stage2_provider=stage2_provider,
+    )
+
+    stage2_context = stage2_provider.enrich_recipe_stage2.call_args.args[0]
+    assert stage2_context["recipe"]["ingredients"] == ["Apple", "Olive Oil"]
+    assert record.model_id == "GEMINI:flash-lite -> ANTHROPIC:haiku"
+    assert record.stage1_input_tokens == 100
+    assert record.stage2_input_tokens == 50
+    assert record.cost_usd == pytest.approx(0.003)

@@ -183,6 +183,8 @@ class EnrichmentRecipeRecord(BaseModel):
     model_id: str
     provider: str
     model: str
+    stage1_model_id: str | None = None
+    stage2_model_id: str | None = None
     prompt_version: str | None = None
     schema_version: str | None = None
     scores: EnrichmentDimensionScores
@@ -191,6 +193,12 @@ class EnrichmentRecipeRecord(BaseModel):
     candidate_tokens: int | None
     thinking_tokens: int | None
     cost_usd: float | None
+    stage1_input_tokens: int | None = None
+    stage1_output_tokens: int | None = None
+    stage1_cost_usd: float | None = None
+    stage2_input_tokens: int | None = None
+    stage2_output_tokens: int | None = None
+    stage2_cost_usd: float | None = None
     duration_s: float
     finish_reason: str | None = None
     error: str | None = None
@@ -809,9 +817,26 @@ def evaluate_enrichment_recipe(
     run_dir: Path,
     vocab: dict[str, str] | None = None,
     include_description: bool = True,
+    stage2_candidate: CandidateModel | None = None,
+    stage2_provider: AIProvider | None = None,
 ) -> EnrichmentRecipeRecord:
     """Evaluate one independent model and recipe pair using two-stage enrichment."""
     started = time.monotonic()
+    stage2_candidate = stage2_candidate or candidate
+    stage2_provider = stage2_provider or provider
+    mixed_models = stage2_candidate.id != candidate.id
+    model_id = f"{candidate.id} -> {stage2_candidate.id}" if mixed_models else candidate.id
+    provider_id = (
+        f"{candidate.provider}->{stage2_candidate.provider}"
+        if mixed_models
+        else candidate.provider
+    )
+    model_name = (
+        f"{candidate.model}->{stage2_candidate.model}" if mixed_models else candidate.model
+    )
+    artefact_model = model_id.replace("/", "_").replace(":", "_").replace(" -> ", "__to__")
+    usage1 = Usage()
+    usage2 = Usage()
 
     try:
         active_vocab = vocab or {}
@@ -836,7 +861,9 @@ def evaluate_enrichment_recipe(
         stage2_context = build_gold_stage2_context(
             gold, ingredient_names, include_description=include_description
         )
-        stage2_response, usage2 = provider.enrich_recipe_stage2(stage2_context, candidate.model)
+        stage2_response, usage2 = stage2_provider.enrich_recipe_stage2(
+            stage2_context, stage2_candidate.model
+        )
 
         all_parsed_lines = deterministic_lines + stage1_response.parsed_lines
         combined_stage1 = Stage1Response(
@@ -852,7 +879,7 @@ def evaluate_enrichment_recipe(
         except ValueError as exc:
             artefact_path = (
                 run_dir
-                / f"{gold.slug}_{candidate.provider}_{candidate.model.replace('/', '_')}.invalid.json"
+                / f"{gold.slug}_{artefact_model}.invalid.json"
             )
             artefact_path.write_text(
                 json.dumps(
@@ -876,9 +903,11 @@ def evaluate_enrichment_recipe(
             recipe_slug=gold.slug,
             recipe_name=gold.name,
             archetype=gold.archetype,
-            model_id=candidate.id,
-            provider=candidate.provider,
-            model=candidate.model,
+            model_id=model_id,
+            provider=provider_id,
+            model=model_name,
+            stage1_model_id=candidate.id,
+            stage2_model_id=stage2_candidate.id,
             prompt_version=PROMPT_VERSION,
             schema_version=SCHEMA_VERSION,
             scores=scores,
@@ -887,12 +916,18 @@ def evaluate_enrichment_recipe(
             candidate_tokens=usage.candidate_tokens,
             thinking_tokens=usage.thinking_tokens,
             cost_usd=float(usage.cost_usd) if usage.cost_usd is not None else None,
+            stage1_input_tokens=usage1.input_tokens,
+            stage1_output_tokens=usage1.output_tokens,
+            stage1_cost_usd=(float(usage1.cost_usd) if usage1.cost_usd is not None else None),
+            stage2_input_tokens=usage2.input_tokens,
+            stage2_output_tokens=usage2.output_tokens,
+            stage2_cost_usd=(float(usage2.cost_usd) if usage2.cost_usd is not None else None),
             duration_s=round(duration, 3),
             finish_reason=usage.finish_reason,
         )
 
         artefact_path = (
-            run_dir / f"{gold.slug}_{candidate.provider}_{candidate.model.replace('/', '_')}.json"
+            run_dir / f"{gold.slug}_{artefact_model}.json"
         )
         artefact_data = {
             "record": record.model_dump(),
@@ -907,7 +942,7 @@ def evaluate_enrichment_recipe(
 
     except AIResponseError as exc:
         duration = time.monotonic() - started
-        logger.error(f"{gold.slug} / {candidate.id} failed: {exc}")
+        logger.error(f"{gold.slug} / {model_id} failed: {exc}")
         return EnrichmentRecipeRecord(
             run_id=run_id,
             timestamp=timestamp,
@@ -916,9 +951,11 @@ def evaluate_enrichment_recipe(
             recipe_slug=gold.slug,
             recipe_name=gold.name,
             archetype=gold.archetype,
-            model_id=candidate.id,
-            provider=candidate.provider,
-            model=candidate.model,
+            model_id=model_id,
+            provider=provider_id,
+            model=model_name,
+            stage1_model_id=candidate.id,
+            stage2_model_id=stage2_candidate.id,
             prompt_version=PROMPT_VERSION,
             schema_version=SCHEMA_VERSION,
             scores=_zero_enrichment_scores(),
@@ -934,7 +971,7 @@ def evaluate_enrichment_recipe(
 
     except Exception as exc:
         duration = time.monotonic() - started
-        logger.error(f"{gold.slug} / {candidate.id} failed: {exc}")
+        logger.error(f"{gold.slug} / {model_id} failed: {exc}")
         return EnrichmentRecipeRecord(
             run_id=run_id,
             timestamp=timestamp,
@@ -943,9 +980,11 @@ def evaluate_enrichment_recipe(
             recipe_slug=gold.slug,
             recipe_name=gold.name,
             archetype=gold.archetype,
-            model_id=candidate.id,
-            provider=candidate.provider,
-            model=candidate.model,
+            model_id=model_id,
+            provider=provider_id,
+            model=model_name,
+            stage1_model_id=candidate.id,
+            stage2_model_id=stage2_candidate.id,
             prompt_version=PROMPT_VERSION,
             schema_version=SCHEMA_VERSION,
             scores=_zero_enrichment_scores(),
@@ -964,7 +1003,13 @@ def run_enrichment_eval(
     model_ids: list[str] | None = None,
     recipe_slugs: list[str] | None = None,
     include_description: bool = True,
+    stage1_model_id: str | None = None,
+    stage2_model_id: str | None = None,
 ) -> list[EnrichmentRecipeRecord]:
+    if bool(stage1_model_id) != bool(stage2_model_id):
+        raise ValueError("stage-1-model and stage-2-model must be supplied together")
+    if model_ids and stage1_model_id:
+        raise ValueError("model cannot be combined with stage-1-model and stage-2-model")
     cfg_models, gold_path = load_enrichment_config(config_path)
     models = cfg_models
     if model_ids:
@@ -988,9 +1033,20 @@ def run_enrichment_eval(
     run_dir = RUNS_DIR / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
 
-    providers: list[tuple[CandidateModel, AIProvider]] = []
+    providers: list[tuple[CandidateModel, AIProvider, CandidateModel, AIProvider]] = []
 
-    for candidate in models:
+    if stage1_model_id and stage2_model_id:
+        stage1_candidate = CandidateModel.parse(stage1_model_id)
+        stage2_candidate = CandidateModel.parse(stage2_model_id)
+        stage1_provider = instantiate_provider(
+            stage1_candidate, resolve_api_key(stage1_candidate.provider)
+        )
+        stage2_provider = instantiate_provider(
+            stage2_candidate, resolve_api_key(stage2_candidate.provider)
+        )
+        providers.append((stage1_candidate, stage1_provider, stage2_candidate, stage2_provider))
+
+    for candidate in models if not stage1_model_id else []:
         try:
             key = resolve_api_key(candidate.provider)
         except RuntimeError as exc:
@@ -998,12 +1054,14 @@ def run_enrichment_eval(
             continue
 
         provider = instantiate_provider(candidate, key)
-        providers.append((candidate, provider))
+        providers.append((candidate, provider, candidate, provider))
 
     vocab = gold_ingredient_vocab(gold_recipes)
 
     evaluations = [
-        (candidate, provider, gold) for gold in gold_recipes for candidate, provider in providers
+        (stage1_candidate, stage1_provider, stage2_candidate, stage2_provider, gold)
+        for gold in gold_recipes
+        for stage1_candidate, stage1_provider, stage2_candidate, stage2_provider in providers
     ]
 
     records: list[EnrichmentRecipeRecord] = []
@@ -1024,8 +1082,10 @@ def run_enrichment_eval(
                 run_dir=run_dir,
                 vocab=vocab,
                 include_description=include_description,
-            ): (candidate.id, gold.slug)
-            for candidate, provider, gold in evaluations
+                stage2_candidate=stage2_candidate,
+                stage2_provider=stage2_provider,
+            ): (f"{candidate.id} -> {stage2_candidate.id}", gold.slug)
+            for candidate, provider, stage2_candidate, stage2_provider, gold in evaluations
         }
         for future in as_completed(futures):
             record = future.result()

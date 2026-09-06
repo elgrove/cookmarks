@@ -66,6 +66,16 @@ def _build_parser() -> argparse.ArgumentParser:
         help="candidate model id (repeatable; default: all)",
     )
     enrich_p.add_argument(
+        "--stage-1-model",
+        metavar="PROVIDER:MODEL",
+        help="ingredient-structuring model for a mixed two-stage run",
+    )
+    enrich_p.add_argument(
+        "--stage-2-model",
+        metavar="PROVIDER:MODEL",
+        help="facet-and-keyword model for a mixed two-stage run",
+    )
+    enrich_p.add_argument(
         "--recipe",
         action="append",
         dest="recipes",
@@ -115,6 +125,8 @@ def main(argv: list[str] | None = None) -> int:
             args.models,
             args.recipes,
             include_description=not args.no_description,
+            stage1_model_id=args.stage_1_model,
+            stage2_model_id=args.stage_2_model,
         )
         print("\n" + enrichment.leaderboard(records))
         return 0
