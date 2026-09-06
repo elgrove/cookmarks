@@ -45,6 +45,42 @@ def start_run(run_id: str) -> None:
         session.commit()
 
 
+def set_waiting(run_id: str, detail: dict | None = None) -> None:
+    """Mark a run WAITING: locally healthy, blocked on remote work (Gemini Batch).
+
+    Merges `detail` so progress/next-poll/last-error stay visible while waiting."""
+    with SessionLocal() as session:
+        run = session.get(TaskRun, uuid.UUID(run_id))
+        if run is None:
+            return
+        run.status = TaskStatus.WAITING
+        if detail:
+            run.detail = {**run.detail, **detail}
+        session.commit()
+
+
+def set_running(run_id: str, detail: dict | None = None) -> None:
+    """Move a WAITING run back to RUNNING while the worker downloads/applies results."""
+    with SessionLocal() as session:
+        run = session.get(TaskRun, uuid.UUID(run_id))
+        if run is None:
+            return
+        run.status = TaskStatus.RUNNING
+        if detail:
+            run.detail = {**run.detail, **detail}
+        session.commit()
+
+
+def merge_detail(run_id: str, detail: dict) -> None:
+    """Merge progress metrics into a run's `detail` without changing its status."""
+    with SessionLocal() as session:
+        run = session.get(TaskRun, uuid.UUID(run_id))
+        if run is None:
+            return
+        run.detail = {**run.detail, **detail}
+        session.commit()
+
+
 def complete_run(run_id: str, detail: dict | None = None, usage: Usage | None = None) -> None:
     """Mark a run DONE, stamp `completed_at`, and merge in the job's result metrics —
     plus its token/cost accounting when the job made AI calls."""
@@ -67,8 +103,9 @@ def reap_stale_runs() -> int:
     """Fail runs left QUEUED or RUNNING by a worker that died or restarted mid-job, so
     the history stops showing long-dead jobs as in-flight. Age is measured from
     `created_at` — a run that never started has no `started_at` — and the threshold is
-    deliberately generous, since a big book legitimately runs for a while. REVIEW is
-    left alone: it's waiting on a person, not abandoned. Returns how many were reaped."""
+    deliberately generous, since a big book legitimately runs for a while. REVIEW and
+    WAITING are left alone: they're waiting on a person or a remote batch job, not
+    abandoned. Returns how many were reaped."""
     cutoff = datetime.now(UTC) - timedelta(hours=settings.stale_run_after_hours)
     with SessionLocal() as session:
         stale = session.scalars(

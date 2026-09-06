@@ -12,7 +12,13 @@ from sqlalchemy.orm import selectinload
 from app.db import SessionLocal
 from app.models.recipe import Recipe
 from app.models.task_run import TaskRun
-from app.services.ai import AIResponseError, Usage
+from app.services.ai import AIResponseError, Usage, get_ai_provider, get_recipe_enrichment_providers
+from app.services.ai.base import ModelRole
+from app.services.recipe_enrichment.schema import (
+    PROMPT_VERSION,
+    SCHEMA_VERSION,
+    TAXONOMY_VERSION,
+)
 from app.services.recipe_enrichment.service import enrich_recipe
 from app.tasks.celery_app import celery_app
 from app.tasks.runs import complete_run, fail_run, start_run
@@ -88,6 +94,26 @@ def choose_pilot_sample(session, seed: int = PILOT_SEED, size: int = PILOT_SAMPL
         "seed": seed,
         "recipe_ids": [str(recipe.id) for recipe in chosen[:size]],
         "strata": {name: [str(recipe.id) for recipe in items] for name, items in strata.items()},
+    }
+
+
+def _pilot_version_snapshot(session) -> dict:
+    """Provider, model and contract versions behind this pilot run.
+
+    Stored on the run detail so the MY-175 backfill launches only against a
+    pilot whose contract matches its own.
+    """
+    stage1, stage2 = get_recipe_enrichment_providers(session)
+    fallback = get_ai_provider(session)
+    stage1 = stage1 or fallback
+    stage2 = stage2 or fallback
+    return {
+        "provider": f"{stage1.name}->{stage2.name}" if stage1 and stage2 else None,
+        "stage1_model": stage1.model_for(ModelRole.RECIPE_INGREDIENTS) if stage1 else None,
+        "stage2_model": stage2.model_for(ModelRole.RECIPE_SEMANTICS) if stage2 else None,
+        "prompt_version": PROMPT_VERSION,
+        "schema_version": SCHEMA_VERSION,
+        "taxonomy_version": TAXONOMY_VERSION,
     }
 
 
@@ -176,6 +202,9 @@ def run_recipe_enrichment_pilot(run_id: str) -> dict:
             "skipped": statuses["skipped"],
             "failed": statuses["failed"],
             "stale_response": statuses["stale"],
+            # Version snapshot for MY-175 backfill gating: a backfill launches
+            # only against a pilot run whose contract versions match its own.
+            **_pilot_version_snapshot(session),
             "outcomes": outcomes,
             "keyword_validation_failures": keyword_validation_failures,
             "cuisine_frequency": dict(fact_counts["cuisines"]),
