@@ -14,13 +14,19 @@ engine = create_engine(
 )
 
 
-@event.listens_for(engine, "connect")
-def _configure_connection(dbapi_conn: Any, _record: Any) -> None:
+def configure_sqlite_connection(dbapi_conn: Any, _record: Any = None) -> None:
     dbapi_conn.enable_load_extension(True)
     sqlite_vec.load(dbapi_conn)
     dbapi_conn.enable_load_extension(False)
     # SQLite ignores foreign keys (and ON DELETE) unless enabled per connection.
     dbapi_conn.execute("PRAGMA foreign_keys=ON")
+    dbapi_conn.execute("PRAGMA journal_mode=WAL")
+    dbapi_conn.execute("PRAGMA busy_timeout=5000")
+
+
+@event.listens_for(engine, "connect")
+def _configure_connection(dbapi_conn: Any, _record: Any) -> None:
+    configure_sqlite_connection(dbapi_conn, _record)
 
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)

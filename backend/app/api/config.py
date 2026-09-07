@@ -31,12 +31,20 @@ def update_config(payload: ConfigUpdate, session: SessionDep) -> ConfigRead:
         config.ai_provider = data["ai_provider"]
     if "assistant_provider" in data:
         config.assistant_provider = data["assistant_provider"]
+    if "enrichment_stage1_provider" in data:
+        config.enrichment_stage1_provider = data["enrichment_stage1_provider"]
+    if "enrichment_stage2_provider" in data:
+        config.enrichment_stage2_provider = data["enrichment_stage2_provider"]
     if "extraction_rate_limit_per_minute" in data:
         config.extraction_rate_limit_per_minute = data["extraction_rate_limit_per_minute"]
     if "api_key" in data:
         config.api_key = data["api_key"] or None
     if "assistant_api_key" in data:
         config.assistant_api_key = data["assistant_api_key"] or None
+    if "enrichment_stage1_api_key" in data:
+        config.enrichment_stage1_api_key = data["enrichment_stage1_api_key"] or None
+    if "enrichment_stage2_api_key" in data:
+        config.enrichment_stage2_api_key = data["enrichment_stage2_api_key"] or None
 
     session.commit()
     return ConfigRead.from_config(config, _providers())

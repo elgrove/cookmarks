@@ -122,6 +122,7 @@ class ContractTest {
     fun recipe_detail() {
         val recipe = pin<RecipeDetail>("recipe")
         assertEquals(3, recipe.ingredients_verbatim.size)
+        assertEquals(0, recipe.canonical_ingredients.size)
         assertEquals("book", recipe.context)
     }
 

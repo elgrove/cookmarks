@@ -24,7 +24,7 @@ RECIPE_KEYS = {
     "name",
     "description",
     "ingredients_verbatim",
-    "ingredients",
+    "canonical_ingredients",
     "enrichment_status",
     "cuisines",
     "methods",
@@ -274,7 +274,7 @@ def test_recipe_detail_content(client: TestClient) -> None:
         "100g anchovy",
         "2 tbsp olive oil",
     ]
-    assert body["ingredients"] == []
+    assert body["canonical_ingredients"] == []
     assert body["enrichment_status"] == "pending"
     assert body["instructions"] == ["Boil the pasta.", "Toss with the oil and serve."]
     # Keywords come back sorted by name.
@@ -297,7 +297,7 @@ def test_recipe_optional_fields_when_absent(client: TestClient) -> None:
     assert body["yields"] is None
     assert body["has_image"] is False
     assert body["ingredients_verbatim"] == []
-    assert body["ingredients"] == []
+    assert body["canonical_ingredients"] == []
     assert body["instructions"] == []
     assert body["keywords"] == []
 

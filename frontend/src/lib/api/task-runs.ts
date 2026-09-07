@@ -26,9 +26,11 @@ export const taskTypeSchema = z.enum([
 	'book_keywords',
 	'keyword_dedup',
 	'calibre_sync',
-	'book_ingest'
+	'book_ingest',
+	'recipe_enrichment_pilot',
+	'recipe_enrichment_backfill'
 ]);
-export const taskStatusSchema = z.enum(['queued', 'running', 'review', 'done', 'failed']);
+export const taskStatusSchema = z.enum(['queued', 'running', 'waiting', 'review', 'done', 'failed']);
 
 // Mirrors the TaskRunRead wire shape (snake_case) — one shape for every task type.
 // `detail` carries each type's own metrics (see the *Detail interfaces below); cost_usd
@@ -113,6 +115,46 @@ export interface CalibreSyncDetail {
 	orphaned: string[];
 	deleted: string[];
 	excluded: string[];
+}
+export interface RecipeEnrichmentPilotDetail {
+	seed: number;
+	recipe_ids: string[];
+	attempted?: number;
+	complete?: number;
+	failed?: number;
+	stale_response?: number;
+	outcomes?: Array<{
+		recipe_id: string;
+		status: 'complete' | 'failed' | 'stale';
+		error?: string;
+		keywords?: string[];
+		line_kinds?: Array<'ingredient' | 'heading' | 'note' | null>;
+	}>;
+}
+export interface RecipeEnrichmentBackfillDetail {
+	pilot_run_id?: string;
+	pilot_reviewed?: boolean;
+	selected?: number;
+	prepared?: number;
+	submitted?: number;
+	succeeded?: number;
+	applied?: number;
+	stale?: number;
+	terminal_failed?: number;
+	chunks_by_state?: Record<string, number>;
+	polls_done?: number;
+	next_poll_in_seconds?: number | null;
+	last_provider_error?: string | null;
+	input_tokens?: number;
+	output_tokens?: number;
+	cached_tokens?: number;
+	cost_estimate_usd?: number;
+	pricing_snapshot_version?: string;
+	elapsed_seconds?: number;
+	prompt_version?: string;
+	schema_version?: string;
+	taxonomy_version?: string;
+	failures?: Array<{ recipe_id: string; error?: string }>;
 }
 
 /** Every task run, newest first — the unified admin reporting index. `type` filters to

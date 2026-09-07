@@ -116,7 +116,7 @@ def backfill(session: Session, provider: AIProvider | None = None) -> int:
         recipe
         for recipe in session.scalars(
             select(Recipe).options(
-                selectinload(Recipe.keywords), selectinload(Recipe.ingredients_verbatim)
+                selectinload(Recipe.keywords), selectinload(Recipe.ingredients)
             )
         )
         if recipe.id not in embedded

@@ -6,6 +6,7 @@ from app.services.ai.registry import (
     get_ai_provider,
     get_assistant_provider,
     get_config,
+    get_recipe_enrichment_providers,
     provider_catalogue,
     provider_requires_api_key,
 )
@@ -24,6 +25,7 @@ __all__ = [
     "get_ai_provider",
     "get_assistant_provider",
     "get_config",
+    "get_recipe_enrichment_providers",
     "provider_catalogue",
     "provider_requires_api_key",
 ]

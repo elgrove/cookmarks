@@ -8,6 +8,7 @@
 	const LABELS: Record<TaskStatus, string> = {
 		queued: 'Queued',
 		running: 'Running',
+		waiting: 'Waiting',
 		review: 'Review',
 		done: 'Done',
 		failed: 'Failed'
@@ -38,6 +39,10 @@
 	.running {
 		color: var(--chip-blue-c);
 		background: var(--chip-blue);
+	}
+	.waiting {
+		color: var(--accent-deep);
+		background: var(--bg-warm);
 	}
 	.review {
 		color: var(--accent-deep);

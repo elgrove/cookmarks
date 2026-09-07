@@ -1,27 +1,31 @@
 import json
 import logging
 import uuid
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime
 from hashlib import sha256
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.db import SessionLocal
 from app.epub import epub_path, has_epub, has_pdf, pdf_path
 from app.models.book import Book
 from app.models.enums import RecipeEnrichmentStatus, TaskStatus, TaskType
-from app.models.ingredient import IngredientLine
+from app.models.ingredient import RecipeIngredient
 from app.models.recipe import Recipe
 from app.models.recipe_enrichment import RecipeEnrichmentState
 from app.models.task_run import TaskRun
 from app.schemas.extraction import RecipeData
-from app.services.ai import get_config
+from app.services.ai import AIProvider, Usage, get_ai_provider, get_config
+from app.services.ai.registry import get_recipe_enrichment_providers
 from app.services.book_keywords import generate_book_keywords
 from app.services.embeddings import embed_recipes
 from app.services.extraction.graph import get_extraction_graph
 from app.services.extraction.review import VALID_HUMAN_RESPONSES
-from app.services.keywords import get_or_create_keyword
+from app.services.recipe_enrichment.service import aggregate_metrics, enrich_recipe
+from app.services.recipe_facts import upsert_facet_vocabulary
 from app.tasks.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
@@ -91,10 +95,13 @@ def _thread_id(run_id: str) -> str:
 
 
 def generate_recipe_embeddings(session: Session, recipes: list[Recipe]) -> None:
-    """Embed the just-saved recipes so they're semantically searchable. Best-effort:
-    a no-op when no embedding-capable provider is configured, so extraction always
-    completes. Writes ride the caller's transaction (committed by save_recipes...)."""
-    embed_recipes(session, recipes)
+    """Embed the enriched recipes in one batch. This is best-effort: a no-op when no
+    embedding-capable provider is configured, so extraction always completes. Writes
+    ride the caller's transaction."""
+    try:
+        embed_recipes(session, recipes)
+    except Exception:
+        logger.exception("Recipe embedding failed after extraction")
 
 
 def _generate_book_keywords(session: Session, book: Book) -> None:
@@ -129,15 +136,16 @@ def _upsert_recipe(session: Session, book: Book, run: TaskRun, data: RecipeData)
     recipe.instructions = data.instructions
     recipe.yields = data.yields
     recipe.image = data.image or None
-    recipe.keywords = [get_or_create_keyword(session, name) for name in data.keywords]
+    # Structured enrichment owns recipe keywords. Re-extraction deliberately leaves
+    # the prior five visible until its replacement enrichment succeeds.
     if fingerprint != previous_fingerprint:
         # SQLite checks the (recipe_id, position) uniqueness while it flushes. Delete
         # the old rows first, before inserting replacement lines at the same positions.
-        if recipe.ingredients_verbatim:
-            recipe.ingredients_verbatim.clear()
+        if recipe.ingredients:
+            recipe.ingredients.clear()
             session.flush()
-        recipe.ingredients_verbatim = [
-            IngredientLine(position=position, text=text)
+        recipe.ingredients = [
+            RecipeIngredient(position=position, text=text, canonical_ingredient_id=None, is_key=False)
             for position, text in enumerate(source_text)
         ]
         recipe.facets.clear()
@@ -188,12 +196,111 @@ def save_recipes_from_graph_state(
             continue
         saved.append(_upsert_recipe(session, book, run, recipe_data))
 
-    generate_recipe_embeddings(session, saved)
-    _generate_book_keywords(session, book)
     session.commit()
 
     logger.info(f"Saved {len(saved)} recipes for {book.title}")
     return len(saved)
+
+
+def _enrich_recipe_worker(
+    recipe_id: uuid.UUID,
+    run_id: uuid.UUID,
+    stage1_provider: AIProvider | None,
+    stage1_fallback_provider: AIProvider | None,
+    stage2_provider: AIProvider | None,
+) -> tuple[dict[str, int] | None, Usage, str | None]:
+    with SessionLocal() as thread_session:
+        try:
+            result, usage = enrich_recipe(
+                thread_session,
+                recipe_id,
+                stage1_provider=stage1_provider,
+                stage1_fallback_provider=stage1_fallback_provider,
+                stage2_provider=stage2_provider,
+                task_run_id=run_id,
+            )
+            return result, usage, None
+        except Exception as exc:
+            logger.warning("Enrichment failed for recipe %s: %s", recipe_id, exc)
+            return None, Usage(), str(exc)
+
+
+def enrich_extracted_recipes(session: Session, run: TaskRun) -> dict:
+    """Enrich every just-extracted recipe concurrently: one failure never loses a book."""
+    recipe_ids = list(session.scalars(select(Recipe.id).where(Recipe.extraction_run_id == run.id)))
+    if not recipe_ids:
+        return {
+            "enrichment": {
+                "attempted": 0,
+                "complete": 0,
+                "failed": 0,
+                "stale_response": 0,
+            }
+        }
+
+    upsert_facet_vocabulary(session)
+    session.commit()
+
+    configured_stage1, configured_stage2 = get_recipe_enrichment_providers(session)
+    base_provider = configured_stage1 or configured_stage2 or get_ai_provider(session)
+    stage1_provider = configured_stage1 or base_provider
+    stage2_provider = configured_stage2 or base_provider
+    stage1_fallback_provider = configured_stage2 or base_provider
+    session.rollback()
+
+    complete = failed = stale = 0
+    results: list[dict[str, int]] = []
+
+    max_workers = min(len(recipe_ids), settings.extraction_threads)
+    if max_workers < 1:
+        max_workers = 1
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {
+            executor.submit(
+                _enrich_recipe_worker,
+                recipe_id,
+                run.id,
+                stage1_provider,
+                stage1_fallback_provider,
+                stage2_provider,
+            ): recipe_id
+            for recipe_id in recipe_ids
+        }
+        for future in as_completed(futures):
+            recipe_id = futures[future]
+            try:
+                result, usage, error = future.result()
+            except Exception as exc:
+                result, usage, error = None, Usage(), str(exc)
+                logger.warning("Enrichment worker thread raised for recipe %s: %s", recipe_id, exc)
+
+            if error is not None:
+                failed += 1
+                if "stale" in error.lower():
+                    stale += 1
+            elif result is not None and result.get("skipped"):
+                continue
+            elif result is not None:
+                complete += 1
+                results.append(result)
+                if usage.cost_usd is not None:
+                    run.cost_usd = (run.cost_usd or 0) + usage.cost_usd
+                if usage.input_tokens is not None:
+                    run.input_tokens = (run.input_tokens or 0) + usage.input_tokens
+                if usage.output_tokens is not None:
+                    run.output_tokens = (run.output_tokens or 0) + usage.output_tokens
+
+    metrics = aggregate_metrics(results)
+    return {
+        "enrichment": {
+            "attempted": len(recipe_ids),
+            "complete": complete,
+            "failed": failed,
+            "stale_response": stale,
+            **metrics,
+        }
+    }
 
 
 def _finalise_result(run_id: str, result: dict | None) -> str:
@@ -215,6 +322,13 @@ def _finalise_result(run_id: str, result: dict | None) -> str:
                 return "Book not found"
             raw_recipes = (result or {}).get("raw_recipes", [])
             created = save_recipes_from_graph_state(session, book, run, raw_recipes)
+            run.detail = {**run.detail, **enrich_extracted_recipes(session, run)}
+            recipes = list(
+                session.scalars(select(Recipe).where(Recipe.extraction_run_id == run.id))
+            )
+            generate_recipe_embeddings(session, recipes)
+            _generate_book_keywords(session, book)
+            session.commit()
             logger.info(f"Finished extraction for {book.title}. Processed {created} recipes.")
             return f"Extracted {created} recipes for {book.title}"
 

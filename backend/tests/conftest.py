@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-import sqlite_vec
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event, select
 from sqlalchemy.orm import Session, sessionmaker
@@ -12,11 +11,12 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.api.deps import current_user
 from app.api.recipes import _clear_keyword_cache, _clear_search_order_cache
 from app.config import settings
-from app.db import get_session
+from app.db import configure_sqlite_connection, get_session
 from app.main import app
-from app.models import Base, Book, IngredientLine, Keyword, Recipe, User
+from app.models import Base, Book, Keyword, Recipe, RecipeIngredient, User
 from app.services.auth import hash_password
 from app.services.embeddings import _clear_query_embed_cache
+from app.tasks.recipe_enrichment import recipe_enrichment_pilot_task
 
 # Where the two seeded books live inside a Calibre library root.
 SEEDED_BOOK_PATHS = ("Author One/With Recipes (1)", "Author Two/No Recipes Yet (2)")
@@ -133,6 +133,46 @@ def ingest_dispatched(monkeypatch: pytest.MonkeyPatch) -> list[tuple[Any, ...]]:
 
 
 @pytest.fixture(autouse=True)
+def enrichment_pilot_dispatched(monkeypatch: pytest.MonkeyPatch) -> list[tuple[Any, ...]]:
+    """Keep the admin pilot trigger off Redis while API tests record its dispatch."""
+    calls: list[tuple[Any, ...]] = []
+
+    def _record(*args: Any, **_kwargs: Any) -> None:
+        calls.append(args)
+
+    monkeypatch.setattr(recipe_enrichment_pilot_task, "delay", _record)
+    return calls
+
+
+@pytest.fixture(autouse=True)
+def enrichment_backfill_dispatched(monkeypatch: pytest.MonkeyPatch) -> list[tuple[Any, ...]]:
+    """Keep the admin backfill trigger off Redis while API tests record its dispatch."""
+    from app.tasks.enrichment_backfill import enrichment_backfill_task
+
+    calls: list[tuple[Any, ...]] = []
+
+    def _record(*args: Any, **_kwargs: Any) -> None:
+        calls.append(args)
+
+    monkeypatch.setattr(enrichment_backfill_task, "delay", _record)
+    return calls
+
+
+@pytest.fixture(autouse=True)
+def poll_backfill_dispatched(monkeypatch: pytest.MonkeyPatch) -> list[tuple[Any, ...]]:
+    """Keep poll re-enqueue off Redis; records (run_id, polls_done, countdown)."""
+    from app.tasks.enrichment_backfill import poll_enrichment_backfill_task
+
+    calls: list[tuple[Any, ...]] = []
+
+    def _record(*args: Any, **kwargs: Any) -> None:
+        calls.append((args, kwargs))
+
+    monkeypatch.setattr(poll_enrichment_backfill_task, "apply_async", _record)
+    return calls
+
+
+@pytest.fixture(autouse=True)
 def _reset_caches() -> Iterator[None]:
     # These caches are module-global; clear them so each test's fresh DB (with fresh
     # recipe ids / its own keyword set) never reads a previous test's cached values.
@@ -199,10 +239,10 @@ def _seed(session: Session) -> None:
             recipe.keywords = [pasta, quick]
             recipe.description = "A quick weeknight pasta."
             recipe.yields = "Serves 2"
-            recipe.ingredients_verbatim = [
-                IngredientLine(position=0, text="200g pasta"),
-                IngredientLine(position=1, text="100g anchovy"),
-                IngredientLine(position=2, text="2 tbsp olive oil"),
+            recipe.ingredients = [
+                RecipeIngredient(position=0, text="200g pasta"),
+                RecipeIngredient(position=1, text="100g anchovy"),
+                RecipeIngredient(position=2, text="2 tbsp olive oil"),
             ]
             recipe.instructions = ["Boil the pasta.", "Toss with the oil and serve."]
             recipe.image = "OPS/images/recipe-0.jpg"
@@ -219,10 +259,7 @@ def session(tmp_path: Path) -> Iterator[Session]:
 
     @event.listens_for(engine, "connect")
     def _configure(dbapi_conn: Any, _record: Any) -> None:
-        dbapi_conn.enable_load_extension(True)
-        sqlite_vec.load(dbapi_conn)
-        dbapi_conn.enable_load_extension(False)
-        dbapi_conn.execute("PRAGMA foreign_keys=ON")
+        configure_sqlite_connection(dbapi_conn, _record)
 
     Base.metadata.create_all(engine)
     factory = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)

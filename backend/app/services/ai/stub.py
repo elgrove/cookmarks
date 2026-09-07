@@ -44,6 +44,10 @@ class StubProvider(AIProvider):
         ModelRole.BOOK_KEYWORDS: "stub-keywords",
         ModelRole.KEYWORD_DEDUP: "stub-dedup",
         ModelRole.ASSISTANT: "stub-assistant",
+        ModelRole.RECIPE_ENRICHMENT: "stub-enrichment",
+        ModelRole.RECIPE_INGREDIENTS: "stub-ingredients",
+        ModelRole.RECIPE_INGREDIENTS_FALLBACK: "stub-ingredients-fallback",
+        ModelRole.RECIPE_SEMANTICS: "stub-semantics",
     }
     # Matches the production (Gemini) width so stub vectors share the vec0 table.
     embedding_dimensions: ClassVar[int] = 3072
@@ -68,6 +72,42 @@ class StubProvider(AIProvider):
             # per-book token exercises the shared-vocabulary join either way.
             token = hashlib.blake2b(prompt.encode("utf-8"), digest_size=3).hexdigest()
             return json.dumps(["Cookbook", "Stub Cuisine", f"Theme {token}"]), usage
+
+        if prompt.startswith("Recipe ingredient structuring prompt"):
+            recipe = json.loads(prompt.rsplit("Recipe ingredient input:\n", 1)[1])
+            ingredients = []
+            token = recipe["id"].split("-")[0]
+            for index, line in enumerate(recipe.get("lines", []), start=1):
+                ingredients.append({"id": line["id"], "n": f"Stub Ingredient {token} {index}"})
+            return json.dumps({"i": ingredients}), usage
+
+        if prompt.startswith("Recipe facets prompt"):
+            recipe = json.loads(prompt.rsplit("Recipe context:\n", 1)[1])
+            ingredients = recipe.get("ingredients", [])
+            key_ingredients = [ingredients[0]] if ingredients else []
+            return json.dumps(
+                {
+                    "k": key_ingredients,
+                    "c": [],
+                    "m": [],
+                    "o": [],
+                    "w": ["Cosy", "Fresh", "Outdoor", "Summer", "Weeknight"],
+                }
+            ), usage
+
+        if prompt.startswith("Recipe enrichment prompt"):
+            recipe = json.loads(prompt.rsplit("Recipe-specific input:\n", 1)[1])
+            ingredients = []
+            token = recipe["id"].split("-")[0]
+            lines = recipe.get("lines", [])
+            for index, line in enumerate(lines, start=1):
+                ingredients.append({"id": line["id"], "n": f"Stub Ingredient {token} {index}", "k": index == 1})
+            return json.dumps(
+                {
+                    "i": ingredients,
+                    "w": ["Cosy", "Fresh", "Outdoor", "Summer", "Weeknight"],
+                }
+            ), usage
 
         suffix = hashlib.blake2b(prompt.encode("utf-8"), digest_size=4).hexdigest()
         recipe = {

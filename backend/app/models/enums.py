@@ -18,11 +18,14 @@ class TaskType(StrEnum):
     KEYWORD_DEDUP = "keyword_dedup"
     CALIBRE_SYNC = "calibre_sync"
     BOOK_INGEST = "book_ingest"
+    RECIPE_ENRICHMENT_PILOT = "recipe_enrichment_pilot"
+    RECIPE_ENRICHMENT_BACKFILL = "recipe_enrichment_backfill"
 
 
 class TaskStatus(StrEnum):
     QUEUED = "queued"
     RUNNING = "running"
+    WAITING = "waiting"
     REVIEW = "review"
     DONE = "done"
     FAILED = "failed"
@@ -42,34 +45,28 @@ class ExtractionMethod(StrEnum):
     PDF_OCR = "pdf_ocr"
 
 
-class IngredientLineKind(StrEnum):
-    INGREDIENT = "ingredient"
-    HEADING = "heading"
-    NOTE = "note"
-
-
-class IngredientParseMethod(StrEnum):
-    DETERMINISTIC = "deterministic"
-    AI = "ai"
-
-
-class IngredientResolutionMethod(StrEnum):
-    CANONICAL_NAME = "canonical_name"
-    ALIAS = "alias"
-    AI_EXISTING = "ai_existing"
-    AI_CREATED = "ai_created"
-
-
-class RecipeFactSource(StrEnum):
-    EXPLICIT = "explicit"
-    INFERRED = "inferred"
-
-
 class RecipeEnrichmentStatus(StrEnum):
     PENDING = "pending"
     RUNNING = "running"
     COMPLETE = "complete"
     FAILED = "failed"
+
+
+class EnrichmentBatchStatus(StrEnum):
+    PREPARING = "preparing"
+    SUBMITTED = "submitted"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+    APPLIED = "applied"
+
+
+class EnrichmentBatchItemStatus(StrEnum):
+    PENDING = "pending"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    STALE = "stale"
+    APPLIED = "applied"
 
 
 class RecipeFacetKind(StrEnum):

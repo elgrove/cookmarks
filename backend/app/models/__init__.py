@@ -6,21 +6,20 @@ from app.models.calibre_exclusion import CalibreExclusion
 from app.models.config import Config
 from app.models.enums import (
     AIProvider,
+    EnrichmentBatchItemStatus,
+    EnrichmentBatchStatus,
     ExtractionMethod,
-    IngredientLineKind,
-    IngredientParseMethod,
-    IngredientResolutionMethod,
     RecipeEnrichmentStatus,
     RecipeFacetKind,
-    RecipeFactSource,
     TaskStatus,
     TaskType,
 )
 from app.models.game import GameDismissal
-from app.models.ingredient import Ingredient, IngredientAlias, IngredientLine, IngredientOccurrence
+from app.models.ingredient import CanonicalIngredient, RecipeIngredient
 from app.models.reading_queue import ReadingQueueItem
 from app.models.recipe import Keyword, Recipe, recipe_keywords
 from app.models.recipe_enrichment import RecipeEnrichmentState
+from app.models.recipe_enrichment_batch import RecipeEnrichmentBatch, RecipeEnrichmentBatchItem
 from app.models.recipe_fact import RecipeCuisine, RecipeFacet, RecipeFacetValue
 from app.models.recipe_list import RecipeList, RecipeListItem
 from app.models.recipe_view import RecipeView
@@ -35,26 +34,24 @@ __all__ = [
     "Book",
     "BookReading",
     "CalibreExclusion",
+    "CanonicalIngredient",
     "Config",
+    "EnrichmentBatchItemStatus",
+    "EnrichmentBatchStatus",
     "ExtractionMethod",
     "GameDismissal",
-    "Ingredient",
-    "IngredientAlias",
-    "IngredientLine",
-    "IngredientLineKind",
-    "IngredientOccurrence",
-    "IngredientParseMethod",
-    "IngredientResolutionMethod",
     "Keyword",
     "ReadingQueueItem",
     "Recipe",
     "RecipeCuisine",
+    "RecipeEnrichmentBatch",
+    "RecipeEnrichmentBatchItem",
     "RecipeEnrichmentState",
     "RecipeEnrichmentStatus",
     "RecipeFacet",
     "RecipeFacetKind",
     "RecipeFacetValue",
-    "RecipeFactSource",
+    "RecipeIngredient",
     "RecipeList",
     "RecipeListItem",
     "RecipeView",

@@ -7,7 +7,7 @@
 		bookHasCover: boolean;
 		name: string;
 		description: string | null;
-		ingredientsVerbatim: { id: string; position: number; kind: 'ingredient' | 'heading' | 'note' | null; text: string }[];
+		ingredientsVerbatim: { id: string; position: number; text: string }[];
 		instructions: string[];
 		yields: string | null;
 		keywords: string[];
@@ -221,7 +221,7 @@
 			{#if recipe.ingredientsVerbatim.length}
 				<ul class="ingredients">
 					{#each recipe.ingredientsVerbatim as line, i (line.id)}
-						<li class:heading={line.kind === 'heading'} class:note={line.kind === 'note'} data-verify-line-kind={line.kind ?? 'unknown'}>
+						<li>
 							<span class="ingno" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
 							<span class="ingtext">{line.text}</span>
 						</li>

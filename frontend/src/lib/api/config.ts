@@ -16,6 +16,10 @@ export const configSchema = z.object({
 	api_key_set: z.boolean(),
 	assistant_provider: aiProviderSchema.nullable(),
 	assistant_api_key_set: z.boolean(),
+	enrichment_stage1_provider: aiProviderSchema.nullable(),
+	enrichment_stage1_api_key_set: z.boolean(),
+	enrichment_stage2_provider: aiProviderSchema.nullable(),
+	enrichment_stage2_api_key_set: z.boolean(),
 	extraction_rate_limit_per_minute: z.number().int().positive(),
 	providers: z.array(providerInfoSchema)
 });
@@ -30,6 +34,10 @@ export type ConfigUpdate = {
 	api_key?: string | null;
 	assistant_provider?: AiProvider | null;
 	assistant_api_key?: string | null;
+	enrichment_stage1_provider?: AiProvider | null;
+	enrichment_stage1_api_key?: string | null;
+	enrichment_stage2_provider?: AiProvider | null;
+	enrichment_stage2_api_key?: string | null;
 	extraction_rate_limit_per_minute?: number;
 };
 

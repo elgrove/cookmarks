@@ -23,6 +23,10 @@ def test_alembic_check_ignores_application_owned_vec0_table(tmp_path: Path) -> N
     assert upgrade.returncode == 0, upgrade.stdout + upgrade.stderr
 
     connection = sqlite3.connect(database_path)
+    for table in ("recipe_facets", "recipe_cuisines"):
+        columns = {row[1] for row in connection.execute(f"PRAGMA table_info({table})")}
+        assert "source" not in columns
+        assert "evidence" not in columns
     connection.enable_load_extension(True)
     sqlite_vec.load(connection)
     connection.execute(
@@ -47,6 +51,10 @@ def test_alembic_check_ignores_application_owned_vec0_table(tmp_path: Path) -> N
     assert "no such module: vec0" not in output
     assert "recipe_embeddings" not in output
     if check.returncode:
+        # Known SQLite-only drift: the Enum-typed columns read back as VARCHAR,
+        # so autogenerate always wants to re-apply them. The task-type widening
+        # for the enrichment backfill ships in its own migration, leaving only
+        # the assistant-provider alter as accepted drift.
         expected_drift = (
             "FAILED: New upgrade operations detected: "
             "[[('modify_type', None, 'config', 'assistant_provider', "

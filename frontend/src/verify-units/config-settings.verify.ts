@@ -19,6 +19,10 @@ const config = (over: Partial<ConfigSettingsConfig> = {}): ConfigSettingsConfig 
 	extractionApiKeySet: false,
 	assistantProvider: null,
 	assistantApiKeySet: false,
+	enrichmentStage1Provider: null,
+	enrichmentStage1ApiKeySet: false,
+	enrichmentStage2Provider: null,
+	enrichmentStage2ApiKeySet: false,
 	rateLimit: 256,
 	providers: PROVIDERS,
 	...over
@@ -53,6 +57,18 @@ const unit: VerifiableUnit<Props> = {
 			id: 'assistant-set',
 			description: 'assistant Anthropic with a key already stored',
 			props: { config: config({ assistantProvider: 'ANTHROPIC', assistantApiKeySet: true }) }
+		},
+		{
+			id: 'enrichment-providers-set',
+			description: 'Flash Lite parsing and Haiku semantics have separate stored keys',
+			props: {
+				config: config({
+					enrichmentStage1Provider: 'GEMINI',
+					enrichmentStage1ApiKeySet: true,
+					enrichmentStage2Provider: 'ANTHROPIC',
+					enrichmentStage2ApiKeySet: true
+				})
+			}
 		},
 		{
 			id: 'non-admin',
@@ -169,6 +185,8 @@ const unit: VerifiableUnit<Props> = {
 				if (root.querySelector('#user-instructions') === null) return 'missing user instructions textarea';
 				if (root.querySelector('#extraction-provider') !== null) return 'extraction provider visible for non-admin';
 				if (root.querySelector('#assistant-provider') !== null) return 'assistant provider visible for non-admin';
+				if (root.querySelector('#enrichment-stage1-provider') !== null) return 'enrichment Stage 1 provider visible for non-admin';
+				if (root.querySelector('#enrichment-stage2-provider') !== null) return 'enrichment Stage 2 provider visible for non-admin';
 				return root.querySelector('#rate-limit') === null || 'rate limit visible for non-admin';
 			}
 		},
@@ -206,6 +224,19 @@ const unit: VerifiableUnit<Props> = {
 				if (contract['assistant-key-set'] !== 'true') return `key-set=${contract['assistant-key-set']}`;
 				if (contract['assistant-key-action'] !== 'keep') return `key-action=${contract['assistant-key-action']}`;
 				return root.querySelector('#assistant-api-key') === null || 'assistant key input exposed';
+			}
+		},
+		{
+			id: 'enrichment-keys-set',
+			description: 'both recipe enrichment providers and write-only key states are explicit',
+			onlyFixtures: ['enrichment-providers-set'],
+			check: ({ contract, root }) => {
+				if (contract['enrichment-stage1-provider'] !== 'GEMINI') return `stage1=${contract['enrichment-stage1-provider']}`;
+				if (contract['enrichment-stage2-provider'] !== 'ANTHROPIC') return `stage2=${contract['enrichment-stage2-provider']}`;
+				if (contract['enrichment-stage1-key-action'] !== 'keep') return `stage1-key=${contract['enrichment-stage1-key-action']}`;
+				if (contract['enrichment-stage2-key-action'] !== 'keep') return `stage2-key=${contract['enrichment-stage2-key-action']}`;
+				if (root.querySelector('#enrichment-stage1-api-key')) return 'Stage 1 key input exposed';
+				return root.querySelector('#enrichment-stage2-api-key') === null || 'Stage 2 key input exposed';
 			}
 		},
 		{
@@ -255,4 +286,3 @@ const unit: VerifiableUnit<Props> = {
 };
 
 export default unit;
-

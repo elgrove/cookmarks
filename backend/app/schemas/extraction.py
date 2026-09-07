@@ -47,7 +47,6 @@ class RecipeData(BaseModel):
     instructions: list[str] = Field(min_length=1, alias="recipeInstructions")
     yields: str | None = Field(None, alias="recipeYield")
     image: str | None = None
-    keywords: list[str] = Field(default_factory=list)
     author: str | None = None
     book_title: str | None = Field(None, alias="bookTitle")
     book_order: int | None = Field(None, alias="bookOrder")

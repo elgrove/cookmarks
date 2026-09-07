@@ -3,6 +3,10 @@
   "api_key_set": true,
   "assistant_provider": "ANTHROPIC",
   "assistant_api_key_set": true,
+  "enrichment_stage1_provider": "GEMINI",
+  "enrichment_stage1_api_key_set": true,
+  "enrichment_stage2_provider": "ANTHROPIC",
+  "enrichment_stage2_api_key_set": true,
   "extraction_rate_limit_per_minute": 256,
   "providers": [
     { "name": "ANTHROPIC", "requires_api_key": true },

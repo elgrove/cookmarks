@@ -6,7 +6,9 @@
 		BookKeywordsDetail,
 		KeywordDedupDetail,
 		CalibreSyncDetail,
-		BookIngestDetail
+		BookIngestDetail,
+		RecipeEnrichmentPilotDetail,
+		RecipeEnrichmentBackfillDetail
 	} from '$lib/api/task-runs';
 
 	export type TaskRunsPanelProps = {
@@ -23,7 +25,9 @@
 		{ id: 'book_keywords', label: 'Keywords' },
 		{ id: 'keyword_dedup', label: 'Dedup' },
 		{ id: 'calibre_sync', label: 'Calibre' },
-		{ id: 'book_ingest', label: 'Added books' }
+		{ id: 'book_ingest', label: 'Added books' },
+		{ id: 'recipe_enrichment_pilot', label: 'Enrichment pilot' },
+		{ id: 'recipe_enrichment_backfill', label: 'Batch backfill' }
 	];
 
 	const TYPE_LABELS: Record<TaskType, string> = {
@@ -31,7 +35,9 @@
 		book_keywords: 'Book keywords',
 		keyword_dedup: 'Keyword dedup',
 		calibre_sync: 'Calibre sync',
-		book_ingest: 'Add book'
+		book_ingest: 'Add book',
+		recipe_enrichment_pilot: 'Enrichment pilot',
+		recipe_enrichment_backfill: 'Batch backfill'
 	};
 
 	const rowDateFmt = new Intl.DateTimeFormat('en-GB', {
@@ -64,6 +70,14 @@
 			}
 			case 'book_ingest':
 				return (run.detail as unknown as BookIngestDetail).title || 'Add book';
+			case 'recipe_enrichment_pilot': {
+				const d = run.detail as unknown as RecipeEnrichmentPilotDetail;
+				return `${d.complete ?? 0} complete · ${d.failed ?? 0} failed`;
+			}
+			case 'recipe_enrichment_backfill': {
+				const d = run.detail as unknown as RecipeEnrichmentBackfillDetail;
+				return `${d.applied ?? 0} applied · ${d.terminal_failed ?? 0} failed`;
+			}
 		}
 	}
 </script>

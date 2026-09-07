@@ -7,14 +7,16 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-import sqlite_vec
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event, select
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.db import configure_sqlite_connection
 from app.models import Base, Book, Config, Recipe, TaskRun
 from app.models.enums import AIProvider, TaskStatus, TaskType
+from app.services.ai import Usage
 from app.tasks.book_keywords import backfill_book_keywords
+from app.tasks.recipe_enrichment import run_recipe_enrichment_pilot
 
 
 def _only_run(session: Session) -> TaskRun:
@@ -73,6 +75,24 @@ def test_trigger_calibre_sync_records_run_and_dispatches(
     assert calibre_dispatched == [(str(run.id),)]
 
 
+def test_trigger_recipe_enrichment_pilot_records_reproducible_sample(
+    client: TestClient, session: Session, enrichment_pilot_dispatched: list[tuple[Any, ...]]
+) -> None:
+    res = client.post("/api/tasks/recipe-enrichment-pilot")
+
+    assert res.status_code == 202
+    run = _only_run(session)
+    assert run.task_type == TaskType.RECIPE_ENRICHMENT_PILOT
+    assert res.json() == {
+        "task": "recipe_enrichment_pilot",
+        "status": "queued",
+        "queued": len(run.detail["recipe_ids"]),
+    }
+    assert run.detail["seed"] == 172
+    assert run.detail["recipe_ids"]
+    assert enrichment_pilot_dispatched == [(str(run.id),)]
+
+
 # --- The sweep itself, against a throwaway DB the task's SessionLocal is patched onto.
 
 
@@ -85,10 +105,7 @@ def task_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[session
 
     @event.listens_for(engine, "connect")
     def _configure(dbapi_conn: Any, _record: Any) -> None:
-        dbapi_conn.enable_load_extension(True)
-        sqlite_vec.load(dbapi_conn)
-        dbapi_conn.enable_load_extension(False)
-        dbapi_conn.execute("PRAGMA foreign_keys=ON")
+        configure_sqlite_connection(dbapi_conn, _record)
 
     Base.metadata.create_all(engine)
     factory = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
@@ -118,6 +135,45 @@ def _seed_book(factory: sessionmaker[Session], *, provider: AIProvider | None) -
         session.flush()
         session.add(Recipe(book_id=book.id, order=0, name="A Recipe"))
         session.commit()
+
+
+def test_enrichment_pilot_batch_embeds_completed_recipes(
+    task_db: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with task_db() as session:
+        book = Book(calibre_id=1, title="A Book", author="An Author", path="A/Book (1)")
+        session.add(book)
+        session.flush()
+        recipe = Recipe(book_id=book.id, order=0, name="A Recipe")
+        session.add(recipe)
+        session.flush()
+        run = TaskRun(
+            task_type=TaskType.RECIPE_ENRICHMENT_PILOT,
+            status=TaskStatus.QUEUED,
+            detail={"recipe_ids": [str(recipe.id)]},
+        )
+        session.add(run)
+        session.commit()
+        run_id = str(run.id)
+
+    def enrich(*_args: object, **_kwargs: object) -> tuple[dict[str, int], Usage]:
+        return {"canonical_ingredients": 0, "key_ingredients": 0}, Usage()
+
+    embedded: list[list[uuid.UUID]] = []
+
+    def embed(_session: Session, recipes: list[Recipe]) -> int:
+        embedded.append([recipe.id for recipe in recipes])
+        return len(recipes)
+
+    monkeypatch.setattr("app.tasks.recipe_enrichment.SessionLocal", task_db)
+    monkeypatch.setattr("app.tasks.runs.SessionLocal", task_db)
+    monkeypatch.setattr("app.tasks.recipe_enrichment.enrich_recipe", enrich)
+    monkeypatch.setattr("app.tasks.recipe_enrichment.embed_recipes", embed)
+
+    detail = run_recipe_enrichment_pilot(run_id)
+
+    assert detail["complete"] == 1
+    assert embedded == [[recipe.id]]
 
 
 def test_backfill_tags_untagged_books(task_db: sessionmaker[Session]) -> None:

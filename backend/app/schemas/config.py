@@ -24,6 +24,10 @@ class ConfigRead(BaseModel):
     api_key_set: bool
     assistant_provider: AIProvider | None
     assistant_api_key_set: bool
+    enrichment_stage1_provider: AIProvider | None
+    enrichment_stage1_api_key_set: bool
+    enrichment_stage2_provider: AIProvider | None
+    enrichment_stage2_api_key_set: bool
     extraction_rate_limit_per_minute: int
     providers: list[ProviderInfo]
 
@@ -34,6 +38,10 @@ class ConfigRead(BaseModel):
             api_key_set=bool(config.api_key),
             assistant_provider=config.assistant_provider,
             assistant_api_key_set=bool(config.assistant_api_key),
+            enrichment_stage1_provider=config.enrichment_stage1_provider,
+            enrichment_stage1_api_key_set=bool(config.enrichment_stage1_api_key),
+            enrichment_stage2_provider=config.enrichment_stage2_provider,
+            enrichment_stage2_api_key_set=bool(config.enrichment_stage2_api_key),
             extraction_rate_limit_per_minute=config.extraction_rate_limit_per_minute,
             providers=providers,
         )
@@ -51,4 +59,8 @@ class ConfigUpdate(BaseModel):
     api_key: str | None = None
     assistant_provider: AIProvider | None = None
     assistant_api_key: str | None = None
+    enrichment_stage1_provider: AIProvider | None = None
+    enrichment_stage1_api_key: str | None = None
+    enrichment_stage2_provider: AIProvider | None = None
+    enrichment_stage2_api_key: str | None = None
     extraction_rate_limit_per_minute: int | None = Field(default=None, ge=1)
