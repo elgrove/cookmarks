@@ -8,6 +8,10 @@ const RUN = '.run';
 const CHECK = '.regen-check';
 const DEDUP_RUN = '.dedup-run';
 const ENRICHMENT_RUN = '.enrichment-run';
+const BACKFILL_RUN = '.backfill-run';
+const BACKFILL_RESUME = '.backfill-resume';
+const PILOT_INPUT = '.pilot-input';
+const REVIEWED_CHECK = '.reviewed-check';
 
 // A handler that echoes the chosen mode back as the queued count, so an invariant can
 // prove the regenerate flag actually reached the call (99 when regenerating, else 1).
@@ -29,11 +33,16 @@ const fixedEnrichment =
 	(): Promise<TaskRunAck> =>
 		Promise.resolve({ task: 'recipe_enrichment_pilot', status: 'queued', queued });
 
+const fixedBackfill =
+	(queued: number) =>
+	(_opts: { pilotRunId: string; confirm: boolean }): Promise<TaskRunAck> =>
+		Promise.resolve({ task: 'recipe_enrichment_backfill', status: 'queued', queued });
+
 const unit: VerifiableUnit<Props> = {
 	id: 'tasks-panel',
 	title: 'Tasks panel',
 	description:
-		'The admin Tasks tab: on-demand "Generate book keywords" (with a regenerate-all toggle) and "Deduplicate keywords" triggers, each driving idle → running → queued (fire-and-forget), or → error if the dispatch rejects.',
+		'The admin Tasks tab: on-demand book keywords (with regenerate-all), keyword dedup, Calibre sync, the live enrichment pilot and the Batch backfill launch/resume — each driving idle → running → queued (fire-and-forget), or → error if the dispatch rejects.',
 	kind: 'component',
 	component: TasksPanel,
 	fixtures: [
@@ -128,6 +137,44 @@ const unit: VerifiableUnit<Props> = {
 			},
 			act: async ({ click, wait }) => {
 				click(ENRICHMENT_RUN);
+				await wait(0);
+			}
+		},
+		{
+			id: 'backfill-run',
+			description: 'a reviewed pilot ID launches the Batch backfill for the outstanding recipes',
+			props: { onRun: fixedRun(5), onBackfill: fixedBackfill(248) },
+			act: async ({ click, type, wait }) => {
+				type(PILOT_INPUT, '3f1a2b3c-4d5e-4f6a-8b9c-0d1e2f3a4b5c');
+				click(REVIEWED_CHECK);
+				click(BACKFILL_RUN);
+				await wait(0);
+			}
+		},
+		{
+			id: 'backfill-unreviewed',
+			description: 'probe: without the review confirmation the launch still reports honestly',
+			probe: true,
+			props: {
+				onRun: fixedRun(5),
+				onBackfill: () => Promise.reject(new Error('confirm the pilot review'))
+			},
+			act: async ({ click, type, wait }) => {
+				type(PILOT_INPUT, '3f1a2b3c-4d5e-4f6a-8b9c-0d1e2f3a4b5c');
+				click(BACKFILL_RUN);
+				await wait(0);
+			}
+		},
+		{
+			id: 'backfill-resume',
+			description: 'resuming after a terminal run queues only the outstanding recipes',
+			props: {
+				onRun: fixedRun(5),
+				onBackfillResume: () =>
+					Promise.resolve({ task: 'recipe_enrichment_backfill', status: 'queued', queued: 3 })
+			},
+			act: async ({ click, wait }) => {
+				click(BACKFILL_RESUME);
 				await wait(0);
 			}
 		},
@@ -247,6 +294,33 @@ const unit: VerifiableUnit<Props> = {
 			check: ({ contract }) =>
 				(contract['enrichment-state'] === 'error' && contract['enrichment-queued'] === '') ||
 				`state=${contract['enrichment-state']} queued=${contract['enrichment-queued']}`
+		},
+		{
+			id: 'backfill-queues',
+			description: 'a reviewed pilot ID launches the backfill and reports the outstanding count',
+			onlyFixtures: ['backfill-run'],
+			check: ({ contract, root }) =>
+				(contract['backfill-state'] === 'done' &&
+					contract['backfill-queued'] === '248' &&
+					contract['backfill-reviewed'] === 'true' &&
+					(root.textContent ?? '').includes('Track prepared / waiting / applied')) ||
+				`state=${contract['backfill-state']} queued=${contract['backfill-queued']}`
+		},
+		{
+			id: 'backfill-unreviewed-errors',
+			description: 'an unconfirmed launch surfaces the error state, never a false queue',
+			onlyFixtures: ['backfill-unreviewed'],
+			check: ({ contract }) =>
+				(contract['backfill-state'] === 'error' && contract['backfill-queued'] === '') ||
+				`state=${contract['backfill-state']} queued=${contract['backfill-queued']}`
+		},
+		{
+			id: 'backfill-resume-queues',
+			description: 'resuming queues the outstanding recipes without touching the launch form',
+			onlyFixtures: ['backfill-resume'],
+			check: ({ contract }) =>
+				(contract['backfill-state'] === 'done' && contract['backfill-queued'] === '3') ||
+				`state=${contract['backfill-state']} queued=${contract['backfill-queued']}`
 		},
 		{
 			id: 'intentional-fail',

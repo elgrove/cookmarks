@@ -7,7 +7,8 @@
 		KeywordDedupDetail,
 		CalibreSyncDetail,
 		BookIngestDetail,
-		RecipeEnrichmentPilotDetail
+		RecipeEnrichmentPilotDetail,
+		RecipeEnrichmentBackfillDetail
 	} from '$lib/api/task-runs';
 
 	export type TaskRunDetailProps = {
@@ -33,14 +34,16 @@
 		keyword_dedup: 'Keyword dedup',
 		calibre_sync: 'Calibre sync',
 		book_ingest: 'Add book',
-		recipe_enrichment_pilot: 'Enrichment pilot'
+		recipe_enrichment_pilot: 'Enrichment pilot',
+		recipe_enrichment_backfill: 'Batch backfill'
 	};
 	const TYPE_TITLES: Record<Exclude<TaskType, 'extraction'>, string> = {
 		book_keywords: 'Book-keyword tagging',
 		keyword_dedup: 'Keyword vocabulary dedup',
 		calibre_sync: 'Calibre library sync',
 		book_ingest: 'Book added to the library',
-		recipe_enrichment_pilot: 'Recipe enrichment pilot'
+		recipe_enrichment_pilot: 'Recipe enrichment pilot',
+		recipe_enrichment_backfill: 'Recipe enrichment batch backfill'
 	};
 
 	const dateFmt = new Intl.DateTimeFormat('en-GB', {
@@ -169,7 +172,7 @@
 					}
 				];
 			}
-			case 'recipe_enrichment_pilot': {
+		case 'recipe_enrichment_pilot': {
 				const d = run.detail as unknown as RecipeEnrichmentPilotDetail;
 				return [
 					{ label: 'Sample', value: `${d.recipe_ids?.length ?? 0} recipes` },
@@ -182,11 +185,29 @@
 					{ label: 'Tokens', value: formatTokens(run.input_tokens, run.output_tokens) }
 				];
 			}
+		case 'recipe_enrichment_backfill': {
+			const d = run.detail as unknown as RecipeEnrichmentBackfillDetail;
+			return [
+				{ label: 'Selected', value: count(d.selected) },
+				{ label: 'Applied', value: count(d.applied) },
+				{ label: 'Terminal failures', value: count(d.terminal_failed) },
+				{ label: 'Stale', value: count(d.stale) },
+				{
+					label: 'Cost estimate',
+					value:
+						d.cost_estimate_usd !== undefined
+							? `$${d.cost_estimate_usd} (snapshot ${d.pricing_snapshot_version ?? '—'})`
+							: '—'
+				},
+				{ label: 'Tokens', value: formatTokens(run.input_tokens, run.output_tokens) }
+			];
+		}
 		}
 	}
 </script>
 
 <script lang="ts">
+	import BackfillProgress from './BackfillProgress.svelte';
 	import TaskStatusBadge from './TaskStatusBadge.svelte';
 	import { cleanTitle } from '$lib/title';
 
@@ -280,6 +301,13 @@
 					</ul>
 				{/if}
 			</section>
+		{/if}
+
+		{#if run.task_type === 'recipe_enrichment_backfill'}
+			<BackfillProgress
+				detail={run.detail as unknown as RecipeEnrichmentBackfillDetail}
+				status={run.status}
+			/>
 		{/if}
 	{:else}
 		<p class="empty">Select a run to see its report.</p>

@@ -15,6 +15,11 @@
 		/** Starts the bounded normal-API enrichment pilot. Its outcomes are reviewed in
 		 * Task Runs before any later Batch backfill can be authorised. */
 		onEnrichmentPilot?: () => Promise<TaskRunAck | void>;
+		/** Launches the durable Gemini Batch backfill once a pilot run is reviewed:
+		 *  needs the done pilot run ID plus an explicit reviewed confirmation. */
+		onBackfill?: (opts: { pilotRunId: string; confirm: boolean }) => Promise<TaskRunAck | void>;
+		/** Resumes idempotently after a terminal run — only outstanding recipes. */
+		onBackfillResume?: () => Promise<TaskRunAck | void>;
 	};
 
 	type State = 'idle' | 'running' | 'done' | 'error';
@@ -28,13 +33,17 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
 
-	let { onRun, onDedup, onSync, onEnrichmentPilot }: TasksPanelProps = $props();
+	let { onRun, onDedup, onSync, onEnrichmentPilot, onBackfill, onBackfillResume }: TasksPanelProps =
+		$props();
 
 	let book = $state<Runner>({ state: 'idle', queued: null });
 	let dedup = $state<Runner>({ state: 'idle', queued: null });
 	let calibre = $state<Runner>({ state: 'idle', queued: null });
 	let enrichment = $state<Runner>({ state: 'idle', queued: null });
+	let backfill = $state<Runner>({ state: 'idle', queued: null });
 	let regenerate = $state(false);
+	let pilotRunId = $state('');
+	let pilotReviewed = $state(false);
 
 	// `run` may be absent (an unwired handler returns undefined), hence the widened
 	// return — `await undefined` simply yields no ack and the note falls back.
@@ -60,6 +69,7 @@
 		clearTimeout(dedup.timer);
 		clearTimeout(calibre.timer);
 		clearTimeout(enrichment.timer);
+		clearTimeout(backfill.timer);
 	});
 
 	function label(state: State): string {
@@ -109,6 +119,15 @@
 				? ERROR_NOTE
 				: ''
 	);
+	let backfillNote = $derived(
+		backfill.state === 'done'
+			? backfill.queued && backfill.queued > 0
+				? `Queued ${backfill.queued} recipes for the Batch backfill. Track prepared / waiting / applied in Task Runs.`
+				: 'Nothing to backfill: every recipe is already current.'
+			: backfill.state === 'error'
+				? 'The backfill could not be queued — check the pilot run ID, the review confirmation and Gemini.'
+				: ''
+	);
 </script>
 
 <section
@@ -122,6 +141,9 @@
 	data-verify-calibre-state={calibre.state}
 	data-verify-enrichment-state={enrichment.state}
 	data-verify-enrichment-queued={enrichment.queued === null ? '' : String(enrichment.queued)}
+	data-verify-backfill-state={backfill.state}
+	data-verify-backfill-queued={backfill.queued === null ? '' : String(backfill.queued)}
+	data-verify-backfill-reviewed={pilotReviewed ? 'true' : 'false'}
 >
 	<article class="task">
 		<div class="copy">
@@ -249,6 +271,65 @@
 	{#if enrichmentNote}
 		<p class="note" class:err={enrichment.state === 'error'} role="status">{enrichmentNote}</p>
 	{/if}
+
+	<article class="task">
+		<div class="copy">
+			<h2 class="name">Launch Batch backfill</h2>
+			<p class="desc">
+				Enrich every recipe that is not yet current through Gemini Batch — half the live cost,
+				tracked in Task Runs. Needs a done pilot run and your explicit confirmation that you
+				reviewed its output. Versions must match the pilot or the launch is rejected.
+			</p>
+			<label class="pilot">
+				<span class="pilot-text">Pilot run ID</span>
+				<input
+					type="text"
+					class="pilot-input"
+					aria-label="Reviewed pilot run ID"
+					placeholder="paste the done pilot run ID"
+					bind:value={pilotRunId}
+				/>
+			</label>
+			<label class="regen">
+				<input
+					type="checkbox"
+					class="reviewed-check"
+					aria-label="I reviewed the pilot output"
+					checked={pilotReviewed}
+					onchange={(e) => (pilotReviewed = e.currentTarget.checked)}
+				/>
+				<span class="regen-text">I reviewed the pilot output</span>
+			</label>
+		</div>
+
+		<div class="action stack">
+			<button
+				class="run backfill-run"
+				class:done={backfill.state === 'done'}
+				class:error={backfill.state === 'error'}
+				type="button"
+				aria-busy={backfill.state === 'running'}
+				disabled={backfill.state === 'running'}
+				onclick={() =>
+					runTask(backfill, () => onBackfill?.({ pilotRunId, confirm: pilotReviewed }))}
+			>
+				{label(backfill.state)}
+			</button>
+			<button
+				class="run ghost backfill-resume"
+				type="button"
+				aria-busy={backfill.state === 'running'}
+				disabled={backfill.state === 'running'}
+				onclick={() => runTask(backfill, () => onBackfillResume?.())}
+			>
+				Resume
+			</button>
+		</div>
+	</article>
+
+	{#if backfillNote}
+		<p class="note" class:err={backfill.state === 'error'} role="status">{backfillNote}</p>
+	{/if}
 </section>
 
 <style>
@@ -336,6 +417,11 @@
 	.action {
 		flex: none;
 	}
+	.action.stack {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
 
 	.run {
 		min-width: 8.5rem;
@@ -371,6 +457,53 @@
 		background: transparent;
 		color: var(--danger);
 		border-color: var(--danger);
+	}
+	.run.ghost {
+		background: transparent;
+		color: var(--ink);
+	}
+	.pilot {
+		display: flex;
+		align-items: center;
+		gap: 0.55rem;
+		margin-top: 1rem;
+	}
+	.pilot-text {
+		font-family: var(--f-grotesk);
+		font-size: 0.85rem;
+		color: var(--ink);
+		flex: none;
+	}
+	.pilot-input {
+		flex: 1;
+		min-width: 0;
+		font-family: var(--f-mono);
+		font-size: 0.78rem;
+		padding: 0.45rem 0.6rem;
+		border: 1px solid var(--line-strong);
+		border-radius: 3px;
+		background-color: var(--bg);
+		color: var(--ink);
+	}
+	.pilot-input:focus-visible,
+	.reviewed-check:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 2px;
+	}
+	.reviewed-check {
+		appearance: none;
+		width: 1rem;
+		height: 1rem;
+		margin: 0;
+		flex: none;
+		border: 1px solid var(--line-strong);
+		border-radius: 3px;
+		background-color: var(--bg);
+		cursor: pointer;
+	}
+	.reviewed-check:checked {
+		border-color: var(--accent);
+		background-color: var(--accent);
 	}
 
 	.note {

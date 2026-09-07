@@ -19,11 +19,13 @@ class TaskType(StrEnum):
     CALIBRE_SYNC = "calibre_sync"
     BOOK_INGEST = "book_ingest"
     RECIPE_ENRICHMENT_PILOT = "recipe_enrichment_pilot"
+    RECIPE_ENRICHMENT_BACKFILL = "recipe_enrichment_backfill"
 
 
 class TaskStatus(StrEnum):
     QUEUED = "queued"
     RUNNING = "running"
+    WAITING = "waiting"
     REVIEW = "review"
     DONE = "done"
     FAILED = "failed"
@@ -48,6 +50,23 @@ class RecipeEnrichmentStatus(StrEnum):
     RUNNING = "running"
     COMPLETE = "complete"
     FAILED = "failed"
+
+
+class EnrichmentBatchStatus(StrEnum):
+    PREPARING = "preparing"
+    SUBMITTED = "submitted"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+    APPLIED = "applied"
+
+
+class EnrichmentBatchItemStatus(StrEnum):
+    PENDING = "pending"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    STALE = "stale"
+    APPLIED = "applied"
 
 
 class RecipeFacetKind(StrEnum):
