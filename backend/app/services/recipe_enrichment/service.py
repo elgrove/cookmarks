@@ -25,7 +25,6 @@ from app.services.ai import (
     get_ai_provider,
     get_recipe_enrichment_providers,
 )
-from app.services.embeddings import embed_recipes
 from app.services.keywords import get_or_create_keyword
 from app.services.recipe_enrichment.schema import (
     PROMPT_VERSION,
@@ -527,13 +526,6 @@ def enrich_recipe(
             failed_state.completed_at = datetime.now(UTC)
         session.commit()
         raise
-    # Embedding intentionally follows the fact transaction: a failed embedding never
-    # turns an otherwise valid enrichment into a failed one.
-    try:
-        embed_recipes(session, [_recipe_with_facts(session, recipe_id)], base_provider)
-        session.commit()
-    except Exception:
-        logger.exception("Embedding refresh failed after enrichment for %s", recipe_id)
     return result, usage
 
 

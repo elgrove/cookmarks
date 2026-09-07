@@ -19,7 +19,7 @@ from app.models import Base
 from app.models.book import Book
 from app.models.enums import AIProvider as AIProviderEnum
 from app.models.enums import ExtractionMethod, TaskStatus, TaskType
-from app.models.recipe import Recipe
+from app.models.recipe import Keyword, Recipe
 from app.models.task_run import TaskRun
 from app.schemas.extraction import RecipeData, RecipeIngredientData
 from app.schemas.task_run import TaskRunRead
@@ -36,6 +36,7 @@ from app.services.extraction.graph import get_extraction_graph
 from app.services.extraction.state import ExtractionState
 from app.services.extraction.utils import deduplicate_recipes_by_title, find_decorative_images
 from app.tasks.extraction import (
+    _finalise_result,
     extract_recipes_from_book,
     extract_recipes_from_book_task,
     resume_extraction,
@@ -535,6 +536,54 @@ def test_save_reconciles_by_name_in_place(db: sessionmaker[Session]) -> None:
         assert recipes[0].description == "updated"
         assert recipes[0].order == 5
         assert recipes[0].keywords == []
+
+
+def test_finalisation_embeds_and_tags_only_after_enrichment(
+    db: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with db() as s:
+        book = _make_book(s)
+        run = _make_run(s, book)
+        run.status = TaskStatus.DONE
+        s.commit()
+        run_id = str(run.id)
+
+    calls: list[str] = []
+
+    def enrich(session: Session, run: TaskRun) -> dict:
+        recipe = session.scalars(select(Recipe).where(Recipe.extraction_run_id == run.id)).one()
+        recipe.keywords = [Keyword(name="Enriched")]
+        calls.append("enrich")
+        return {"enrichment": {"complete": 1}}
+
+    def embed(session: Session, recipes: list[Recipe]) -> None:
+        assert calls == ["enrich"]
+        assert [keyword.name for keyword in recipes[0].keywords] == ["Enriched"]
+        calls.append("embed")
+
+    def tag(session: Session, book: Book) -> None:
+        assert calls == ["enrich", "embed"]
+        calls.append("tag")
+
+    monkeypatch.setattr("app.tasks.extraction.enrich_extracted_recipes", enrich)
+    monkeypatch.setattr("app.tasks.extraction.generate_recipe_embeddings", embed)
+    monkeypatch.setattr("app.tasks.extraction._generate_book_keywords", tag)
+
+    message = _finalise_result(
+        run_id,
+        {
+            "raw_recipes": [
+                {
+                    "name": "Pasta",
+                    "recipeIngredients": [{"text": "pasta"}],
+                    "recipeInstructions": ["Cook."],
+                }
+            ]
+        },
+    )
+
+    assert message == "Extracted 1 recipes for Test Cookbook"
+    assert calls == ["enrich", "embed", "tag"]
 
 
 # --------------------------------------------------------------------------- #
