@@ -95,10 +95,13 @@ def _thread_id(run_id: str) -> str:
 
 
 def generate_recipe_embeddings(session: Session, recipes: list[Recipe]) -> None:
-    """Embed the just-saved recipes so they're semantically searchable. Best-effort:
-    a no-op when no embedding-capable provider is configured, so extraction always
-    completes. Writes ride the caller's transaction (committed by save_recipes...)."""
-    embed_recipes(session, recipes)
+    """Embed the enriched recipes in one batch. This is best-effort: a no-op when no
+    embedding-capable provider is configured, so extraction always completes. Writes
+    ride the caller's transaction."""
+    try:
+        embed_recipes(session, recipes)
+    except Exception:
+        logger.exception("Recipe embedding failed after extraction")
 
 
 def _generate_book_keywords(session: Session, book: Book) -> None:
@@ -193,8 +196,6 @@ def save_recipes_from_graph_state(
             continue
         saved.append(_upsert_recipe(session, book, run, recipe_data))
 
-    generate_recipe_embeddings(session, saved)
-    _generate_book_keywords(session, book)
     session.commit()
 
     logger.info(f"Saved {len(saved)} recipes for {book.title}")
@@ -322,6 +323,11 @@ def _finalise_result(run_id: str, result: dict | None) -> str:
             raw_recipes = (result or {}).get("raw_recipes", [])
             created = save_recipes_from_graph_state(session, book, run, raw_recipes)
             run.detail = {**run.detail, **enrich_extracted_recipes(session, run)}
+            recipes = list(
+                session.scalars(select(Recipe).where(Recipe.extraction_run_id == run.id))
+            )
+            generate_recipe_embeddings(session, recipes)
+            _generate_book_keywords(session, book)
             session.commit()
             logger.info(f"Finished extraction for {book.title}. Processed {created} recipes.")
             return f"Extracted {created} recipes for {book.title}"
