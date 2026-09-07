@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-import sqlite_vec
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event, select
 from sqlalchemy.orm import Session, sessionmaker
@@ -12,7 +11,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.api.deps import current_user
 from app.api.recipes import _clear_keyword_cache, _clear_search_order_cache
 from app.config import settings
-from app.db import get_session
+from app.db import configure_sqlite_connection, get_session
 from app.main import app
 from app.models import Base, Book, Keyword, Recipe, RecipeIngredient, User
 from app.services.auth import hash_password
@@ -232,10 +231,7 @@ def session(tmp_path: Path) -> Iterator[Session]:
 
     @event.listens_for(engine, "connect")
     def _configure(dbapi_conn: Any, _record: Any) -> None:
-        dbapi_conn.enable_load_extension(True)
-        sqlite_vec.load(dbapi_conn)
-        dbapi_conn.enable_load_extension(False)
-        dbapi_conn.execute("PRAGMA foreign_keys=ON")
+        configure_sqlite_connection(dbapi_conn, _record)
 
     Base.metadata.create_all(engine)
     factory = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)

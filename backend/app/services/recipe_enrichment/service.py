@@ -2,6 +2,7 @@
 
 import json
 import logging
+import threading
 import uuid
 from collections import Counter
 from datetime import UTC, datetime
@@ -37,12 +38,14 @@ from app.services.recipe_enrichment.schema import (
 )
 from app.services.recipe_facts import (
     accepted_cuisine_ids,
-    create_canonical_ingredient,
+    get_or_create_canonical_ingredient,
     upsert_facet_vocabulary,
 )
 from app.text import fold
 
 logger = logging.getLogger(__name__)
+
+_enrichment_write_lock = threading.RLock()
 
 
 class EnrichmentValidationError(ValueError):
@@ -318,7 +321,7 @@ def _apply_response(
         else:
             canonical = created.get(name_folded)
             if canonical is None:
-                canonical = create_canonical_ingredient(session, canonical_name)
+                canonical = get_or_create_canonical_ingredient(session, canonical_name)
                 created[name_folded] = canonical
                 canonical_by_name[name_folded] = canonical
 
@@ -377,28 +380,29 @@ def apply_enrichment(
     task_run_id: uuid.UUID | None = None,
 ) -> dict[str, int]:
     """Validate before mutation; a bad completion leaves old facts and keywords intact."""
-    recipe = _recipe_with_facts(session, recipe_id)
-    try:
-        with session.begin_nested():
-            result = _apply_response(
-                session,
-                recipe,
-                response,
-                provider=provider,
-                model=model,
-                task_run_id=task_run_id,
-            )
+    with _enrichment_write_lock:
+        recipe = _recipe_with_facts(session, recipe_id)
+        try:
+            with session.begin_nested():
+                result = _apply_response(
+                    session,
+                    recipe,
+                    response,
+                    provider=provider,
+                    model=model,
+                    task_run_id=task_run_id,
+                )
+                session.flush()
+            return result
+        except Exception as exc:
+            logger.info("Recipe enrichment rejected for %s: %s", recipe_id, exc)
+            state = _recipe_with_facts(session, recipe_id).enrichment_state
+            assert state is not None
+            state.status = RecipeEnrichmentStatus.FAILED
+            state.last_error = str(exc)[:1000]
+            state.completed_at = datetime.now(UTC)
             session.flush()
-        return result
-    except Exception as exc:
-        logger.info("Recipe enrichment rejected for %s: %s", recipe_id, exc)
-        state = _recipe_with_facts(session, recipe_id).enrichment_state
-        assert state is not None
-        state.status = RecipeEnrichmentStatus.FAILED
-        state.last_error = str(exc)[:1000]
-        state.completed_at = datetime.now(UTC)
-        session.flush()
-        raise
+            raise
 
 
 def _run_stage1(
@@ -431,26 +435,27 @@ def enrich_recipe(
     include_description: bool = True,
 ) -> tuple[dict[str, int], Usage]:
     """Execute two-stage enrichment and atomically persist the valid response."""
-    recipe = _recipe_with_facts(session, recipe_id)
-    state = recipe.enrichment_state
-    if state is not None and state.status is RecipeEnrichmentStatus.COMPLETE:
-        return {"skipped": 1}, Usage()
-    configured_stage1 = None
-    configured_stage2 = None
-    if stage1_provider is None or stage1_fallback_provider is None or stage2_provider is None:
-        configured_stage1, configured_stage2 = get_recipe_enrichment_providers(session)
-    base_provider = provider or stage1_provider or configured_stage1 or get_ai_provider(session)
-    if base_provider is None:
-        raise RuntimeError("No usable AI provider is configured")
-    stage1_provider = stage1_provider or configured_stage1 or base_provider
-    stage2_provider = stage2_provider or configured_stage2 or base_provider
-    stage1_fallback_provider = stage1_fallback_provider or configured_stage2 or base_provider
-    if state is None:
-        raise EnrichmentValidationError("recipe has no enrichment state")
-    ensure_source_fingerprint(recipe)
-    state.status = RecipeEnrichmentStatus.RUNNING
-    state.started_at = datetime.now(UTC)
-    session.commit()
+    with _enrichment_write_lock:
+        recipe = _recipe_with_facts(session, recipe_id)
+        state = recipe.enrichment_state
+        if state is not None and state.status is RecipeEnrichmentStatus.COMPLETE:
+            return {"skipped": 1}, Usage()
+        configured_stage1 = None
+        configured_stage2 = None
+        if stage1_provider is None or stage1_fallback_provider is None or stage2_provider is None:
+            configured_stage1, configured_stage2 = get_recipe_enrichment_providers(session)
+        base_provider = provider or stage1_provider or configured_stage1 or get_ai_provider(session)
+        if base_provider is None:
+            raise RuntimeError("No usable AI provider is configured")
+        stage1_provider = stage1_provider or configured_stage1 or base_provider
+        stage2_provider = stage2_provider or configured_stage2 or base_provider
+        stage1_fallback_provider = stage1_fallback_provider or configured_stage2 or base_provider
+        if state is None:
+            raise EnrichmentValidationError("recipe has no enrichment state")
+        ensure_source_fingerprint(recipe)
+        state.status = RecipeEnrichmentStatus.RUNNING
+        state.started_at = datetime.now(UTC)
+        session.commit()
     recipe = _recipe_with_facts(session, recipe_id)
     build_context(session, recipe)
     stage1_model = stage1_model or stage1_provider.model_for(ModelRole.RECIPE_INGREDIENTS)
@@ -461,6 +466,7 @@ def enrich_recipe(
     stage1_fallback_used = False
     try:
         stage1_context = build_stage1_context(recipe)
+        session.rollback()
         if not stage1_context["recipe"]["lines"]:
             stage1_response = Stage1Response(i=[])
             usage1 = Usage()
@@ -489,9 +495,11 @@ def enrich_recipe(
 
         stage1_names = [item.name for item in stage1_response.ingredients if item.name]
         unique_ingredients = deduplicate_ingredient_names(stage1_names)
+        recipe = _recipe_with_facts(session, recipe_id)
         stage2_context = build_stage2_context(
             session, recipe, unique_ingredients, include_description=include_description
         )
+        session.rollback()
         stage2_response, usage2 = stage2_provider.enrich_recipe_stage2(stage2_context, stage2_model)
 
         usage = usage1 + usage2
@@ -505,33 +513,37 @@ def enrich_recipe(
             if stage1_fallback_used
             else stage1_model
         )
-        result = apply_enrichment(
-            session,
-            recipe_id,
-            response,
-            provider=stage2_provider,
-            model=f"{applied_stage1_model} -> {stage2_model}",
-            task_run_id=task_run_id,
-        )
-        result["stage1_fallback_used"] = int(stage1_fallback_used)
-        completed_state = _recipe_with_facts(session, recipe_id).enrichment_state
-        assert completed_state is not None
-        completed_state.provider = f"{stage1_provider.name}->{stage2_provider.name}"
-        session.commit()
+        with _enrichment_write_lock:
+            result = apply_enrichment(
+                session,
+                recipe_id,
+                response,
+                provider=stage2_provider,
+                model=f"{applied_stage1_model} -> {stage2_model}",
+                task_run_id=task_run_id,
+            )
+            result["stage1_fallback_used"] = int(stage1_fallback_used)
+            completed_state = _recipe_with_facts(session, recipe_id).enrichment_state
+            assert completed_state is not None
+            completed_state.provider = f"{stage1_provider.name}->{stage2_provider.name}"
+            session.commit()
     except Exception as exc:
-        failed_recipe = _recipe_with_facts(session, recipe_id)
-        failed_state = failed_recipe.enrichment_state
-        if failed_state is not None and failed_state.status is RecipeEnrichmentStatus.RUNNING:
-            failed_state.status = RecipeEnrichmentStatus.FAILED
-            failed_state.last_error = str(exc)[:1000]
-            failed_state.completed_at = datetime.now(UTC)
-        session.commit()
+        with _enrichment_write_lock:
+            session.rollback()
+            failed_recipe = _recipe_with_facts(session, recipe_id)
+            failed_state = failed_recipe.enrichment_state
+            if failed_state is not None and failed_state.status is RecipeEnrichmentStatus.RUNNING:
+                failed_state.status = RecipeEnrichmentStatus.FAILED
+                failed_state.last_error = str(exc)[:1000]
+                failed_state.completed_at = datetime.now(UTC)
+            session.commit()
         raise
     # Embedding intentionally follows the fact transaction: a failed embedding never
     # turns an otherwise valid enrichment into a failed one.
     try:
-        embed_recipes(session, [_recipe_with_facts(session, recipe_id)], base_provider)
-        session.commit()
+        with _enrichment_write_lock:
+            embed_recipes(session, [_recipe_with_facts(session, recipe_id)], base_provider)
+            session.commit()
     except Exception:
         logger.exception("Embedding refresh failed after enrichment for %s", recipe_id)
     return result, usage

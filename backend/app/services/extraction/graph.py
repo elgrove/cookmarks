@@ -14,7 +14,7 @@ from langgraph.types import interrupt
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.db import SessionLocal
+from app.db import SessionLocal, configure_sqlite_connection
 from app.models.book import Book
 from app.models.enums import ExtractionMethod, TaskStatus
 from app.models.task_run import TaskRun
@@ -544,6 +544,7 @@ def get_extraction_graph():
     pointed at the application database. Cached so the connection and compiled graph
     are reused; importing this module does not touch the database."""
     conn = sqlite3.connect(str(settings.db_path), check_same_thread=False)
+    configure_sqlite_connection(conn)
     checkpointer = SqliteSaver(conn)
 
     workflow = StateGraph(ExtractionState)  # ty: ignore[invalid-argument-type]

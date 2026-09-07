@@ -1,4 +1,6 @@
 import io
+import threading
+import time
 import uuid
 import zipfile
 from collections.abc import Iterator
@@ -8,13 +10,13 @@ from typing import Any
 
 import pymupdf
 import pytest
-import sqlite_vec
 from langgraph.checkpoint.sqlite import SqliteSaver
 from PIL import Image
 from sqlalchemy import create_engine, event, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.config import settings as app_settings
+from app.db import configure_sqlite_connection
 from app.models import Base
 from app.models.book import Book
 from app.models.enums import AIProvider as AIProviderEnum
@@ -36,6 +38,7 @@ from app.services.extraction.graph import get_extraction_graph
 from app.services.extraction.state import ExtractionState
 from app.services.extraction.utils import deduplicate_recipes_by_title, find_decorative_images
 from app.tasks.extraction import (
+    enrich_extracted_recipes,
     extract_recipes_from_book,
     extract_recipes_from_book_task,
     resume_extraction,
@@ -55,10 +58,7 @@ def _make_engine(db_file: Path) -> Any:
 
     @event.listens_for(engine, "connect")
     def _configure(dbapi_conn: Any, _record: Any) -> None:
-        dbapi_conn.enable_load_extension(True)
-        sqlite_vec.load(dbapi_conn)
-        dbapi_conn.enable_load_extension(False)
-        dbapi_conn.execute("PRAGMA foreign_keys=ON")
+        configure_sqlite_connection(dbapi_conn, _record)
 
     Base.metadata.create_all(engine)
     return engine
@@ -796,3 +796,154 @@ def test_find_decorative_images_keeps_dish_photos(tmp_path: Path) -> None:
 
 def test_find_decorative_images_keeps_all_when_epub_unreadable(tmp_path: Path) -> None:
     assert find_decorative_images(tmp_path / "missing.epub", ["photo.jpg"]) == set()
+
+
+def test_enrich_extracted_recipes_empty_run(db: sessionmaker[Session]) -> None:
+    with db() as session:
+        book = _make_book(session)
+        run = TaskRun(
+            task_type=TaskType.EXTRACTION,
+            status=TaskStatus.RUNNING,
+            book_id=book.id,
+        )
+        session.add(run)
+        session.commit()
+
+        result = enrich_extracted_recipes(session, run)
+        assert result == {
+            "enrichment": {
+                "attempted": 0,
+                "complete": 0,
+                "failed": 0,
+                "stale_response": 0,
+            }
+        }
+
+
+def test_enrich_extracted_recipes_concurrent(
+    db: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    active_threads: set[int] = set()
+    max_active_threads = 0
+    lock = threading.Lock()
+
+    def mock_enrich_recipe(
+        session: Session,
+        recipe_id: uuid.UUID,
+        **kwargs: Any,
+    ) -> tuple[dict[str, int], Usage]:
+        nonlocal max_active_threads
+        thread_id = threading.get_ident()
+        with lock:
+            active_threads.add(thread_id)
+            if len(active_threads) > max_active_threads:
+                max_active_threads = len(active_threads)
+        time.sleep(0.05)
+        with lock:
+            active_threads.remove(thread_id)
+
+        return (
+            {"canonical_ingredients": 2, "key_ingredients": 1},
+            Usage(input_tokens=100, output_tokens=50, cost_usd=Decimal("0.002")),
+        )
+
+    monkeypatch.setattr("app.tasks.extraction.enrich_recipe", mock_enrich_recipe)
+
+    with db() as session:
+        book = _make_book(session)
+        run = TaskRun(
+            task_type=TaskType.EXTRACTION,
+            status=TaskStatus.RUNNING,
+            book_id=book.id,
+        )
+        session.add(run)
+        session.flush()
+
+        for i in range(4):
+            recipe = Recipe(
+                book_id=book.id,
+                extraction_run_id=run.id,
+                order=i,
+                name=f"Recipe {i}",
+                instructions=[],
+            )
+            session.add(recipe)
+        session.commit()
+
+        result = enrich_extracted_recipes(session, run)
+
+        assert max_active_threads > 1
+        enrichment_data = result["enrichment"]
+        assert enrichment_data["attempted"] == 4
+        assert enrichment_data["complete"] == 4
+        assert enrichment_data["failed"] == 0
+        assert enrichment_data["stale_response"] == 0
+        assert enrichment_data["canonical_ingredients"] == 8
+        assert enrichment_data["key_ingredients"] == 4
+
+        assert run.input_tokens == 400
+        assert run.output_tokens == 200
+        assert run.cost_usd == Decimal("0.008")
+
+
+def test_enrich_extracted_recipes_isolates_failures(
+    db: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls = 0
+    lock = threading.Lock()
+
+    def mock_enrich_recipe(
+        session: Session,
+        recipe_id: uuid.UUID,
+        **kwargs: Any,
+    ) -> tuple[dict[str, int], Usage]:
+        nonlocal calls
+        with lock:
+            calls += 1
+            current = calls
+
+        if current == 1:
+            raise RuntimeError("Generic enrichment crash")
+        elif current == 2:
+            raise ValueError("Stale source fingerprint detected")
+        else:
+            return (
+                {"canonical_ingredients": 1},
+                Usage(input_tokens=50, output_tokens=25, cost_usd=Decimal("0.001")),
+            )
+
+    monkeypatch.setattr("app.tasks.extraction.enrich_recipe", mock_enrich_recipe)
+
+    with db() as session:
+        book = _make_book(session)
+        run = TaskRun(
+            task_type=TaskType.EXTRACTION,
+            status=TaskStatus.RUNNING,
+            book_id=book.id,
+        )
+        session.add(run)
+        session.flush()
+
+        for i in range(3):
+            recipe = Recipe(
+                book_id=book.id,
+                extraction_run_id=run.id,
+                order=i,
+                name=f"Recipe {i}",
+                instructions=[],
+            )
+            session.add(recipe)
+        session.commit()
+
+        result = enrich_extracted_recipes(session, run)
+
+        enrichment_data = result["enrichment"]
+        assert enrichment_data["attempted"] == 3
+        assert enrichment_data["complete"] == 1
+        assert enrichment_data["failed"] == 2
+        assert enrichment_data["stale_response"] == 1
+        assert enrichment_data["canonical_ingredients"] == 1
+
+        assert run.input_tokens == 50
+        assert run.output_tokens == 25
+        assert run.cost_usd == Decimal("0.001")
