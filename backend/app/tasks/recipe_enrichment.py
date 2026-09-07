@@ -202,6 +202,7 @@ def run_recipe_enrichment_pilot(run_id: str) -> dict:
                     session.commit()
                 except Exception:
                     logger.exception("Recipe embedding failed after enrichment pilot")
+            pilot_version = _pilot_version_snapshot(session)
         statuses = Counter(item["status"] for item in outcomes)
         line_counts = Counter()
         fact_counts = {"cuisines": Counter(), "methods": Counter(), "courses": Counter()}
@@ -226,7 +227,7 @@ def run_recipe_enrichment_pilot(run_id: str) -> dict:
             "stale_response": statuses["stale"],
             # Version snapshot for MY-175 backfill gating: a backfill launches
             # only against a pilot run whose contract versions match its own.
-            **_pilot_version_snapshot(session),
+            **pilot_version,
             "outcomes": outcomes,
             "keyword_validation_failures": keyword_validation_failures,
             "cuisine_frequency": dict(fact_counts["cuisines"]),

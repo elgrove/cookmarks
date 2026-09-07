@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event, select
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.db import configure_sqlite_connection
 from app.models import Base, Book, Config, Recipe, TaskRun
 from app.models.enums import AIProvider, TaskStatus, TaskType
 from app.services.ai import Usage
@@ -105,10 +106,7 @@ def task_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[session
 
     @event.listens_for(engine, "connect")
     def _configure(dbapi_conn: Any, _record: Any) -> None:
-        dbapi_conn.enable_load_extension(True)
-        sqlite_vec.load(dbapi_conn)
-        dbapi_conn.enable_load_extension(False)
-        dbapi_conn.execute("PRAGMA foreign_keys=ON")
+        configure_sqlite_connection(dbapi_conn, _record)
 
     Base.metadata.create_all(engine)
     factory = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
