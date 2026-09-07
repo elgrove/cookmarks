@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-import sqlite_vec
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event, select
 from sqlalchemy.orm import Session, sessionmaker
