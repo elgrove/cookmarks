@@ -14,7 +14,9 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.models import Base, Book, Config, Recipe, TaskRun
 from app.models.enums import AIProvider, TaskStatus, TaskType
+from app.services.ai import Usage
 from app.tasks.book_keywords import backfill_book_keywords
+from app.tasks.recipe_enrichment import run_recipe_enrichment_pilot
 
 
 def _only_run(session: Session) -> TaskRun:
@@ -136,6 +138,45 @@ def _seed_book(factory: sessionmaker[Session], *, provider: AIProvider | None) -
         session.flush()
         session.add(Recipe(book_id=book.id, order=0, name="A Recipe"))
         session.commit()
+
+
+def test_enrichment_pilot_batch_embeds_completed_recipes(
+    task_db: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with task_db() as session:
+        book = Book(calibre_id=1, title="A Book", author="An Author", path="A/Book (1)")
+        session.add(book)
+        session.flush()
+        recipe = Recipe(book_id=book.id, order=0, name="A Recipe")
+        session.add(recipe)
+        session.flush()
+        run = TaskRun(
+            task_type=TaskType.RECIPE_ENRICHMENT_PILOT,
+            status=TaskStatus.QUEUED,
+            detail={"recipe_ids": [str(recipe.id)]},
+        )
+        session.add(run)
+        session.commit()
+        run_id = str(run.id)
+
+    def enrich(*_args: object, **_kwargs: object) -> tuple[dict[str, int], Usage]:
+        return {"canonical_ingredients": 0, "key_ingredients": 0}, Usage()
+
+    embedded: list[list[uuid.UUID]] = []
+
+    def embed(_session: Session, recipes: list[Recipe]) -> int:
+        embedded.append([recipe.id for recipe in recipes])
+        return len(recipes)
+
+    monkeypatch.setattr("app.tasks.recipe_enrichment.SessionLocal", task_db)
+    monkeypatch.setattr("app.tasks.runs.SessionLocal", task_db)
+    monkeypatch.setattr("app.tasks.recipe_enrichment.enrich_recipe", enrich)
+    monkeypatch.setattr("app.tasks.recipe_enrichment.embed_recipes", embed)
+
+    detail = run_recipe_enrichment_pilot(run_id)
+
+    assert detail["complete"] == 1
+    assert embedded == [[recipe.id]]
 
 
 def test_backfill_tags_untagged_books(task_db: sessionmaker[Session]) -> None:

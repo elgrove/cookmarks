@@ -1,5 +1,6 @@
 """The deliberately bounded, normal-API recipe enrichment pilot."""
 
+import logging
 import random
 import re
 import uuid
@@ -13,6 +14,7 @@ from app.db import SessionLocal
 from app.models.recipe import Recipe
 from app.models.task_run import TaskRun
 from app.services.ai import AIResponseError, Usage
+from app.services.embeddings import embed_recipes
 from app.services.recipe_enrichment.service import enrich_recipe
 from app.tasks.celery_app import celery_app
 from app.tasks.runs import complete_run, fail_run, start_run
@@ -25,6 +27,7 @@ _COMMON_FACT = re.compile(
     r"\b(bake|boil|braise|fry|grill|roast|simmer|steam|italian|indian|japanese|mexican)\b",
     re.IGNORECASE,
 )
+logger = logging.getLogger(__name__)
 
 
 def _recipe_rows(session) -> list[Recipe]:
@@ -98,6 +101,7 @@ def enqueue_recipe_enrichment_pilot(run_id: str) -> None:
 def run_recipe_enrichment_pilot(run_id: str) -> dict:
     start_run(run_id)
     outcomes: list[dict] = []
+    completed_recipe_ids: list[uuid.UUID] = []
     usage = Usage()
     try:
         with SessionLocal() as session:
@@ -122,6 +126,8 @@ def run_recipe_enrichment_pilot(run_id: str) -> dict:
                     usage += call_usage
                     session.refresh(recipe)
                     status = "skipped" if metrics.get("skipped") else "complete"
+                    if status == "complete":
+                        completed_recipe_ids.append(recipe_id)
                     outcomes.append(
                         {
                             "recipe_id": str(recipe_id),
@@ -154,6 +160,17 @@ def run_recipe_enrichment_pilot(run_id: str) -> dict:
                             "error": str(exc)[:500],
                         }
                     )
+            if completed_recipe_ids:
+                try:
+                    completed_recipes = list(
+                        session.scalars(
+                            select(Recipe).where(Recipe.id.in_(completed_recipe_ids))
+                        )
+                    )
+                    embed_recipes(session, completed_recipes)
+                    session.commit()
+                except Exception:
+                    logger.exception("Recipe embedding failed after enrichment pilot")
         statuses = Counter(item["status"] for item in outcomes)
         line_counts = Counter()
         fact_counts = {"cuisines": Counter(), "methods": Counter(), "courses": Counter()}

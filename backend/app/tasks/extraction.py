@@ -94,7 +94,10 @@ def generate_recipe_embeddings(session: Session, recipes: list[Recipe]) -> None:
     """Embed the enriched recipes in one batch. This is best-effort: a no-op when no
     embedding-capable provider is configured, so extraction always completes. Writes
     ride the caller's transaction."""
-    embed_recipes(session, recipes)
+    try:
+        embed_recipes(session, recipes)
+    except Exception:
+        logger.exception("Recipe embedding failed after extraction")
 
 
 def _generate_book_keywords(session: Session, book: Book) -> None:

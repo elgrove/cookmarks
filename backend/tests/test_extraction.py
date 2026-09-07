@@ -39,6 +39,7 @@ from app.tasks.extraction import (
     _finalise_result,
     extract_recipes_from_book,
     extract_recipes_from_book_task,
+    generate_recipe_embeddings,
     resume_extraction,
     resume_extraction_task,
     save_recipes_from_graph_state,
@@ -584,6 +585,23 @@ def test_finalisation_embeds_and_tags_only_after_enrichment(
 
     assert message == "Extracted 1 recipes for Test Cookbook"
     assert calls == ["enrich", "embed", "tag"]
+
+
+def test_embedding_failure_does_not_stop_extraction(
+    db: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with db() as session:
+        book = _make_book(session)
+        recipe = Recipe(book_id=book.id, name="Pasta", order=1)
+        session.add(recipe)
+        session.commit()
+
+    def fail(*_args: object) -> None:
+        raise RuntimeError("embedding provider unavailable")
+
+    monkeypatch.setattr("app.tasks.extraction.embed_recipes", fail)
+
+    generate_recipe_embeddings(session, [recipe])
 
 
 # --------------------------------------------------------------------------- #
