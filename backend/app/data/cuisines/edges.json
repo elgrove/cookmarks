@@ -424,6 +424,10 @@
     "Asia"
   ],
   [
+    "Australian",
+    "Oceania"
+  ],
+  [
     "Levantine",
     "West Asia"
   ],
@@ -760,16 +764,20 @@
     "Nordic"
   ],
   [
-    "English",
+    "British",
     "Europe"
+  ],
+  [
+    "English",
+    "British"
   ],
   [
     "Scottish",
-    "Europe"
+    "British"
   ],
   [
     "Welsh",
-    "Europe"
+    "British"
   ],
   [
     "Irish",
