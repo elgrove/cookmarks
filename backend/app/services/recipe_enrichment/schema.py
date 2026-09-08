@@ -5,7 +5,7 @@ import re
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 SCHEMA_VERSION = "v8"
-PROMPT_VERSION = "v26"
+PROMPT_VERSION = "v27"
 TAXONOMY_VERSION = "v1"
 
 _EN_GB_INGREDIENT_RULES: list[tuple[re.Pattern[str], str]] = [
@@ -17,10 +17,11 @@ _EN_GB_INGREDIENT_RULES: list[tuple[re.Pattern[str], str]] = [
 ]
 
 _EXCLUDED_SEASONING_PATTERN: re.Pattern[str] = re.compile(
-    r"^(?:(?:sea|kosher|table|flaked?|coarse|fine|maldon|rock|cooking|iodi[sz]ed)\s+)*salt$"
+    r"^(?:(?:sea|kosher|table|flaked?|coarse|fine|maldon|rock|cooking|iodi[sz]ed|himalayan|pink)\s+)*salt$"
+    r"|^fleur\s+de\s+sel$"
     r"|^(?:(?:ground|cracked|freshly ground|coarse|whole)\s+)*(?:black\s+|white\s+)?pepper(?:corn)?$"
-    r"|^(?:(?:sea|kosher|table|flaked?|coarse|fine|maldon|rock|cooking|iodi[sz]ed)\s+)*salt\s+and\s+(?:(?:ground|cracked|freshly ground|coarse|whole)\s+)*(?:black\s+|white\s+)?pepper(?:corn)?$"
-    r"|^(?:(?:ground|cracked|freshly ground|coarse|whole)\s+)*(?:black\s+|white\s+)?pepper(?:corn)?\s+and\s+(?:(?:sea|kosher|table|flaked?|coarse|fine|maldon|rock|cooking|iodi[sz]ed)\s+)*salt$",
+    r"|^(?:(?:sea|kosher|table|flaked?|coarse|fine|maldon|rock|cooking|iodi[sz]ed|himalayan|pink)\s+)*salt\s+and\s+(?:(?:ground|cracked|freshly ground|coarse|whole)\s+)*(?:black\s+|white\s+)?pepper(?:corn)?$"
+    r"|^(?:(?:ground|cracked|freshly ground|coarse|whole)\s+)*(?:black\s+|white\s+)?pepper(?:corn)?\s+and\s+(?:(?:sea|kosher|table|flaked?|coarse|fine|maldon|rock|cooking|iodi[sz]ed|himalayan|pink)\s+)*salt$",
     re.IGNORECASE,
 )
 
