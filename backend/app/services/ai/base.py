@@ -13,6 +13,7 @@ from pydantic import ValidationError
 from app.schemas.extraction import RecipeData
 from app.services.prompts import (
     BOOK_KEYWORDS_PROMPT,
+    DEDUPLICATE_INGREDIENTS_PROMPT,
     DEDUPLICATE_KEYWORDS_PROMPT,
     EXTRACT_RECIPES_PROMPT,
     IMAGE_MATCH_CHECK_PROMPT,
@@ -56,6 +57,7 @@ class ModelRole(Enum):
     BLOCKS_OF_FILES = "blocks_of_files"
     BOOK_KEYWORDS = "book_keywords"
     KEYWORD_DEDUP = "keyword_dedup"
+    INGREDIENT_DEDUP = "ingredient_dedup"
     ASSISTANT = "assistant"
     RECIPE_ENRICHMENT = "recipe_enrichment"
     RECIPE_INGREDIENTS = "recipe_ingredients"
@@ -360,5 +362,53 @@ class AIProvider(abc.ABC):
         if len(merges) < len(pairs):
             logger.debug(
                 f"Dropped {len(pairs) - len(merges)} dedup merge(s) keyed outside the candidates"
+            )
+        return merges, usage, truncated
+
+    def deduplicate_ingredients(
+        self, ingredients: list[str], candidates: list[str], model: str | None = None
+    ) -> tuple[dict[str, str], Usage, bool]:
+        """Propose canonical-ingredient merges over one rotating candidate window.
+
+        This has the same strict candidate validation and truncated-JSON recovery as
+        keyword deduplication. The service validates the returned names against the
+        live vocabulary and applies the resulting merge map in its transaction.
+        """
+        model = model or self.model_for(ModelRole.INGREDIENT_DEDUP)
+        prompt = DEDUPLICATE_INGREDIENTS_PROMPT.format(
+            ingredients=json.dumps(ingredients), candidates=json.dumps(candidates)
+        )
+        response, usage = self._complete(prompt, model, temp=0)
+
+        if not response:
+            return {}, usage, False
+
+        truncated = False
+        try:
+            raw = json.loads(_strip_json_fence(response))
+        except json.JSONDecodeError:
+            raw = _salvage_pairs(response)
+            truncated = bool(raw)
+            if raw:
+                logger.warning(f"Ingredient-dedup reply was cut off; salvaged {len(raw)} pair(s)")
+            else:
+                logger.error(
+                    f"Failed to decode ingredient-dedup JSON from AI response:\n{response}"
+                )
+
+        if not isinstance(raw, dict):
+            logger.warning(f"Ingredient-dedup response was not a JSON object: {raw!r}")
+            return {}, usage, truncated
+
+        allowed = set(candidates)
+        pairs = {
+            key: value
+            for key, value in raw.items()
+            if isinstance(key, str) and isinstance(value, str)
+        }
+        merges = {key: value for key, value in pairs.items() if key in allowed}
+        if len(merges) < len(pairs):
+            logger.debug(
+                f"Dropped {len(pairs) - len(merges)} ingredient-dedup merge(s) keyed outside the candidates"
             )
         return merges, usage, truncated

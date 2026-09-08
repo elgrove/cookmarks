@@ -25,6 +25,7 @@ export const taskTypeSchema = z.enum([
 	'extraction',
 	'book_keywords',
 	'keyword_dedup',
+	'ingredient_dedup',
 	'calibre_sync',
 	'book_ingest',
 	'recipe_enrichment_pilot',
@@ -83,6 +84,17 @@ export interface KeywordDedupDetail {
 	keywords_removed: number;
 	// The rotating candidate window and the two merge stages counted apart. Optional:
 	// older runs may omit them.
+	candidates?: number;
+	pre_merges?: number;
+	ai_merges?: number;
+	ai_truncated?: boolean;
+	cursor_from?: string | null;
+	cursor_to?: string | null;
+}
+export interface IngredientDedupDetail {
+	ingredients_in: number;
+	merges_applied: number;
+	ingredients_removed: number;
 	candidates?: number;
 	pre_merges?: number;
 	ai_merges?: number;

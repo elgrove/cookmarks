@@ -124,6 +124,37 @@ Return ONLY a valid JSON object. No other text.
 """
 
 
+DEDUPLICATE_INGREDIENTS_PROMPT = """You maintain the canonical ingredient vocabulary for a cookbook library. Each name represents an ingredient identity linked to recipe ingredient lines.
+
+Analyse the candidate ingredient names and return only merges that are genuinely the same ingredient. Return a JSON object where every key is a duplicate candidate and every value is the canonical ingredient name to keep.
+
+Rules:
+- Prefer British English: "spring onion", not "scallion"; "coriander", not "cilantro"; "aubergine", not "eggplant".
+- Merge redundant narrow descriptors on staple ingredients when they do not change the ingredient, for example "Chinese wheat flour noodle" into "wheat flour noodle".
+- Preserve real culinary distinctions. Do not merge "chicken stock" into "chicken", "extra virgin olive oil" into "olive oil", or distinct types of flour, noodles, cheese, cuts, herbs, spices, oils, stocks, sauces, or preserved ingredients.
+- Do not merge an ingredient into a broader category merely because it is related.
+- Use a name from the whole vocabulary as every value. Do not invent names.
+
+Good merges:
+- "scallion" -> "spring onion"
+- "caster sugar" -> "superfine sugar"
+- "Chinese wheat flour noodle" -> "wheat flour noodle"
+
+Bad merges:
+- "chicken stock" -> "chicken"
+- "extra virgin olive oil" -> "olive oil"
+- "self-raising flour" -> "plain flour"
+
+Whole ingredient vocabulary. Values may use any item here:
+{ingredients}
+
+Candidate ingredients. Propose merges ONLY for these keys:
+{candidates}
+
+Return ONLY a valid JSON object. No other text.
+"""
+
+
 ASSISTANT_SYSTEM_PROMPT = """You are the Cookmarks assistant, working inside a private, self-hosted app that holds the recipes extracted from a library of cookbooks (hundreds of books and tens of thousands of recipes).
 
 What you help with:

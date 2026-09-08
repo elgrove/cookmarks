@@ -16,6 +16,7 @@ class TaskType(StrEnum):
     EXTRACTION = "extraction"
     BOOK_KEYWORDS = "book_keywords"
     KEYWORD_DEDUP = "keyword_dedup"
+    INGREDIENT_DEDUP = "ingredient_dedup"
     CALIBRE_SYNC = "calibre_sync"
     BOOK_INGEST = "book_ingest"
     RECIPE_ENRICHMENT_PILOT = "recipe_enrichment_pilot"

@@ -172,6 +172,30 @@ const unit: VerifiableUnit<Props> = {
 			}
 		},
 		{
+			id: 'ingredient-dedup',
+			description:
+				'a canonical-ingredient dedup run reports merge counts and its rotating candidate window',
+			props: {
+				run: maintenance({
+					id: 'm6',
+					task_type: 'ingredient_dedup',
+					cost_usd: '0.0042',
+					input_tokens: 1450,
+					output_tokens: 220,
+					detail: {
+						ingredients_in: 24,
+						candidates: 24,
+						merges_applied: 3,
+						pre_merges: 1,
+						ai_merges: 2,
+						ingredients_removed: 3,
+						cursor_from: null,
+						cursor_to: 'Wheat flour noodle'
+					}
+				})
+			}
+		},
+		{
 			id: 'calibre-sync',
 			description: 'a Calibre sync shows created / updated / orphaned / deleted / excluded counts',
 			props: {
@@ -371,6 +395,22 @@ const unit: VerifiableUnit<Props> = {
 				const candidates = value('Candidates');
 				if (Number.isNaN(ai) || Number.isNaN(candidates)) return 'split rows unreadable';
 				return ai <= candidates || `${ai} AI merges over ${candidates} candidates`;
+			}
+		},
+		{
+			id: 'ingredient-dedup-rows',
+			description: 'an ingredient dedup run identifies its vocabulary and merge metrics',
+			onlyFixtures: ['ingredient-dedup'],
+			check: ({ contract, root }) => {
+				if (contract['task-type'] !== 'ingredient_dedup')
+					return `task-type=${contract['task-type']}`;
+				const text = root.textContent ?? '';
+				return (
+					(text.includes('Ingredients analysed') &&
+						text.includes('Ingredients removed') &&
+						text.includes('Canonical ingredient dedup')) ||
+					'ingredient dedup rows missing'
+				);
 			}
 		},
 		{

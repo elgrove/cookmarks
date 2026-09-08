@@ -6,6 +6,7 @@ from sqlalchemy import func, select
 from app.db import SessionDep
 from app.models.book import Book
 from app.models.enums import TaskStatus, TaskType
+from app.models.ingredient import CanonicalIngredient
 from app.models.recipe import Keyword
 from app.models.task_run import TaskRun
 from app.schemas.tasks import (
@@ -25,6 +26,7 @@ from app.services.recipe_enrichment.schema import (
 from app.tasks.book_keywords import enqueue_backfill_book_keywords
 from app.tasks.calibre_sync import enqueue_calibre_sync
 from app.tasks.enrichment_backfill import enqueue_enrichment_backfill, select_backfill_recipe_ids
+from app.tasks.ingredient_dedup import enqueue_dedup_ingredients
 from app.tasks.keyword_dedup import enqueue_dedup_keywords
 from app.tasks.recipe_enrichment import choose_pilot_sample, enqueue_recipe_enrichment_pilot
 from app.tasks.runs import create_task_run
@@ -65,6 +67,19 @@ def trigger_dedup_keywords(session: SessionDep) -> TaskRunAck:
     run = create_task_run(session, TaskType.KEYWORD_DEDUP)
     enqueue_dedup_keywords(str(run.id))
     return TaskRunAck(task="keyword_dedup", status="queued", queued=vocabulary)
+
+
+@router.post(
+    "/dedup-ingredients",
+    response_model=TaskRunAck,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+def trigger_dedup_ingredients(session: SessionDep) -> TaskRunAck:
+    """Queue an AI-assisted merge of near-duplicate canonical ingredients."""
+    vocabulary = session.scalar(select(func.count()).select_from(CanonicalIngredient)) or 0
+    run = create_task_run(session, TaskType.INGREDIENT_DEDUP)
+    enqueue_dedup_ingredients(str(run.id))
+    return TaskRunAck(task="ingredient_dedup", status="queued", queued=vocabulary)
 
 
 @router.post(

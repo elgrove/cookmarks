@@ -11,6 +11,7 @@
 	import {
 		triggerBookKeywords,
 		triggerDedupKeywords,
+		triggerDedupIngredients,
 		triggerCalibreSync,
 		triggerRecipeEnrichmentPilot,
 		triggerRecipeEnrichmentBackfill,
@@ -165,6 +166,7 @@
 		<TasksPanel
 			onRun={({ regenerate }) => triggerBookKeywords(regenerate)}
 			onDedup={() => triggerDedupKeywords()}
+			onDedupIngredients={() => triggerDedupIngredients()}
 			onSync={() => triggerCalibreSync()}
 			onEnrichmentPilot={() => triggerRecipeEnrichmentPilot()}
 			onBackfill={({ pilotRunId, confirm }) =>

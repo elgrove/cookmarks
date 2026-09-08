@@ -37,6 +37,14 @@ export async function triggerDedupKeywords(fetchFn: typeof fetch = fetch): Promi
 	return taskRunAckSchema.parse(await res.json());
 }
 
+/** Queue an AI-assisted merge of canonical ingredient variants. The worker repoints
+ * recipe ingredient facts before removing duplicates; `queued` is the vocabulary size. */
+export async function triggerDedupIngredients(fetchFn: typeof fetch = fetch): Promise<TaskRunAck> {
+	const res = await fetchFn('/api/tasks/dedup-ingredients', { method: 'POST' });
+	if (!res.ok) throw new Error(`POST /api/tasks/dedup-ingredients → ${res.status}`);
+	return taskRunAckSchema.parse(await res.json());
+}
+
 /** Queue a sync of the Calibre library into the v2 DB, upserting books by calibre_id.
  *  Fire-and-forget: the sync runs on the background worker and its result lands on the
  *  task run. `queued` is 0 (the book count isn't known until the worker reads the

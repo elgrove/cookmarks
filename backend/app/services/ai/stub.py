@@ -6,6 +6,7 @@ from typing import ClassVar
 from app.services.ai.base import AIProvider, EmbedTask, ModelRole, Usage
 from app.services.prompts import (
     BOOK_KEYWORDS_PROMPT,
+    DEDUPLICATE_INGREDIENTS_PROMPT,
     DEDUPLICATE_KEYWORDS_PROMPT,
     IMAGE_MATCH_CHECK_PROMPT,
 )
@@ -43,6 +44,7 @@ class StubProvider(AIProvider):
         ModelRole.BLOCKS_OF_FILES: "stub-extract",
         ModelRole.BOOK_KEYWORDS: "stub-keywords",
         ModelRole.KEYWORD_DEDUP: "stub-dedup",
+        ModelRole.INGREDIENT_DEDUP: "stub-ingredient-dedup",
         ModelRole.ASSISTANT: "stub-assistant",
         ModelRole.RECIPE_ENRICHMENT: "stub-enrichment",
         ModelRole.RECIPE_INGREDIENTS: "stub-ingredients",
@@ -65,6 +67,10 @@ class StubProvider(AIProvider):
             # Echo each keyword as its own canonical form: no merging.
             keywords = json.loads(prompt[prompt.rfind("[") : prompt.rfind("]") + 1])
             return json.dumps({k: k for k in keywords}), usage
+
+        if prompt.startswith(DEDUPLICATE_INGREDIENTS_PROMPT[:40]):
+            ingredients = json.loads(prompt[prompt.rfind("[") : prompt.rfind("]") + 1])
+            return json.dumps({ingredient: ingredient for ingredient in ingredients}), usage
 
         if prompt.startswith(BOOK_KEYWORDS_PROMPT[:40]):
             # Deterministic book tags that vary per book, so distinct books get
@@ -101,7 +107,9 @@ class StubProvider(AIProvider):
             token = recipe["id"].split("-")[0]
             lines = recipe.get("lines", [])
             for index, line in enumerate(lines, start=1):
-                ingredients.append({"id": line["id"], "n": f"Stub Ingredient {token} {index}", "k": index == 1})
+                ingredients.append(
+                    {"id": line["id"], "n": f"Stub Ingredient {token} {index}", "k": index == 1}
+                )
             return json.dumps(
                 {
                     "i": ingredients,

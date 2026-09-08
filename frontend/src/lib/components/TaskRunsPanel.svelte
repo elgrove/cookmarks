@@ -5,6 +5,7 @@
 		ExtractionDetail,
 		BookKeywordsDetail,
 		KeywordDedupDetail,
+		IngredientDedupDetail,
 		CalibreSyncDetail,
 		BookIngestDetail,
 		RecipeEnrichmentPilotDetail,
@@ -24,6 +25,7 @@
 		{ id: 'extraction', label: 'Extraction' },
 		{ id: 'book_keywords', label: 'Keywords' },
 		{ id: 'keyword_dedup', label: 'Dedup' },
+		{ id: 'ingredient_dedup', label: 'Ingredients' },
 		{ id: 'calibre_sync', label: 'Calibre' },
 		{ id: 'book_ingest', label: 'Added books' },
 		{ id: 'recipe_enrichment_pilot', label: 'Enrichment pilot' },
@@ -34,6 +36,7 @@
 		extraction: 'Extraction',
 		book_keywords: 'Book keywords',
 		keyword_dedup: 'Keyword dedup',
+		ingredient_dedup: 'Ingredient dedup',
 		calibre_sync: 'Calibre sync',
 		book_ingest: 'Add book',
 		recipe_enrichment_pilot: 'Enrichment pilot',
@@ -64,6 +67,8 @@
 				return `${(run.detail as unknown as BookKeywordsDetail).books_tagged ?? 0} tagged`;
 			case 'keyword_dedup':
 				return plural((run.detail as unknown as KeywordDedupDetail).merges_applied ?? 0, 'merge');
+			case 'ingredient_dedup':
+				return plural((run.detail as unknown as IngredientDedupDetail).merges_applied ?? 0, 'merge');
 			case 'calibre_sync': {
 				const d = run.detail as unknown as CalibreSyncDetail;
 				return `${d.created?.length ?? 0} new · ${d.updated?.length ?? 0} updated`;

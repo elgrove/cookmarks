@@ -112,6 +112,20 @@ const unit: VerifiableUnit<Props> = {
 			act: ({ click }) => click('[data-filter="extraction"]')
 		},
 		{
+			id: 'filter-ingredient-dedup',
+			description: 'the ingredient filter shows canonical ingredient dedup runs and their summary',
+			props: {
+				runs: [
+					maintenance({
+						id: 'ingredient',
+						task_type: 'ingredient_dedup',
+						detail: { ingredients_in: 20, merges_applied: 3, ingredients_removed: 3 }
+					})
+				]
+			},
+			act: ({ click }) => click('[data-filter="ingredient_dedup"]')
+		},
+		{
 			id: 'many',
 			description: 'probe: many runs of every type and status with overlong titles all render',
 			probe: true,
@@ -190,6 +204,21 @@ const unit: VerifiableUnit<Props> = {
 				);
 				if (!allExtraction) return 'non-extraction row leaked through the filter';
 				return contract.selected === 'a' || `selected=${contract.selected}`;
+			}
+		},
+		{
+			id: 'ingredient-filter-narrows',
+			description: 'the ingredient filter preserves the ingredient dedup run and its merge summary',
+			onlyFixtures: ['filter-ingredient-dedup'],
+			check: ({ contract, root }) => {
+				if (contract.filter !== 'ingredient_dedup') return `filter=${contract.filter}`;
+				if (contract.count !== '1' || contract.selected !== 'ingredient')
+					return `count=${contract.count} selected=${contract.selected}`;
+				const row = root.querySelector('.run-row');
+				return (
+					row?.getAttribute('data-task-type') === 'ingredient_dedup' &&
+					(row.textContent ?? '').includes('3 merges')
+				) || 'ingredient dedup summary missing';
 			}
 		},
 		{

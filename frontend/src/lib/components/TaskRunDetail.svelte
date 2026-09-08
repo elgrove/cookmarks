@@ -5,6 +5,7 @@
 		ExtractionDetail,
 		BookKeywordsDetail,
 		KeywordDedupDetail,
+		IngredientDedupDetail,
 		CalibreSyncDetail,
 		BookIngestDetail,
 		RecipeEnrichmentPilotDetail,
@@ -32,6 +33,7 @@
 		extraction: 'Extraction',
 		book_keywords: 'Book keywords',
 		keyword_dedup: 'Keyword dedup',
+		ingredient_dedup: 'Ingredient dedup',
 		calibre_sync: 'Calibre sync',
 		book_ingest: 'Add book',
 		recipe_enrichment_pilot: 'Enrichment pilot',
@@ -40,6 +42,7 @@
 	const TYPE_TITLES: Record<Exclude<TaskType, 'extraction'>, string> = {
 		book_keywords: 'Book-keyword tagging',
 		keyword_dedup: 'Keyword vocabulary dedup',
+		ingredient_dedup: 'Canonical ingredient dedup',
 		calibre_sync: 'Calibre library sync',
 		book_ingest: 'Book added to the library',
 		recipe_enrichment_pilot: 'Recipe enrichment pilot',
@@ -142,6 +145,22 @@
 				if (d.ai_truncated) rows.push({ label: 'AI reply', value: 'Truncated — salvaged' });
 				return rows;
 			}
+			case 'ingredient_dedup': {
+				const d = run.detail as unknown as IngredientDedupDetail;
+				const rows: Row[] = [
+					{ label: 'Ingredients analysed', value: count(d.ingredients_in) },
+					{ label: 'Candidates', value: count(d.candidates) },
+					{ label: 'Merges applied', value: count(d.merges_applied) },
+					{ label: 'Deterministic merges', value: count(d.pre_merges) },
+					{ label: 'AI merges', value: count(d.ai_merges) },
+					{ label: 'Ingredients removed', value: count(d.ingredients_removed) },
+					{ label: 'Swept to', value: d.cursor_to || '—', wrap: true },
+					{ label: 'Cost', value: formatCost(run.cost_usd) },
+					{ label: 'Tokens', value: formatTokens(run.input_tokens, run.output_tokens) }
+				];
+				if (d.ai_truncated) rows.push({ label: 'AI reply', value: 'Truncated — salvaged' });
+				return rows;
+			}
 			case 'calibre_sync': {
 				const d = run.detail as unknown as CalibreSyncDetail;
 				return [
@@ -229,8 +248,10 @@
 	data-verify-task-type={run ? run.task_type : 'none'}
 	data-verify-status={run ? run.status : 'none'}
 	data-verify-error-count={run ? run.errors.length : 0}
-	data-verify-ai-truncated={run?.task_type === 'keyword_dedup' &&
-	(run.detail as unknown as KeywordDedupDetail).ai_truncated
+	data-verify-ai-truncated={(run?.task_type === 'keyword_dedup' &&
+		(run.detail as unknown as KeywordDedupDetail).ai_truncated) ||
+		(run?.task_type === 'ingredient_dedup' &&
+			(run.detail as unknown as IngredientDedupDetail).ai_truncated)
 		? 'true'
 		: 'false'}
 >
