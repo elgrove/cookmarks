@@ -215,10 +215,20 @@ def test_stage1_normalizer_excludes_salt_and_pepper() -> None:
     assert Stage1LineDecision(id="07", n="freshly ground black pepper").name is None
     assert Stage1LineDecision(id="08", n="peppercorn").name is None
     assert Stage1LineDecision(id="09", n="salt and black pepper").name is None
-    assert Stage1LineDecision(id="10", n="Sichuan pepper").name == "Sichuan pepper"
-    assert Stage1LineDecision(id="11", n="bell pepper").name == "bell pepper"
-    assert Stage1LineDecision(id="12", n="chilli").name == "chilli"
-    assert Stage1LineDecision(id="13", n="cayenne pepper").name == "cayenne pepper"
+    assert Stage1LineDecision(id="10", n="Maldon salt").name is None
+    assert Stage1LineDecision(id="11", n="Himalayan pink salt").name is None
+    assert Stage1LineDecision(id="12", n="pink Himalayan salt").name is None
+    assert Stage1LineDecision(id="13", n="Himalayan rock salt").name is None
+    assert Stage1LineDecision(id="14", n="pink salt").name is None
+    assert Stage1LineDecision(id="15", n="fleur de sel").name is None
+    assert Stage1LineDecision(id="16", n="Sichuan pepper").name == "Sichuan pepper"
+    assert Stage1LineDecision(id="17", n="bell pepper").name == "bell pepper"
+    assert Stage1LineDecision(id="18", n="chilli").name == "chilli"
+    assert Stage1LineDecision(id="19", n="cayenne pepper").name == "cayenne pepper"
+    assert Stage1LineDecision(id="20", n="kala namak").name == "kala namak"
+    assert Stage1LineDecision(id="21", n="black salt").name == "black salt"
+    assert Stage1LineDecision(id="22", n="smoked salt").name == "smoked salt"
+    assert Stage1LineDecision(id="23", n="celery salt").name == "celery salt"
 
 
 def test_stage1_schema_rejects_key_ingredient_decisions() -> None:
