@@ -526,3 +526,65 @@ def test_repeated_new_canonical_ingredient_resolves_to_one_identity(session) -> 
     ingredients = session.query(CanonicalIngredient).filter_by(name_folded="seaweed").all()
     assert len(ingredients) == 1
     assert recipe1.ingredients[0].canonical_ingredient_id == recipe2.ingredients[0].canonical_ingredient_id
+
+
+def test_unknown_and_duplicate_cuisines_are_filtered_and_deduplicated(session) -> None:
+    recipe = _recipe(session)
+    response = _response(cuisines=["chinese", "shanghai", "chinese", "nonexistent-cuisine"])
+
+    apply_enrichment(session, recipe.id, response, provider=StubProvider(""), model="stub")
+    session.commit()
+    session.refresh(recipe)
+
+    assert recipe.enrichment_state is not None
+    assert recipe.enrichment_state.status is RecipeEnrichmentStatus.COMPLETE
+    assert [c.cuisine_id for c in recipe.cuisines] == ["chinese"]
+
+
+def test_all_unknown_cuisines_results_in_empty_cuisines(session) -> None:
+    recipe = _recipe(session)
+    response = _response(cuisines=["shanghai", "unknown-region"])
+
+    apply_enrichment(session, recipe.id, response, provider=StubProvider(""), model="stub")
+    session.commit()
+    session.refresh(recipe)
+
+    assert recipe.enrichment_state is not None
+    assert recipe.enrichment_state.status is RecipeEnrichmentStatus.COMPLETE
+    assert recipe.cuisines == []
+
+
+def test_unknown_and_duplicate_methods_and_courses_are_filtered_and_deduplicated(session) -> None:
+    recipe = _recipe(session)
+    response = _response(
+        methods=[
+            {"value_id": "bake", "is_primary": True},
+            {"value_id": "unknown-method", "is_primary": True},
+            {"value_id": "bake", "is_primary": False},
+            {"value_id": "fry", "is_primary": True},
+        ],
+        courses=["main", "unknown-course", "main", "dessert"],
+    )
+
+    apply_enrichment(session, recipe.id, response, provider=StubProvider(""), model="stub")
+    session.commit()
+    session.refresh(recipe)
+
+    assert recipe.enrichment_state is not None
+    assert recipe.enrichment_state.status is RecipeEnrichmentStatus.COMPLETE
+
+    method_facets = [
+        (f.facet_value.value_id, f.is_primary)
+        for f in recipe.facets
+        if f.facet_value.kind.value == "method"
+    ]
+    # bake is primary; duplicate bake dropped; unknown-method dropped; fry is secondary
+    assert method_facets == [("bake", True), ("fry", False)]
+
+    course_facets = [
+        f.facet_value.value_id
+        for f in recipe.facets
+        if f.facet_value.kind.value == "course"
+    ]
+    assert course_facets == ["main", "dessert"]
+

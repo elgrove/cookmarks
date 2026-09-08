@@ -54,11 +54,14 @@ Key ingredients (k):
 Cuisines (c):
 - Select zero or more matching IDs strictly from the supplied `cuisines` list.
 - Every selected cuisine MUST be an exact string from the supplied `cuisines` list (e.g. `afghan`, not `afghanistan`). Any value not in the list is invalid.
+- NEVER invent or select a region, province, or city name (such as `shanghai`, `sichuan`, or `cantonese`) that is not present in the supplied `cuisines` list.
+- Do not repeat cuisine IDs.
 - Select a cuisine ID only when the dish is explicitly named for, or unmistakably from, that culinary tradition.
 - General Western home baking (such as plain cakes, cookies, quick breads) without specific national tradition should have NO cuisine (c: []).
 
 Methods (m):
 - Select zero or more matching IDs strictly from the supplied `methods` list.
+- Do not repeat method IDs.
 - Select a method only for a central, intentional cooking technique that defines the prepared dish (e.g. bake, grill, simmer, fry, roast, stir-fry).
 - Teriyaki and cooking fish, meat, or vegetables in oil in a skillet or pan on the stovetop is `fry` (pan-fry), NOT `sear`. Do NOT select `sear` for pan-fried fish or meat.
 - For soups, stews, curries, and braises where a sauce, broth, or dish cooks gently on the stove, the primary method is `simmer` (not `boil` or `fry`).
@@ -71,6 +74,7 @@ Methods (m):
 
 Courses (o):
 - Select zero or more matching IDs strictly from the supplied `courses` list (breakfast, brunch, starter, main, side, dessert, snack, drink, component).
+- Do not repeat course IDs.
 - Select only the primary intended role for the dish. Do not add `side` to an unambiguous main dish.
 
 Residual Keywords (w):
