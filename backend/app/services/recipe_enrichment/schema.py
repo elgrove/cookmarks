@@ -5,7 +5,7 @@ import re
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 SCHEMA_VERSION = "v8"
-PROMPT_VERSION = "v23"
+PROMPT_VERSION = "v24"
 TAXONOMY_VERSION = "v1"
 
 _EN_GB_INGREDIENT_RULES: list[tuple[re.Pattern[str], str]] = [

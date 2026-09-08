@@ -200,6 +200,7 @@ def test_stage1_prompt_requires_singular_uk_english() -> None:
 
     assert "Singular UK-English canonical food name" in prompt
     assert "chilli" in prompt
+    assert "Strip redundant nationality and regional prefixes" in prompt
     assert "Do not decide which ingredients are key" in prompt
 
 

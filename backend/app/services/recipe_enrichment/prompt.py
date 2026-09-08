@@ -5,7 +5,7 @@ import json
 from app.services.recipe_enrichment.schema import PROMPT_VERSION
 
 _INSTRUCTIONS = """You enrich one extracted recipe. Return only the JSON response.
-For each line in the input, return an entry in i with the line id, singular UK-English canonical food name (n or null), and key ingredient flag (k).
+For each line in the input, return an entry in i with the line id, singular UK-English canonical food name (n or null), and key ingredient flag (k). Strip redundant nationality prefixes from common staples (write `wheat flour noodle` never `Chinese wheat flour noodle`).
 Mark k true for one to three core ingredients that define the identity of the dish (such as the main protein, star vegetable, or signature flavour). Mark false for secondary, supporting, or seasoning ingredients.
 If a line is a section heading, note, or contains no food ingredient, return null for n and false for k.
 Always take the first ingredient when alternatives are listed.
@@ -29,6 +29,10 @@ For n:
   * Use strictly British English (en-GB) vocabulary and spelling: write `chilli` never `chile` or `chili`, `coriander` never `cilantro`, `aubergine` never `eggplant`, `courgette` never `zucchini`, `spring onion` never `scallion` or `green onion`.
   * ALWAYS use strictly singular forms: write `egg` not `eggs`, `spring onion` not `spring onions`, `noodle` not `noodles`, `tomato` not `tomatoes`.
   * Exclude size adjectives (`large`, `small`, `medium`) and preparation/state adjectives (`roasted`, `baked`, `toasted`, `ground`, `steamed`, `peeled`, `crushed`, `chopped`, `diced`).
+  * Strip redundant nationality and regional prefixes from common staples when they denote origin rather than a fundamentally distinct food item:
+    - Write `wheat flour noodle` (never `Chinese wheat flour noodle` or `Japanese wheat flour noodle`), `egg noodle` (not `Chinese egg noodle`), `rice vermicelli` (not `Chinese rice vermicelli`), `plum tomato` (not `Italian plum tomato`), `dark soy sauce` (not `Chinese dark soy sauce`), `white rice` (not `Chinese white rice`).
+    - If a staple has a recognised specific variety name, use the variety name without the nationality prefix: write `udon noodle` (not `Japanese udon noodle`), `soba noodle` (not `Japanese soba noodle`), `basmati rice` (not `Indian basmati rice`).
+    - KEEP regional or nationality prefixes ONLY when they designate a protected origin, a distinct regional specialty, or a culinarily distinct variety with no generic equivalent: `Shaoxing wine` (or `Shaoxing rice wine`), `Dijon mustard`, `English mustard`, `Parmesan`, `Kalamata olive`, `Chinese five-spice`, `Chinese chive`, `Chinese cabbage`.
   * Preserve culinary specificity. Do not strip distinct varieties, products, or compound foods into generic parents: keep `plain flour` (not `flour`), `cheddar cheese` (not `cheese`), `madras curry powder` (not `curry powder`), `chicken stock` / `beef stock` (not `stock`), `mung bean sprout` (not `bean sprout`), `preserved sweet radish` (not `radish`), `vegetable oil` (not `oil`), `red pickled ginger` (not `ginger`), `red pepper` (not `pepper`).
   * Exclude units of measurement: `clove` is a unit of measurement, so extract `garlic` (never `garlic clove`).
 
