@@ -74,7 +74,7 @@ class GeminiBatchClient:
         """Create one remote job for an uploaded input file."""
         job = self._client.batches.create(
             model=model,
-            src={"file_name": input_file_id, "format": "jsonl"},
+            src={"file_name": input_file_id},
             config={"display_name": display_name},
         )
         return self._wrap(job)
