@@ -2,6 +2,7 @@
 
 import json
 import logging
+import re
 import threading
 import uuid
 from collections import Counter
@@ -45,6 +46,11 @@ from app.text import fold
 logger = logging.getLogger(__name__)
 
 _enrichment_write_lock = threading.RLock()
+_KEYWORD_WORD = re.compile(r"[^\W\d_]+(?:['\u2019][^\W\d_]+)?", re.UNICODE)
+_KEYWORD_INVALID_CHARACTERS = re.compile(r"[^\w\s'\u2019\-]", re.UNICODE)
+_KEYWORD_FORMAT = re.compile(
+    r"[^\W\d_]+(?:[ '\-][^\W\d_]+(?:['\u2019][^\W\d_]+)?)*", re.UNICODE
+)
 
 
 class EnrichmentValidationError(ValueError):
@@ -215,11 +221,18 @@ def validate_stage1_response(context: dict, response: Stage1Response) -> None:
         raise EnrichmentValidationError("Stage 1 extracted no ingredient decisions from recipe")
 
 
-def _validate_keyword(value: str) -> str:
-    name = value.strip()
-    if not name or name != name.title():
-        raise EnrichmentValidationError(f"keyword is not Title Case: {value!r}")
-    return name
+def _validate_keyword(value: str) -> str | None:
+    """Return a display-safe residual keyword, or discard provider noise."""
+    name = _KEYWORD_INVALID_CHARACTERS.sub("", value.strip())
+    name = " ".join(name.split())
+    if not name or not _KEYWORD_FORMAT.fullmatch(name):
+        return None
+    return _KEYWORD_WORD.sub(lambda match: match.group(0).capitalize(), name)
+
+
+def _keyword_fold(value: str) -> str:
+    """Fold residual keyword text and make word separators equivalent."""
+    return " ".join(fold(value).replace("-", " ").split())
 
 
 def _validate_response(
@@ -241,9 +254,11 @@ def _validate_response(
         raise EnrichmentValidationError("response must contain at least one key ingredient")
 
     names = [item.name for item in canonical_items if item.name]
-    folded_names = [fold(name) for name in names]
+    folded_names = [_keyword_fold(name) for name in names]
 
-    canonical = {item.name_folded: item for item in session.scalars(select(CanonicalIngredient))}
+    canonical = {
+        _keyword_fold(item.name): item for item in session.scalars(select(CanonicalIngredient))
+    }
 
     cuisine_ids = response.cuisines
     if len(cuisine_ids) != len(set(cuisine_ids)) or not set(cuisine_ids) <= accepted_cuisine_ids():
@@ -263,25 +278,29 @@ def _validate_response(
         raise EnrichmentValidationError("response contains unknown or duplicate course")
     if sum(fact.is_primary for fact in response.methods) > 1:
         raise EnrichmentValidationError("response has multiple primary methods")
-    if len(response.keywords) > 5:
-        raise EnrichmentValidationError("response must contain at most five residual keywords")
-    keywords = [_validate_keyword(value) for value in response.keywords]
-    folded_keywords = [fold(value) for value in keywords]
-    if len(folded_keywords) != len(set(folded_keywords)):
-        raise EnrichmentValidationError("response contains duplicate residual keywords")
-    forbidden = set(cuisine_ids)
+    forbidden = {_keyword_fold(cuisine_id) for cuisine_id in cuisine_ids}
     forbidden |= {
-        fold(values[(RecipeFacetKind.METHOD, fact.value_id)].name) for fact in response.methods
+        _keyword_fold(values[(RecipeFacetKind.METHOD, fact.value_id)].name)
+        for fact in response.methods
     }
     forbidden |= {
-        fold(values[(RecipeFacetKind.COURSE, value_id)].name) for value_id in response.courses
+        _keyword_fold(values[(RecipeFacetKind.COURSE, value_id)].name)
+        for value_id in response.courses
     }
     forbidden |= set(canonical.keys())
     forbidden |= set(folded_names)
-    if set(folded_keywords) & forbidden:
-        raise EnrichmentValidationError(
-            "residual keyword duplicates a structured fact or ingredient"
-        )
+    keywords: list[str] = []
+    seen_keywords: set[str] = set()
+    for value in response.keywords:
+        keyword = _validate_keyword(value)
+        if keyword is None:
+            continue
+        folded_keyword = _keyword_fold(keyword)
+        if folded_keyword in seen_keywords or folded_keyword in forbidden:
+            continue
+        seen_keywords.add(folded_keyword)
+        keywords.append(keyword)
+    response.keywords = keywords[:5]
 
 
 def _apply_response(
@@ -492,20 +511,45 @@ def enrich_recipe(
                     ) from fallback_exc
                 usage1 = primary_exc.usage + fallback_usage
 
-        stage1_names = [item.name for item in stage1_response.ingredients if item.name]
-        unique_ingredients = deduplicate_ingredient_names(stage1_names)
-        recipe = _recipe_with_facts(session, recipe_id)
-        stage2_context = build_stage2_context(
-            session, recipe, unique_ingredients, include_description=include_description
-        )
-        session.rollback()
-        stage2_response, usage2 = stage2_provider.enrich_recipe_stage2(stage2_context, stage2_model)
-
-        usage = usage1 + usage2
-        try:
-            response = EnrichmentResponse.from_stages(stage1_response, stage2_response)
-        except ValueError as exc:
-            raise AIResponseError(f"Invalid Stage 2 response: {exc}", usage) from exc
+        usage = usage1
+        while True:
+            stage1_names = [item.name for item in stage1_response.ingredients if item.name]
+            unique_ingredients = deduplicate_ingredient_names(stage1_names)
+            recipe = _recipe_with_facts(session, recipe_id)
+            stage2_context = build_stage2_context(
+                session, recipe, unique_ingredients, include_description=include_description
+            )
+            session.rollback()
+            stage2_response, usage2 = stage2_provider.enrich_recipe_stage2(stage2_context, stage2_model)
+            usage += usage2
+            try:
+                response = EnrichmentResponse.from_stages(stage1_response, stage2_response)
+            except ValueError as exc:
+                if (
+                    str(exc) != "Stage 2 refers to an unknown Stage 1 ingredient"
+                    or stage1_fallback_used
+                ):
+                    raise AIResponseError(f"Invalid Stage 2 response: {exc}", usage) from exc
+                stage1_fallback_used = True
+                logger.info(
+                    "Stage 2 selected an unknown Stage 1 ingredient for recipe %s; "
+                    "retrying Stage 1 with %s",
+                    recipe_id,
+                    stage1_fallback_model,
+                )
+                try:
+                    stage1_response, fallback_usage = _run_stage1(
+                        stage1_context,
+                        stage1_fallback_provider,
+                        stage1_fallback_model,
+                    )
+                except AIResponseError as fallback_exc:
+                    raise AIResponseError(
+                        str(fallback_exc), usage + fallback_exc.usage
+                    ) from fallback_exc
+                usage += fallback_usage
+                continue
+            break
 
         applied_stage1_model = (
             f"{stage1_model} (fallback {stage1_fallback_model})"

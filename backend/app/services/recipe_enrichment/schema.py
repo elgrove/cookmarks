@@ -186,7 +186,7 @@ class Stage2Response(EnrichmentDecision):
     cuisines: list[str] = Field(default_factory=list, max_length=10, alias="c")
     methods: list[MethodDecision] = Field(default_factory=list, max_length=10, alias="m")
     courses: list[str] = Field(default_factory=list, max_length=10, alias="o")
-    keywords: list[str] = Field(default_factory=list, max_length=5, alias="w")
+    keywords: list[str] = Field(default_factory=list, max_length=100, alias="w")
 
     @field_validator("key_ingredients", mode="before")
     @classmethod
@@ -240,7 +240,7 @@ class EnrichmentResponse(EnrichmentDecision):
     cuisines: list[str] = Field(default_factory=list, max_length=10, alias="c")
     methods: list[MethodDecision] = Field(default_factory=list, max_length=10, alias="m")
     courses: list[str] = Field(default_factory=list, max_length=10, alias="o")
-    keywords: list[str] = Field(default_factory=list, max_length=5, alias="w")
+    keywords: list[str] = Field(default_factory=list, max_length=100, alias="w")
 
     @property
     def canonical_ingredients(self) -> list[RecipeIngredientDecision]:
@@ -316,4 +316,3 @@ def _without_stateful_constraints(value: object) -> object:
 GEMINI_ENRICHMENT_JSON_SCHEMA = _without_stateful_constraints(ENRICHMENT_JSON_SCHEMA)
 GEMINI_STAGE1_JSON_SCHEMA = _without_stateful_constraints(STAGE1_JSON_SCHEMA)
 GEMINI_STAGE2_JSON_SCHEMA = _without_stateful_constraints(STAGE2_JSON_SCHEMA)
-
