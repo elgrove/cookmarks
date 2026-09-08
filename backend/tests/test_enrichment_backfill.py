@@ -9,6 +9,7 @@ and orphan pruning — plus one end-to-end run against a fake Batch client.
 import json
 import uuid
 from datetime import UTC, datetime
+from unittest.mock import Mock
 
 import pytest
 from sqlalchemy import select
@@ -28,7 +29,7 @@ from app.models.recipe_enrichment import RecipeEnrichmentState
 from app.models.recipe_enrichment_batch import RecipeEnrichmentBatch
 from app.models.task_run import TaskRun
 from app.services.ai import get_config
-from app.services.ai.gemini_batch import RemoteBatchJob
+from app.services.ai.gemini_batch import GeminiBatchClient, RemoteBatchJob
 from app.services.ai.stub import StubProvider
 from app.services.recipe_enrichment.batch import (
     BATCH_CHUNK_MAX_BYTES,
@@ -509,6 +510,33 @@ def test_split_moves_every_item_off_the_deleted_batch(worker_session) -> None:
     ).all()
     assert len(survivors) == len(rows)
     assert {item.recipe_id for sibling in survivors for item in sibling.items} == {recipe.id}
+
+
+def test_gemini_batch_client_create_job_developer_api_mode(monkeypatch) -> None:
+    client = GeminiBatchClient("fake-key")
+    batches_mock = Mock()
+    fake_job = Mock(
+        display_name="test-batch",
+        state="JOB_STATE_RUNNING",
+        error=None,
+        dest=None,
+    )
+    fake_job.name = "batches/123"
+    batches_mock.create.return_value = fake_job
+    monkeypatch.setattr(client, "_client", Mock(batches=batches_mock))
+
+    job = client.create_job(
+        model="gemini-2.5-flash-lite",
+        input_file_id="files/abc-123",
+        display_name="test-batch",
+    )
+
+    batches_mock.create.assert_called_once_with(
+        model="gemini-2.5-flash-lite",
+        src={"file_name": "files/abc-123"},
+        config={"display_name": "test-batch"},
+    )
+    assert job.name == "batches/123"
 
 
 def test_empty_selection_finishes_done_without_cutover(
