@@ -429,6 +429,34 @@ def test_stage2_validation_failure_retries_stage2(session) -> None:
     assert result["canonical_ingredients"] == 1
     assert usage.cost_usd == Decimal("0.006")
     assert semantic.enrich_recipe_stage2.call_count == 2
+    assert semantic.enrich_recipe_stage2.call_args_list[0].kwargs.get("allow_truncate_keys") is False
+    assert semantic.enrich_recipe_stage2.call_args_list[1].kwargs.get("allow_truncate_keys") is True
+
+
+def test_ai_provider_enrich_recipe_stage2_truncates_when_allowed(monkeypatch: pytest.MonkeyPatch) -> None:
+    provider = StubProvider("")
+    monkeypatch.setattr(
+        provider,
+        "_complete",
+        Mock(
+            return_value=(
+                '{"k": ["one", "two", "three", "four"], "c": [], "m": [], "o": [], "w": []}',
+                Usage(),
+            )
+        ),
+    )
+    context = {
+        "recipe": {"id": "1", "name": "Test", "lines": []},
+        "vocabulary": {"cuisines": [], "methods": [], "courses": []},
+    }
+
+    # When allow_truncate_keys is False, raises AIResponseError because of max_length=3
+    with pytest.raises(AIResponseError, match="List should have at most 3 items"):
+        provider.enrich_recipe_stage2(context, allow_truncate_keys=False)
+
+    # When allow_truncate_keys is True, truncates to 3 items
+    res, _ = provider.enrich_recipe_stage2(context, allow_truncate_keys=True)
+    assert res.key_ingredients == ["one", "two", "three"]
 
 
 def test_unknown_stage2_ingredient_retries_stage2_when_stage1_does_not_find_it(session) -> None:

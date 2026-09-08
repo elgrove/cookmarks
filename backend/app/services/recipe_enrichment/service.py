@@ -544,7 +544,9 @@ def enrich_recipe(
             )
             session.rollback()
             try:
-                stage2_response, usage2 = stage2_provider.enrich_recipe_stage2(stage2_context, stage2_model)
+                stage2_response, usage2 = stage2_provider.enrich_recipe_stage2(
+                    stage2_context, stage2_model, allow_truncate_keys=stage2_retried
+                )
             except AIResponseError as stage2_exc:
                 if not stage2_retried:
                     stage2_retried = True

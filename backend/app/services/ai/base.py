@@ -279,7 +279,7 @@ class AIProvider(abc.ABC):
             ) from exc
 
     def enrich_recipe_stage2(
-        self, context: dict, model: str | None = None
+        self, context: dict, model: str | None = None, allow_truncate_keys: bool = False
     ) -> tuple[Stage2Response, Usage]:
         """Run Stage 2 facet & keyword assignment for one recipe."""
         model = model or self.model_for(ModelRole.RECIPE_SEMANTICS)
@@ -288,8 +288,23 @@ class AIProvider(abc.ABC):
         )
         if not response:
             raise AIResponseError("Recipe facet assignment returned an empty response", usage)
+        raw_text = _strip_json_fence(response)
+        if allow_truncate_keys:
+            try:
+                data = json.loads(raw_text)
+                if isinstance(data, dict):
+                    keys = data.get("k") or data.get("key_ingredients")
+                    if isinstance(keys, list) and len(keys) > 3:
+                        data = dict(data)
+                        if "k" in data:
+                            data["k"] = keys[:3]
+                        if "key_ingredients" in data:
+                            data["key_ingredients"] = keys[:3]
+                        raw_text = json.dumps(data)
+            except Exception:
+                pass
         try:
-            return Stage2Response.model_validate_json(_strip_json_fence(response)), usage
+            return Stage2Response.model_validate_json(raw_text), usage
         except ValidationError as exc:
             raise AIResponseError(f"Invalid recipe facet response: {exc}", usage) from exc
 

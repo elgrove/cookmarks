@@ -480,6 +480,48 @@ def test_unknown_stage1_ingredient_retries_the_stage1_wave(worker_session) -> No
     assert item.stage1_ingredients == []
 
 
+def test_excessive_key_ingredients_retry_and_truncate_on_retry(worker_session) -> None:
+    session = worker_session
+    recipe = _recipe(session)
+    run = _backfill_run(session)
+    prepare_stage_chunks(session, run, [recipe.id], stage="stage1", attempt=1, first_chunk=0)
+    batch = session.scalars(select(RecipeEnrichmentBatch)).one()
+    item = batch.items[0]
+    batch.stage = "stage2"
+    item.status = EnrichmentBatchItemStatus.SUCCEEDED
+    # Attempt 1: 4 key ingredients -> fails Stage2Response validation
+    item.stage1_response = {
+        "i": [{"id": "01", "n": "olive oil"}],
+        "stage2": {"k": ["one", "two", "three", "four"], "c": [], "m": [], "o": [], "w": []},
+    }
+    session.commit()
+
+    assert apply_ready_stage2(
+        session, run, StubProvider(""), StubProvider(""), "stage1", "stage2"
+    ) == {"applied": 0, "stale": 0, "failed": 1}
+    assert "List should have at most 3 items" in (item.provider_error or "")
+
+    # Now simulate retry chunk with attempt=2
+    item.attempt = 2
+    item.status = EnrichmentBatchItemStatus.SUCCEEDED
+    # Model on attempt 2 still returned 4 key ingredients, matching stage 1
+    item.stage1_response = {
+        "i": [
+            {"id": "01", "n": "olive oil"},
+            {"id": "02", "n": "two"},
+            {"id": "03", "n": "three"},
+            {"id": "04", "n": "four"},
+        ],
+        "stage2": {"k": ["olive oil", "two", "three", "four"], "c": [], "m": [], "o": [], "w": []},
+    }
+    session.commit()
+
+    assert apply_ready_stage2(
+        session, run, StubProvider(""), StubProvider(""), "stage1", "stage2"
+    ) == {"applied": 1, "stale": 0, "failed": 0}
+    assert item.status is EnrichmentBatchItemStatus.APPLIED
+
+
 def test_stale_items_never_retry_in_same_run(worker_session) -> None:
     session = worker_session
     recipe = _recipe(session)
