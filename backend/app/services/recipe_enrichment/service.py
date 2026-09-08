@@ -33,6 +33,7 @@ from app.services.recipe_enrichment.schema import (
     SCHEMA_VERSION,
     TAXONOMY_VERSION,
     EnrichmentResponse,
+    MethodDecision,
     Stage1Response,
     normalize_ingredient_name,
 )
@@ -235,6 +236,40 @@ def _keyword_fold(value: str) -> str:
     return " ".join(fold(value).replace("-", " ").split())
 
 
+def sanitize_enrichment_response(
+    session: Session, response: EnrichmentResponse
+) -> None:
+    """Filter unrecognised identifiers and deduplicate cuisines, methods, and courses."""
+    accepted_cuisines = accepted_cuisine_ids()
+    response.cuisines = list(
+        dict.fromkeys(c for c in response.cuisines if c in accepted_cuisines)
+    )
+
+    values = {
+        (item.kind, item.value_id): item for item in session.scalars(select(RecipeFacetValue))
+    }
+    seen_methods: set[str] = set()
+    clean_methods: list[MethodDecision] = []
+    has_primary = False
+    for fact in response.methods:
+        if (
+            (RecipeFacetKind.METHOD, fact.value_id) in values
+            and fact.value_id not in seen_methods
+        ):
+            seen_methods.add(fact.value_id)
+            is_primary = fact.is_primary and not has_primary
+            if is_primary:
+                has_primary = True
+            clean_methods.append(MethodDecision(v=fact.value_id, p=is_primary))
+    response.methods = clean_methods
+
+    response.courses = list(
+        dict.fromkeys(
+            c for c in response.courses if (RecipeFacetKind.COURSE, c) in values
+        )
+    )
+
+
 def _validate_response(
     session: Session,
     recipe: Recipe,
@@ -260,24 +295,11 @@ def _validate_response(
         _keyword_fold(item.name): item for item in session.scalars(select(CanonicalIngredient))
     }
 
+    sanitize_enrichment_response(session, response)
     cuisine_ids = response.cuisines
-    if len(cuisine_ids) != len(set(cuisine_ids)) or not set(cuisine_ids) <= accepted_cuisine_ids():
-        raise EnrichmentValidationError("response contains unknown or duplicate cuisine")
     values = {
         (item.kind, item.value_id): item for item in session.scalars(select(RecipeFacetValue))
     }
-    method_ids = [fact.value_id for fact in response.methods]
-    if len(method_ids) != len(set(method_ids)) or any(
-        (RecipeFacetKind.METHOD, value_id) not in values for value_id in method_ids
-    ):
-        raise EnrichmentValidationError("response contains unknown or duplicate method")
-    course_ids = response.courses
-    if len(course_ids) != len(set(course_ids)) or any(
-        (RecipeFacetKind.COURSE, value_id) not in values for value_id in course_ids
-    ):
-        raise EnrichmentValidationError("response contains unknown or duplicate course")
-    if sum(fact.is_primary for fact in response.methods) > 1:
-        raise EnrichmentValidationError("response has multiple primary methods")
     forbidden = {_keyword_fold(cuisine_id) for cuisine_id in cuisine_ids}
     forbidden |= {
         _keyword_fold(values[(RecipeFacetKind.METHOD, fact.value_id)].name)

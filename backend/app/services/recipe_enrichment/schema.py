@@ -1,11 +1,13 @@
 """Versioned wire contract for one enrichment completion."""
 
 import re
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 SCHEMA_VERSION = "v8"
-PROMPT_VERSION = "v28"
+PROMPT_VERSION = "v29"
 TAXONOMY_VERSION = "v1"
 
 _EN_GB_INGREDIENT_RULES: list[tuple[re.Pattern[str], str]] = [
@@ -146,6 +148,56 @@ def normalize_cuisine_ids(cuisines: list[str]) -> list[str]:
     return cleaned
 
 
+def normalize_method_decisions(methods: Sequence[Any]) -> list[Any]:
+    seen: set[str] = set()
+    cleaned: list[Any] = []
+    has_primary = False
+    for item in methods:
+        vid = None
+        is_p = False
+        if isinstance(item, Mapping):
+            vid = item.get("v") or item.get("value_id")
+            is_p = bool(item.get("p") or item.get("is_primary"))
+        elif hasattr(item, "value_id") and hasattr(item, "is_primary"):
+            vid = item.value_id
+            is_p = bool(item.is_primary)
+        if vid is not None:
+            s_vid = str(vid).strip().lower()
+            if s_vid and s_vid not in seen:
+                seen.add(s_vid)
+                clean_p = is_p and not has_primary
+                if clean_p:
+                    has_primary = True
+                if isinstance(item, Mapping):
+                    clean_dict = dict(item)
+                    if "v" in clean_dict:
+                        clean_dict["v"] = s_vid
+                    elif "value_id" in clean_dict:
+                        clean_dict["value_id"] = s_vid
+                    clean_dict["p"] = clean_p
+                    clean_dict.pop("is_primary", None)
+                    cleaned.append(clean_dict)
+                else:
+                    cleaned.append(MethodDecision(v=s_vid, p=clean_p))
+        else:
+            cleaned.append(item)
+    return cleaned
+
+
+def normalize_course_ids(courses: Sequence[Any]) -> list[Any]:
+    seen: set[str] = set()
+    cleaned: list[Any] = []
+    for item in courses:
+        if isinstance(item, str):
+            s = item.strip().lower()
+            if s and s not in seen:
+                seen.add(s)
+                cleaned.append(s)
+        else:
+            cleaned.append(item)
+    return cleaned
+
+
 class EnrichmentDecision(BaseModel):
     """Shared validation configuration for enrichment response models."""
 
@@ -207,6 +259,20 @@ class Stage2Response(EnrichmentDecision):
             return normalize_cuisine_ids([str(item) for item in value])
         return []
 
+    @field_validator("methods", mode="before")
+    @classmethod
+    def normalize_methods(cls, value: object) -> list[object]:
+        if isinstance(value, list):
+            return normalize_method_decisions(value)
+        return []
+
+    @field_validator("courses", mode="before")
+    @classmethod
+    def normalize_courses(cls, value: object) -> list[object]:
+        if isinstance(value, list):
+            return normalize_course_ids(value)
+        return []
+
     @model_validator(mode="after")
     def one_primary_method(self) -> "Stage2Response":
         if sum(fact.is_primary for fact in self.methods) > 1:
@@ -251,6 +317,20 @@ class EnrichmentResponse(EnrichmentDecision):
     def normalize_cuisines(cls, value: object) -> list[str]:
         if isinstance(value, list):
             return normalize_cuisine_ids([str(item) for item in value])
+        return []
+
+    @field_validator("methods", mode="before")
+    @classmethod
+    def normalize_methods(cls, value: object) -> list[object]:
+        if isinstance(value, list):
+            return normalize_method_decisions(value)
+        return []
+
+    @field_validator("courses", mode="before")
+    @classmethod
+    def normalize_courses(cls, value: object) -> list[object]:
+        if isinstance(value, list):
+            return normalize_course_ids(value)
         return []
 
     @model_validator(mode="after")
