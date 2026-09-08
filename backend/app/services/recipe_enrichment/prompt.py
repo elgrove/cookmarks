@@ -48,6 +48,8 @@ Key ingredients (k):
 - Select one to three canonical ingredient names strictly from the supplied `ingredients` list that define the dish identity, such as the main protein, star vegetable, or signature flavour.
 - Do not select seasoning, cooking oil, or a supporting ingredient.
 - Every selected key ingredient MUST be an exact string from the supplied `ingredients` list.
+- NEVER invent, infer, or select an ingredient (even if mentioned in the recipe title, description, or instructions) that is not in the supplied `ingredients` list. If a dish component (such as labneh, pastry, stock, or dressing) is prepared from scratch in the instructions rather than listed as an ingredient, you must select from the actual base ingredients supplied.
+- Select at most three key ingredients. Never return four or more key ingredients.
 
 Cuisines (c):
 - Select zero or more matching IDs strictly from the supplied `cuisines` list.

@@ -8,7 +8,7 @@ from app.models.enums import AIProvider, RecipeEnrichmentStatus
 from app.models.ingredient import CanonicalIngredient, RecipeIngredient
 from app.models.recipe import Keyword, Recipe
 from app.models.recipe_enrichment import RecipeEnrichmentState
-from app.services.ai import ModelRole, Usage
+from app.services.ai import AIResponseError, ModelRole, Usage
 from app.services.ai.anthropic import AnthropicProvider
 from app.services.ai.gemini import GeminiProvider
 from app.services.ai.registry import get_config, get_recipe_enrichment_providers
@@ -395,6 +395,85 @@ def test_unknown_stage2_ingredient_retries_stage1_with_fallback(session) -> None
         "olive oil",
         "garlic",
     ]
+
+
+def test_stage2_validation_failure_retries_stage2(session) -> None:
+    recipe = _recipe(session)
+    primary = Mock()
+    primary.enrich_recipe_stage1.return_value = (
+        Stage1Response.model_validate({"i": [{"id": "01", "n": "olive oil"}]}),
+        Usage(cost_usd=Decimal("0.001")),
+    )
+    semantic = Mock()
+    semantic.name = "ANTHROPIC"
+    semantic.enrich_recipe_stage2.side_effect = [
+        AIResponseError("List should have at most 3 items", Usage(cost_usd=Decimal("0.002"))),
+        (
+            Stage2Response.model_validate({"key_ingredients": ["olive oil"]}),
+            Usage(cost_usd=Decimal("0.003")),
+        ),
+    ]
+
+    result, usage = enrich_recipe(
+        session,
+        recipe.id,
+        provider=StubProvider(""),
+        stage1_provider=primary,
+        stage1_fallback_provider=primary,
+        stage2_provider=semantic,
+        stage1_model="flash-lite",
+        stage1_fallback_model="flash-lite",
+        stage2_model="haiku",
+    )
+
+    assert result["canonical_ingredients"] == 1
+    assert usage.cost_usd == Decimal("0.006")
+    assert semantic.enrich_recipe_stage2.call_count == 2
+
+
+def test_unknown_stage2_ingredient_retries_stage2_when_stage1_does_not_find_it(session) -> None:
+    recipe = _recipe(session)
+    primary = Mock()
+    primary.enrich_recipe_stage1.return_value = (
+        Stage1Response.model_validate({"i": [{"id": "01", "n": "olive oil"}]}),
+        Usage(cost_usd=Decimal("0.001")),
+    )
+    fallback = Mock()
+    fallback.enrich_recipe_stage1.return_value = (
+        Stage1Response.model_validate({"i": [{"id": "01", "n": "olive oil"}]}),
+        Usage(cost_usd=Decimal("0.002")),
+    )
+    semantic = Mock()
+    semantic.name = "ANTHROPIC"
+    semantic.enrich_recipe_stage2.side_effect = [
+        (
+            Stage2Response.model_validate({"key_ingredients": ["labneh"]}),
+            Usage(cost_usd=Decimal("0.003")),
+        ),
+        (
+            Stage2Response.model_validate({"key_ingredients": ["olive oil"]}),
+            Usage(cost_usd=Decimal("0.003")),
+        ),
+    ]
+
+    result, usage = enrich_recipe(
+        session,
+        recipe.id,
+        provider=StubProvider(""),
+        stage1_provider=primary,
+        stage1_fallback_provider=fallback,
+        stage2_provider=semantic,
+        stage1_model="flash-lite",
+        stage1_fallback_model="flash",
+        stage2_model="haiku",
+    )
+
+    assert result["canonical_ingredients"] == 1
+    assert result["stage1_fallback_used"] == 1
+    assert usage.cost_usd == Decimal("0.009")
+    assert primary.enrich_recipe_stage1.call_count == 1
+    assert fallback.enrich_recipe_stage1.call_count == 1
+    assert semantic.enrich_recipe_stage2.call_count == 2
 
 
 def test_explicit_enrichment_provider_settings_route_flash_lite_and_haiku(session) -> None:
