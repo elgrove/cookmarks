@@ -20,7 +20,7 @@ Wire keys: i list of {id: line ID, n: canonical name or null, k: key boolean}; c
 
 _STAGE1_INSTRUCTIONS = """You extract canonical food ingredient names from recipe ingredient lines. Return only valid JSON.
 For each line in the input, return an entry in i with the line id and the singular UK-English canonical food name (n).
-If a line is a section heading, note, contains no food ingredient, or contains ONLY salt and/or pepper, return null for n.
+If a line is a section heading, note, or contains no food ingredient, return null for n.
 Always take the first ingredient. If a line mentions alternatives (e.g. "butter or vegetable oil", "cooking spray or butter"), extract only the first mentioned ingredient ("butter", "cooking spray").
 Do not extract quantities, units, or preparation methods.
 
