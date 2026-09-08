@@ -512,6 +512,7 @@ def enrich_recipe(
                 usage1 = primary_exc.usage + fallback_usage
 
         usage = usage1
+        stage2_retried = False
         while True:
             stage1_names = [item.name for item in stage1_response.ingredients if item.name]
             unique_ingredients = deduplicate_ingredient_names(stage1_names)
@@ -520,35 +521,55 @@ def enrich_recipe(
                 session, recipe, unique_ingredients, include_description=include_description
             )
             session.rollback()
-            stage2_response, usage2 = stage2_provider.enrich_recipe_stage2(stage2_context, stage2_model)
+            try:
+                stage2_response, usage2 = stage2_provider.enrich_recipe_stage2(stage2_context, stage2_model)
+            except AIResponseError as stage2_exc:
+                if not stage2_retried:
+                    stage2_retried = True
+                    usage += stage2_exc.usage
+                    logger.info(
+                        "Stage 2 failed validation for recipe %s (%s); retrying Stage 2 with %s",
+                        recipe_id,
+                        stage2_exc,
+                        stage2_model,
+                    )
+                    continue
+                raise
             usage += usage2
             try:
                 response = EnrichmentResponse.from_stages(stage1_response, stage2_response)
             except ValueError as exc:
-                if (
-                    str(exc) != "Stage 2 refers to an unknown Stage 1 ingredient"
-                    or stage1_fallback_used
-                ):
-                    raise AIResponseError(f"Invalid Stage 2 response: {exc}", usage) from exc
-                stage1_fallback_used = True
-                logger.info(
-                    "Stage 2 selected an unknown Stage 1 ingredient for recipe %s; "
-                    "retrying Stage 1 with %s",
-                    recipe_id,
-                    stage1_fallback_model,
-                )
-                try:
-                    stage1_response, fallback_usage = _run_stage1(
-                        stage1_context,
-                        stage1_fallback_provider,
-                        stage1_fallback_model,
-                    )
-                except AIResponseError as fallback_exc:
-                    raise AIResponseError(
-                        str(fallback_exc), usage + fallback_exc.usage
-                    ) from fallback_exc
-                usage += fallback_usage
-                continue
+                if str(exc) == "Stage 2 refers to an unknown Stage 1 ingredient":
+                    if not stage1_fallback_used:
+                        stage1_fallback_used = True
+                        logger.info(
+                            "Stage 2 selected an unknown Stage 1 ingredient for recipe %s; "
+                            "retrying Stage 1 with %s",
+                            recipe_id,
+                            stage1_fallback_model,
+                        )
+                        try:
+                            stage1_response, fallback_usage = _run_stage1(
+                                stage1_context,
+                                stage1_fallback_provider,
+                                stage1_fallback_model,
+                            )
+                        except AIResponseError as fallback_exc:
+                            raise AIResponseError(
+                                str(fallback_exc), usage + fallback_exc.usage
+                            ) from fallback_exc
+                        usage += fallback_usage
+                        continue
+                    elif not stage2_retried:
+                        stage2_retried = True
+                        logger.info(
+                            "Stage 2 selected an unknown Stage 1 ingredient for recipe %s after Stage 1 fallback; "
+                            "retrying Stage 2 with %s",
+                            recipe_id,
+                            stage2_model,
+                        )
+                        continue
+                raise AIResponseError(f"Invalid Stage 2 response: {exc}", usage) from exc
             break
 
         applied_stage1_model = (
