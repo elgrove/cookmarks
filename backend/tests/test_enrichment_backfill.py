@@ -54,6 +54,7 @@ from app.services.recipe_enrichment.service import source_fingerprint
 from app.tasks.enrichment_backfill import (
     _delete_orphan_keywords,
     _recipe_map,
+    apply_ready_stage2,
     build_retry_chunks,
     ingest_succeeded_batch,
     poll_backfill,
@@ -440,6 +441,42 @@ def test_retry_is_bounded_to_one(worker_session) -> None:
     session.commit()
     assert build_retry_chunks(session, run) == 0
     assert BATCH_MAX_ATTEMPTS == 2
+
+
+def test_unknown_stage1_ingredient_retries_the_stage1_wave(worker_session) -> None:
+    session = worker_session
+    recipe = _recipe(session)
+    run = _backfill_run(session)
+    prepare_stage_chunks(session, run, [recipe.id], stage="stage1", attempt=1, first_chunk=0)
+    batch = session.scalars(select(RecipeEnrichmentBatch)).one()
+    item = batch.items[0]
+    batch.stage = "stage2"
+    item.status = EnrichmentBatchItemStatus.SUCCEEDED
+    item.stage1_response = {
+        "i": [{"id": "01", "n": "Glorp"}],
+        "stage2": Stage2Response.model_validate({"k": ["unknown"]}).model_dump(
+            mode="json", by_alias=True
+        ),
+    }
+    session.commit()
+
+    assert apply_ready_stage2(
+        session, run, StubProvider(""), StubProvider(""), "stage1", "stage2"
+    ) == {"applied": 0, "stale": 0, "failed": 1}
+    assert item.provider_error == "unknown Stage 1 ingredient"
+
+    assert build_retry_chunks(session, run) == 1
+    session.refresh(item)
+    retry = session.scalars(
+        select(RecipeEnrichmentBatch).where(
+            RecipeEnrichmentBatch.stage == "stage1",
+            RecipeEnrichmentBatch.attempt == 2,
+        )
+    ).one()
+    assert item.batch_id == retry.id
+    assert item.status is EnrichmentBatchItemStatus.PENDING
+    assert item.stage1_response == {}
+    assert item.stage1_ingredients == []
 
 
 def test_stale_items_never_retry_in_same_run(worker_session) -> None:

@@ -603,6 +603,15 @@ def apply_ready_stage2(
                 "ingredients_created", "existing_ingredients", "aliases_created")}}
             session.commit()
             counts["applied"] += 1
+        except ValueError as exc:
+            session.rollback()
+            item.status = EnrichmentBatchItemStatus.FAILED
+            if str(exc) == "Stage 2 refers to an unknown Stage 1 ingredient":
+                item.provider_error = "unknown Stage 1 ingredient"
+            else:
+                item.provider_error = str(exc)[:1000]
+            session.commit()
+            counts["failed"] += 1
         except Exception as exc:
             session.rollback()
             item.status = EnrichmentBatchItemStatus.FAILED
@@ -629,7 +638,12 @@ def build_retry_chunks(session: Session, run: TaskRun) -> int:
     for item in retryable:
         batch = session.get(RecipeEnrichmentBatch, item.batch_id)
         assert batch is not None
-        by_stage.setdefault(batch.stage, []).append(item)
+        stage = batch.stage
+        if stage == "stage2" and "unknown Stage 1 ingredient" in (item.provider_error or ""):
+            stage = "stage1"
+            item.stage1_response = {}
+            item.stage1_ingredients = []
+        by_stage.setdefault(stage, []).append(item)
     created = 0
     existing_chunks = session.scalar(
         select(func.count())

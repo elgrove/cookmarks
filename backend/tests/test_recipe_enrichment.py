@@ -120,10 +120,30 @@ def test_empty_keywords_replace_previous_keywords(session) -> None:
     assert len(recipe.canonical_ingredients) == 1
 
 
-def test_response_rejects_more_than_five_keywords(session) -> None:
+def test_response_normalises_prunes_and_truncates_residual_keywords(session) -> None:
     recipe = _recipe(session)
-    with pytest.raises(ValidationError, match="at most 5 items"):
-        _response(recipe, keywords=["One", "Two", "Three", "Four", "Five", "Six"])
+    response = _response(
+        recipe,
+        cuisines=["arabian-peninsula"],
+        keywords=[
+            "hakka-style",
+            "olive oil",
+            "bake",
+            "Arabian Peninsula",
+            "cosy",
+            "Cosy",
+            "One",
+            "Two",
+            "Three",
+            "Four",
+            "Five",
+            "123",
+        ],
+    )
+
+    apply_enrichment(session, recipe.id, response, provider=StubProvider(""), model="stub")
+
+    assert response.keywords == ["Hakka-Style", "Cosy", "One", "Two", "Three"]
 
 
 def test_stub_enrichment_is_separate_and_offline(session) -> None:
@@ -318,6 +338,63 @@ def test_stage1_validation_failure_retries_complete_recipe(session) -> None:
     )
     stage2_context = semantic.enrich_recipe_stage2.call_args.args[0]
     assert stage2_context["recipe"]["ingredients"] == ["olive oil"]
+
+
+def test_unknown_stage2_ingredient_retries_stage1_with_fallback(session) -> None:
+    recipe = _recipe(session)
+    recipe.ingredients.append(RecipeIngredient(position=1, text="garlic"))
+    session.commit()
+    primary = Mock()
+    primary.enrich_recipe_stage1.return_value = (
+        Stage1Response.model_validate(
+            {"i": [{"id": "01", "n": "olive oil"}, {"id": "02", "n": None}]}
+        ),
+        Usage(cost_usd=Decimal("0.001")),
+    )
+    fallback = Mock()
+    fallback.enrich_recipe_stage1.return_value = (
+        Stage1Response.model_validate(
+            {"i": [{"id": "01", "n": "olive oil"}, {"id": "02", "n": "garlic"}]}
+        ),
+        Usage(cost_usd=Decimal("0.002")),
+    )
+    semantic = Mock()
+    semantic.name = "ANTHROPIC"
+    semantic.enrich_recipe_stage2.side_effect = [
+        (
+            Stage2Response.model_validate({"key_ingredients": ["garlic"]}),
+            Usage(cost_usd=Decimal("0.003")),
+        ),
+        (
+            Stage2Response.model_validate({"key_ingredients": ["garlic"]}),
+            Usage(cost_usd=Decimal("0.003")),
+        ),
+    ]
+
+    result, usage = enrich_recipe(
+        session,
+        recipe.id,
+        provider=StubProvider(""),
+        stage1_provider=primary,
+        stage1_fallback_provider=fallback,
+        stage2_provider=semantic,
+        stage1_model="flash-lite",
+        stage1_fallback_model="haiku",
+        stage2_model="haiku",
+    )
+
+    assert result["stage1_fallback_used"] == 1
+    assert usage.cost_usd == Decimal("0.009")
+    assert primary.enrich_recipe_stage1.call_count == 1
+    assert fallback.enrich_recipe_stage1.call_count == 1
+    assert semantic.enrich_recipe_stage2.call_count == 2
+    assert semantic.enrich_recipe_stage2.call_args_list[0].args[0]["recipe"]["ingredients"] == [
+        "olive oil"
+    ]
+    assert semantic.enrich_recipe_stage2.call_args_list[1].args[0]["recipe"]["ingredients"] == [
+        "olive oil",
+        "garlic",
+    ]
 
 
 def test_explicit_enrichment_provider_settings_route_flash_lite_and_haiku(session) -> None:
