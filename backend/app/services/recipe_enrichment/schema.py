@@ -5,7 +5,7 @@ import re
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 SCHEMA_VERSION = "v8"
-PROMPT_VERSION = "v24"
+PROMPT_VERSION = "v25"
 TAXONOMY_VERSION = "v1"
 
 _EN_GB_INGREDIENT_RULES: list[tuple[re.Pattern[str], str]] = [
@@ -15,6 +15,19 @@ _EN_GB_INGREDIENT_RULES: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"\bzucchinis?\b", re.IGNORECASE), "courgette"),
     (re.compile(r"\b(scallions?|green onions?)\b", re.IGNORECASE), "spring onion"),
 ]
+
+_EXCLUDED_SEASONING_PATTERN: re.Pattern[str] = re.compile(
+    r"^(?:(?:sea|kosher|table|flaked?|coarse|fine|maldon|rock|cooking|iodi[sz]ed)\s+)*salt$"
+    r"|^(?:(?:ground|cracked|freshly ground|coarse|whole)\s+)*(?:black\s+|white\s+)?pepper(?:corn)?$"
+    r"|^(?:(?:sea|kosher|table|flaked?|coarse|fine|maldon|rock|cooking|iodi[sz]ed)\s+)*salt\s+and\s+(?:(?:ground|cracked|freshly ground|coarse|whole)\s+)*(?:black\s+|white\s+)?pepper(?:corn)?$"
+    r"|^(?:(?:ground|cracked|freshly ground|coarse|whole)\s+)*(?:black\s+|white\s+)?pepper(?:corn)?\s+and\s+(?:(?:sea|kosher|table|flaked?|coarse|fine|maldon|rock|cooking|iodi[sz]ed)\s+)*salt$",
+    re.IGNORECASE,
+)
+
+
+def is_excluded_seasoning(name: str) -> bool:
+    """Return True for universal seasonings (salt, black/white pepper) that should not be extracted."""
+    return bool(_EXCLUDED_SEASONING_PATTERN.match(name.strip()))
 
 
 def normalize_ingredient_name(name: str) -> str:
@@ -150,7 +163,10 @@ class Stage1LineDecision(EnrichmentDecision):
         text = str(value).strip()
         if not text:
             return None
-        return normalize_ingredient_name(text)
+        cleaned = normalize_ingredient_name(text)
+        if is_excluded_seasoning(cleaned):
+            return None
+        return cleaned
 
 
 class Stage1Response(EnrichmentDecision):
@@ -175,7 +191,12 @@ class Stage2Response(EnrichmentDecision):
     @classmethod
     def normalize_key_ingredients(cls, value: object) -> list[str]:
         if isinstance(value, list):
-            return [normalize_ingredient_name(str(item).strip()) for item in value if str(item).strip()]
+            return [
+                cleaned
+                for item in value
+                if (cleaned := normalize_ingredient_name(str(item).strip()))
+                and not is_excluded_seasoning(cleaned)
+            ]
         return []
 
     @field_validator("cuisines", mode="before")
@@ -205,7 +226,10 @@ class RecipeIngredientDecision(EnrichmentDecision):
         text = str(value).strip()
         if not text:
             return None
-        return normalize_ingredient_name(text)
+        cleaned = normalize_ingredient_name(text)
+        if is_excluded_seasoning(cleaned):
+            return None
+        return cleaned
 
 
 class EnrichmentResponse(EnrichmentDecision):
