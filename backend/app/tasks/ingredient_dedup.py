@@ -53,9 +53,9 @@ def dedup_ingredients_task(run_id: str) -> dict[str, object]:
         fail_run(run_id, exc)
         raise
     detail: dict[str, object] = {
-        "ingredients_in": result.ingredients_in,
+        "ingredients_in": result.vocabulary_in,
         "merges_applied": result.merges_applied,
-        "ingredients_removed": result.ingredients_removed,
+        "ingredients_removed": result.vocabulary_removed,
         "pre_merges": result.pre_merges,
         "ai_merges": result.ai_merges,
         "ai_truncated": result.ai_truncated,

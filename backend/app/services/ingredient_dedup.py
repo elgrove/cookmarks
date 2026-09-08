@@ -1,131 +1,49 @@
-"""AI-assisted canonical-ingredient deduplication.
+"""AI-assisted deduplication for canonical ingredients.
 
-The deterministic pre-pass folds only certain spelling variants. The semantic pass
-asks the configured provider about one rotating candidate window, while the complete
-vocabulary remains available as possible canonical targets. Merges move every linked
-``RecipeIngredient`` to the surviving canonical row before the duplicate is deleted.
+The generic vocabulary service prepares and validates merge maps. This module keeps
+the ingredient-specific vocabulary query, AI request, and recipe-fact reassignment.
 """
 
 import logging
-from bisect import bisect_right
-from dataclasses import dataclass, field, replace
+from dataclasses import replace
 
-import inflect
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.models.ingredient import CanonicalIngredient, RecipeIngredient
-from app.services.ai import AIProvider, Usage, get_ai_provider
+from app.services.ai import AIProvider, get_ai_provider
 from app.services.recipe_facts import get_or_create_canonical_ingredient
+from app.services.vocabulary_dedup import (
+    DEFAULT_CANDIDATE_WINDOW,
+    VocabularyDedupResult,
+)
+from app.services.vocabulary_dedup import (
+    propose_merges as propose_vocabulary_merges,
+)
 
 logger = logging.getLogger(__name__)
 
-DEDUP_CANDIDATE_WINDOW = 1000
+# This remains an ingredient setting. A future vocabulary can choose a smaller window
+# without copying the generic rotation implementation.
+DEDUP_CANDIDATE_WINDOW = DEFAULT_CANDIDATE_WINDOW
 
-
-@dataclass(frozen=True)
-class DedupResult:
-    """Metrics from one canonical-ingredient deduplication pass."""
-
-    ingredients_in: int = 0
-    merges_applied: int = 0
-    ingredients_removed: int = 0
-    pre_merges: int = 0
-    ai_merges: int = 0
-    ai_truncated: bool = False
-    candidates: int = 0
-    cursor_from: str | None = None
-    cursor_to: str | None = None
-    usage: Usage = field(default_factory=Usage)
-
-
-def _normalise(name: str) -> str:
-    """Trim and collapse internal whitespace without restyling a name."""
-    return " ".join(name.split())
-
-
-def pre_deduplicate(names: list[str]) -> tuple[list[str], dict[str, str]]:
-    """Fold whitespace/case variants and existing singular/plural pairs.
-
-    ``names`` must be ordered by usage. The first spelling for each normalised form
-    is kept so the most referenced name becomes canonical rather than a new style.
-    """
-    engine = inflect.engine()
-    merge_map: dict[str, str] = {}
-    canonical_by_key: dict[str, str] = {}
-
-    for name in names:
-        collapsed = _normalise(name)
-        canonical = canonical_by_key.setdefault(collapsed.casefold(), collapsed)
-        if name != canonical:
-            merge_map[name] = canonical
-
-    for key in list(canonical_by_key):
-        singular = engine.singular_noun(key)
-        if isinstance(singular, str) and singular in canonical_by_key:
-            duplicate = canonical_by_key[key]
-            target = canonical_by_key[singular]
-            if duplicate != target:
-                merge_map[duplicate] = target
-                del canonical_by_key[key]
-
-    return list(canonical_by_key.values()), merge_map
-
-
-def _resolve_chains(raw: dict[str, str]) -> dict[str, str]:
-    """Resolve A -> B -> C into terminal targets and discard self maps/cycles."""
-    resolved: dict[str, str] = {}
-    for original in raw:
-        target = original
-        seen = {original}
-        while target in raw and raw[target] not in seen:
-            seen.add(raw[target])
-            target = raw[target]
-        if target != original:
-            resolved[original] = target
-    return {original: target for original, target in resolved.items() if target not in resolved}
-
-
-def select_candidates(survivors: list[str], cursor: str | None) -> tuple[list[str], str | None]:
-    """Select the next sorted candidate window and wrap after the vocabulary end."""
-    names = sorted(survivors)
-    if not names:
-        return [], None
-    start = 0 if cursor is None else bisect_right(names, cursor)
-    if start >= len(names):
-        start = 0
-    window = (names[start:] + names[:start])[:DEDUP_CANDIDATE_WINDOW]
-    return window, window[-1]
+DedupResult = VocabularyDedupResult
 
 
 def propose_merges(
     provider: AIProvider, names: list[str], cursor: str | None = None
 ) -> tuple[dict[str, str], DedupResult]:
-    """Combine deterministic and AI proposals into one validated merge map."""
-    survivors, pre_map = pre_deduplicate(names)
-    candidates, cursor_to = select_candidates(survivors, cursor)
-    ai_map, usage, truncated = provider.deduplicate_ingredients(survivors, candidates)
-    vocabulary = set(survivors)
-    ai_map = {
-        original: canonical for original, canonical in ai_map.items() if canonical in vocabulary
-    }
-    merges = _resolve_chains({**pre_map, **ai_map})
-    ai_merges = sum(1 for original in merges if original in ai_map)
-    stats = DedupResult(
-        ingredients_in=len(names),
-        pre_merges=len(merges) - ai_merges,
-        ai_merges=ai_merges,
-        ai_truncated=truncated,
-        candidates=len(candidates),
-        cursor_from=cursor,
-        cursor_to=cursor_to,
-        usage=usage,
+    """Ask the ingredient model through the reusable vocabulary-deduplication flow."""
+    return propose_vocabulary_merges(
+        names,
+        cursor,
+        provider.deduplicate_ingredients,
+        candidate_window=DEDUP_CANDIDATE_WINDOW,
     )
-    return merges, stats
 
 
 def apply_merges(session: Session, merges: dict[str, str]) -> int:
-    """Repoint recipe ingredients, then delete each merged-away canonical row."""
+    """Repoint recipe ingredients, then delete each duplicate canonical row."""
     applied = 0
     for original, canonical in merges.items():
         duplicate = session.scalar(
@@ -151,7 +69,7 @@ def apply_merges(session: Session, merges: dict[str, str]) -> int:
 
 
 def _vocabulary_by_usage(session: Session) -> list[str]:
-    """Return every canonical name, most-linked first, then alphabetically."""
+    """Return canonical ingredient names most-linked first, then alphabetically."""
     rows = session.execute(
         select(CanonicalIngredient.name, func.count(RecipeIngredient.id))
         .outerjoin(
@@ -164,7 +82,7 @@ def _vocabulary_by_usage(session: Session) -> list[str]:
 
 
 def deduplicate_ingredients(session: Session, cursor: str | None = None) -> DedupResult:
-    """Run one tracked deduplication pass in the caller's transaction."""
+    """Run one canonical-ingredient pass in the caller's transaction."""
     provider = get_ai_provider(session)
     if provider is None:
         logger.debug("No AI provider configured; skipping ingredient dedup")
@@ -182,4 +100,4 @@ def deduplicate_ingredients(session: Session, cursor: str | None = None) -> Dedu
         f"{', reply truncated' if stats.ai_truncated else ''}) from {len(names)} ingredient(s) "
         f"over {stats.candidates} candidate(s)"
     )
-    return replace(stats, merges_applied=applied, ingredients_removed=applied)
+    return replace(stats, merges_applied=applied, vocabulary_removed=applied)

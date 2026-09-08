@@ -143,6 +143,48 @@ def _salvage_pairs(response: str) -> dict[str, str]:
     return pairs
 
 
+def _deduplication_pairs(
+    response: str, candidates: list[str], vocabulary_name: str
+) -> tuple[dict[str, str], bool]:
+    """Parse one vocabulary-deduplication response and keep valid candidate keys."""
+    if not response:
+        return {}, False
+
+    truncated = False
+    try:
+        raw = json.loads(_strip_json_fence(response))
+    except json.JSONDecodeError:
+        raw = _salvage_pairs(response)
+        truncated = bool(raw)
+        if raw:
+            logger.warning(
+                f"{vocabulary_name.capitalize()}-dedup reply was cut off; "
+                f"salvaged {len(raw)} pair(s)"
+            )
+        else:
+            logger.error(
+                f"Failed to decode {vocabulary_name}-dedup JSON from AI response:\n{response}"
+            )
+
+    if not isinstance(raw, dict):
+        logger.warning(
+            f"{vocabulary_name.capitalize()}-dedup response was not a JSON object: {raw!r}"
+        )
+        return {}, truncated
+
+    allowed = set(candidates)
+    pairs = {
+        key: value for key, value in raw.items() if isinstance(key, str) and isinstance(value, str)
+    }
+    merges = {key: value for key, value in pairs.items() if key in allowed}
+    if len(merges) < len(pairs):
+        logger.debug(
+            f"Dropped {len(pairs) - len(merges)} {vocabulary_name}-dedup merge(s) "
+            "keyed outside the candidates"
+        )
+    return merges, truncated
+
+
 def _clean_keywords(raw: list[object], limit: int) -> list[str]:
     """Tidy a model's keyword list: keep non-empty strings, trim whitespace, drop
     case-insensitive duplicates (first spelling wins), and cap to `limit`."""
@@ -336,33 +378,7 @@ class AIProvider(abc.ABC):
         )
         response, usage = self._complete(prompt, model, temp=0)
 
-        if not response:
-            return {}, usage, False
-
-        truncated = False
-        try:
-            raw = json.loads(_strip_json_fence(response))
-        except json.JSONDecodeError:
-            raw = _salvage_pairs(response)
-            # Pairs recovered from unparseable JSON means the object was cut off
-            # mid-generation; nothing recovered means a reply that was never a map.
-            truncated = bool(raw)
-            if raw:
-                logger.warning(f"Keyword-dedup reply was cut off; salvaged {len(raw)} pair(s)")
-            else:
-                logger.error(f"Failed to decode keyword-dedup JSON from AI response:\n{response}")
-
-        if not isinstance(raw, dict):
-            logger.warning(f"Keyword-dedup response was not a JSON object: {raw!r}")
-            return {}, usage, truncated
-
-        allowed = set(candidates)
-        pairs = {k: v for k, v in raw.items() if isinstance(k, str) and isinstance(v, str)}
-        merges = {k: v for k, v in pairs.items() if k in allowed}
-        if len(merges) < len(pairs):
-            logger.debug(
-                f"Dropped {len(pairs) - len(merges)} dedup merge(s) keyed outside the candidates"
-            )
+        merges, truncated = _deduplication_pairs(response, candidates, "keyword")
         return merges, usage, truncated
 
     def deduplicate_ingredients(
@@ -380,35 +396,5 @@ class AIProvider(abc.ABC):
         )
         response, usage = self._complete(prompt, model, temp=0)
 
-        if not response:
-            return {}, usage, False
-
-        truncated = False
-        try:
-            raw = json.loads(_strip_json_fence(response))
-        except json.JSONDecodeError:
-            raw = _salvage_pairs(response)
-            truncated = bool(raw)
-            if raw:
-                logger.warning(f"Ingredient-dedup reply was cut off; salvaged {len(raw)} pair(s)")
-            else:
-                logger.error(
-                    f"Failed to decode ingredient-dedup JSON from AI response:\n{response}"
-                )
-
-        if not isinstance(raw, dict):
-            logger.warning(f"Ingredient-dedup response was not a JSON object: {raw!r}")
-            return {}, usage, truncated
-
-        allowed = set(candidates)
-        pairs = {
-            key: value
-            for key, value in raw.items()
-            if isinstance(key, str) and isinstance(value, str)
-        }
-        merges = {key: value for key, value in pairs.items() if key in allowed}
-        if len(merges) < len(pairs):
-            logger.debug(
-                f"Dropped {len(pairs) - len(merges)} ingredient-dedup merge(s) keyed outside the candidates"
-            )
+        merges, truncated = _deduplication_pairs(response, candidates, "ingredient")
         return merges, usage, truncated

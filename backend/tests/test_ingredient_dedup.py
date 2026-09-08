@@ -19,14 +19,12 @@ from app.models.task_run import TaskRun
 from app.services.ai import AIProvider, ModelRole, Usage
 from app.services.ingredient_dedup import (
     DedupResult,
-    _resolve_chains,
     _vocabulary_by_usage,
     apply_merges,
     deduplicate_ingredients,
-    pre_deduplicate,
     propose_merges,
-    select_candidates,
 )
+from app.services.vocabulary_dedup import pre_deduplicate, resolve_chains, select_candidates
 from app.tasks.celery_app import celery_app
 from app.tasks.ingredient_dedup import (
     _last_cursor,
@@ -79,18 +77,22 @@ def test_pre_deduplicate_folds_variants_and_existing_plural() -> None:
 
 
 def test_resolve_chains_drops_cycles() -> None:
-    assert _resolve_chains({"A": "B", "B": "C", "Loop A": "Loop B", "Loop B": "Loop A"}) == {
+    assert resolve_chains({"A": "B", "B": "C", "Loop A": "Loop B", "Loop B": "Loop A"}) == {
         "A": "C",
         "B": "C",
     }
 
 
-def test_select_candidates_rotates_and_wraps(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("app.services.ingredient_dedup.DEDUP_CANDIDATE_WINDOW", 2)
-
-    first, cursor = select_candidates(["Egg", "Flour", "Noodle", "Oil", "Salt"], None)
-    second, cursor = select_candidates(["Egg", "Flour", "Noodle", "Oil", "Salt"], cursor)
-    third, cursor = select_candidates(["Egg", "Flour", "Noodle", "Oil", "Salt"], cursor)
+def test_select_candidates_rotates_and_wraps() -> None:
+    first, cursor = select_candidates(
+        ["Egg", "Flour", "Noodle", "Oil", "Salt"], None, candidate_window=2
+    )
+    second, cursor = select_candidates(
+        ["Egg", "Flour", "Noodle", "Oil", "Salt"], cursor, candidate_window=2
+    )
+    third, cursor = select_candidates(
+        ["Egg", "Flour", "Noodle", "Oil", "Salt"], cursor, candidate_window=2
+    )
 
     assert first == ["Egg", "Flour"]
     assert second == ["Noodle", "Oil"]
@@ -159,9 +161,9 @@ def test_deduplicate_ingredients_uses_ai_map(
     result = deduplicate_ingredients(session)
     session.commit()
 
-    assert result.ingredients_in == 2
+    assert result.vocabulary_in == 2
     assert result.merges_applied == 1
-    assert result.ingredients_removed == 1
+    assert result.vocabulary_removed == 1
     assert session.get(CanonicalIngredient, scallion.id) is None
 
 
@@ -217,7 +219,7 @@ def test_worker_completes_tracked_run(
         run_id = str(run.id)
     monkeypatch.setattr(
         "app.tasks.ingredient_dedup.run_dedup",
-        lambda _cursor: DedupResult(ingredients_in=4, merges_applied=1, ingredients_removed=1),
+        lambda _cursor: DedupResult(vocabulary_in=4, merges_applied=1, vocabulary_removed=1),
     )
 
     detail = dedup_ingredients_task(run_id)
