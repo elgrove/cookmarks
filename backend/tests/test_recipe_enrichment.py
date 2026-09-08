@@ -52,7 +52,7 @@ def _recipe(session) -> Recipe:
 def _response(recipe: Recipe | None = None, **overrides) -> EnrichmentResponse:
     fields = {
         "ingredients": [
-            {"id": "01", "name": "sea salt", "is_key": True}
+            {"id": "01", "name": "olive oil", "is_key": True}
         ],
         "cuisines": [],
         "methods": [{"value_id": "bake", "is_primary": True}],
@@ -73,7 +73,7 @@ def _response(recipe: Recipe | None = None, **overrides) -> EnrichmentResponse:
 
 def test_apply_enrichment_replaces_all_derived_facts_atomically(session) -> None:
     recipe = _recipe(session)
-    create_canonical_ingredient(session, "sea salt")
+    create_canonical_ingredient(session, "olive oil")
     result = apply_enrichment(
         session,
         recipe.id,
@@ -88,7 +88,7 @@ def test_apply_enrichment_replaces_all_derived_facts_atomically(session) -> None
     assert result["existing_ingredients"] == 1
     assert recipe.enrichment_state is not None
     assert recipe.enrichment_state.status is RecipeEnrichmentStatus.COMPLETE
-    assert [item.canonical_name for item in recipe.ingredients if item.canonical_name] == ["sea salt"]
+    assert [item.canonical_name for item in recipe.ingredients if item.canonical_name] == ["olive oil"]
     assert [fact.facet_value.value_id for fact in recipe.facets] == ["bake"]
     assert {keyword.name for keyword in recipe.keywords} == {
         "Cosy",
@@ -102,7 +102,7 @@ def test_apply_enrichment_replaces_all_derived_facts_atomically(session) -> None
 def test_empty_keywords_replace_previous_keywords(session) -> None:
     recipe = _recipe(session)
     recipe.keywords = [Keyword(name="Existing")]
-    create_canonical_ingredient(session, "sea salt")
+    create_canonical_ingredient(session, "olive oil")
     session.commit()
     response = _response(keywords=[])
     apply_enrichment(
@@ -202,6 +202,23 @@ def test_stage1_prompt_requires_singular_uk_english() -> None:
     assert "chilli" in prompt
     assert "Strip redundant nationality and regional prefixes" in prompt
     assert "Do not decide which ingredients are key" in prompt
+    assert "Never extract salt or pepper" in prompt
+
+
+def test_stage1_normalizer_excludes_salt_and_pepper() -> None:
+    assert Stage1LineDecision(id="01", n="sea salt").name is None
+    assert Stage1LineDecision(id="02", n="kosher salt").name is None
+    assert Stage1LineDecision(id="03", n="table salt").name is None
+    assert Stage1LineDecision(id="04", n="flaked sea salt").name is None
+    assert Stage1LineDecision(id="05", n="black pepper").name is None
+    assert Stage1LineDecision(id="06", n="white pepper").name is None
+    assert Stage1LineDecision(id="07", n="freshly ground black pepper").name is None
+    assert Stage1LineDecision(id="08", n="peppercorn").name is None
+    assert Stage1LineDecision(id="09", n="salt and black pepper").name is None
+    assert Stage1LineDecision(id="10", n="Sichuan pepper").name == "Sichuan pepper"
+    assert Stage1LineDecision(id="11", n="bell pepper").name == "bell pepper"
+    assert Stage1LineDecision(id="12", n="chilli").name == "chilli"
+    assert Stage1LineDecision(id="13", n="cayenne pepper").name == "cayenne pepper"
 
 
 def test_stage1_schema_rejects_key_ingredient_decisions() -> None:
@@ -212,9 +229,9 @@ def test_stage1_schema_rejects_key_ingredient_decisions() -> None:
 def test_stage2_receives_structured_stage1_result_and_owns_key_selection(session) -> None:
     recipe = _recipe(session)
     stage1 = Stage1Response.model_validate(
-        {"i": [{"id": "01", "n": "sea salt"}, {"id": "02", "n": "garlic"}]}
+        {"i": [{"id": "01", "n": "olive oil"}, {"id": "02", "n": "garlic"}]}
     )
-    ingredients = ["sea salt", "garlic"]
+    ingredients = ["olive oil", "garlic"]
     context = build_stage2_context(session, recipe, ingredients)
     assert context["recipe"]["ingredients"] == ingredients
     prompt = build_stage2_prompt(context)
@@ -257,14 +274,14 @@ def test_stage1_validation_failure_retries_complete_recipe(session) -> None:
     )
     fallback = Mock()
     fallback.enrich_recipe_stage1.return_value = (
-        Stage1Response(i=[Stage1LineDecision(id="01", n="salt")]),
+        Stage1Response(i=[Stage1LineDecision(id="01", n="olive oil")]),
         Usage(cost_usd=Decimal("0.002")),
     )
     semantic = Mock()
     semantic.name = "ANTHROPIC"
     semantic.enrich_recipe_stage2.return_value = (
         Stage2Response.model_validate(
-            {"key_ingredients": ["salt"]}
+            {"key_ingredients": ["olive oil"]}
         ),
         Usage(cost_usd=Decimal("0.003")),
     )
@@ -290,7 +307,7 @@ def test_stage1_validation_failure_retries_complete_recipe(session) -> None:
         == fallback.enrich_recipe_stage1.call_args.args[0]
     )
     stage2_context = semantic.enrich_recipe_stage2.call_args.args[0]
-    assert stage2_context["recipe"]["ingredients"] == ["salt"]
+    assert stage2_context["recipe"]["ingredients"] == ["olive oil"]
 
 
 def test_explicit_enrichment_provider_settings_route_flash_lite_and_haiku(session) -> None:

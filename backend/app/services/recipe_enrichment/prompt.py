@@ -5,7 +5,7 @@ import json
 from app.services.recipe_enrichment.schema import PROMPT_VERSION
 
 _INSTRUCTIONS = """You enrich one extracted recipe. Return only the JSON response.
-For each line in the input, return an entry in i with the line id, singular UK-English canonical food name (n or null), and key ingredient flag (k). Strip redundant nationality prefixes from common staples (write `wheat flour noodle` never `Chinese wheat flour noodle`).
+For each line in the input, return an entry in i with the line id, singular UK-English canonical food name (n or null), and key ingredient flag (k). Never extract salt or pepper (return null for n); strip redundant nationality prefixes from common staples (write `wheat flour noodle` never `Chinese wheat flour noodle`).
 Mark k true for one to three core ingredients that define the identity of the dish (such as the main protein, star vegetable, or signature flavour). Mark false for secondary, supporting, or seasoning ingredients.
 If a line is a section heading, note, or contains no food ingredient, return null for n and false for k.
 Always take the first ingredient when alternatives are listed.
@@ -20,12 +20,13 @@ Wire keys: i list of {id: line ID, n: canonical name or null, k: key boolean}; c
 
 _STAGE1_INSTRUCTIONS = """You extract canonical food ingredient names from recipe ingredient lines. Return only valid JSON.
 For each line in the input, return an entry in i with the line id and the singular UK-English canonical food name (n).
-If a line is a section heading, note, or contains no food ingredient, return null for n.
+If a line is a section heading, note, contains no food ingredient, or contains ONLY salt and/or pepper, return null for n.
 Always take the first ingredient. If a line mentions alternatives (e.g. "butter or vegetable oil", "cooking spray or butter"), extract only the first mentioned ingredient ("butter", "cooking spray").
 Do not extract quantities, units, or preparation methods.
 
 For n:
 - Singular UK-English canonical food name (e.g. `garlic`, `tofu`, `prawn`, `peanut`, `lime`, `aubergine`, `coriander`, `chilli`, `egg`, `spring onion`, `noodle`).
+  * Never extract salt or pepper: return null for n on lines that specify salt, black pepper, white pepper, or universal seasoning (e.g. `salt`, `sea salt`, `kosher salt`, `table salt`, `flaked salt`, `black pepper`, `white pepper`, `peppercorn`, `freshly ground black pepper`, `salt and black pepper`). Salt and pepper are present in virtually all food and must never be extracted as canonical ingredients. Distinct culinary spices like `Sichuan pepper`, `cayenne pepper`, `chilli`, and `bell pepper` are NOT table pepper and must be kept.
   * Use strictly British English (en-GB) vocabulary and spelling: write `chilli` never `chile` or `chili`, `coriander` never `cilantro`, `aubergine` never `eggplant`, `courgette` never `zucchini`, `spring onion` never `scallion` or `green onion`.
   * ALWAYS use strictly singular forms: write `egg` not `eggs`, `spring onion` not `spring onions`, `noodle` not `noodles`, `tomato` not `tomatoes`.
   * Exclude size adjectives (`large`, `small`, `medium`) and preparation/state adjectives (`roasted`, `baked`, `toasted`, `ground`, `steamed`, `peeled`, `crushed`, `chopped`, `diced`).
