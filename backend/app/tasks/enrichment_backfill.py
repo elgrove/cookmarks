@@ -581,12 +581,18 @@ def apply_ready_stage2(
                 {k: v for k, v in stored.items() if k != "stage2"})
             if item.attempt > 1 and isinstance(stage2_payload, dict):
                 keys = stage2_payload.get("k") or stage2_payload.get("key_ingredients")
+                stage1_names = [i.name for i in stage1.ingredients if i.name]
+                stage2_payload = dict(stage2_payload)
                 if isinstance(keys, list) and len(keys) > 3:
-                    stage2_payload = dict(stage2_payload)
                     if "k" in stage2_payload:
                         stage2_payload["k"] = keys[:3]
                     if "key_ingredients" in stage2_payload:
                         stage2_payload["key_ingredients"] = keys[:3]
+                elif (not keys or len(keys) == 0) and stage1_names:
+                    if "k" in stage2_payload:
+                        stage2_payload["k"] = [stage1_names[0]]
+                    if "key_ingredients" in stage2_payload:
+                        stage2_payload["key_ingredients"] = [stage1_names[0]]
             stage2 = Stage2Response.model_validate(stage2_payload)
             response = EnrichmentResponse.from_stages(stage1, stage2)
             metrics = apply_enrichment(

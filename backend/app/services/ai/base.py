@@ -301,6 +301,15 @@ class AIProvider(abc.ABC):
                         if "key_ingredients" in data:
                             data["key_ingredients"] = keys[:3]
                         raw_text = json.dumps(data)
+                    elif not keys:
+                        recipe_ings = context.get("recipe", {}).get("ingredients") or []
+                        if recipe_ings:
+                            data = dict(data)
+                            if "k" in data or "k" in raw_text:
+                                data["k"] = [recipe_ings[0]]
+                            if "key_ingredients" in data or "key_ingredients" in raw_text or "k" not in data:
+                                data["key_ingredients"] = [recipe_ings[0]]
+                            raw_text = json.dumps(data)
             except Exception:
                 pass
         try:

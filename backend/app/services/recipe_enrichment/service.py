@@ -560,6 +560,21 @@ def enrich_recipe(
                     continue
                 raise
             usage += usage2
+            if unique_ingredients and not stage2_response.key_ingredients:
+                if not stage2_retried:
+                    stage2_retried = True
+                    logger.info(
+                        "Stage 2 selected 0 key ingredients for recipe %s; retrying Stage 2 with %s",
+                        recipe_id,
+                        stage2_model,
+                    )
+                    continue
+                stage2_response.key_ingredients = [unique_ingredients[0]]
+                logger.info(
+                    "Stage 2 selected 0 key ingredients on retry for recipe %s; falling back to %s",
+                    recipe_id,
+                    unique_ingredients[0],
+                )
             try:
                 response = EnrichmentResponse.from_stages(stage1_response, stage2_response)
             except ValueError as exc:
@@ -593,6 +608,19 @@ def enrich_recipe(
                             stage2_model,
                         )
                         continue
+                elif str(exc) == "Stage 2 must select at least one key ingredient":
+                    if not stage2_retried:
+                        stage2_retried = True
+                        logger.info(
+                            "Stage 2 selected 0 key ingredients for recipe %s; retrying Stage 2 with %s",
+                            recipe_id,
+                            stage2_model,
+                        )
+                        continue
+                    if unique_ingredients:
+                        stage2_response.key_ingredients = [unique_ingredients[0]]
+                        response = EnrichmentResponse.from_stages(stage1_response, stage2_response)
+                        break
                 raise AIResponseError(f"Invalid Stage 2 response: {exc}", usage) from exc
             break
 

@@ -522,6 +522,55 @@ def test_excessive_key_ingredients_retry_and_truncate_on_retry(worker_session) -
     assert item.status is EnrichmentBatchItemStatus.APPLIED
 
 
+def test_apply_ready_stage2_falls_back_when_attempt2_selects_zero_keys(worker_session) -> None:
+    session = worker_session
+    recipe = _recipe(session)
+    run = _backfill_run(session)
+    prepare_stage_chunks(session, run, [recipe.id], stage="stage1", attempt=1, first_chunk=0)
+    batch = session.scalars(select(RecipeEnrichmentBatch)).one()
+    item = batch.items[0]
+    batch.stage = "stage2"
+
+    # Attempt 1 failed with zero keys
+    item.status = EnrichmentBatchItemStatus.SUCCEEDED
+    item.attempt = 1
+    item.stage1_response = {
+        "i": [
+            {"id": "01", "n": "olive oil"},
+            {"id": "02", "n": "lemon"},
+        ],
+        "stage2": {"k": [], "c": [], "m": [], "o": [], "w": []},
+    }
+    session.commit()
+
+    assert apply_ready_stage2(
+        session, run, StubProvider(""), StubProvider(""), "stage1", "stage2"
+    ) == {"applied": 0, "stale": 0, "failed": 1}
+    assert "Stage 2 must select at least one key ingredient" in (item.provider_error or "")
+
+    # Now simulate retry chunk with attempt=2 where Stage 2 still returned 0 keys
+    item.attempt = 2
+    item.status = EnrichmentBatchItemStatus.SUCCEEDED
+    item.stage1_response = {
+        "i": [
+            {"id": "01", "n": "olive oil"},
+            {"id": "02", "n": "lemon"},
+        ],
+        "stage2": {"k": [], "c": [], "m": [], "o": [], "w": []},
+    }
+    session.commit()
+
+    assert apply_ready_stage2(
+        session, run, StubProvider(""), StubProvider(""), "stage1", "stage2"
+    ) == {"applied": 1, "stale": 0, "failed": 0}
+    assert item.status is EnrichmentBatchItemStatus.APPLIED
+    session.refresh(recipe)
+    key_ings = [i for i in recipe.ingredients if i.is_key]
+    assert len(key_ings) == 1
+    assert key_ings[0].canonical_ingredient is not None
+    assert key_ings[0].canonical_ingredient.name == "olive oil"
+
+
 def test_stale_items_never_retry_in_same_run(worker_session) -> None:
     session = worker_session
     recipe = _recipe(session)

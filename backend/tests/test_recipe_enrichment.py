@@ -459,6 +459,75 @@ def test_ai_provider_enrich_recipe_stage2_truncates_when_allowed(monkeypatch: py
     assert res.key_ingredients == ["one", "two", "three"]
 
 
+def test_ai_provider_enrich_recipe_stage2_zero_keys_fallback_when_allowed(monkeypatch: pytest.MonkeyPatch) -> None:
+    provider = StubProvider("")
+    monkeypatch.setattr(
+        provider,
+        "_complete",
+        Mock(
+            return_value=(
+                '{"k": [], "c": [], "m": [], "o": [], "w": []}',
+                Usage(),
+            )
+        ),
+    )
+    context = {
+        "recipe": {"id": "1", "name": "Test", "lines": [], "ingredients": ["olive oil", "lemon"]},
+        "vocabulary": {"cuisines": [], "methods": [], "courses": []},
+    }
+
+    # When allow_truncate_keys is False, key_ingredients is empty
+    res_false, _ = provider.enrich_recipe_stage2(context, allow_truncate_keys=False)
+    assert res_false.key_ingredients == []
+
+    # When allow_truncate_keys is True, falls back to first ingredient
+    res_true, _ = provider.enrich_recipe_stage2(context, allow_truncate_keys=True)
+    assert res_true.key_ingredients == ["olive oil"]
+
+
+def test_stage2_zero_key_ingredients_retries_and_falls_back(session) -> None:
+    recipe = _recipe(session)
+    primary = Mock()
+    primary.enrich_recipe_stage1.return_value = (
+        Stage1Response.model_validate({"i": [{"id": "01", "n": "olive oil"}]}),
+        Usage(cost_usd=Decimal("0.001")),
+    )
+    semantic = Mock()
+    semantic.name = "ANTHROPIC"
+    semantic.enrich_recipe_stage2.side_effect = [
+        (
+            Stage2Response.model_validate({"k": [], "c": [], "m": [], "o": [], "w": []}),
+            Usage(cost_usd=Decimal("0.002")),
+        ),
+        (
+            Stage2Response.model_validate({"k": [], "c": [], "m": [], "o": [], "w": []}),
+            Usage(cost_usd=Decimal("0.003")),
+        ),
+    ]
+
+    result, _ = enrich_recipe(
+        session,
+        recipe.id,
+        provider=StubProvider(""),
+        stage1_provider=primary,
+        stage1_fallback_provider=primary,
+        stage2_provider=semantic,
+        stage1_model="flash-lite",
+        stage1_fallback_model="flash-lite",
+        stage2_model="haiku",
+    )
+
+    assert result["key_ingredients"] == 1
+    assert semantic.enrich_recipe_stage2.call_count == 2
+    assert semantic.enrich_recipe_stage2.call_args_list[0].kwargs.get("allow_truncate_keys") is False
+    assert semantic.enrich_recipe_stage2.call_args_list[1].kwargs.get("allow_truncate_keys") is True
+    session.refresh(recipe)
+    key_ings = [i for i in recipe.ingredients if i.is_key]
+    assert len(key_ings) == 1
+    assert key_ings[0].canonical_ingredient is not None
+    assert key_ings[0].canonical_ingredient.name == "olive oil"
+
+
 def test_unknown_stage2_ingredient_retries_stage2_when_stage1_does_not_find_it(session) -> None:
     recipe = _recipe(session)
     primary = Mock()
