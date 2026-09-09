@@ -262,12 +262,12 @@ class AIProvider(abc.ABC):
             raise AIResponseError(f"Invalid recipe enrichment response: {exc}", usage) from exc
 
     def enrich_recipe_stage1(
-        self, context: dict, model: str | None = None
+        self, context: dict, model: str | None = None, temp: float = 0
     ) -> tuple[Stage1Response, Usage]:
         """Run Stage 1 ingredient structuring for one recipe."""
         model = model or self.model_for(ModelRole.RECIPE_INGREDIENTS)
         response, usage = self._complete(
-            build_stage1_prompt(context), model, schema=STAGE1_JSON_SCHEMA, temp=0
+            build_stage1_prompt(context), model, schema=STAGE1_JSON_SCHEMA, temp=temp
         )
         if not response:
             raise AIResponseError("Recipe ingredient structuring returned an empty response", usage)

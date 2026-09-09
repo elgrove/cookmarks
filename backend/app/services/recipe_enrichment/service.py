@@ -449,9 +449,10 @@ def _run_stage1(
     context: dict,
     provider: AIProvider,
     model: str,
+    temp: float = 0,
 ) -> tuple[Stage1Response, Usage]:
     try:
-        response, usage = provider.enrich_recipe_stage1(context, model)
+        response, usage = provider.enrich_recipe_stage1(context, model, temp=temp)
         validate_stage1_response(context, response)
         return response, usage
     except AIResponseError:
@@ -526,6 +527,7 @@ def enrich_recipe(
                         stage1_context,
                         stage1_fallback_provider,
                         stage1_fallback_model,
+                        temp=0.2,
                     )
                 except AIResponseError as fallback_exc:
                     raise AIResponseError(
