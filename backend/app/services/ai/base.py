@@ -279,12 +279,16 @@ class AIProvider(abc.ABC):
             ) from exc
 
     def enrich_recipe_stage2(
-        self, context: dict, model: str | None = None, allow_truncate_keys: bool = False
+        self,
+        context: dict,
+        model: str | None = None,
+        allow_truncate_keys: bool = False,
+        temp: float = 0,
     ) -> tuple[Stage2Response, Usage]:
         """Run Stage 2 facet & keyword assignment for one recipe."""
         model = model or self.model_for(ModelRole.RECIPE_SEMANTICS)
         response, usage = self._complete(
-            build_stage2_prompt(context), model, schema=STAGE2_JSON_SCHEMA, temp=0
+            build_stage2_prompt(context), model, schema=STAGE2_JSON_SCHEMA, temp=temp
         )
         if not response:
             raise AIResponseError("Recipe facet assignment returned an empty response", usage)
@@ -294,15 +298,34 @@ class AIProvider(abc.ABC):
                 data = json.loads(raw_text)
                 if isinstance(data, dict):
                     keys = data.get("k") or data.get("key_ingredients")
-                    if isinstance(keys, list) and len(keys) > 3:
+                    recipe_ings = context.get("recipe", {}).get("ingredients") or []
+                    if isinstance(keys, list):
+                        if recipe_ings:
+                            ings_folded = {ing.casefold(): ing for ing in recipe_ings}
+                            valid_keys: list[str] = []
+                            for k in keys:
+                                k_str = str(k).strip()
+                                if k_str.casefold() in ings_folded:
+                                    valid_keys.append(ings_folded[k_str.casefold()])
+                                else:
+                                    for ing_name in recipe_ings:
+                                        if (
+                                            k_str.casefold() in ing_name.casefold()
+                                            or ing_name.casefold() in k_str.casefold()
+                                        ):
+                                            if ing_name not in valid_keys:
+                                                valid_keys.append(ing_name)
+                                            break
+                            keys = valid_keys or [recipe_ings[0]]
+                        if len(keys) > 3:
+                            keys = keys[:3]
                         data = dict(data)
                         if "k" in data:
-                            data["k"] = keys[:3]
+                            data["k"] = keys
                         if "key_ingredients" in data:
-                            data["key_ingredients"] = keys[:3]
+                            data["key_ingredients"] = keys
                         raw_text = json.dumps(data)
                     elif not keys:
-                        recipe_ings = context.get("recipe", {}).get("ingredients") or []
                         if recipe_ings:
                             data = dict(data)
                             if "k" in data or "k" in raw_text:

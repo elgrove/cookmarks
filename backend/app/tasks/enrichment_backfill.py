@@ -583,11 +583,27 @@ def apply_ready_stage2(
                 keys = stage2_payload.get("k") or stage2_payload.get("key_ingredients")
                 stage1_names = [i.name for i in stage1.ingredients if i.name]
                 stage2_payload = dict(stage2_payload)
-                if isinstance(keys, list) and len(keys) > 3:
+                if isinstance(keys, list) and stage1_names:
+                    names_folded = {name.casefold(): name for name in stage1_names}
+                    valid_keys: list[str] = []
+                    for k in keys:
+                        k_str = str(k).strip()
+                        if k_str.casefold() in names_folded:
+                            valid_keys.append(names_folded[k_str.casefold()])
+                        else:
+                            for name in stage1_names:
+                                if (
+                                    k_str.casefold() in name.casefold()
+                                    or name.casefold() in k_str.casefold()
+                                ):
+                                    if name not in valid_keys:
+                                        valid_keys.append(name)
+                                    break
+                    filtered = (valid_keys or [stage1_names[0]])[:3]
                     if "k" in stage2_payload:
-                        stage2_payload["k"] = keys[:3]
+                        stage2_payload["k"] = filtered
                     if "key_ingredients" in stage2_payload:
-                        stage2_payload["key_ingredients"] = keys[:3]
+                        stage2_payload["key_ingredients"] = filtered
                 elif (not keys or len(keys) == 0) and stage1_names:
                     if "k" in stage2_payload:
                         stage2_payload["k"] = [stage1_names[0]]

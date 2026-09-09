@@ -88,12 +88,15 @@ class GeminiProvider(AIProvider):
             if schema is ENRICHMENT_JSON_SCHEMA:
                 config["response_json_schema"] = GEMINI_ENRICHMENT_JSON_SCHEMA
                 config["thinking_config"] = {"thinking_budget": 0}
+                config["max_output_tokens"] = 4096
             elif schema is STAGE1_JSON_SCHEMA:
                 config["response_json_schema"] = GEMINI_STAGE1_JSON_SCHEMA
                 config["thinking_config"] = {"thinking_budget": 0}
+                config["max_output_tokens"] = 4096
             elif schema is STAGE2_JSON_SCHEMA:
                 config["response_json_schema"] = GEMINI_STAGE2_JSON_SCHEMA
                 config["thinking_config"] = {"thinking_budget": 0}
+                config["max_output_tokens"] = 2048
             else:
                 config["response_json_schema"] = schema
 

@@ -545,7 +545,10 @@ def enrich_recipe(
             session.rollback()
             try:
                 stage2_response, usage2 = stage2_provider.enrich_recipe_stage2(
-                    stage2_context, stage2_model, allow_truncate_keys=stage2_retried
+                    stage2_context,
+                    stage2_model,
+                    allow_truncate_keys=stage2_retried,
+                    temp=0.2 if stage2_retried else 0.0,
                 )
             except AIResponseError as stage2_exc:
                 if not stage2_retried:
@@ -608,6 +611,29 @@ def enrich_recipe(
                             stage2_model,
                         )
                         continue
+                    if unique_ingredients:
+                        ings_folded = {u.casefold(): u for u in unique_ingredients}
+                        valid_keys: list[str] = []
+                        for k in stage2_response.key_ingredients:
+                            k_str = str(k).strip()
+                            if k_str.casefold() in ings_folded:
+                                valid_keys.append(ings_folded[k_str.casefold()])
+                            else:
+                                for u in unique_ingredients:
+                                    if (
+                                        k_str.casefold() in u.casefold()
+                                        or u.casefold() in k_str.casefold()
+                                    ):
+                                        if u not in valid_keys:
+                                            valid_keys.append(u)
+                                        break
+                        stage2_response.key_ingredients = (
+                            valid_keys or [unique_ingredients[0]]
+                        )[:3]
+                        response = EnrichmentResponse.from_stages(
+                            stage1_response, stage2_response
+                        )
+                        break
                 elif str(exc) == "Stage 2 must select at least one key ingredient":
                     if not stage2_retried:
                         stage2_retried = True

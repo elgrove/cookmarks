@@ -1,3 +1,4 @@
+import json
 from decimal import Decimal
 from unittest.mock import Mock
 
@@ -13,6 +14,7 @@ from app.services.ai.anthropic import AnthropicProvider
 from app.services.ai.gemini import GeminiProvider
 from app.services.ai.registry import get_config, get_recipe_enrichment_providers
 from app.services.ai.stub import StubProvider
+from app.services.recipe_enrichment.batch import stage1_row, stage2_row
 from app.services.recipe_enrichment.prompt import (
     build_prompt,
     build_stage1_prompt,
@@ -684,4 +686,67 @@ def test_unknown_and_duplicate_methods_and_courses_are_filtered_and_deduplicated
         if f.facet_value.kind.value == "course"
     ]
     assert course_facets == ["main", "dessert"]
+
+
+def test_stage2_retry_maps_unknown_ingredient_to_valid_fallback(session) -> None:
+    recipe = _recipe(session)
+    recipe.ingredients[0].text = "muscovado sugar"
+    session.commit()
+    stage1_provider = Mock()
+    stage1_provider.name = "MOCK_STAGE1"
+    stage1_provider.model_for.return_value = "stage1-model"
+    stage1_provider.enrich_recipe_stage1.return_value = (
+        Stage1Response.model_validate(
+            {
+                "i": [
+                    {"id": "01", "n": "light muscovado sugar"},
+                ]
+            }
+        ),
+        Usage(),
+    )
+
+    stage2_provider = Mock()
+    stage2_provider.name = "MOCK_STAGE2"
+    stage2_provider.model_for.return_value = "stage2-model"
+    stage2_provider.enrich_recipe_stage2.return_value = (
+        Stage2Response.model_validate(
+            {"key_ingredients": ["muscovado sugar"]}
+        ),
+        Usage(),
+    )
+
+    enrich_recipe(
+        session,
+        recipe.id,
+        stage1_provider=stage1_provider,
+        stage1_fallback_provider=stage1_provider,
+        stage2_provider=stage2_provider,
+    )
+
+    session.refresh(recipe)
+    assert recipe.enrichment_state is not None
+    assert recipe.enrichment_state.status is RecipeEnrichmentStatus.COMPLETE
+    assert recipe.ingredients[0].is_key is True
+    assert recipe.ingredients[0].canonical_name == "light muscovado sugar"
+
+
+def test_batch_rows_set_max_output_tokens() -> None:
+    context = {
+        "recipe": {
+            "id": "1",
+            "name": "Cake",
+            "book_title": "Baking",
+            "book_author": "Chef",
+            "lines": [{"id": "01", "text": "1 cup flour"}],
+            "ingredients": ["flour"],
+            "instructions": ["Mix and bake."],
+        },
+        "vocabulary": {"cuisines": [], "methods": [], "courses": []},
+    }
+    s1 = json.loads(stage1_row("k1", context))
+    assert s1["request"]["generation_config"]["max_output_tokens"] == 4096
+
+    s2 = json.loads(stage2_row("k2", context))
+    assert s2["request"]["generation_config"]["max_output_tokens"] == 2048
 
