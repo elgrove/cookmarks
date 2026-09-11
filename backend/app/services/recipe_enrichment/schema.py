@@ -11,7 +11,7 @@ PROMPT_VERSION = "v46"
 TAXONOMY_VERSION = "v1"
 
 SUMMARY_MIN_WORDS = 3
-SUMMARY_MAX_WORDS = 10
+SUMMARY_MAX_WORDS = 12
 
 
 def summary_style_error(summary: str) -> str | None:

@@ -251,9 +251,11 @@ def test_schema_version_tracks_the_bounded_output_change() -> None:
 
 
 def test_summary_rejects_invalid_length_or_format() -> None:
-    with pytest.raises(ValidationError, match="3 to 10 words"):
+    with pytest.raises(ValidationError, match="3 to 12 words"):
         Stage2Response.model_validate(
-            {"s": "Corn kernels in broth with epazote chilli lime cheese and avocado crema"}
+            {
+                "s": "Corn kernels in broth with epazote chilli lime cheese and avocado crema salsa"
+            }
         )
 
     decorative = Stage2Response.model_validate({"s": "Rich corn with cheese"})
@@ -262,10 +264,10 @@ def test_summary_rejects_invalid_length_or_format() -> None:
     with pytest.raises(ValidationError, match="fragment without terminal punctuation"):
         Stage2Response.model_validate({"s": "Corn in broth with epazote."})
 
-    ten_words = Stage2Response.model_validate(
-        {"s": "Corn kernels in broth with epazote chilli lime cheese avocado"}
+    twelve_words = Stage2Response.model_validate(
+        {"s": "Corn kernels in broth with epazote chilli lime cheese avocado crema salsa"}
     )
-    assert ten_words.summary == "Corn kernels in broth with epazote chilli lime cheese avocado"
+    assert twelve_words.summary == "Corn kernels in broth with epazote chilli lime cheese avocado crema salsa"
 
     response = Stage2Response.model_validate({"s": "Corn in broth with epazote"})
     assert response.summary == "Corn in broth with epazote"
