@@ -83,53 +83,27 @@ Residual Keywords (w):
 - Do NOT repeat any cuisine, method, course, or ingredient name in keywords.
 - Do not add filler keywords.
 
-Alternate Name (a):
-- Check the recipe title and description.
-- If the recipe title is in a non-English language (such as Spanish, French, Italian, Hindi, Persian):
-  * Look at the recipe description: if description is or contains a short 1-4 word English dish name or translation (e.g. "description": "Split Pea and Lamb Stew" or "description": "Spiced Potatoes and Cauliflower"), copy that English name directly into 'a'!
-  * Otherwise, you MUST provide an English translation in Title Case UK-English in 'a' (e.g. "Pollo Al Ajillo" -> "Garlic Chicken", "Zuppa Di Pesce" -> "Fish Soup", "Pescado A La Veracruzana" -> "Veracruz-style Fish", "Khoresht Gheimeh" -> "Split Pea and Lamb Stew", "Arroz Con Pollo" -> "Rice with Chicken").
-  * Foreign Title Translation in 'a' TAKES STRICT PRECEDENCE over dish summary ('s'). When 'a' provides a plain English dish translation, 's' MUST be null! Never write a summary when 'a' translates the dish.
-- Set 'a' to null ONLY IF:
-  * The recipe title itself is in English.
-  * The recipe title is an established English loanword with no translation needed (e.g. "Tacos", "Kimchi", "Gyoza", "Croissant", "Miso", "Puris", "Shakshuka", "Bibimbap", "Ramen", "Tempura", "Spanakopita").
-  * The recipe title itself already contains the English translation directly in the title text (e.g. "Boeuf Bourguignon / Braised Beef In Red Wine", "Hong Shao Rou (Red-braised Pork Belly)").
-  * The recipe title combines an English ingredient with a foreign dish style (e.g. "Chicken Cafreal").
-- Never invent artificial foreign translations for English dishes or modern fusion recipes.
+Title descriptor decision (a and s):
+- Return exactly one descriptor outcome. Never return both 'a' and 's'.
+- Literal native-language description: if the title directly names ordinary food, ingredients, or a dish form in its native language, return its literal English translation in Title Case UK-English as 'a'; set 's' to null. This is not a named dish. Examples: "Bharli Mirchi" -> a: "Stuffed Chillies", s: null; "Mouna Au Lait" -> a: "Milk Bread", s: null; "Patl\u0131can Biber Tavas\u0131 Yo\u011furtlu Sarm\u0131sakl\u0131 Ve Domates Soslu" -> a: "Fried Aubergine and Pepper with Tomato and Garlic Yoghurt Sauce", s: null.
+- Named cultural dish or opaque title: if the title is a conventional dish name, regional name, loanword, or cannot be understood by translating each word into an ordinary English recipe name, set 'a' to null and provide 's'. Never translate a named dish word by word. Examples: "Bhel Puri" -> a: null, s: "Puffed rice with tamarind chutney"; "Gazpacho" -> a: null, s: "Chilled tomato and pepper soup".
+- Self-descriptive English title: if the English title already tells the reader what food it is and its defining ingredient or sauce, set both 'a' and 's' to null. Examples: "Pickled Pears With Thyme, Chilli & Coriander", "Greek Breads With Green Onions", and "Courgette Noodles With Callaloo Pesto".
 
-Summary (s):
+Summary style (s):
 - A cold, food-first descriptor of 3 to 8 words. It is a label, not a sentence: do not add a full stop.
 - State only the food and its primary component or sauce. Do not describe the method, serving details, garnish, or extra ingredients unless needed to identify the food.
 - For noodle dishes, name the noodle type or base grain, not the cooking method.
 - Select details from the cooked dish, not from optional serving items. Prefer a defining herb, chilli, or sauce component over cheese, mayonnaise, lime, or other garnish.
 - For a named sauce, include its colour and the one or two ingredients that distinguish it. Use a preparation word only when it identifies the dish form, such as a layered dish.
-- ALWAYS provide a summary for:
+- Always provide a summary for:
   * Named cultural dishes, regional styles, and loanwords whose preparation is not obvious from English words (e.g. "Shakshuka", "Spanakopita", "Goulash", "Bouillabaisse", "Caponata", "Bibimbap", "Lentil Puris", "Elote").
   * Dishes named after a culinary style, glaze, or sauce (e.g. dishes featuring "Teriyaki", "Adobo", "Tikka", "Kung Pao", "Mole").
   * Dishes that combine an English ingredient with an obscure regional dish style (e.g. "Chicken Cafreal").
   * Regional noodle soups and noodle dishes (e.g. "Laksa", "Khao Soi", "Dan Dan Noodles").
   * Dishes whose title combines a foreign name and an English translation, but the dish is a complex regional preparation (e.g. "Hong Shao Rou (Red-braised Pork Belly)").
-- Familiarity is not a reason to set summary to null. A named cultural dish or loanword always needs a summary. A self-descriptive English title must name both the food and its defining ingredient or sauce in ordinary English; a title with a foreign dish term or regional style is not self-descriptive.
-- Set summary to null ONLY IF:
-  * The recipe title is standard, self-descriptive English cooking (e.g. "Lemon Drizzle Sponge Cake", "Fruit Salad Cups", "Carrot And Coriander Soup", "Peach & Halloumi Salad").
-  * The alternate name ('a') already clearly names the food in plain English (e.g. 'Garlic Chicken', 'Fish Soup', 'Split Pea and Lamb Stew', 'Spiced Potatoes and Cauliflower'). In this case, 'a' already explains what the dish is, so 's' MUST be null.
+- Familiarity is not a reason to set summary to null. A named cultural dish or loanword always needs a summary.
 - Style: Never start with "A" or "An". Describe the food directly, without praise or decorative language. Stop after the essential food components.
 - FORBIDDEN WORDS: NEVER use any of these words or phrases in 's': "spiced", "ground", "coated", "with spices", "until tender", "rich", "deep", "complex", "classic", "fresh", "crisp", "creamy", "fragrant", "vibrant", "delicate", "luscious", "aromatic", "warming", "luxurious", "silky", "tender", "golden", "finished".
-
-Examples for alternate name (a) and summary (s):
-- Title: "Spanakopita" -> a: null, s: "Filo pie with spinach and feta"
-- Title: "Pollo Al Ajillo", Description: "Garlic chicken is a classic Spanish tapa..." -> a: "Garlic Chicken", s: null
-- Title: "Khoresht Gheimeh", Description: "Split Pea and Lamb Stew" -> a: "Split Pea and Lamb Stew", s: null
-- Title: "Fruit Salad Cups" -> a: null, s: null
-- Title: "Laksa" -> a: null, s: "Noodles in coconut curry broth"
-- Title: "Boeuf Bourguignon / Braised Beef In Red Wine" -> a: null, s: "Beef in red wine sauce"
-- Title: "Lemon Drizzle Sponge Cake" -> a: null, s: null
-- Title: "Elote" -> a: null, s: "Corn with cheese and chilli"
-- Title: "Zuppa Di Pesce" -> a: "Fish Soup", s: null
-- Title: "Hong Shao Rou (Red-braised Pork Belly)" -> a: null, s: "Pork belly in soy sauce"
-- Title: "Shakshuka" -> a: null, s: "Eggs in tomato pepper sauce"
-- Title: "Chicken Cafreal" -> a: null, s: "Goan chicken with green chilli paste"
-- Title: "Goulash" -> a: null, s: "Beef stew with paprika"
-- Title: "Carrot And Coriander Soup" -> a: null, s: null
 
 Wire keys: k key ingredient names; c cuisine IDs; m methods {v ID, p primary}; o course IDs; w keywords; a alternate name or null; s summary or null."""
 
@@ -157,10 +131,8 @@ def build_stage2_prompts(context: dict) -> tuple[str, str]:
         "Recipe context:\n"
         + json.dumps(context["recipe"], ensure_ascii=False)
         + "\n\nEnrich this recipe with key ingredients (1-3), cuisines, methods, courses, residual keywords, alternate name (a), and summary (s).\n"
-        + "- If the recipe title is in a foreign language (e.g. Spanish, French, Italian, Hindi, Persian):\n"
-        + "  * Provide the English translation in \"a\" (e.g. \"Arroz Con Pollo\" -> \"Rice with Chicken\", \"Pollo Al Ajillo\" -> \"Garlic Chicken\", \"Zuppa Di Pesce\" -> \"Fish Soup\"). If \"description\" is a short English dish name (e.g. \"Split Pea and Lamb Stew\") or starts by explaining the dish (e.g. \"Chicken cooked in garlic is...\"), copy or use that English name for \"a\"!\n"
-        + "  * When \"a\" names the dish in plain English (e.g. \"Garlic Chicken\", \"Fish Soup\", \"Split Pea and Lamb Stew\"), set \"s\" to null.\n"
-        + "- Summary \"s\" is a cold 3-8 word descriptor. State only the food and its main component or sauce; no full stop. Do not use optional serving items or garnish. For noodle dishes, name the noodle type or base grain, not the cooking method. Familiarity is not a reason for null: a named cultural dish or loanword always needs a summary. A self-descriptive English title must name both the food and its defining ingredient or sauce in ordinary English; a title with a foreign dish term or regional style still needs a summary. Prefer a defining cooked-in herb, chilli, or sauce component. For a named sauce, include its colour and one or two distinctive ingredients. Use a preparation word only when it identifies the dish form, such as a layered dish. Never use decorative language such as \"rich\", \"deep\", \"complex\", \"crisp\", \"creamy\", \"fragrant\", \"vibrant\", or \"golden\"; also never use \"spiced\", \"ground\", \"coated\", \"with spices\", or \"until tender\"."
+        + "- Apply the title descriptor decision exactly: a literal native-language description gets English translation in \"a\" and null \"s\"; a named cultural dish or opaque title gets null \"a\" and a food-first \"s\"; a self-descriptive English title gets null for both.\n"
+        + "- Do not translate a named dish word by word. Never return both \"a\" and \"s\"."
     )
     return system, user
 

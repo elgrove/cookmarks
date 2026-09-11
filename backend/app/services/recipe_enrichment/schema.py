@@ -7,7 +7,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 SCHEMA_VERSION = "v9"
-PROMPT_VERSION = "v44"
+PROMPT_VERSION = "v45"
 TAXONOMY_VERSION = "v1"
 
 SUMMARY_MIN_WORDS = 3
@@ -292,12 +292,12 @@ class Stage2Response(EnrichmentDecision):
     alternate_name: str | None = Field(
         default=None,
         alias="a",
-        description="English translation of a non-English recipe title in Title Case UK-English (e.g. 'Pollo Al Ajillo' -> 'Garlic Chicken', 'Zuppa Di Pesce' -> 'Fish Soup', 'Khoresht Gheimeh' -> 'Split Pea and Lamb Stew'). Check description: if description is or contains a short 1-4 word English dish name or translation, copy it directly into 'a'. Must be null only if the recipe title itself is in English, is an established loanword (e.g. 'Tacos', 'Gyoza', 'Shakshuka'), or already includes the translation directly in the title.",
+        description="Title Case UK-English literal translation only for a native-language title that directly describes the food, ingredients, or form (e.g. 'Bharli Mirchi' -> 'Stuffed Chillies', 'Mouna Au Lait' -> 'Milk Bread'). Set null for a named cultural dish, opaque traditional name, loanword, or self-descriptive English title. Do not translate a named dish word by word; it needs summary (s) instead.",
     )
     summary: str | None = Field(
         default=None,
         alias="s",
-        description="3-8 word food-first descriptor for named cultural dishes, regional styles, glaze/sauce styles, noodle soups, loanwords, or opaque titles. State only the food and its main component or sauce (e.g. 'Filo pie with spinach and feta', 'Chicken with dark sauce'). Must be null only if the recipe title is everyday self-descriptive English cooking or if alternate name (a) already clearly explains the dish. Never start with 'A' or 'An'. Do not use decorative language, cooking-process detail, or forbidden words including 'spiced', 'rich', 'deep', 'complex', 'crisp', 'creamy', 'fragrant', 'vibrant', 'golden', 'ground', 'coated', 'with spices', or 'until tender'.",
+        description="3-8 word food-first descriptor for a named cultural dish, opaque traditional name, loanword, regional style, glaze/sauce style, or noodle dish (e.g. 'Bhel Puri' -> 'Puffed rice with tamarind chutney', 'Gazpacho' -> 'Chilled tomato and pepper soup'). Must be null for literal native-language translations and self-descriptive English titles. Never start with 'A' or 'An'. Do not use decorative language, cooking-process detail, or forbidden words including 'spiced', 'rich', 'deep', 'complex', 'crisp', 'creamy', 'fragrant', 'vibrant', 'golden', 'ground', 'coated', 'with spices', or 'until tender'.",
     )
 
     @field_validator("alternate_name", mode="before")
@@ -390,12 +390,12 @@ class EnrichmentResponse(EnrichmentDecision):
     alternate_name: str | None = Field(
         default=None,
         alias="a",
-        description="English translation of non-English recipe title in Title Case UK-English (e.g. 'Pollo Al Ajillo' -> 'Garlic Chicken', 'Zuppa Di Pesce' -> 'Fish Soup', 'Khoresht Gheimeh' -> 'Split Pea and Lamb Stew'). Check description: if description is or contains a short 1-4 word English dish name or translation, copy it directly into 'a'. Must be null if title is in English, is an established loanword (e.g. 'Tacos', 'Gyoza', 'Shakshuka'), or already includes the English translation.",
+        description="Title Case UK-English literal translation only for a native-language title that directly describes the food, ingredients, or form (e.g. 'Bharli Mirchi' -> 'Stuffed Chillies', 'Mouna Au Lait' -> 'Milk Bread'). Set null for a named cultural dish, opaque traditional name, loanword, or self-descriptive English title. Do not translate a named dish word by word; it needs summary (s) instead.",
     )
     summary: str | None = Field(
         default=None,
         alias="s",
-        description="3-8 word food-first descriptor for named cultural dishes, regional styles, glaze/sauce styles, noodle soups, loanwords, or opaque titles. State only the food and its main component or sauce (e.g. 'Filo pie with spinach and feta', 'Chicken with dark sauce'). Must be null only if the recipe title is everyday self-descriptive English cooking or if alternate name (a) already clearly explains the dish. Never start with 'A' or 'An'. Do not use decorative language, cooking-process detail, or forbidden words including 'spiced', 'rich', 'deep', 'complex', 'crisp', 'creamy', 'fragrant', 'vibrant', 'golden', 'ground', 'coated', 'with spices', or 'until tender'.",
+        description="3-8 word food-first descriptor for a named cultural dish, opaque traditional name, loanword, regional style, glaze/sauce style, or noodle dish (e.g. 'Bhel Puri' -> 'Puffed rice with tamarind chutney', 'Gazpacho' -> 'Chilled tomato and pepper soup'). Must be null for literal native-language translations and self-descriptive English titles. Never start with 'A' or 'An'. Do not use decorative language, cooking-process detail, or forbidden words including 'spiced', 'rich', 'deep', 'complex', 'crisp', 'creamy', 'fragrant', 'vibrant', 'golden', 'ground', 'coated', 'with spices', or 'until tender'.",
     )
 
     @field_validator("alternate_name", mode="before")

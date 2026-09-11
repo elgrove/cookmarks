@@ -223,6 +223,22 @@ def test_enrichment_prompt_requires_central_methods() -> None:
     assert "Decide cuisines, methods and courses" in prompt
 
 
+def test_stage2_prompt_distinguishes_title_descriptor_outcomes() -> None:
+    prompt = build_stage2_prompt(
+        {
+            "vocabulary": {"cuisines": [], "methods": [], "courses": []},
+            "recipe": {"id": "recipe-id", "name": "Recipe", "instructions": [], "ingredients": []},
+        }
+    )
+
+    assert '"Bharli Mirchi" -> a: "Stuffed Chillies", s: null' in prompt
+    assert '"Mouna Au Lait" -> a: "Milk Bread", s: null' in prompt
+    assert '"Bhel Puri" -> a: null, s: "Puffed rice with tamarind chutney"' in prompt
+    assert '"Gazpacho" -> a: null, s: "Chilled tomato and pepper soup"' in prompt
+    assert '"Pickled Pears With Thyme, Chilli & Coriander"' in prompt
+    assert "Never return both 'a' and 's'." in prompt
+
+
 def test_response_rejects_extra_fields() -> None:
     with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
         EnrichmentResponse.model_validate({"extra_field": "disallowed"})
