@@ -42,14 +42,14 @@ Do not decide which ingredients are key. Stage 2 owns all recipe-level interpret
 Wire keys: i list of {id: line ID, n: canonical ingredient name or null}."""
 
 _STAGE2_INSTRUCTIONS = """You make recipe-level semantic decisions from extracted canonical ingredients and cooking instructions. Return only valid JSON.
-Decide key ingredients, cuisines, cooking methods, courses, and residual keywords using the recipe title, book title, author, cooking instructions, and extracted ingredient list.
+Decide key ingredients, cuisines, cooking methods, courses, residual keywords, alternate name, and summary using the recipe title, book title, author, cooking instructions, and extracted ingredient list.
 
 Key ingredients (k):
 - Select one to three canonical ingredient names strictly from the supplied `ingredients` list that define the dish identity, such as the main protein, star vegetable, or signature flavour.
 - Do not select seasoning, cooking oil, or a supporting ingredient.
 - Every selected key ingredient MUST be an exact string from the supplied `ingredients` list.
 - NEVER invent, infer, or select an ingredient (even if mentioned in the recipe title, description, or instructions) that is not in the supplied `ingredients` list. If a dish component (such as labneh, pastry, stock, or dressing) is prepared from scratch in the instructions rather than listed as an ingredient, you must select from the actual base ingredients supplied.
-- Select at most three key ingredients. Never return four or more key ingredients.
+- Select at most three key ingredients. You MUST select between 1 and 3 items only; returning 4 or more items is strictly forbidden.
 
 Cuisines (c):
 - Select zero or more matching IDs strictly from the supplied `cuisines` list.
@@ -83,7 +83,55 @@ Residual Keywords (w):
 - Do NOT repeat any cuisine, method, course, or ingredient name in keywords.
 - Do not add filler keywords.
 
-Wire keys: k key ingredient names; c cuisine IDs; m methods {v ID, p primary}; o course IDs; w keywords."""
+Alternate Name (a):
+- Check the recipe title and description.
+- If the recipe title is in a non-English language (such as Spanish, French, Italian, Hindi, Persian):
+  * Look at the recipe description: if description is or contains a short 1-4 word English dish name or translation (e.g. "description": "Split Pea and Lamb Stew" or "description": "Spiced Potatoes and Cauliflower"), copy that English name directly into 'a'!
+  * Otherwise, you MUST provide an English translation in Title Case UK-English in 'a' (e.g. "Pollo Al Ajillo" -> "Garlic Chicken", "Zuppa Di Pesce" -> "Fish Soup", "Pescado A La Veracruzana" -> "Veracruz-style Fish", "Khoresht Gheimeh" -> "Split Pea and Lamb Stew", "Arroz Con Pollo" -> "Rice with Chicken").
+  * Foreign Title Translation in 'a' TAKES STRICT PRECEDENCE over dish summary ('s'). When 'a' provides a plain English dish translation, 's' MUST be null! Never write a summary when 'a' translates the dish.
+- Set 'a' to null ONLY IF:
+  * The recipe title itself is in English.
+  * The recipe title is an established English loanword with no translation needed (e.g. "Tacos", "Kimchi", "Gyoza", "Croissant", "Miso", "Puris", "Shakshuka", "Bibimbap", "Ramen", "Tempura", "Spanakopita").
+  * The recipe title itself already contains the English translation directly in the title text (e.g. "Boeuf Bourguignon / Braised Beef In Red Wine", "Hong Shao Rou (Red-braised Pork Belly)").
+  * The recipe title combines an English ingredient with a foreign dish style (e.g. "Chicken Cafreal").
+- Never invent artificial foreign translations for English dishes or modern fusion recipes.
+
+Summary (s):
+- A cold, food-first descriptor of 3 to 8 words. It is a label, not a sentence: do not add a full stop.
+- State only the food and its primary component or sauce. Do not describe the method, serving details, garnish, or extra ingredients unless needed to identify the food.
+- For noodle dishes, name the noodle type or base grain, not the cooking method.
+- Select details from the cooked dish, not from optional serving items. Prefer a defining herb, chilli, or sauce component over cheese, mayonnaise, lime, or other garnish.
+- For a named sauce, include its colour and the one or two ingredients that distinguish it. Use a preparation word only when it identifies the dish form, such as a layered dish.
+- ALWAYS provide a summary for:
+  * Named cultural dishes, regional styles, and loanwords whose preparation is not obvious from English words (e.g. "Shakshuka", "Spanakopita", "Goulash", "Bouillabaisse", "Caponata", "Bibimbap", "Lentil Puris", "Elote").
+  * Dishes named after a culinary style, glaze, or sauce (e.g. dishes featuring "Teriyaki", "Adobo", "Tikka", "Kung Pao", "Mole").
+  * Dishes that combine an English ingredient with an obscure regional dish style (e.g. "Chicken Cafreal").
+  * Regional noodle soups and noodle dishes (e.g. "Laksa", "Khao Soi", "Dan Dan Noodles").
+  * Dishes whose title combines a foreign name and an English translation, but the dish is a complex regional preparation (e.g. "Hong Shao Rou (Red-braised Pork Belly)").
+- Familiarity is not a reason to set summary to null. A named cultural dish or loanword always needs a summary. A self-descriptive English title must name both the food and its defining ingredient or sauce in ordinary English; a title with a foreign dish term or regional style is not self-descriptive.
+- Set summary to null ONLY IF:
+  * The recipe title is standard, self-descriptive English cooking (e.g. "Lemon Drizzle Sponge Cake", "Fruit Salad Cups", "Carrot And Coriander Soup", "Peach & Halloumi Salad").
+  * The alternate name ('a') already clearly names the food in plain English (e.g. 'Garlic Chicken', 'Fish Soup', 'Split Pea and Lamb Stew', 'Spiced Potatoes and Cauliflower'). In this case, 'a' already explains what the dish is, so 's' MUST be null.
+- Style: Never start with "A" or "An". Describe the food directly, without praise or decorative language. Stop after the essential food components.
+- FORBIDDEN WORDS: NEVER use any of these words or phrases in 's': "spiced", "ground", "coated", "with spices", "until tender", "rich", "deep", "complex", "classic", "fresh", "crisp", "creamy", "fragrant", "vibrant", "delicate", "luscious", "aromatic", "warming", "luxurious", "silky", "tender", "golden", "finished".
+
+Examples for alternate name (a) and summary (s):
+- Title: "Spanakopita" -> a: null, s: "Filo pie with spinach and feta"
+- Title: "Pollo Al Ajillo", Description: "Garlic chicken is a classic Spanish tapa..." -> a: "Garlic Chicken", s: null
+- Title: "Khoresht Gheimeh", Description: "Split Pea and Lamb Stew" -> a: "Split Pea and Lamb Stew", s: null
+- Title: "Fruit Salad Cups" -> a: null, s: null
+- Title: "Laksa" -> a: null, s: "Noodles in coconut curry broth"
+- Title: "Boeuf Bourguignon / Braised Beef In Red Wine" -> a: null, s: "Beef in red wine sauce"
+- Title: "Lemon Drizzle Sponge Cake" -> a: null, s: null
+- Title: "Elote" -> a: null, s: "Corn with cheese and chilli"
+- Title: "Zuppa Di Pesce" -> a: "Fish Soup", s: null
+- Title: "Hong Shao Rou (Red-braised Pork Belly)" -> a: null, s: "Pork belly in soy sauce"
+- Title: "Shakshuka" -> a: null, s: "Eggs in tomato pepper sauce"
+- Title: "Chicken Cafreal" -> a: null, s: "Goan chicken with green chilli paste"
+- Title: "Goulash" -> a: null, s: "Beef stew with paprika"
+- Title: "Carrot And Coriander Soup" -> a: null, s: null
+
+Wire keys: k key ingredient names; c cuisine IDs; m methods {v ID, p primary}; o course IDs; w keywords; a alternate name or null; s summary or null."""
 
 
 def build_stage1_prompt(context: dict) -> str:
@@ -96,15 +144,30 @@ def build_stage1_prompt(context: dict) -> str:
     )
 
 
-def build_stage2_prompt(context: dict) -> str:
-    return "\n\n".join(
+def build_stage2_prompts(context: dict) -> tuple[str, str]:
+    """Return (system_prompt, user_prompt) for Stage 2."""
+    system = "\n\n".join(
         [
             f"Recipe facets prompt {PROMPT_VERSION}",
             _STAGE2_INSTRUCTIONS,
             "Reusable vocabulary:\n" + json.dumps(context["vocabulary"], ensure_ascii=False),
-            "Recipe context:\n" + json.dumps(context["recipe"], ensure_ascii=False),
         ]
     )
+    user = (
+        "Recipe context:\n"
+        + json.dumps(context["recipe"], ensure_ascii=False)
+        + "\n\nEnrich this recipe with key ingredients (1-3), cuisines, methods, courses, residual keywords, alternate name (a), and summary (s).\n"
+        + "- If the recipe title is in a foreign language (e.g. Spanish, French, Italian, Hindi, Persian):\n"
+        + "  * Provide the English translation in \"a\" (e.g. \"Arroz Con Pollo\" -> \"Rice with Chicken\", \"Pollo Al Ajillo\" -> \"Garlic Chicken\", \"Zuppa Di Pesce\" -> \"Fish Soup\"). If \"description\" is a short English dish name (e.g. \"Split Pea and Lamb Stew\") or starts by explaining the dish (e.g. \"Chicken cooked in garlic is...\"), copy or use that English name for \"a\"!\n"
+        + "  * When \"a\" names the dish in plain English (e.g. \"Garlic Chicken\", \"Fish Soup\", \"Split Pea and Lamb Stew\"), set \"s\" to null.\n"
+        + "- Summary \"s\" is a cold 3-8 word descriptor. State only the food and its main component or sauce; no full stop. Do not use optional serving items or garnish. For noodle dishes, name the noodle type or base grain, not the cooking method. Familiarity is not a reason for null: a named cultural dish or loanword always needs a summary. A self-descriptive English title must name both the food and its defining ingredient or sauce in ordinary English; a title with a foreign dish term or regional style still needs a summary. Prefer a defining cooked-in herb, chilli, or sauce component. For a named sauce, include its colour and one or two distinctive ingredients. Use a preparation word only when it identifies the dish form, such as a layered dish. Never use decorative language such as \"rich\", \"deep\", \"complex\", \"crisp\", \"creamy\", \"fragrant\", \"vibrant\", or \"golden\"; also never use \"spiced\", \"ground\", \"coated\", \"with spices\", or \"until tender\"."
+    )
+    return system, user
+
+
+def build_stage2_prompt(context: dict) -> str:
+    system, user = build_stage2_prompts(context)
+    return f"{system}\n\n{user}"
 
 
 def build_prompt(context: dict) -> str:

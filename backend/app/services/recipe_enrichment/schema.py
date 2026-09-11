@@ -6,9 +6,54 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-SCHEMA_VERSION = "v8"
-PROMPT_VERSION = "v30"
+SCHEMA_VERSION = "v9"
+PROMPT_VERSION = "v44"
 TAXONOMY_VERSION = "v1"
+
+SUMMARY_MIN_WORDS = 3
+SUMMARY_MAX_WORDS = 8
+_SUMMARY_FORBIDDEN_TERMS = (
+    "spiced",
+    "ground",
+    "coated",
+    "with spices",
+    "until tender",
+    "rich",
+    "deep",
+    "complex",
+    "classic",
+    "fresh",
+    "crisp",
+    "creamy",
+    "fragrant",
+    "vibrant",
+    "delicate",
+    "luscious",
+    "aromatic",
+    "warming",
+    "luxurious",
+    "silky",
+    "tender",
+    "golden",
+    "finished",
+)
+
+
+def summary_style_error(summary: str) -> str | None:
+    """Return the descriptor-style violation, if the summary is not suitably terse."""
+    words = summary.split()
+    if not SUMMARY_MIN_WORDS <= len(words) <= SUMMARY_MAX_WORDS:
+        return f"summary must contain {SUMMARY_MIN_WORDS} to {SUMMARY_MAX_WORDS} words"
+    if summary.casefold().startswith(("a ", "an ")):
+        return "summary must not start with an article"
+    if summary.endswith((".", "!", "?")):
+        return "summary must be a fragment without terminal punctuation"
+
+    lowered = summary.casefold()
+    for term in _SUMMARY_FORBIDDEN_TERMS:
+        if re.search(rf"(?<!\\w){re.escape(term)}(?!\\w)", lowered):
+            return f"summary contains decorative or forbidden term: {term}"
+    return None
 
 _EN_GB_INGREDIENT_RULES: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"\bchil[ei]s?\b", re.IGNORECASE), "chilli"),
@@ -234,11 +279,46 @@ class MethodDecision(EnrichmentDecision):
 
 
 class Stage2Response(EnrichmentDecision):
-    key_ingredients: list[str] = Field(default_factory=list, max_length=3, alias="k")
+    key_ingredients: list[str] = Field(
+        default_factory=list,
+        max_length=3,
+        alias="k",
+        description="1 to 3 key distinguishing ingredients chosen strictly from the supplied ingredients list. Never return more than 3.",
+    )
     cuisines: list[str] = Field(default_factory=list, max_length=10, alias="c")
     methods: list[MethodDecision] = Field(default_factory=list, max_length=10, alias="m")
     courses: list[str] = Field(default_factory=list, max_length=10, alias="o")
     keywords: list[str] = Field(default_factory=list, max_length=100, alias="w")
+    alternate_name: str | None = Field(
+        default=None,
+        alias="a",
+        description="English translation of a non-English recipe title in Title Case UK-English (e.g. 'Pollo Al Ajillo' -> 'Garlic Chicken', 'Zuppa Di Pesce' -> 'Fish Soup', 'Khoresht Gheimeh' -> 'Split Pea and Lamb Stew'). Check description: if description is or contains a short 1-4 word English dish name or translation, copy it directly into 'a'. Must be null only if the recipe title itself is in English, is an established loanword (e.g. 'Tacos', 'Gyoza', 'Shakshuka'), or already includes the translation directly in the title.",
+    )
+    summary: str | None = Field(
+        default=None,
+        alias="s",
+        description="3-8 word food-first descriptor for named cultural dishes, regional styles, glaze/sauce styles, noodle soups, loanwords, or opaque titles. State only the food and its main component or sauce (e.g. 'Filo pie with spinach and feta', 'Chicken with dark sauce'). Must be null only if the recipe title is everyday self-descriptive English cooking or if alternate name (a) already clearly explains the dish. Never start with 'A' or 'An'. Do not use decorative language, cooking-process detail, or forbidden words including 'spiced', 'rich', 'deep', 'complex', 'crisp', 'creamy', 'fragrant', 'vibrant', 'golden', 'ground', 'coated', 'with spices', or 'until tender'.",
+    )
+
+    @field_validator("alternate_name", mode="before")
+    @classmethod
+    def normalize_alternate_name(cls, value: object) -> str | None:
+        if value is None:
+            return None
+        text = str(value).strip()
+        return text if text else None
+
+    @field_validator("summary", mode="before")
+    @classmethod
+    def normalize_summary(cls, value: object) -> str | None:
+        if value is None:
+            return None
+        text = str(value).strip()
+        if not text:
+            return None
+        if error := summary_style_error(text):
+            raise ValueError(error)
+        return text
 
     @field_validator("key_ingredients", mode="before")
     @classmethod
@@ -307,6 +387,36 @@ class EnrichmentResponse(EnrichmentDecision):
     methods: list[MethodDecision] = Field(default_factory=list, max_length=10, alias="m")
     courses: list[str] = Field(default_factory=list, max_length=10, alias="o")
     keywords: list[str] = Field(default_factory=list, max_length=100, alias="w")
+    alternate_name: str | None = Field(
+        default=None,
+        alias="a",
+        description="English translation of non-English recipe title in Title Case UK-English (e.g. 'Pollo Al Ajillo' -> 'Garlic Chicken', 'Zuppa Di Pesce' -> 'Fish Soup', 'Khoresht Gheimeh' -> 'Split Pea and Lamb Stew'). Check description: if description is or contains a short 1-4 word English dish name or translation, copy it directly into 'a'. Must be null if title is in English, is an established loanword (e.g. 'Tacos', 'Gyoza', 'Shakshuka'), or already includes the English translation.",
+    )
+    summary: str | None = Field(
+        default=None,
+        alias="s",
+        description="3-8 word food-first descriptor for named cultural dishes, regional styles, glaze/sauce styles, noodle soups, loanwords, or opaque titles. State only the food and its main component or sauce (e.g. 'Filo pie with spinach and feta', 'Chicken with dark sauce'). Must be null only if the recipe title is everyday self-descriptive English cooking or if alternate name (a) already clearly explains the dish. Never start with 'A' or 'An'. Do not use decorative language, cooking-process detail, or forbidden words including 'spiced', 'rich', 'deep', 'complex', 'crisp', 'creamy', 'fragrant', 'vibrant', 'golden', 'ground', 'coated', 'with spices', or 'until tender'.",
+    )
+
+    @field_validator("alternate_name", mode="before")
+    @classmethod
+    def normalize_alternate_name(cls, value: object) -> str | None:
+        if value is None:
+            return None
+        text = str(value).strip()
+        return text if text else None
+
+    @field_validator("summary", mode="before")
+    @classmethod
+    def normalize_summary(cls, value: object) -> str | None:
+        if value is None:
+            return None
+        text = str(value).strip()
+        if not text:
+            return None
+        if error := summary_style_error(text):
+            raise ValueError(error)
+        return text
 
     @property
     def canonical_ingredients(self) -> list[RecipeIngredientDecision]:
@@ -372,6 +482,8 @@ class EnrichmentResponse(EnrichmentDecision):
             m=stage2.methods,
             o=stage2.courses,
             w=stage2.keywords,
+            a=stage2.alternate_name,
+            s=stage2.summary,
         )
 
 

@@ -78,12 +78,20 @@ class GeminiProvider(AIProvider):
         return Decimal(str(cost))
 
     def _complete(
-        self, prompt: str, model: str, *, schema: dict | None = None, temp: float = 0
+        self,
+        prompt: str,
+        model: str,
+        *,
+        schema: dict | None = None,
+        temp: float = 0,
+        system: str | None = None,
     ) -> tuple[str, Usage]:
         config: GenerateContentConfigDict = {
             "response_mime_type": "application/json",
             "temperature": temp,
         }
+        if system:
+            config["system_instruction"] = system
         if schema:
             if schema is ENRICHMENT_JSON_SCHEMA:
                 config["response_json_schema"] = GEMINI_ENRICHMENT_JSON_SCHEMA
