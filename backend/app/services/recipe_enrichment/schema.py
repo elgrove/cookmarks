@@ -7,7 +7,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 SCHEMA_VERSION = "v9"
-PROMPT_VERSION = "v45"
+PROMPT_VERSION = "v46"
 TAXONOMY_VERSION = "v1"
 
 SUMMARY_MIN_WORDS = 3
@@ -292,7 +292,7 @@ class Stage2Response(EnrichmentDecision):
     alternate_name: str | None = Field(
         default=None,
         alias="a",
-        description="Title Case UK-English literal translation only for a native-language title that directly describes the food, ingredients, or form (e.g. 'Bharli Mirchi' -> 'Stuffed Chillies', 'Mouna Au Lait' -> 'Milk Bread'). Set null for a named cultural dish, opaque traditional name, loanword, or self-descriptive English title. Do not translate a named dish word by word; it needs summary (s) instead.",
+        description="Title Case UK-English literal translation only when a native-language title directly describes the food, ingredients, or form and its translation makes the dish self-descriptive (e.g. 'Bharli Mirchi' -> 'Stuffed Chillies', 'Mouna Au Lait' -> 'Milk Bread'). Set null for a named cultural dish, opaque traditional name, loanword, self-descriptive English title, or a generic translation such as 'Pomodori Fritti' -> 'Fried Tomatoes'. Do not translate a named dish word by word; it needs summary (s) instead.",
     )
     summary: str | None = Field(
         default=None,
@@ -390,7 +390,7 @@ class EnrichmentResponse(EnrichmentDecision):
     alternate_name: str | None = Field(
         default=None,
         alias="a",
-        description="Title Case UK-English literal translation only for a native-language title that directly describes the food, ingredients, or form (e.g. 'Bharli Mirchi' -> 'Stuffed Chillies', 'Mouna Au Lait' -> 'Milk Bread'). Set null for a named cultural dish, opaque traditional name, loanword, or self-descriptive English title. Do not translate a named dish word by word; it needs summary (s) instead.",
+        description="Title Case UK-English literal translation only when a native-language title directly describes the food, ingredients, or form and its translation makes the dish self-descriptive (e.g. 'Bharli Mirchi' -> 'Stuffed Chillies', 'Mouna Au Lait' -> 'Milk Bread'). Set null for a named cultural dish, opaque traditional name, loanword, self-descriptive English title, or a generic translation such as 'Pomodori Fritti' -> 'Fried Tomatoes'. Do not translate a named dish word by word; it needs summary (s) instead.",
     )
     summary: str | None = Field(
         default=None,

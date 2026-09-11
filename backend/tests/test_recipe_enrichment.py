@@ -235,7 +235,9 @@ def test_stage2_prompt_distinguishes_title_descriptor_outcomes() -> None:
     assert '"Mouna Au Lait" -> a: "Milk Bread", s: null' in prompt
     assert '"Bhel Puri" -> a: null, s: "Puffed rice with tamarind chutney"' in prompt
     assert '"Gazpacho" -> a: null, s: "Chilled tomato and pepper soup"' in prompt
+    assert '"Pomodori Fritti" -> a: null, s: "Fried tomato slices with cornmeal crust"' in prompt
     assert '"Pickled Pears With Thyme, Chilli & Coriander"' in prompt
+    assert '"Simmered Mackerel With Radish"' in prompt
     assert "Never return both 'a' and 's'." in prompt
 
 
