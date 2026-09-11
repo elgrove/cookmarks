@@ -250,22 +250,22 @@ def test_schema_version_tracks_the_bounded_output_change() -> None:
     assert SCHEMA_VERSION == "v10"
 
 
-def test_summary_rejects_long_or_decorative_descriptors() -> None:
-    with pytest.raises(ValidationError, match="3 to 12 words"):
+def test_summary_rejects_invalid_length_or_format() -> None:
+    with pytest.raises(ValidationError, match="3 to 10 words"):
         Stage2Response.model_validate(
-            {"s": "Corn kernels in broth with epazote chilli lime cheese and mayonnaise avocado crema"}
+            {"s": "Corn kernels in broth with epazote chilli lime cheese and avocado crema"}
         )
 
-    with pytest.raises(ValidationError, match="decorative or forbidden"):
-        Stage2Response.model_validate({"s": "Rich corn with cheese"})
+    decorative = Stage2Response.model_validate({"s": "Rich corn with cheese"})
+    assert decorative.summary == "Rich corn with cheese"
 
     with pytest.raises(ValidationError, match="fragment without terminal punctuation"):
         Stage2Response.model_validate({"s": "Corn in broth with epazote."})
 
-    twelve_words = Stage2Response.model_validate(
-        {"s": "Corn kernels in broth with epazote chilli lime cheese and avocado crema"}
+    ten_words = Stage2Response.model_validate(
+        {"s": "Corn kernels in broth with epazote chilli lime cheese avocado"}
     )
-    assert twelve_words.summary == "Corn kernels in broth with epazote chilli lime cheese and avocado crema"
+    assert ten_words.summary == "Corn kernels in broth with epazote chilli lime cheese avocado"
 
     response = Stage2Response.model_validate({"s": "Corn in broth with epazote"})
     assert response.summary == "Corn in broth with epazote"

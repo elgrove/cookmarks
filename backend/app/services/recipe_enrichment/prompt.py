@@ -90,7 +90,7 @@ Title descriptor decision (a and s):
 - Self-descriptive English title: if the English title already tells the reader what food it is and its defining ingredient or sauce, set both 'a' and 's' to null. A simple cooking-method word does not make a title opaque. Examples: "Pickled Pears With Thyme, Chilli & Coriander", "Greek Breads With Green Onions", "Courgette Noodles With Callaloo Pesto", and "Simmered Mackerel With Radish".
 
 Summary style (s):
-- A cold, food-first descriptor of 3 to 12 words. It is a label, not a sentence: do not add a full stop.
+- A cold, food-first descriptor of 3 to 8 words. It is a label, not a sentence: do not add a full stop.
 - State only the food and its primary component or sauce. Do not describe the method, serving details, garnish, or extra ingredients unless needed to identify the food.
 - For noodle dishes, name the noodle type or base grain, not the cooking method.
 - Select details from the cooked dish, not from optional serving items. Prefer a defining herb, chilli, or sauce component over cheese, mayonnaise, lime, or other garnish.

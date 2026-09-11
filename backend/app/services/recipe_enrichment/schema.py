@@ -7,36 +7,11 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 SCHEMA_VERSION = "v10"
-PROMPT_VERSION = "v47"
+PROMPT_VERSION = "v46"
 TAXONOMY_VERSION = "v1"
 
 SUMMARY_MIN_WORDS = 3
-SUMMARY_MAX_WORDS = 12
-_SUMMARY_FORBIDDEN_TERMS = (
-    "spiced",
-    "ground",
-    "coated",
-    "with spices",
-    "until tender",
-    "rich",
-    "deep",
-    "complex",
-    "classic",
-    "fresh",
-    "crisp",
-    "creamy",
-    "fragrant",
-    "vibrant",
-    "delicate",
-    "luscious",
-    "aromatic",
-    "warming",
-    "luxurious",
-    "silky",
-    "tender",
-    "golden",
-    "finished",
-)
+SUMMARY_MAX_WORDS = 10
 
 
 def summary_style_error(summary: str) -> str | None:
@@ -49,10 +24,6 @@ def summary_style_error(summary: str) -> str | None:
     if summary.endswith((".", "!", "?")):
         return "summary must be a fragment without terminal punctuation"
 
-    lowered = summary.casefold()
-    for term in _SUMMARY_FORBIDDEN_TERMS:
-        if re.search(rf"(?<!\\w){re.escape(term)}(?!\\w)", lowered):
-            return f"summary contains decorative or forbidden term: {term}"
     return None
 
 _EN_GB_INGREDIENT_RULES: list[tuple[re.Pattern[str], str]] = [
@@ -297,7 +268,7 @@ class Stage2Response(EnrichmentDecision):
     summary: str | None = Field(
         default=None,
         alias="s",
-        description="3-12 word food-first descriptor for a named cultural dish, opaque traditional name, loanword, regional style, glaze/sauce style, or noodle dish (e.g. 'Bhel Puri' -> 'Puffed rice with tamarind chutney', 'Gazpacho' -> 'Chilled tomato and pepper soup'). Must be null for literal native-language translations and self-descriptive English titles. Never start with 'A' or 'An'. Do not use decorative language, cooking-process detail, or forbidden words including 'spiced', 'rich', 'deep', 'complex', 'crisp', 'creamy', 'fragrant', 'vibrant', 'golden', 'ground', 'coated', 'with spices', or 'until tender'.",
+        description="3-8 word food-first descriptor for a named cultural dish, opaque traditional name, loanword, regional style, glaze/sauce style, or noodle dish (e.g. 'Bhel Puri' -> 'Puffed rice with tamarind chutney', 'Gazpacho' -> 'Chilled tomato and pepper soup'). Must be null for literal native-language translations and self-descriptive English titles. Never start with 'A' or 'An'. Do not use decorative language, cooking-process detail, or forbidden words including 'spiced', 'rich', 'deep', 'complex', 'crisp', 'creamy', 'fragrant', 'vibrant', 'golden', 'ground', 'coated', 'with spices', or 'until tender'.",
     )
 
     @field_validator("alternate_name", mode="before")
@@ -395,7 +366,7 @@ class EnrichmentResponse(EnrichmentDecision):
     summary: str | None = Field(
         default=None,
         alias="s",
-        description="3-12 word food-first descriptor for a named cultural dish, opaque traditional name, loanword, regional style, glaze/sauce style, or noodle dish (e.g. 'Bhel Puri' -> 'Puffed rice with tamarind chutney', 'Gazpacho' -> 'Chilled tomato and pepper soup'). Must be null for literal native-language translations and self-descriptive English titles. Never start with 'A' or 'An'. Do not use decorative language, cooking-process detail, or forbidden words including 'spiced', 'rich', 'deep', 'complex', 'crisp', 'creamy', 'fragrant', 'vibrant', 'golden', 'ground', 'coated', 'with spices', or 'until tender'.",
+        description="3-8 word food-first descriptor for a named cultural dish, opaque traditional name, loanword, regional style, glaze/sauce style, or noodle dish (e.g. 'Bhel Puri' -> 'Puffed rice with tamarind chutney', 'Gazpacho' -> 'Chilled tomato and pepper soup'). Must be null for literal native-language translations and self-descriptive English titles. Never start with 'A' or 'An'. Do not use decorative language, cooking-process detail, or forbidden words including 'spiced', 'rich', 'deep', 'complex', 'crisp', 'creamy', 'fragrant', 'vibrant', 'golden', 'ground', 'coated', 'with spices', or 'until tender'.",
     )
 
     @field_validator("alternate_name", mode="before")
