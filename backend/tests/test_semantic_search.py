@@ -117,6 +117,8 @@ def test_endpoint_ranks_and_shapes_results(client: TestClient, session: Session)
     assert set(body["items"][0].keys()) == {
         "id",
         "name",
+        "alternate_name",
+        "summary",
         "book_id",
         "book_title",
         "book_author",
