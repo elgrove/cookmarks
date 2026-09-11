@@ -390,6 +390,8 @@ def _apply_response(
         )
     recipe.cuisines = [RecipeCuisine(cuisine_id=cuisine_id) for cuisine_id in response.cuisines]
     recipe.keywords = [get_or_create_keyword(session, value.strip()) for value in response.keywords]
+    recipe.alternate_name = response.alternate_name
+    recipe.summary = response.summary
     state.status = RecipeEnrichmentStatus.COMPLETE
     state.schema_version = SCHEMA_VERSION
     state.prompt_version = PROMPT_VERSION

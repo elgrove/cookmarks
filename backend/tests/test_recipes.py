@@ -22,6 +22,8 @@ RECIPE_KEYS = {
     "book_author",
     "book_has_cover",
     "name",
+    "alternate_name",
+    "summary",
     "description",
     "ingredients_verbatim",
     "canonical_ingredients",

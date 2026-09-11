@@ -113,7 +113,7 @@ def test_book_detail_recipes_capped_and_shaped(client: TestClient) -> None:
     recipes = client.get(f"/api/books/{book_id}").json()["recipes"]
     assert 0 < len(recipes) <= 10
     for row in recipes:
-        assert set(row.keys()) == {"id", "name", "keywords"}
+        assert set(row.keys()) == {"id", "name", "alternate_name", "summary", "keywords"}
         assert isinstance(row["keywords"], list)
     # The seeded "Recipe 0" carries two keywords, sorted.
     keyworded = next((r for r in recipes if r["name"] == "Recipe 0"), None)

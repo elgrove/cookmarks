@@ -138,6 +138,8 @@ def get_book(book_id: uuid.UUID, session: SessionDep, user: CurrentUser) -> Book
             RecipeRow(
                 id=r.id,
                 name=r.name,
+                alternate_name=r.alternate_name,
+                summary=r.summary,
                 keywords=sorted(k.name for k in r.keywords),
             )
             for r in recipes
