@@ -1214,6 +1214,37 @@ def _finalise(session: Session, run: TaskRun, usage: Usage) -> dict:
     return detail
 
 
+def _finish_stage1_checkpoint(session: Session, run: TaskRun) -> dict:
+    """Stop at the durable Stage 1 boundary without starting cut-over work."""
+    progress = build_progress_detail(session, run)
+    failed = progress["terminal_failed"]
+    stale = progress["stale"]
+    if failed or stale:
+        detail = {
+            **progress,
+            "stage1_checkpoint": True,
+            "stage1_checkpoint_status": "failed",
+        }
+        fail_with_detail(
+            str(run.id),
+            detail,
+            RuntimeError(
+                f"Stage 1 checkpoint finished with {failed} terminal failures and "
+                f"{stale} stale recipes"
+            ),
+        )
+        return detail
+
+    detail = {
+        **progress,
+        "stage1_checkpoint": True,
+        "stage1_checkpoint_status": "complete",
+        "next_poll_in_seconds": None,
+    }
+    set_waiting(str(run.id), detail)
+    return detail
+
+
 def _delete_orphan_keywords(session: Session) -> int:
     """Delete Keyword rows with neither recipe nor book associations.
 
@@ -1362,7 +1393,9 @@ def poll_backfill(run_id: str, polls_done: int = 0) -> dict:
         _active, last_error = _refresh_submitted(
             session, run, gemini_client, anthropic_client
         )
-        _promote_stage2(session, run)
+        stage1_only = bool(run.detail.get("stage1_only"))
+        if not stage1_only:
+            _promote_stage2(session, run)
         max_active = int(run.detail.get("max_active_jobs", BATCH_DEFAULT_MAX_ACTIVE_JOBS))
         submit_prepared(
             session,
@@ -1373,8 +1406,10 @@ def poll_backfill(run_id: str, polls_done: int = 0) -> dict:
             stage2_model,
             max_active=max_active,
         )
-        apply_counts = apply_ready_stage2(
-            session, run, stage1_provider, stage2_provider, stage1_model, stage2_model
+        apply_counts = (
+            {} if stage1_only else apply_ready_stage2(
+                session, run, stage1_provider, stage2_provider, stage1_model, stage2_model
+            )
         )
         built = build_retry_chunks(session, run)
         if built:
@@ -1392,6 +1427,8 @@ def poll_backfill(run_id: str, polls_done: int = 0) -> dict:
         if last_error:
             progress["last_provider_error"] = last_error
         if _is_terminal(session, run):
+            if stage1_only:
+                return _finish_stage1_checkpoint(session, run)
             return _finalise(session, run, _run_usage(session, run))
         polls_done += 1
         countdown = poll_countdown(polls_done)

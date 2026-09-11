@@ -155,6 +155,17 @@ def _require_backfill_providers(session: SessionDep) -> tuple[str, str]:
     return stage1_model, stage2_model
 
 
+def _require_gemini_stage1(session: SessionDep) -> tuple[str, str]:
+    """Require Gemini only for an operations-only Stage 1 checkpoint."""
+    provider, stage1_model, stage2_model = _stage_models(session)
+    if not provider or not provider.startswith("GEMINI->") or not stage1_model or not stage2_model:
+        raise HTTPException(
+            status_code=422,
+            detail="A Stage 1 checkpoint requires the Gemini provider for Stage 1",
+        )
+    return stage1_model, stage2_model
+
+
 def _require_no_active_backfill(session: SessionDep) -> None:
     active = session.scalar(
         select(func.count())
@@ -190,6 +201,7 @@ def _check_pilot(session: SessionDep, pilot_run_id: uuid.UUID, confirmed: bool) 
             status_code=422,
             detail="pilot_run_id must be a done recipe-enrichment pilot run",
         )
+    provider, stage1_model, stage2_model = _stage_models(session)
     expected = {
         "provider": "GEMINI->ANTHROPIC",
         "prompt_version": PROMPT_VERSION,
@@ -199,7 +211,6 @@ def _check_pilot(session: SessionDep, pilot_run_id: uuid.UUID, confirmed: bool) 
     mismatched = [
         key for key, value in expected.items() if pilot.detail.get(key) != value
     ]
-    _provider, stage1_model, stage2_model = _stage_models(session)
     for key, value in (("stage1_model", stage1_model), ("stage2_model", stage2_model)):
         if value is None or pilot.detail.get(key) != value:
             mismatched.append(key)
@@ -237,10 +248,14 @@ def trigger_recipe_enrichment_backfill(
             "pilot_run_id": str(pilot.id),
             "pilot_reviewed": True,
             "max_active_jobs": max_active,
+            "stage1_only": body.stage1_only,
         },
     )
     run.provider_name = "GEMINI->ANTHROPIC"
-    run.model_name = f"{stage1_model} -> {stage2_model}"
+    run.model_name = (
+        f"{stage1_model} -> stage1 checkpoint" if body.stage1_only
+        else f"{stage1_model} -> {stage2_model}"
+    )
     session.commit()
     eligible = len(select_backfill_recipe_ids(session))
     enqueue_enrichment_backfill(str(run.id))

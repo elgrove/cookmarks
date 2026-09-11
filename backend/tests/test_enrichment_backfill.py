@@ -974,6 +974,36 @@ def test_full_backfill_applies_two_waves_and_finishes_done(
     assert "cutover_orphan_keywords_removed" in run.detail
 
 
+def test_stage1_only_checkpoint_keeps_results_without_starting_stage2(
+    worker_session, fake_client
+) -> None:
+    session = worker_session
+    _gemini_config(session)
+    recipe = _recipe(session)
+    run = _backfill_run(session, max_active_jobs=4, stage1_only=True)
+    _settle(session)
+    run_backfill_prepare_and_submit(str(run.id))
+
+    stage1 = session.scalars(
+        select(RecipeEnrichmentBatch).where(RecipeEnrichmentBatch.stage == "stage1")
+    ).one()
+    _complete_stage1(session, fake_client, stage1)
+    _settle(session)
+    poll_backfill(str(run.id))
+
+    session.refresh(run)
+    assert run.status is TaskStatus.WAITING
+    assert run.detail["stage1_checkpoint"] is True
+    assert run.detail["stage1_checkpoint_status"] == "complete"
+    assert run.detail["succeeded"] == 4
+    assert session.scalars(
+        select(RecipeEnrichmentBatch).where(RecipeEnrichmentBatch.stage == "stage2")
+    ).all() == []
+    session.refresh(recipe)
+    assert recipe.enrichment_state is not None
+    assert recipe.enrichment_state.status is RecipeEnrichmentStatus.PENDING
+
+
 def test_source_change_mid_flight_marks_item_stale(worker_session, fake_client) -> None:
     session = worker_session
     _gemini_config(session)
@@ -1134,6 +1164,45 @@ def test_trigger_rejects_non_gemini_provider(client, session) -> None:
         json={"pilot_run_id": str(pilot.id), "confirm_pilot_reviewed": True},
     )
     assert response.status_code == 422
+
+
+def test_stage1_checkpoint_allows_anthropic_stage2(
+    client, session, enrichment_backfill_dispatched
+) -> None:
+    config = get_config(session)
+    config.ai_provider = AIProvider.GEMINI
+    config.api_key = "gemini-default-key"
+    config.enrichment_stage1_provider = AIProvider.GEMINI
+    config.enrichment_stage1_api_key = "gemini-stage1-key"
+    config.enrichment_stage2_provider = AIProvider.ANTHROPIC
+    config.enrichment_stage2_api_key = "anthropic-stage2-key"
+    session.commit()
+    pilot = _done_pilot(
+        session,
+        provider="GEMINI->ANTHROPIC",
+        stage1_model="gemini-2.5-flash-lite",
+        stage2_model="claude-haiku-4-5-20251001",
+    )
+
+    response = client.post(
+        "/api/tasks/recipe-enrichment-backfill",
+        json={
+            "pilot_run_id": str(pilot.id),
+            "confirm_pilot_reviewed": True,
+            "stage1_only": True,
+        },
+    )
+
+    assert response.status_code == 202
+    assert len(enrichment_backfill_dispatched) == 1
+    run = session.scalars(
+        select(TaskRun)
+        .where(TaskRun.task_type == TaskType.RECIPE_ENRICHMENT_BACKFILL)
+        .order_by(TaskRun.created_at.desc())
+        .limit(1)
+    ).one()
+    assert run is not None
+    assert run.detail["stage1_only"] is True
 
 
 def test_trigger_requires_review_confirmation(client, session) -> None:

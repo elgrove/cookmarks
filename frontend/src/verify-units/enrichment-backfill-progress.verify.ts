@@ -54,6 +54,20 @@ const unit: VerifiableUnit<Props> = {
 			}
 		},
 		{
+			id: 'stage1-checkpoint',
+			description: 'Stage 1 results are durable and wait for the Stage 2 provider',
+			props: {
+				status: 'waiting',
+				detail: {
+					selected: 10,
+					prepared: 10,
+					succeeded: 10,
+					stage1_checkpoint: true,
+					stage1_checkpoint_status: 'complete'
+				}
+			}
+		},
+		{
 			id: 'complete',
 			description: 'every recipe applied, with the final cost estimate',
 			props: {
@@ -149,6 +163,15 @@ const unit: VerifiableUnit<Props> = {
 					contract.applied === '3' &&
 					(root.textContent ?? '').includes('2026-08-31')) ||
 				`phase=${contract.phase} applied=${contract.applied}`
+		},
+		{
+			id: 'stage1-checkpoint-phase',
+			description: 'a completed Stage 1 checkpoint reports its durable waiting boundary',
+			onlyFixtures: ['stage1-checkpoint'],
+			check: ({ contract, root }) =>
+				(contract.phase === 'stage1_checkpoint' &&
+					root.textContent?.includes('Gemini Stage 1 complete')) ||
+				`phase=${contract.phase}`
 		},
 		{
 			id: 'complete-phase',

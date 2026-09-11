@@ -28,6 +28,9 @@ class EnrichmentBackfillRequest(BaseModel):
     pilot_run_id: uuid.UUID
     confirm_pilot_reviewed: bool = False
     max_active_jobs: int = Field(default=4, ge=1, le=10)
+    # Operations-only checkpoint: submit and ingest Gemini ingredient batches,
+    # then retain the durable Stage 1 results for a later Stage 2 provider.
+    stage1_only: bool = False
 
 
 class EnrichmentBackfillResumeRequest(BaseModel):

@@ -15,6 +15,7 @@
 		| 'prepared'
 		| 'waiting'
 		| 'partial'
+		| 'stage1_checkpoint'
 		| 'complete'
 		| 'terminal'
 		| 'stale';
@@ -29,6 +30,7 @@
 		const submitted = detail.submitted ?? 0;
 		if (failed > 0) return 'terminal';
 		if (stale > 0) return 'stale';
+		if (detail.stage1_checkpoint) return 'stage1_checkpoint';
 		if (applied > 0 && applied + stale + failed < prepared) return 'partial';
 		if (applied > 0 && prepared > 0 && applied >= prepared) return 'complete';
 		if (submitted > 0) return 'waiting';
@@ -59,12 +61,15 @@
 	data-verify-applied={detail.applied ?? 0}
 	data-verify-failed={detail.terminal_failed ?? 0}
 	data-verify-stale={detail.stale ?? 0}
+	data-verify-stage1-checkpoint={detail.stage1_checkpoint ?? false}
 	data-verify-cost={detail.cost_estimate_usd ?? ''}
 	aria-label="Batch backfill progress"
 >
 	<p class="headline">
 		{#if phase === 'complete'}
 			Backfill complete — {detail.applied} of {detail.prepared} recipes applied.
+		{:else if phase === 'stage1_checkpoint'}
+			Gemini Stage 1 complete — {detail.succeeded ?? 0} recipes are ready for Stage 2.
 		{:else if phase === 'terminal'}
 			Backfill stopped with {detail.terminal_failed} terminal failure{detail.terminal_failed === 1
 				? ''

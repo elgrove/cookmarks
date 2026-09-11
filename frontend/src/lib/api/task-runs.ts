@@ -146,6 +146,8 @@ export interface RecipeEnrichmentPilotDetail {
 export interface RecipeEnrichmentBackfillDetail {
 	pilot_run_id?: string;
 	pilot_reviewed?: boolean;
+	stage1_checkpoint?: boolean;
+	stage1_checkpoint_status?: 'complete' | 'failed';
 	selected?: number;
 	prepared?: number;
 	submitted?: number;
