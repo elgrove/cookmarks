@@ -49,6 +49,8 @@ export async function fetchBookFilters(fetchFn: typeof fetch = fetch): Promise<B
 export const recipeRowSchema = z.object({
 	id: z.string().uuid(),
 	name: z.string(),
+	alternate_name: z.string().nullable(),
+	summary: z.string().nullable(),
 	keywords: z.array(z.string())
 });
 

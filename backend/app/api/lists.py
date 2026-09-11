@@ -93,6 +93,8 @@ def _recipe_summaries(
         RecipeSummary(
             id=recipe.id,
             name=recipe.name,
+            alternate_name=recipe.alternate_name,
+            summary=recipe.summary,
             book_id=book.id,
             book_title=book.title,
             book_author=book.author,

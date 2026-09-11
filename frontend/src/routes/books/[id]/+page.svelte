@@ -60,6 +60,8 @@
 				recipes: b.recipes.map((r) => ({
 					id: r.id,
 					name: r.name,
+					alternateName: r.alternate_name,
+					summary: r.summary,
 					keywords: r.keywords
 				})),
 				queued: b.queued,

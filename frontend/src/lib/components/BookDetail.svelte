@@ -2,6 +2,8 @@
 	export type BookDetailRecipe = {
 		id: string;
 		name: string;
+		alternateName?: string | null;
+		summary?: string | null;
 		keywords: string[];
 	};
 
@@ -196,6 +198,9 @@
 									<div class="rname">
 										<a href={`/recipes/${recipe.id}`}>{recipe.name}</a>
 									</div>
+									{#if recipe.alternateName ?? recipe.summary}
+										<p class="rdescriptor">{recipe.alternateName ?? recipe.summary}</p>
+									{/if}
 									{#if recipe.keywords.length}
 										<div class="chips">
 											{#each recipe.keywords as kw (kw)}
@@ -550,6 +555,14 @@
 	}
 	.rname a:hover {
 		color: var(--accent-deep);
+	}
+	.rdescriptor {
+		margin: 0.25rem 0 0;
+		font-family: var(--f-serif);
+		font-size: 0.92rem;
+		font-style: italic;
+		line-height: 1.3;
+		color: var(--muted);
 	}
 	/* Keep tags to a single line: extra chips wrap, then the second row clips away. */
 	.chips {

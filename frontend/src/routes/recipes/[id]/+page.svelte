@@ -59,6 +59,8 @@
 			recipes: r.items.map((it) => ({
 				id: it.id,
 				name: it.name,
+				alternateName: it.alternate_name,
+				summary: it.summary,
 				bookId: it.book_id,
 				bookTitle: it.book_title,
 				bookAuthor: it.book_author,
@@ -109,6 +111,8 @@
 				bookAuthor: r.book_author,
 				bookHasCover: r.book_has_cover,
 				name: r.name,
+				alternateName: r.alternate_name,
+				summary: r.summary,
 				description: r.description,
 				ingredientsVerbatim: r.ingredients_verbatim,
 				instructions: r.instructions,

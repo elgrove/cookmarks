@@ -68,6 +68,8 @@ def _summary(recipe: Recipe, book: Book) -> RecipeSummary:
     return RecipeSummary(
         id=recipe.id,
         name=recipe.name,
+        alternate_name=recipe.alternate_name,
+        summary=recipe.summary,
         book_id=book.id,
         book_title=book.title,
         book_author=book.author,
@@ -293,6 +295,8 @@ def semantic_search(
             SemanticResult(
                 id=recipe.id,
                 name=recipe.name,
+                alternate_name=recipe.alternate_name,
+                summary=recipe.summary,
                 book_id=book.id,
                 book_title=book.title,
                 book_author=book.author,
@@ -561,6 +565,8 @@ def get_recipe(
         book_author=book.author,
         book_has_cover=has_cover(book),
         name=recipe.name,
+        alternate_name=recipe.alternate_name,
+        summary=recipe.summary,
         description=recipe.description,
         ingredients_verbatim=[
             IngredientLineRead.model_validate(line) for line in recipe.ingredients

@@ -158,6 +158,14 @@ private fun RecipeHeading(recipe: RecipeDetail) {
         color = colors.ink,
         modifier = Modifier.padding(top = 8.dp, bottom = 16.dp),
     )
+    (recipe.alternate_name ?: recipe.summary)?.let { descriptor ->
+        Text(
+            text = descriptor,
+            style = MaterialTheme.typography.bodyLarge,
+            color = colors.muted,
+            modifier = Modifier.padding(bottom = 12.dp),
+        )
+    }
     if (recipe.keywords.isNotEmpty()) {
         MonoLabel(
             recipe.keywords.joinToString(" · "),

@@ -196,6 +196,16 @@ private fun SimilarRail(recipeId: String, onOpenRecipe: (String, List<String>) -
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
+                    (recipe.alternate_name ?: recipe.summary)?.let { descriptor ->
+                        Text(
+                            text = descriptor,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = colors.muted,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
                     MonoLabel(
                         cleanTitle(recipe.book_title),
                         colour = colors.faint,

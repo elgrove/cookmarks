@@ -101,6 +101,21 @@ def test_apply_enrichment_replaces_all_derived_facts_atomically(session) -> None
     }
 
 
+def test_apply_enrichment_persists_recipe_descriptors(session) -> None:
+    recipe = _recipe(session)
+    response = _response(
+        alternate_name="Tamarind Lentil Broth",
+        summary=None,
+    )
+
+    apply_enrichment(session, recipe.id, response, provider=StubProvider(""), model="stub")
+    session.commit()
+    session.refresh(recipe)
+
+    assert recipe.alternate_name == "Tamarind Lentil Broth"
+    assert recipe.summary is None
+
+
 def test_empty_keywords_replace_previous_keywords(session) -> None:
     recipe = _recipe(session)
     recipe.keywords = [Keyword(name="Existing")]

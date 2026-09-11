@@ -64,6 +64,8 @@ class Recipe(UUIDAuditBase):
     )
     order: Mapped[int]
     name: Mapped[str] = mapped_column(String(500))
+    alternate_name: Mapped[str | None] = mapped_column(String(500))
+    summary: Mapped[str | None] = mapped_column(String(500))
     # Accent-stripped, lower-cased name. Stored because folding 21k rows per query
     # costs ~300ms against ~55ms for a plain scan of a stored column.
     name_folded: Mapped[str] = mapped_column(String(500), default="")

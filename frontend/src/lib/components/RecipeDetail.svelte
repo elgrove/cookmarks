@@ -6,6 +6,8 @@
 		bookAuthor: string;
 		bookHasCover: boolean;
 		name: string;
+		alternateName: string | null;
+		summary: string | null;
 		description: string | null;
 		ingredientsVerbatim: { id: string; position: number; text: string }[];
 		instructions: string[];
@@ -76,6 +78,7 @@
 
 	// The book's display title (pre-colon) for the breadcrumb and provenance.
 	let bookTitle = $derived(cleanTitle(recipe.bookTitle));
+	let descriptor = $derived(recipe.alternateName ?? recipe.summary);
 	// Calibre descriptions carry HTML; render the intro as plain serif text.
 	let lede = $derived(plainText(recipe.description ?? ''));
 </script>
@@ -124,6 +127,7 @@
 	data-verify-next={recipe.next?.id ?? ''}
 	data-verify-open-in-book={`/books/${recipe.bookId}/read?at=${recipe.id}`}
 	data-verify-in-book={recipe.inBook === null ? 'unknown' : String(recipe.inBook)}
+	data-verify-descriptor={descriptor ?? ''}
 >
 	<div class="topbar">
 		<nav class="crumb" aria-label="Breadcrumb">
@@ -170,6 +174,7 @@
 		<div class="head">
 			<div class="head-main">
 				<h1 class="display">{recipe.name}</h1>
+				{#if descriptor}<p class="descriptor">{descriptor}</p>{/if}
 				{#if recipe.keywords.length}
 					<div class="chips">
 						{#each recipe.keywords as kw (kw)}
@@ -278,6 +283,14 @@
 		margin: 0 auto;
 		padding: 1.35rem var(--page-h) 4rem;
 		animation: fadeUp 0.6s var(--ease-out) both;
+	}
+	.descriptor {
+		margin: 0.45rem 0 0;
+		font-family: var(--f-serif);
+		font-size: 1.18rem;
+		font-style: italic;
+		line-height: 1.35;
+		color: var(--muted);
 	}
 
 	/* Breadcrumb on the left, the prev/next pager on the right (desktop). */

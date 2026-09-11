@@ -121,6 +121,8 @@
 				recipes: sim.items.map((it) => ({
 					id: it.id,
 					name: it.name,
+					alternateName: it.alternate_name,
+					summary: it.summary,
 					bookId: it.book_id,
 					bookTitle: it.book_title,
 					bookAuthor: it.book_author,

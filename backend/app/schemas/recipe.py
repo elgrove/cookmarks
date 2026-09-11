@@ -14,6 +14,8 @@ class RecipeRow(BaseModel):
 
     id: uuid.UUID
     name: str
+    alternate_name: str | None
+    summary: str | None
     keywords: list[str]
     # Whether the caller has read this one — the per-row detail behind the book's
 
@@ -25,6 +27,8 @@ class RecipeSummary(BaseModel):
 
     id: uuid.UUID
     name: str
+    alternate_name: str | None
+    summary: str | None
     book_id: uuid.UUID
     book_title: str
     book_author: str
@@ -164,6 +168,8 @@ class RecipeDetail(BaseModel):
     book_author: str
     book_has_cover: bool
     name: str
+    alternate_name: str | None
+    summary: str | None
     description: str | None
     ingredients_verbatim: list[IngredientLineRead]
     canonical_ingredients: list[RecipeCanonicalIngredientRead]

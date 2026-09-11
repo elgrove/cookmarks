@@ -34,6 +34,8 @@ export const recipeDetailSchema = z.object({
 	book_author: z.string(),
 	book_has_cover: z.boolean(),
 	name: z.string(),
+	alternate_name: z.string().nullable(),
+	summary: z.string().nullable(),
 	description: z.string().nullable(),
 	ingredients_verbatim: z.array(ingredientLineSchema),
 	canonical_ingredients: z.array(recipeCanonicalIngredientSchema),
@@ -110,6 +112,8 @@ export async function markRecipeSeen(
 export const recipeSummarySchema = z.object({
 	id: z.string().uuid(),
 	name: z.string(),
+	alternate_name: z.string().nullable(),
+	summary: z.string().nullable(),
 	book_id: z.string().uuid(),
 	book_title: z.string(),
 	book_author: z.string(),
