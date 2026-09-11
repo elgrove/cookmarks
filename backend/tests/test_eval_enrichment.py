@@ -23,11 +23,13 @@ from evals.enrichment import (
     build_gold_stage2_context,
     evaluate_enrichment_recipe,
     load_gold_recipes,
+    score_alternate_name,
     score_canonical_ingredients,
     score_enrichment_response,
     score_facets,
     score_key_ingredients,
     score_residual_keywords,
+    score_summary,
     validate_enrichment_response,
 )
 from evals.models import CandidateModel
@@ -56,9 +58,9 @@ def _sample_gold_recipe() -> GoldRecipe:
     )
 
 
-def test_gold_dataset_loads_five_contrasting_recipes() -> None:
+def test_gold_dataset_loads_nine_contrasting_recipes() -> None:
     recipes = load_gold_recipes(ENRICHMENT_GOLD_PATH)
-    assert len(recipes) == 5
+    assert len(recipes) == 9
     archetypes = {r.archetype for r in recipes}
     assert archetypes == {
         "simple",
@@ -66,6 +68,9 @@ def test_gold_dataset_loads_five_contrasting_recipes() -> None:
         "heading_and_alternative_heavy",
         "stir_fry_with_optional_and_alternative_ingredients",
         "baked_cake_with_sections_and_alternatives",
+        "foreign_title_translation",
+        "loanword_opaque_summary",
+        "dual_title_bilingual",
     }
     slugs = [r.slug for r in recipes]
     assert "teriyaki-yellowtail" in slugs
@@ -73,6 +78,116 @@ def test_gold_dataset_loads_five_contrasting_recipes() -> None:
     assert "curry-udon" in slugs
     assert "pad-thai" in slugs
     assert "brown-butter-buttermilk-cake" in slugs
+    assert "pollo-almendrado" in slugs
+    assert "palang-ka-kapha" in slugs
+    assert "esquites" in slugs
+    assert "mole-poblano-con-pollo" in slugs
+
+
+def test_score_alternate_name() -> None:
+    gold = _sample_gold_recipe()
+    gold.alternate_name = "Chicken in Almond Sauce"
+    gold.accepted_alternate_names = ["Chicken with Almond Sauce", "Almond Chicken"]
+
+    # Exact match
+    resp1 = EnrichmentResponse.model_validate(
+        {"alternate_name": "Chicken in Almond Sauce", "ingredients": [], "keywords": []}
+    )
+    assert score_alternate_name(gold, resp1) == 1.0
+
+    # Accepted variant
+    resp2 = EnrichmentResponse.model_validate(
+        {"alternate_name": "Almond Chicken", "ingredients": [], "keywords": []}
+    )
+    assert score_alternate_name(gold, resp2) == 1.0
+
+    # Fuzzy match >= 85
+    resp3 = EnrichmentResponse.model_validate(
+        {"alternate_name": "Chicken Almond Sauce", "ingredients": [], "keywords": []}
+    )
+    assert score_alternate_name(gold, resp3) == 0.9
+
+    # Completely wrong
+    resp4 = EnrichmentResponse.model_validate(
+        {"alternate_name": "Beef Stew", "ingredients": [], "keywords": []}
+    )
+    assert score_alternate_name(gold, resp4) == 0.0
+
+    # Null when expected is not null
+    resp5 = EnrichmentResponse.model_validate(
+        {"alternate_name": None, "ingredients": [], "keywords": []}
+    )
+    assert score_alternate_name(gold, resp5) == 0.0
+
+    # Null when expected is null
+    gold_null = _sample_gold_recipe()
+    assert score_alternate_name(gold_null, resp5) == 1.0
+    assert score_alternate_name(gold_null, resp1) == 0.0
+
+
+def test_score_summary() -> None:
+    gold = _sample_gold_recipe()
+    gold.summary = "Corn salad with cheese"
+    gold.accepted_summaries = ["Sweetcorn salad with cheese"]
+
+    # Good match
+    resp1 = EnrichmentResponse.model_validate(
+        {"summary": "Corn salad with cheese", "ingredients": [], "keywords": []}
+    )
+    assert score_summary(gold, resp1) == 1.0
+
+    # A concise, related descriptor receives graded content credit.
+    resp_partial = EnrichmentResponse.model_validate(
+        {"summary": "Corn salad with lime", "ingredients": [], "keywords": []}
+    )
+    assert score_summary(gold, resp_partial) == pytest.approx(0.833)
+
+    # Decorative language fails rather than receiving partial credit.
+    resp_forbidden = EnrichmentResponse.model_construct(summary="Corn salad with spiced cheese")
+    assert score_summary(gold, resp_forbidden) == 0.0
+
+    # Leading "A" / "An" fails rather than receiving partial credit.
+    resp_leading_a = EnrichmentResponse.model_construct(summary="A corn salad with cheese")
+    assert score_summary(gold, resp_leading_a) == 0.0
+
+    # Extra details cannot score merely by containing the target nouns.
+    resp_long = EnrichmentResponse.model_construct(
+        summary="Corn salad with cheese lime herbs and toasted seeds"
+    )
+    assert score_summary(gold, resp_long) == 0.0
+
+    resp_flowery = EnrichmentResponse.model_construct(summary="Rich corn salad with cheese")
+    assert score_summary(gold, resp_flowery) == 0.0
+
+    # Null when expected is null
+    gold_null = _sample_gold_recipe()
+    resp_null = EnrichmentResponse.model_validate(
+        {"summary": None, "ingredients": [], "keywords": []}
+    )
+    assert score_summary(gold_null, resp_null) == 1.0
+    assert score_summary(gold_null, resp1) == 0.0
+
+
+def test_summary_score_rejects_verbose_esquites_mole_and_borani() -> None:
+    gold_by_slug = {recipe.slug: recipe for recipe in load_gold_recipes(ENRICHMENT_GOLD_PATH)}
+    verbose_summaries = {
+        "esquites": (
+            "Roasted corn kernels simmered in broth with epazote, topped with chipotle "
+            "mayonnaise, queso cotija, and lime."
+        ),
+        "mole-poblano-con-pollo": (
+            "Poached chicken in a deep, dark sauce of toasted chillies, nuts, seeds, "
+            "and Mexican chocolate."
+        ),
+        "aubergine-borani": (
+            "Grilled aubergine layered with tomato sauce and yoghurt, finished with "
+            "cumin-chilli tempering."
+        ),
+    }
+
+    for slug, summary in verbose_summaries.items():
+        response = EnrichmentResponse.model_construct(summary=summary)
+        assert score_summary(gold_by_slug[slug], response) == 0.0
 
 
 def test_score_canonical_ingredients_exact_and_misses() -> None:

@@ -37,11 +37,19 @@ class OpenRouterProvider(AIProvider):
     }
 
     def _complete(
-        self, prompt: str, model: str, *, schema: dict | None = None, temp: float = 0
+        self,
+        prompt: str,
+        model: str,
+        *,
+        schema: dict | None = None,
+        temp: float = 0,
+        system: str | None = None,
     ) -> tuple[str, Usage]:
+        messages = [{"role": "system", "content": system}] if system else []
+        messages.append({"role": "user", "content": prompt})
         payload: dict[str, object] = {
             "model": model,
-            "messages": [{"role": "user", "content": prompt}],
+            "messages": messages,
             "temperature": temp,
         }
         if schema is not None:

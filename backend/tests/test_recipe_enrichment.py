@@ -206,7 +206,23 @@ def test_response_rejects_extra_fields() -> None:
 
 
 def test_schema_version_tracks_the_bounded_output_change() -> None:
-    assert SCHEMA_VERSION == "v8"
+    assert SCHEMA_VERSION == "v9"
+
+
+def test_summary_rejects_long_or_decorative_descriptors() -> None:
+    with pytest.raises(ValidationError, match="3 to 8 words"):
+        Stage2Response.model_validate(
+            {"s": "Corn kernels in broth with epazote chilli lime cheese and mayonnaise"}
+        )
+
+    with pytest.raises(ValidationError, match="decorative or forbidden"):
+        Stage2Response.model_validate({"s": "Rich corn with cheese"})
+
+    with pytest.raises(ValidationError, match="fragment without terminal punctuation"):
+        Stage2Response.model_validate({"s": "Corn in broth with epazote."})
+
+    response = Stage2Response.model_validate({"s": "Corn in broth with epazote"})
+    assert response.summary == "Corn in broth with epazote"
 
 
 def test_stage1_prompt_requires_singular_uk_english() -> None:
@@ -268,6 +284,9 @@ def test_stage2_receives_structured_stage1_result_and_owns_key_selection(session
     assert context["recipe"]["ingredients"] == ingredients
     prompt = build_stage2_prompt(context)
     assert "Key ingredients (k)" in prompt
+    assert "Familiarity is not a reason" in prompt
+    assert "foreign dish term or regional style" in prompt
+    assert "noodle type or base grain" in prompt
 
     response = EnrichmentResponse.from_stages(
         stage1,
@@ -749,4 +768,3 @@ def test_batch_rows_set_max_output_tokens() -> None:
 
     s2 = json.loads(stage2_row("k2", context))
     assert s2["request"]["generation_config"]["max_output_tokens"] == 2048
-

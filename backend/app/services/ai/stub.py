@@ -54,7 +54,13 @@ class StubProvider(AIProvider):
     vision_model: ClassVar[str] = "stub-vision"
 
     def _complete(
-        self, prompt: str, model: str, *, schema: dict | None = None, temp: float = 0
+        self,
+        prompt: str,
+        model: str,
+        *,
+        schema: dict | None = None,
+        temp: float = 0,
+        system: str | None = None,
     ) -> tuple[str, Usage]:
         usage = Usage(cost_usd=Decimal("0"), input_tokens=0, output_tokens=0)
 
@@ -81,8 +87,12 @@ class StubProvider(AIProvider):
                 ingredients.append({"id": line["id"], "n": f"Stub Ingredient {token} {index}"})
             return json.dumps({"i": ingredients}), usage
 
-        if prompt.startswith("Recipe facets prompt"):
-            recipe = json.loads(prompt.rsplit("Recipe context:\n", 1)[1])
+        if (system and system.startswith("Recipe facets prompt")) or prompt.startswith("Recipe facets prompt"):
+            recipe_text = prompt.rsplit("Recipe context:\n", 1)[1] if "Recipe context:\n" in prompt else prompt
+            try:
+                recipe = json.loads(recipe_text)
+            except json.JSONDecodeError:
+                recipe, _ = json.JSONDecoder().raw_decode(recipe_text)
             ingredients = recipe.get("ingredients", [])
             key_ingredients = [ingredients[0]] if ingredients else []
             return json.dumps(
@@ -92,6 +102,8 @@ class StubProvider(AIProvider):
                     "m": [],
                     "o": [],
                     "w": ["Cosy", "Fresh", "Outdoor", "Summer", "Weeknight"],
+                    "a": None,
+                    "s": None,
                 }
             ), usage
 

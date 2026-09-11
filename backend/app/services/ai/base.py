@@ -20,7 +20,7 @@ from app.services.prompts import (
 from app.services.recipe_enrichment.prompt import (
     build_prompt,
     build_stage1_prompt,
-    build_stage2_prompt,
+    build_stage2_prompts,
 )
 from app.services.recipe_enrichment.schema import (
     ENRICHMENT_JSON_SCHEMA,
@@ -201,7 +201,13 @@ class AIProvider(abc.ABC):
 
     @abc.abstractmethod
     def _complete(
-        self, prompt: str, model: str, *, schema: dict | None = None, temp: float = 0
+        self,
+        prompt: str,
+        model: str,
+        *,
+        schema: dict | None = None,
+        temp: float = 0,
+        system: str | None = None,
     ) -> tuple[str, Usage]:
         """Run one completion and return (raw_text, usage). `schema` is a JSON schema
         the provider may use to constrain output; `temp` is the sampling temperature."""
@@ -287,8 +293,13 @@ class AIProvider(abc.ABC):
     ) -> tuple[Stage2Response, Usage]:
         """Run Stage 2 facet & keyword assignment for one recipe."""
         model = model or self.model_for(ModelRole.RECIPE_SEMANTICS)
+        system_prompt, user_prompt = build_stage2_prompts(context)
         response, usage = self._complete(
-            build_stage2_prompt(context), model, schema=STAGE2_JSON_SCHEMA, temp=temp
+            user_prompt,
+            model,
+            schema=STAGE2_JSON_SCHEMA,
+            temp=temp,
+            system=system_prompt,
         )
         if not response:
             raise AIResponseError("Recipe facet assignment returned an empty response", usage)

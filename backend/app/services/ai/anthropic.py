@@ -34,9 +34,17 @@ class AnthropicProvider(AIProvider):
         self.client = Anthropic(api_key=api_key)
 
     def _complete(
-        self, prompt: str, model: str, *, schema: dict | None = None, temp: float = 0
+        self,
+        prompt: str,
+        model: str,
+        *,
+        schema: dict | None = None,
+        temp: float = 0,
+        system: str | None = None,
     ) -> tuple[str, Usage]:
         kwargs: dict[str, Any] = {}
+        if system is not None:
+            kwargs["system"] = system
         if schema is not None:
             kwargs["tools"] = [
                 {

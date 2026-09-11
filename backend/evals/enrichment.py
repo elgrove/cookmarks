@@ -12,6 +12,7 @@ Evaluation runs against the curated gold set in ``evals/gold/enrichment/recipes.
 
 import json
 import logging
+import re
 import time
 import tomllib
 from collections import defaultdict
@@ -22,6 +23,7 @@ from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel
+from rapidfuzz import fuzz
 
 from app.services.ai import AIProvider, AIResponseError, Usage
 from app.services.ai.anthropic import AnthropicProvider
@@ -33,13 +35,14 @@ from app.services.recipe_enrichment.schema import (
     SCHEMA_VERSION,
     EnrichmentResponse,
     Stage1Response,
+    summary_style_error,
 )
 from app.services.recipe_enrichment.service import (
     deduplicate_ingredient_names,
     validate_stage1_response,
 )
 from app.services.recipe_facts import accepted_cuisine_ids, facet_vocabulary
-from app.text import fold
+from app.text import fold, stem
 from evals.config import DEFAULT_CONFIG_PATH, EVALS_DIR, RUNS_DIR, git_sha
 from evals.environment import resolve_api_key
 from evals.models import CandidateModel
@@ -144,6 +147,10 @@ class GoldRecipe(BaseModel):
     courses: list[GoldFact] = []
     accepted_courses: list[str] = []
     residual_keywords: list[str] = []
+    alternate_name: str | None = None
+    accepted_alternate_names: list[str] = []
+    summary: str | None = None
+    accepted_summaries: list[str | None] = []
 
 
 class EnrichmentDimensionScores(BaseModel):
@@ -176,6 +183,9 @@ class EnrichmentDimensionScores(BaseModel):
     keywords_count: int = 0
     keywords_duplicates: int = 0
     keywords_overlap: int = 0
+
+    alternate_name_score: float = 0.0
+    summary_score: float = 0.0
 
     composite: float = 0.0
 
@@ -390,18 +400,99 @@ def score_residual_keywords(
     }
 
 
+def score_alternate_name(gold: GoldRecipe, response: EnrichmentResponse) -> float:
+    pred = response.alternate_name
+    acceptable = (
+        [gold.alternate_name, *gold.accepted_alternate_names]
+        if gold.alternate_name is not None
+        else gold.accepted_alternate_names
+    )
+    if not acceptable or all(a is None for a in acceptable):
+        return 1.0 if not pred else 0.0
+    if not pred:
+        return 1.0 if None in acceptable else 0.0
+
+    pred_clean = " ".join(pred.strip().split()).casefold()
+    for acc in acceptable:
+        if acc is not None and " ".join(acc.strip().split()).casefold() == pred_clean:
+            return 1.0
+    for acc in acceptable:
+        if acc is not None and fuzz.token_set_ratio(acc, pred) >= 85:
+            return 0.9
+    return 0.0
+
+
+_SUMMARY_STOP_WORDS = {"a", "an", "and", "in", "of", "the", "with"}
+
+
+def _summary_terms(summary: str) -> set[str]:
+    """Return the content terms used to compare concise recipe descriptors."""
+    return {
+        stem(term)
+        for term in re.findall(r"[a-z0-9]+", fold(summary))
+        if term not in _SUMMARY_STOP_WORDS
+    }
+
+
+def _summary_content_f1(prediction: str, target: str) -> float:
+    predicted_terms = _summary_terms(prediction)
+    target_terms = _summary_terms(target)
+    if not predicted_terms or not target_terms:
+        return 0.0
+
+    overlap = len(predicted_terms & target_terms)
+    if not overlap:
+        return 0.0
+    precision = overlap / len(predicted_terms)
+    recall = overlap / len(target_terms)
+    return 2 * precision * recall / (precision + recall)
+
+
+def score_summary(gold: GoldRecipe, response: EnrichmentResponse) -> float:
+    pred = response.summary
+    acceptable_gold = (
+        [gold.summary, *gold.accepted_summaries]
+        if gold.summary is not None
+        else gold.accepted_summaries
+    )
+    if not acceptable_gold or all(g is None for g in acceptable_gold):
+        return 1.0 if not pred else 0.0
+    if not pred:
+        return 1.0 if None in acceptable_gold else 0.0
+
+    pred_stripped = pred.strip()
+    if summary_style_error(pred_stripped):
+        return 0.0
+
+    valid_golds = [g for g in acceptable_gold if g is not None]
+    if not valid_golds:
+        return 0.0
+
+    content_f1 = max(_summary_content_f1(pred_stripped, target) for target in valid_golds)
+    if content_f1 == 0:
+        return 0.0
+
+    # Valid length and style are a gate. Content F1 supplies the remaining half,
+    # so a concise related description receives meaningful partial credit.
+    return round(0.5 + 0.5 * content_f1, 3)
+
+
 def calculate_composite_score(scores: dict[str, Any]) -> float:
     weights = {
-        "canonical_ingredients": 0.35,
+        "canonical_ingredients": 0.30,
         "key_ingredients": 0.15,
-        "facets": 0.30,
-        "residual_keywords": 0.20,
+        "facets": 0.25,
+        "residual_keywords": 0.15,
+        "alternate_name": 0.075,
+        "summary": 0.075,
     }
     composite = (
         weights["canonical_ingredients"] * scores["canonical_ingredients_f1"]
         + weights["key_ingredients"] * scores["key_ingredients_f1"]
         + weights["facets"] * scores["facets_mean"]
         + weights["residual_keywords"] * scores["keywords_validity"]
+        + weights["alternate_name"] * scores.get("alternate_name_score", 0.0)
+        + weights["summary"] * scores.get("summary_score", 0.0)
     )
     return round(composite, 4)
 
@@ -413,6 +504,8 @@ def score_enrichment_response(
     p_key, r_key, f1_key = score_key_ingredients(gold.key_ingredients, response)
     facets = score_facets(gold, response)
     kw = score_residual_keywords(response.keywords, gold, response)
+    alt_score = score_alternate_name(gold, response)
+    summ_score = score_summary(gold, response)
 
     payload = {
         "canonical_ingredients_precision": p_ing,
@@ -421,6 +514,8 @@ def score_enrichment_response(
         "key_ingredients_precision": p_key,
         "key_ingredients_recall": r_key,
         "key_ingredients_f1": f1_key,
+        "alternate_name_score": alt_score,
+        "summary_score": summ_score,
         **facets,
         **kw,
     }
@@ -623,6 +718,8 @@ def leaderboard(records: list[EnrichmentRecipeRecord]) -> str:
                     "0.0%",
                     "0.0%",
                     "0.0%",
+                    "0.0%",
+                    "0.0%",
                     "—",
                     "—",
                     f"{len(items)} errors",
@@ -645,6 +742,8 @@ def leaderboard(records: list[EnrichmentRecipeRecord]) -> str:
         ) / len(valid_items)
         facets_mean = sum(item.scores.facets_mean for item in valid_items) / len(valid_items)
         kw_mean = sum(item.scores.keywords_validity for item in valid_items) / len(valid_items)
+        alt_mean = sum(item.scores.alternate_name_score for item in valid_items) / len(valid_items)
+        sum_mean = sum(item.scores.summary_score for item in valid_items) / len(valid_items)
 
         total_cost = sum(item.cost_usd or 0.0 for item in items)
         total_dur = sum(item.duration_s for item in items)
@@ -657,6 +756,8 @@ def leaderboard(records: list[EnrichmentRecipeRecord]) -> str:
                 f"{key_f1 * 100:.1f}%",
                 f"{facets_mean * 100:.1f}%",
                 f"{kw_mean * 100:.1f}%",
+                f"{alt_mean * 100:.1f}%",
+                f"{sum_mean * 100:.1f}%",
                 f"${total_cost:.4f}",
                 f"{total_dur:.1f}s",
                 f"{len(valid_items)}/{len(items)}",
@@ -671,6 +772,8 @@ def leaderboard(records: list[EnrichmentRecipeRecord]) -> str:
         "Key F1",
         "Facets",
         "Keywords",
+        "AltName",
+        "Summary",
         "Cost",
         "Duration",
         "Passed",
@@ -695,6 +798,8 @@ def _zero_enrichment_scores() -> EnrichmentDimensionScores:
         keywords_count=0,
         keywords_duplicates=0,
         keywords_overlap=0,
+        alternate_name_score=0.0,
+        summary_score=0.0,
         composite=0.0,
     )
 
@@ -757,9 +862,15 @@ def evaluate_enrichment_recipe(
             stage2_response, usage2 = stage2_provider.enrich_recipe_stage2(
                 stage2_context, stage2_candidate.model
             )
-        except AIResponseError as exc:
-            usage2 = exc.usage
-            raise AIResponseError(str(exc), usage1 + usage2) from exc
+        except AIResponseError:
+            try:
+                stage2_response, retry_usage = stage2_provider.enrich_recipe_stage2(
+                    stage2_context, stage2_candidate.model, allow_truncate_keys=True
+                )
+                usage2 += retry_usage
+            except AIResponseError as exc:
+                usage2 += exc.usage
+                raise AIResponseError(str(exc), usage1 + usage2) from exc
 
         usage = usage1 + usage2
         try:

@@ -90,6 +90,14 @@
     ],
     "key_ingredients": [
       "Yellowtail Fillet"
+    ],
+    "alternate_name": null,
+    "accepted_alternate_names": [],
+    "summary": "Yellowtail in soy-mirin sauce",
+    "accepted_summaries": [
+      "Yellowtail in soy-mirin sauce",
+      "Yellowtail with soy-mirin sauce",
+      "Yellowtail in teriyaki sauce"
     ]
   },
   {
@@ -256,6 +264,12 @@
       "Aubergine",
       "Tomato",
       "Greek Yoghurt"
+    ],
+    "alternate_name": null,
+    "accepted_alternate_names": [],
+    "summary": "Layered aubergine with tomato sauce and yoghurt",
+    "accepted_summaries": [
+      "Layered aubergine with tomato sauce and yoghurt"
     ]
   },
   {
@@ -421,6 +435,13 @@
     ],
     "key_ingredients": [
       "Udon Noodles"
+    ],
+    "alternate_name": null,
+    "accepted_alternate_names": [],
+    "summary": "Udon noodles in Japanese curry broth",
+    "accepted_summaries": [
+      "Udon noodles in Japanese curry broth",
+      "Udon noodles in curry broth"
     ]
   },
   {
@@ -578,6 +599,13 @@
       "Pad Thai Noodles",
       "Tamarind Pulp",
       "Shrimp"
+    ],
+    "alternate_name": null,
+    "accepted_alternate_names": [],
+    "summary": "Rice noodles with prawns and tamarind",
+    "accepted_summaries": [
+      "Rice noodles with prawns and tamarind",
+      "Rice noodles with tofu and tamarind"
     ]
   },
   {
@@ -708,6 +736,505 @@
     "key_ingredients": [
       "Butter",
       "Buttermilk"
+    ],
+    "alternate_name": null,
+    "accepted_alternate_names": [],
+    "summary": null,
+    "accepted_summaries": []
+  },
+  {
+    "id": "0891f325d7ec4ad5801d1dba0e2c5d5b",
+    "slug": "pollo-almendrado",
+    "name": "Pollo Almendrado",
+    "archetype": "foreign_title_translation",
+    "yields": "Serves 6",
+    "description": "Chicken cooked in almond sauce is one of the milder, more elegant dishes of the Mexican cuisine, and there are many recipes for it. This one, a more unusual version, was given to me by Señora Leticia Castro, who comes from Coahuila in the north of Mexico. She generously let me take recipes from the family cookbook that have been handed down for several generations. The original recipe was for a “young and tender chicken” that was thickly covered, inside and out, with the almond “paste.” However, the crust falls off when you serve the chicken, so I think this version is more practical.\nI suggest you serve this with small, boiled new potatoes and a lightly dressed salad. Strips of jalapeño chiles en escabeche can be passed separately.",
+    "book_title": "The Essential Cuisines of Mexico",
+    "book_author": "Diana Kennedy",
+    "instructions": [
+      "Season the chicken with 2 teaspoons of the salt, pepper, and the lime juice and set aside for at least 1 hour.",
+      "Preheat the oven to 350° F (180° C).",
+      "Put the peppercorns, cloves, bay leaves, ¼ cup (65 ml) of water, and ½ teaspoon salt into a blender jar and blend thoroughly, then gradually add the tomatoes and blend again. Melt about half of the lard in a small frying pan and fry the almonds to a deep golden color, crush, and transfer to the blender jar. Adding a little more lard, fry the bread, break up roughly, and add to the blender, then blend all the ingredients to a slightly textured paste, adding a little more water only if necessary to release the blades.",
+      "Choose a shallow, ovenproof dish into which the pieces of chicken will just fit in one layer. Pour a little of the melted lard from the frying pan into the dish and spread the bottom of it with a little more than one third of the almond sauce. Place the chicken pieces over the sauce and then cover them with the remaining sauce. Bake, uncovered, basting from time to time with the rest of the lard until the chicken is tender and the sauce slightly crusty on top—about 45 minutes.",
+      "NOTE: While this dish may be prepared some hours ahead and left to season, it should be eaten as soon as it comes out of the oven. It does not freeze successfully."
+    ],
+    "lines": [
+      {
+        "position": 0,
+        "text": "4½ POUNDS (2 KG) CHICKEN PARTS"
+      },
+      {
+        "position": 1,
+        "text": "2½ TEASPOONS SALT, OR TO TASTE"
+      },
+      {
+        "position": 2,
+        "text": "FRESHLY GROUND BLACK PEPPER"
+      },
+      {
+        "position": 3,
+        "text": "3 TABLESPOONS FRESH LIME JUICE"
+      },
+      {
+        "position": 4,
+        "text": "6 PEPPERCORNS, CRUSHED"
+      },
+      {
+        "position": 5,
+        "text": "2 WHOLE CLOVES, CRUSHED"
+      },
+      {
+        "position": 6,
+        "text": "2 MEXICAN BAY LEAVES"
+      },
+      {
+        "position": 7,
+        "text": "¼ CUP (65 ML) COLD WATER, APPROXIMATELY"
+      },
+      {
+        "position": 8,
+        "text": "1 POUND (450 G) TOMATOES, BROILED"
+      },
+      {
+        "position": 9,
+        "text": "4 TO 6 TABLESPOONS PORK LARD"
+      },
+      {
+        "position": 10,
+        "text": "1 CUP (250 ML) PEELED ALMONDS, ROUGHLY CHOPPED"
+      },
+      {
+        "position": 11,
+        "text": "2 THICK ROUNDS OF STALE FRENCH BREAD OR HARD ROLL"
+      }
+    ],
+    "cuisines": [
+      {
+        "value_id": "mexican"
+      }
+    ],
+    "accepted_cuisines": [
+      "mexican"
+    ],
+    "methods": [],
+    "courses": [],
+    "accepted_courses": [],
+    "residual_keywords": [],
+    "canonical_ingredients": [
+      "chicken",
+      "lime",
+      "bay leaf",
+      "tomato",
+      "pork lard",
+      "almond",
+      "french bread"
+    ],
+    "key_ingredients": [
+      "chicken",
+      "almond"
+    ],
+    "alternate_name": "Almond Chicken",
+    "accepted_alternate_names": [
+      "Almond Chicken",
+      "Chicken in Almond Sauce",
+      "Chicken with Almond Sauce"
+    ],
+    "summary": null,
+    "accepted_summaries": [
+      null,
+      "Chicken baked in an almond sauce."
+    ]
+  },
+  {
+    "id": "1ff90489289242919a01859db544277b",
+    "slug": "palang-ka-kapha",
+    "name": "Palang Ka Kapha",
+    "archetype": "foreign_title_translation",
+    "yields": "Serves 4",
+    "description": "Puréed Spinach",
+    "book_title": "India: The Cookbook",
+    "book_author": "Pushpesh Pant",
+    "instructions": [
+      "Bring 250ml / 8fl oz (1 cup) water to the boil in a heavy-based pan, add the spinach and cook for a few minutes until the spinach is cooked. Remove from the heat and mash it well with a wooden churner or in a blender or food processor. Set aside.",
+      "Heat the oil in a kadhai or deep, heavy-based pan over medium heat, add the asafoetida and stir-fry for about 30 seconds, or until it dissolves.",
+      "Add the onions and stir-fry for about 2 minutes, or until they are translucent.",
+      "Add the ginger paste and continue stir-frying for about 1 minute.",
+      "Add the spinach purée and green chillies to the pan, then pour in 500ml / 18fl oz (2¼ cups) hot water and mix well.",
+      "Slowly add the rice flour, stirring constantly to make sure that no lumps form, then bring to the boil. Season with salt and reduce the heat to medium-low and cook for about 20 minutes.",
+      "Heat the ghee in a small frying pan (skillet) over medium heat, add the dried red chillies and garlic cloves, if using, and stir-fry for about 1 minute, or until they change colour. Pour over the spinach mixture and serve hot garnished with ginger strips and accompanied with Rice or Roti."
+    ],
+    "lines": [
+      {
+        "position": 0,
+        "text": "1kg / 2¼lb spinach, chopped"
+      },
+      {
+        "position": 1,
+        "text": "1 tablespoon vegetable oil"
+      },
+      {
+        "position": 2,
+        "text": "pinch of asafoetida"
+      },
+      {
+        "position": 3,
+        "text": "2 onions, sliced"
+      },
+      {
+        "position": 4,
+        "text": "1 tablespoon Ginger Paste (see page 57)"
+      },
+      {
+        "position": 5,
+        "text": "3–4 green chillies, slit in half lengthways and de-seeded"
+      },
+      {
+        "position": 6,
+        "text": "2 tablespoons rice flour"
+      },
+      {
+        "position": 7,
+        "text": "1 tablespoon ghee"
+      },
+      {
+        "position": 8,
+        "text": "2–3 dried red chillies"
+      },
+      {
+        "position": 9,
+        "text": "6 garlic cloves, chopped (optional)"
+      },
+      {
+        "position": 10,
+        "text": "salt"
+      },
+      {
+        "position": 11,
+        "text": "1 × 5-cm / 2-inch piece fresh ginger, peeled and cut into strips, to garnish freshly cooked Rice (see page 631) or Roti (see page 616), to serve"
+      }
+    ],
+    "cuisines": [
+      {
+        "value_id": "indian"
+      }
+    ],
+    "accepted_cuisines": [
+      "indian"
+    ],
+    "methods": [],
+    "courses": [],
+    "accepted_courses": [],
+    "residual_keywords": [
+      "Warming"
+    ],
+    "canonical_ingredients": [
+      "spinach",
+      "vegetable oil",
+      "asafoetida",
+      "onion",
+      "ginger paste",
+      "green chilli",
+      "rice flour",
+      "ghee",
+      "red chilli",
+      "garlic",
+      "ginger"
+    ],
+    "key_ingredients": [
+      "spinach",
+      "rice flour"
+    ],
+    "alternate_name": "Puréed Spinach",
+    "accepted_alternate_names": [
+      "Puréed Spinach",
+      "Pureed Spinach",
+      "Spinach Purée",
+      "Spinach Puree"
+    ],
+    "summary": null,
+    "accepted_summaries": [
+      null
+    ]
+  },
+  {
+    "id": "046516f9f6c140faa0a4cff7046f1f3c",
+    "slug": "esquites",
+    "name": "Esquites",
+    "archetype": "loanword_opaque_summary",
+    "yields": "Makes 4 to 6 servings",
+    "description": "Are esquites a salad? A soup? Neither and both. Esquites are a favorite Mexican street snack, always eaten in the fall when corn is fresh and plentiful. Kernels of corn get cut off the cob, boiled, and then served in a bit of the cooking liquid, mixed with toppings such as mayonnaise, grated queso Cotija (I substitute ricotta salata when I don’t have access to good Cotija), lime, and ground chile piquín. It’s usually served in a Styrofoam cup and eaten with a spoon while standing up. In Mexico, no one will invite you to their house to eat an esquite. It’s a to-go food. But it’s also something I crave when I’m not in Mexico, so I like to re-create it at home. I make mine a bit more refined than the street version. Instead of merely boiling the corn, I like to roast the ears first and then slice off the kernels, which imparts a nice toasty flavor. I throw fresh epazote in the broth, along with some chile piquín. It’s important to use white corn for esquites. The best variety is cacahuazintle, which has big kernels, but any sweet white corn will do.\nI recommend placing the toppings in the center of the table for people to choose what they’d like to add. Mayonnaise and cheese are delicious and make the broth turn creamy, but I prefer just lime and ground chile. Esquites can be enjoyed hot, at room temperature, or cold. At parties, the pot is often left on the stove for hours, so people can come back for more.",
+    "book_title": "My Mexico City Kitchen: Recipes and Convictions [A Cookbook]",
+    "book_author": "Gabriela Camara & Malena Watrous",
+    "instructions": [
+      "Place a comal or skillet over high heat and oil it lightly so that the corn doesn’t stick. Place the ears of corn on the comal or skillet and rotate every 30 seconds or so, until they are lightly charred on all sides, 4 to 5 minutes total. Let the corn cool to the touch, then slice off the kernels.",
+      "Place the kernels in a medium saucepan over medium-high heat and add water to barely cover, then add the salt, epazote, and chiles. Bring to a boil, then decrease the heat and let simmer for 5 minutes. You have to make sure that the corn is cooked through but not overcooked to the point of being mushy. It should be soft enough to chew easily while still retaining a slight crunch. Remove the chiles. Divide the kernels and liquid evenly among serving bowls and serve warm, passing the mayonnaise, cheese, limes, and ground chile for people to add if they wish.",
+      "Esquites can be stored in a sealed container, covered, in the refrigerator for 2 to 3 days. Reheat in a saucepan over low heat."
+    ],
+    "lines": [
+      {
+        "position": 0,
+        "text": "6 ears white corn, shucked"
+      },
+      {
+        "position": 1,
+        "text": "1 Tbsp sea salt, plus more as needed"
+      },
+      {
+        "position": 2,
+        "text": "¼ cup / 5g coarsely chopped epazote or cilantro"
+      },
+      {
+        "position": 3,
+        "text": "3 chiles piquín"
+      },
+      {
+        "position": 4,
+        "text": "1 recipe freshly made Mayonesa con Chipotle (this page) or Mayonesa con Limón (this page)"
+      },
+      {
+        "position": 5,
+        "text": "Grated queso Cotija or ricotta salata for serving"
+      },
+      {
+        "position": 6,
+        "text": "2 limes, cut into quarters"
+      },
+      {
+        "position": 7,
+        "text": "Ground chile piquín for serving"
+      }
+    ],
+    "cuisines": [
+      {
+        "value_id": "mexican"
+      }
+    ],
+    "accepted_cuisines": [
+      "mexican"
+    ],
+    "methods": [],
+    "courses": [],
+    "accepted_courses": [],
+    "residual_keywords": [
+      "Warming",
+      "Street Food"
+    ],
+    "canonical_ingredients": [
+      "corn",
+      "epazote",
+      "chilli piquin",
+      "mayonesa",
+      "queso cotija",
+      "lime",
+      "chilli piquin"
+    ],
+    "key_ingredients": [
+      "corn",
+      "epazote",
+      "chilli piquin",
+      "chilli piquin"
+    ],
+    "alternate_name": null,
+    "accepted_alternate_names": [],
+    "summary": "Corn in broth with epazote and chilli",
+    "accepted_summaries": [
+      "Corn in broth with epazote and chilli"
+    ]
+  },
+  {
+    "id": "a89ada8715654579ab27e9655d2ad6bf",
+    "slug": "mole-poblano-con-pollo",
+    "name": "Mole Poblano With Chicken / Mole Poblano Con Pollo",
+    "archetype": "dual_title_bilingual",
+    "yields": "Serves 10",
+    "description": "Mole poblano, so called because it’s from the state of Puebla, is the most iconic of the many moles that Mexican cuisine has to offer and definitely one of the most delicious. It’s a deep, dark, nut-thickened sauce with an enchanting flavor. The last time I visited Puebla with my family, they all poked fun at me because I ate it at every meal of the day all week, sauced over eggs for breakfast, over poached chicken with a side of rice for lunch (the most traditional way, and how it’s served here), and in mole enchiladas for dinner. I never tire of it! Above all other moles, mole poblano personifies the extensive intermingling of foods resulting from the intermarriage of native Mexican and Spanish cuisines. The long and varied list of ingredients, including seeds from dried chiles, which add a deep dimension of flavor and heat, is the most obvious reason why this sauce is so complex and memorable; the dish’s complexity also has a lot to do with the preliminary steps you take to bring out the flavors of each ingredient before they are pureed together. Each one is essential, and they all contribute to the smooth multilayering of flavors. I know, the length of this recipe may strike you as intimidating, yet few things compare to a mole made from scratch, and I’ve come across more and more people who are eager to learn how to do it. The most time-consuming task is prepping all the ingredients, but as long as you have everything in place before you start putting them into the pot, you will find the recipe manageable. Every minute is worth it! I like to make a big batch of the mole, partly because it freezes well (see note). You can save some time by poaching the chicken a day ahead, and that will also provide you with the chicken stock you’ll need for this recipe. Serve with rice and warm corn tortillas.",
+    "book_title": "Pati Jinich Treasures of the Mexican Table: Classic Recipes, Local Secrets",
+    "book_author": "Pati Jinich",
+    "instructions": [
+      "To make the mole: Preheat the broiler, with the rack 2 to 3 inches from the heat source. Put the tomato, tomatillos, onion, and garlic on a baking sheet lined with foil and broil, turning halfway through, until the vegetables are charred and the tomato and tomatillos are mushy, 5 to 7 minutes for the garlic and 10 to 12 minutes for the other vegetables. Remove the garlic when charred and softened, and when it is cool enough to handle, peel it. Alternatively, you can roast the vegetables on a preheated comal or skillet over medium heat, turning them every 4 to 5 minutes, until charred. Remove from the heat.",
+      "Heat the lard, shortening, or oil in a large Dutch oven over medium-high heat. It should be hot enough so that the chiles begin to cook and bubble gently as soon as you add them. Working in batches as necessary so that you don’t crowd the pot, sauté the chiles, stirring often, until they crisp and turn darker, 2 to 3 minutes; do not let them burn. Remove with a slotted spoon or tongs as they are done, allowing the oil to drip back into the pot, and place in a large bowl.",
+      "Add the almonds, peanuts, raisins, and pumpkin seeds to the hot fat and cook, stirring often, until nicely toasted but not burned, 2 to 3 minutes. The raisins will puff. Remove with a slotted spoon and add to the bowl with the chiles.",
+      "Fry the tortilla and bread pieces in the hot fat until crisp and browned. Remove with a slotted spoon and add to the bowl.",
+      "Add the sesame seeds, reserved chile seeds, cloves, aniseseeds, coriander seeds, peppercorns, canela stick, and allspice to the oil. Cook, stirring frequently and taking care not to burn the spices, for 2 to 3 more minutes, until they are fragrant and beginning to darken. Stir in the roasted tomatoes, tomatillos, onion, and garlic and cook, stirring, for a couple of minutes to blend the flavors.",
+      "Return all the ingredients in the bowl to the Dutch oven and pour in 2½ cups of the chicken broth. Stir everything together, pressing the chiles down into the broth with the back of a spoon so they are moistened and break up, and bring to a simmer. Add the chocolate, brown sugar, and salt, stir well, and simmer for 15 minutes, pressing the ingredients down to submerge them if necessary and stirring and scraping the bottom of the pot often to prevent sticking. Add up to ½ cup more broth if necessary to cover all the ingredients. Turn off the heat, cover, and let sit for 30 minutes so that all the ingredients soften thoroughly. (This will make the mixture easier to puree.)",
+      "To finish the mole: Working in batches, puree the mixture in a blender or food processor until completely silky smooth. Measure out the mole (you should have 4½ to 5 cups) and place in a large saucepan. Add 2½ cups chicken broth to the mole and stir together. If desired, thin with a little more chicken broth. Bring to a simmer over medium-low heat and simmer, stirring and scraping the bottom of the saucepan, for 2 to 3 minutes. Taste and adjust the salt, turn off the heat, and cover to keep warm.",
+      "Place the poached chicken breasts in a large pot or a wide deep skillet, add enough broth to cover, and heat gently over medium-low heat. When the chicken is hot, remove it from the broth and arrange on a platter. Spoon the mole over the chicken, sprinkle with the sesame seeds, and serve."
+    ],
+    "lines": [
+      {
+        "position": 0,
+        "text": "For the mole poblano"
+      },
+      {
+        "position": 1,
+        "text": "1 tomato (see note)"
+      },
+      {
+        "position": 2,
+        "text": "3 ounces tomatillos (2 or 3 small), husked and rinsed"
+      },
+      {
+        "position": 3,
+        "text": "¼ white onion, cut in half"
+      },
+      {
+        "position": 4,
+        "text": "3 garlic cloves, not peeled"
+      },
+      {
+        "position": 5,
+        "text": "½ cup lard, vegetable shortening, or vegetable oil"
+      },
+      {
+        "position": 6,
+        "text": "4 dried pasilla chiles, stemmed and seeded, seeds reserved"
+      },
+      {
+        "position": 7,
+        "text": "3 dried ancho chiles, stemmed and seeded, seeds reserved"
+      },
+      {
+        "position": 8,
+        "text": "3 dried mulato or ancho chiles, stemmed and seeded, seeds reserved"
+      },
+      {
+        "position": 9,
+        "text": "2 dried chipotle chiles, preferably moritas, stemmed and seeded, seeds reserved"
+      },
+      {
+        "position": 10,
+        "text": "2 tablespoons raw unblanched almonds"
+      },
+      {
+        "position": 11,
+        "text": "2 tablespoons raw peanuts"
+      },
+      {
+        "position": 12,
+        "text": "2 tablespoons dark raisins"
+      },
+      {
+        "position": 13,
+        "text": "1 tablespoon raw hulled pumpkin seeds"
+      },
+      {
+        "position": 14,
+        "text": "1 corn tortilla, cut into 8 wedges"
+      },
+      {
+        "position": 15,
+        "text": "4 (½-inch) slices bolillo or baguette (about 1 ounce)"
+      },
+      {
+        "position": 16,
+        "text": "2 tablespoons sesame seeds"
+      },
+      {
+        "position": 17,
+        "text": "3 cloves, stems removed and discarded"
+      },
+      {
+        "position": 18,
+        "text": "½ teaspoon aniseseeds"
+      },
+      {
+        "position": 19,
+        "text": "½ teaspoon coriander seeds"
+      },
+      {
+        "position": 20,
+        "text": "¼ teaspoon black peppercorns"
+      },
+      {
+        "position": 21,
+        "text": "1 (1½-inch) canela stick (see note)"
+      },
+      {
+        "position": 22,
+        "text": "⅛ teaspoon allspice berries"
+      },
+      {
+        "position": 23,
+        "text": "About 6 cups chicken broth (see headnote)"
+      },
+      {
+        "position": 24,
+        "text": "3 ounces Mexican chocolate, cut or broken into pieces"
+      },
+      {
+        "position": 25,
+        "text": "1 tablespoon dark brown sugar or grated piloncillo"
+      },
+      {
+        "position": 26,
+        "text": "1 teaspoon kosher salt, or more to taste"
+      },
+      {
+        "position": 27,
+        "text": "For serving and garnish"
+      },
+      {
+        "position": 28,
+        "text": "8 to 10 boneless, skinless chicken breasts, poached (see note)"
+      },
+      {
+        "position": 29,
+        "text": "¼ cup sesame seeds, toasted"
+      }
+    ],
+    "cuisines": [
+      {
+        "value_id": "mexican"
+      }
+    ],
+    "accepted_cuisines": [
+      "mexican"
+    ],
+    "methods": [],
+    "courses": [],
+    "accepted_courses": [],
+    "residual_keywords": [
+      "Complex",
+      "Warming"
+    ],
+    "canonical_ingredients": [
+      "tomato",
+      "tomatillo",
+      "onion",
+      "garlic",
+      "lard",
+      "pasilla chilli",
+      "ancho chilli",
+      "mulato chilli",
+      "chipotle chilli",
+      "almond",
+      "peanut",
+      "raisin",
+      "pumpkin seed",
+      "corn tortilla",
+      "bolillo",
+      "sesame seed",
+      "clove",
+      "aniseed",
+      "coriander seed",
+      "canela stick",
+      "allspice berry",
+      "chicken broth",
+      "Mexican chocolate",
+      "dark brown sugar",
+      "chicken breast",
+      "sesame seed"
+    ],
+    "key_ingredients": [
+      "pasilla chilli",
+      "ancho chilli",
+      "chicken breast"
+    ],
+    "alternate_name": null,
+    "accepted_alternate_names": [],
+    "summary": "Chicken in dark chilli, nut, and chocolate sauce",
+    "accepted_summaries": [
+      "Chicken in dark chilli, nut, and chocolate sauce"
     ]
   }
 ]
