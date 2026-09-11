@@ -1,20 +1,27 @@
-"""Gemini Batch building blocks for the recipe-enrichment backfill (MY-175).
+"""Batch building blocks for the recipe-enrichment backfill (MY-175, MY-187).
 
 Pure helpers with no I/O: display-name/request-key identity, chunk planning,
-JSONL row construction using exactly the MY-174 stage prompts and
-Gemini-compilable schemas, keyed result correlation, poll backoff, and the
-versioned Batch pricing snapshot. The provider I/O lives behind
-`GeminiBatchClient` in `app/services/ai/gemini_batch.py`; orchestration lives
-in `app/tasks/enrichment_backfill.py`.
+request construction using exactly the MY-174 stage prompts and schemas, keyed
+result correlation, poll backoff, and the versioned Batch pricing snapshot.
+Stage 1 submits through `GeminiBatchClient` in
+`app/services/ai/gemini_batch.py`; stage 2 submits through
+`AnthropicBatchClient` in `app/services/ai/anthropic_batch.py`;
+orchestration lives in `app/tasks/enrichment_backfill.py`.
 """
 
 import json
 import logging
+from typing import Any
 
-from app.services.recipe_enrichment.prompt import build_stage1_prompt, build_stage2_prompt
+from app.services.recipe_enrichment.prompt import (
+    build_stage1_prompt,
+    build_stage2_prompt,
+    build_stage2_prompts,
+)
 from app.services.recipe_enrichment.schema import (
     GEMINI_STAGE1_JSON_SCHEMA,
     GEMINI_STAGE2_JSON_SCHEMA,
+    STAGE2_JSON_SCHEMA,
 )
 
 logger = logging.getLogger(__name__)
@@ -38,11 +45,12 @@ BATCH_MAX_ATTEMPTS = 2
 # Versioned Batch pricing snapshot (USD per million tokens). Batch bills at half
 # the live rate; cost estimates are labelled with this snapshot version and never
 # inferred by dividing live pricing at display time.
-BATCH_PRICING_SNAPSHOT_VERSION = "2026-08-31"
+BATCH_PRICING_SNAPSHOT_VERSION = "2026-09-11"
 BATCH_PRICING: dict[str, tuple[float, float]] = {
     "gemini-2.5-flash": (0.15, 1.25),
     "gemini-2.5-flash-lite": (0.05, 0.20),
     "gemini-2.0-flash-lite": (0.0375, 0.15),
+    "claude-haiku-4-5-20251001": (0.50, 2.50),
 }
 
 
@@ -139,6 +147,117 @@ def stage2_row(key: str, context: dict) -> str:
         },
         ensure_ascii=False,
     )
+
+
+def anthropic_custom_id(key: str) -> str:
+    """Sanitise a request key into a valid Anthropic `custom_id`.
+
+    Anthropic requires `^[a-zA-Z0-9_-]{1,64}$`, but request keys join the
+    recipe UUID and fingerprint with a colon. Neither UUIDs nor hex
+    fingerprints ever contain an underscore, so the single `_` separator is
+    unambiguous and `anthropic_request_key` reverses it exactly.
+    """
+    return key.replace(":", "_")
+
+
+def anthropic_request_key(custom_id: str) -> str:
+    """Reverse `anthropic_custom_id` back to the request key."""
+    return custom_id.replace("_", ":", 1)
+
+
+def anthropic_stage2_request(key: str, context: dict, model: str) -> dict[str, Any]:
+    """One Anthropic Message Batch request for stage 2 (facet/keyword).
+
+    Uses exactly the MY-174 stage 2 prompts with the full (un-stripped)
+    `STAGE2_JSON_SCHEMA` as the structured-output tool schema.
+    """
+    system_prompt, user_prompt = build_stage2_prompts(context)
+    return {
+        "custom_id": anthropic_custom_id(key),
+        "params": {
+            "model": model,
+            "max_tokens": 2048,
+            "temperature": 0,
+            "system": system_prompt,
+            "messages": [{"role": "user", "content": user_prompt}],
+            "tools": [
+                {
+                    "name": "structured_output",
+                    "description": "Output structured data matching the schema",
+                    "input_schema": STAGE2_JSON_SCHEMA,
+                }
+            ],
+            "tool_choice": {"type": "tool", "name": "structured_output"},
+        },
+    }
+
+
+def parse_anthropic_batch_item(
+    item_result: dict,
+) -> tuple[dict[str, Any] | None, dict[str, Any], str | None]:
+    """Split one Anthropic batch result into (parsed, usage, error).
+
+    `item_result` is one decoded `MessageBatchIndividualResponse` dict with
+    `custom_id` and `result`. On success returns the structured tool-use input
+    dict, the token usage, and None. On `errored`/`canceled`/`expired` (or a
+    response with no structured tool use) returns (None, usage, error text).
+    """
+    result = item_result.get("result") if isinstance(item_result, dict) else None
+    if not isinstance(result, dict):
+        return None, {"input_tokens": 0, "output_tokens": 0, "cached_tokens": 0}, (
+            "batch item has no result"
+        )
+    result_type = result.get("type")
+    if result_type != "succeeded":
+        error = result.get("error")
+        message: str | None = None
+        if isinstance(error, dict):
+            inner = error.get("error")
+            if isinstance(inner, dict):
+                message = inner.get("message") or error.get("message")
+            else:
+                message = error.get("message")
+            if message is None:
+                message = str(error)
+        elif error is not None:
+            message = str(error)
+        if not message:
+            message = f"batch item {result_type or 'failed'}"
+        return (
+            None,
+            {"input_tokens": 0, "output_tokens": 0, "cached_tokens": 0},
+            str(message)[:1000],
+        )
+    message_obj = result.get("message")
+    if not isinstance(message_obj, dict):
+        return (
+            None,
+            {"input_tokens": 0, "output_tokens": 0, "cached_tokens": 0},
+            "batch item message missing",
+        )
+    usage = message_obj.get("usage") if isinstance(message_obj.get("usage"), dict) else {}
+    input_tokens = int(usage.get("input_tokens") or 0)
+    output_tokens = int(usage.get("output_tokens") or 0)
+    cached_tokens = int(usage.get("cache_read_input_tokens") or 0) + int(
+        usage.get("cache_creation_input_tokens") or 0
+    )
+    usage_dict: dict[str, Any] = {
+        "model": message_obj.get("model"),
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "cached_tokens": cached_tokens,
+    }
+    content = message_obj.get("content") or []
+    if isinstance(content, list):
+        for block in content:
+            if (
+                isinstance(block, dict)
+                and block.get("type") == "tool_use"
+                and block.get("name") == "structured_output"
+                and isinstance(block.get("input"), dict)
+            ):
+                return block["input"], usage_dict, None
+    return None, usage_dict, "no structured tool use in response"
 
 
 def poll_countdown(polls_done: int) -> int:

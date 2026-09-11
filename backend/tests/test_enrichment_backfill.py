@@ -36,6 +36,7 @@ from app.services.recipe_enrichment.batch import (
     BATCH_MAX_ATTEMPTS,
     BATCH_PRICING,
     BATCH_PRICING_SNAPSHOT_VERSION,
+    anthropic_custom_id,
     batch_cost_usd,
     correlate_results,
     display_name,
@@ -54,6 +55,7 @@ from app.services.recipe_enrichment.schema import (
 from app.services.recipe_enrichment.service import source_fingerprint
 from app.tasks.enrichment_backfill import (
     _delete_orphan_keywords,
+    _promote_stage2,
     _recipe_map,
     apply_ready_stage2,
     build_retry_chunks,
@@ -69,6 +71,8 @@ from app.tasks.runs import create_task_run
 
 class FakeBatchClient:
     """Scriptable stand-in for GeminiBatchClient: no network, full call log."""
+
+    anthropic: "FakeAnthropicBatchClient"
 
     def __init__(self, api_key: str = "") -> None:
         self.api_key = api_key
@@ -136,6 +140,61 @@ class FakeBatchClient:
         self.cancelled.append(name)
 
 
+class FakeAnthropicBatchClient:
+    """Scriptable stand-in for AnthropicBatchClient: no network, full call log."""
+
+    def __init__(self, api_key: str = "") -> None:
+        self.api_key = api_key
+        self.jobs: dict[str, dict] = {}
+        self.created: list[str] = []
+        self.cancelled: list[str] = []
+        self.create_calls: list[dict] = []
+        self._counter = 0
+
+    def create_batch(
+        self, *, model: str, requests: list[dict], job_key: str
+    ) -> RemoteBatchJob:
+        self._counter += 1
+        name = f"msgbatch_fake-{self._counter}"
+        self.jobs[name] = {
+            "job_key": job_key,
+            "model": model,
+            "requests": list(requests),
+            "state": "JOB_STATE_RUNNING",
+            "output": None,
+            "error": None,
+        }
+        self.created.append(name)
+        self.create_calls.append({"model": model, "job_key": job_key})
+        return RemoteBatchJob(name=name, display_name=job_key, state="JOB_STATE_RUNNING")
+
+    def get_job(self, name: str) -> RemoteBatchJob:
+        job = self.jobs[name]
+        return RemoteBatchJob(
+            name=name,
+            display_name=job["job_key"],
+            state=job["state"],
+            error=job["error"],
+            output_file_id=name if job["state"] == "JOB_STATE_SUCCEEDED" else None,
+        )
+
+    def complete_job(self, name: str, results: list[dict]) -> None:
+        self.jobs[name]["state"] = "JOB_STATE_SUCCEEDED"
+        self.jobs[name]["output"] = list(results)
+
+    def fail_job(self, name: str, error: str = "remote exploded") -> None:
+        self.jobs[name]["state"] = "JOB_STATE_FAILED"
+        self.jobs[name]["error"] = error
+
+    def download_results(self, provider_batch_id: str) -> list[dict]:
+        output = self.jobs[provider_batch_id]["output"]
+        assert output is not None
+        return output
+
+    def cancel_job(self, name: str) -> None:
+        self.cancelled.append(name)
+
+
 @pytest.fixture
 def worker_session(session, monkeypatch):
     """Route every SessionLocal in the backfill path at the test database."""
@@ -148,8 +207,14 @@ def worker_session(session, monkeypatch):
 @pytest.fixture
 def fake_client(monkeypatch):
     fake = FakeBatchClient()
+    fake_anthropic = FakeAnthropicBatchClient()
+    fake.anthropic = fake_anthropic
     monkeypatch.setattr(
         "app.tasks.enrichment_backfill.GeminiBatchClient", lambda api_key: fake
+    )
+    monkeypatch.setattr(
+        "app.tasks.enrichment_backfill.AnthropicBatchClient",
+        lambda api_key: fake_anthropic,
     )
     stub = StubProvider("")
     monkeypatch.setattr(
@@ -183,7 +248,7 @@ def _recipe(session, name: str = "Glorp Stew") -> Recipe:
 
 def _backfill_run(session, **detail) -> TaskRun:
     run = create_task_run(session, TaskType.RECIPE_ENRICHMENT_BACKFILL, detail=detail or {})
-    run.provider_name = "GEMINI"
+    run.provider_name = "GEMINI->ANTHROPIC"
     run.model_name = "stub-enrichment"
     session.commit()
     return run
@@ -236,6 +301,43 @@ def _stage2_line(session, recipe: Recipe, key: str) -> str:
     )
 
 
+def _stage2_payload() -> dict:
+    return Stage2Response.model_validate(
+        {
+            "k": ["Glorp"],
+            "c": [],
+            "m": [{"v": "bake", "p": True}],
+            "o": ["main"],
+            "w": ["Cosy", "Hearty", "Rustic", "Sharing", "Winter"],
+        }
+    ).model_dump(mode="json", by_alias=True)
+
+
+def _stage2_anthropic_result(key: str, payload: dict | None = None) -> dict:
+    return {
+        "custom_id": anthropic_custom_id(key),
+        "result": {
+            "type": "succeeded",
+            "message": {
+                "model": "claude-haiku-4-5-20251001",
+                "content": [
+                    {
+                        "type": "tool_use",
+                        "name": "structured_output",
+                        "input": payload if payload is not None else _stage2_payload(),
+                    }
+                ],
+                "usage": {
+                    "input_tokens": 200,
+                    "output_tokens": 30,
+                    "cache_read_input_tokens": 0,
+                    "cache_creation_input_tokens": 0,
+                },
+            },
+        },
+    }
+
+
 # --------------------------------------------------------------------------- #
 # Pure helpers
 # --------------------------------------------------------------------------- #
@@ -252,6 +354,7 @@ def test_plan_chunks_splits_by_bytes() -> None:
 
 
 def test_batch_pricing_snapshot_is_half_live() -> None:
+    from app.services.ai.anthropic import _PRICING as _ANTHROPIC_PRICING
     from app.services.ai.gemini import _PRICING
 
     live_in, live_out = _PRICING["gemini-2.5-flash"]
@@ -259,7 +362,11 @@ def test_batch_pricing_snapshot_is_half_live() -> None:
     assert snap_in == live_in / 2
     assert snap_out == live_out / 2
     assert batch_cost_usd("gemini-2.5-flash", 1_000_000, 1_000_000) == snap_in + snap_out
-    assert BATCH_PRICING_SNAPSHOT_VERSION == "2026-08-31"
+    haiku_live_in, haiku_live_out = _ANTHROPIC_PRICING["claude-haiku-4-5-20251001"]
+    haiku_snap_in, haiku_snap_out = BATCH_PRICING["claude-haiku-4-5-20251001"]
+    assert haiku_snap_in == haiku_live_in / 2
+    assert haiku_snap_out == haiku_live_out / 2
+    assert BATCH_PRICING_SNAPSHOT_VERSION == "2026-09-11"
 
 
 def test_request_key_carries_recipe_and_fingerprint() -> None:
@@ -353,7 +460,14 @@ def test_submit_adopts_existing_remote_job(worker_session, fake_client) -> None:
     stray = fake_client.create_job(
         model="m", input_file_id="files/old", display_name=batch.display_name
     )
-    submitted = submit_prepared(session, run, fake_client, "stub-ingredients", "stub-semantics")
+    submitted = submit_prepared(
+        session,
+        run,
+        fake_client,
+        fake_client.anthropic,
+        "stub-ingredients",
+        "stub-semantics",
+    )
     assert submitted == 1
     session.refresh(batch)
     assert batch.provider_batch_id == stray.name
@@ -368,7 +482,14 @@ def test_submit_adopts_one_duplicate_and_cancels_extras(worker_session, fake_cli
     batch = session.scalars(select(RecipeEnrichmentBatch)).one()
     first = fake_client.create_job(model="m", input_file_id="f1", display_name=batch.display_name)
     second = fake_client.create_job(model="m", input_file_id="f2", display_name=batch.display_name)
-    submit_prepared(session, run, fake_client, "stub-ingredients", "stub-semantics")
+    submit_prepared(
+        session,
+        run,
+        fake_client,
+        fake_client.anthropic,
+        "stub-ingredients",
+        "stub-semantics",
+    )
     session.refresh(batch)
     assert batch.provider_batch_id == first.name
     assert batch.duplicate_ids == [second.name]
@@ -386,7 +507,15 @@ def test_submit_respects_max_active_jobs(worker_session, fake_client, monkeypatc
         session, run, [recipe.id for recipe in recipes],
         stage="stage1", attempt=1, first_chunk=0,
     )
-    submitted = submit_prepared(session, run, fake_client, "stub-ingredients", "stub-semantics", max_active=2)
+    submitted = submit_prepared(
+        session,
+        run,
+        fake_client,
+        fake_client.anthropic,
+        "stub-ingredients",
+        "stub-semantics",
+        max_active=2,
+    )
     assert submitted == 2
     preparing = session.scalar(
         select(RecipeEnrichmentBatch).where(
@@ -394,6 +523,107 @@ def test_submit_respects_max_active_jobs(worker_session, fake_client, monkeypatc
         )
     )
     assert preparing is not None
+
+
+def test_submit_stage2_uses_anthropic_with_idempotency_key(
+    worker_session, fake_client
+) -> None:
+    session = worker_session
+    recipe = _recipe(session)
+    run = _backfill_run(session)
+    prepare_stage_chunks(session, run, [recipe.id], stage="stage1", attempt=1, first_chunk=0)
+    stage1 = session.scalars(select(RecipeEnrichmentBatch)).one()
+    items = {item.request_key: item for item in stage1.items}
+    key = next(iter(items))
+    stage1.submitted_keys = [key]
+    session.commit()
+    ingest_succeeded_batch(session, stage1, [_stage1_line(session, recipe, key)])
+    _promote_stage2(session, run)
+    stage2 = session.scalars(
+        select(RecipeEnrichmentBatch).where(RecipeEnrichmentBatch.stage == "stage2")
+    ).one()
+    assert stage2.provider == "ANTHROPIC"
+
+    submitted = submit_prepared(
+        session,
+        run,
+        fake_client,
+        fake_client.anthropic,
+        "gemini-2.5-flash-lite",
+        "claude-haiku-4-5-20251001",
+    )
+    assert submitted == 1
+    session.refresh(stage2)
+    assert stage2.status is EnrichmentBatchStatus.SUBMITTED
+    assert stage2.provider == "ANTHROPIC"
+    assert stage2.model == "claude-haiku-4-5-20251001"
+    assert stage2.input_file_id is None
+    assert stage2.provider_batch_id is not None
+    assert stage2.provider_batch_id.startswith("msgbatch_")
+    created = fake_client.anthropic.jobs[stage2.provider_batch_id]
+    assert created["job_key"] == stage2.job_key
+    assert created["model"] == "claude-haiku-4-5-20251001"
+    request = created["requests"][0]
+    assert request["custom_id"] == anthropic_custom_id(key)
+    assert request["params"]["model"] == "claude-haiku-4-5-20251001"
+    assert request["params"]["tool_choice"] == {
+        "type": "tool",
+        "name": "structured_output",
+    }
+
+
+def test_ingest_anthropic_results_record_usage_and_stage2(
+    worker_session, fake_client
+) -> None:
+    session = worker_session
+    recipe = _recipe(session)
+    run = _backfill_run(session)
+    prepare_stage_chunks(session, run, [recipe.id], stage="stage1", attempt=1, first_chunk=0)
+    stage1 = session.scalars(select(RecipeEnrichmentBatch)).one()
+    key = next(item.request_key for item in stage1.items)
+    stage1.submitted_keys = [key]
+    session.commit()
+    ingest_succeeded_batch(session, stage1, [_stage1_line(session, recipe, key)])
+    _promote_stage2(session, run)
+    stage2 = session.scalars(
+        select(RecipeEnrichmentBatch).where(RecipeEnrichmentBatch.stage == "stage2")
+    ).one()
+    stage2.submitted_keys = [key]
+    session.commit()
+    good = _stage2_anthropic_result(key)
+    bad_key = f"{key}-missing"
+    ingest_succeeded_batch(session, stage2, [good])
+    item = next(item for item in stage2.items if item.request_key == key)
+    assert item.status is EnrichmentBatchItemStatus.SUCCEEDED
+    assert item.stage1_response.get("stage2", {}).get("k") == ["Glorp"]
+    assert item.usage["input_tokens"] == 200
+    assert item.usage["model"] == "claude-haiku-4-5-20251001"
+    assert bad_key not in {item.request_key for item in stage2.items}
+
+
+def test_ingest_anthropic_errored_item_fails_with_message(worker_session) -> None:
+    session = worker_session
+    recipe = _recipe(session)
+    run = _backfill_run(session)
+    prepare_stage_chunks(session, run, [recipe.id], stage="stage1", attempt=1, first_chunk=0)
+    batch = session.scalars(select(RecipeEnrichmentBatch)).one()
+    batch.stage = "stage2"
+    batch.provider = "ANTHROPIC"
+    key = batch.items[0].request_key
+    batch.submitted_keys = [key]
+    session.commit()
+    ingest_succeeded_batch(
+        session,
+        batch,
+        [
+            {
+                "custom_id": anthropic_custom_id(key),
+                "result": {"type": "errored", "error": {"message": "busy"}},
+            }
+        ],
+    )
+    assert batch.items[0].status is EnrichmentBatchItemStatus.FAILED
+    assert batch.items[0].provider_error == "busy"
 
 
 # --------------------------------------------------------------------------- #
@@ -664,7 +894,7 @@ def test_repeated_poll_errors_fail_the_batch(worker_session, fake_client, monkey
     fake_client.complete_job(batch.provider_batch_id, ["{}"])
     for _ in range(MAX_CONSECUTIVE_POLL_ERRORS):
         _settle(session)
-        _refresh_submitted(session, run, fake_client)
+        _refresh_submitted(session, run, fake_client, fake_client.anthropic)
     session.refresh(batch)
     assert batch.status is EnrichmentBatchStatus.FAILED
     assert "poll failed" in (batch.last_error or "")
@@ -687,15 +917,20 @@ def _complete_stage1(session, fake_client, batch) -> None:
     fake_client.complete_job(batch.provider_batch_id, lines)
 
 
-def _complete_stage2(session, fake_client, batch) -> None:
-    items = {item.request_key: item for item in batch.items}
-    lines = []
+def _complete_stage2(session, fake_anthropic, batch) -> None:
+    results = []
     for key in batch.submitted_keys:
-        recipe = session.get(Recipe, items[key].recipe_id)
+        item = {item.request_key: item for item in batch.items}[key]
+        recipe = session.get(Recipe, item.recipe_id)
         assert recipe is not None
-        lines.append(_stage2_line(session, recipe, key))
+        payload = dict(_stage2_payload())
+        if recipe.ingredients:
+            payload["k"] = ["Glorp"]
+        else:
+            payload["k"] = []
+        results.append(_stage2_anthropic_result(key, payload))
     assert batch.provider_batch_id is not None
-    fake_client.complete_job(batch.provider_batch_id, lines)
+    fake_anthropic.complete_job(batch.provider_batch_id, results)
 
 
 def test_full_backfill_applies_two_waves_and_finishes_done(
@@ -720,7 +955,7 @@ def test_full_backfill_applies_two_waves_and_finishes_done(
         select(RecipeEnrichmentBatch).where(RecipeEnrichmentBatch.stage == "stage2")
     ).one()
     assert stage2.status is EnrichmentBatchStatus.SUBMITTED
-    _complete_stage2(session, fake_client, stage2)
+    _complete_stage2(session, fake_client.anthropic, stage2)
     _settle(session)
     poll_backfill(str(run.id))
 
@@ -758,7 +993,7 @@ def test_source_change_mid_flight_marks_item_stale(worker_session, fake_client) 
     stage2 = session.scalars(
         select(RecipeEnrichmentBatch).where(RecipeEnrichmentBatch.stage == "stage2")
     ).one()
-    _complete_stage2(session, fake_client, stage2)
+    _complete_stage2(session, fake_client.anthropic, stage2)
     _settle(session)
     poll_backfill(str(run.id))
     session.refresh(run)
@@ -809,7 +1044,7 @@ def test_terminal_failure_keeps_successes_and_reports_ids(
             RecipeEnrichmentBatch.status == EnrichmentBatchStatus.SUBMITTED,
         )
     ).one()
-    _complete_stage2(session, fake_client, stage2)
+    _complete_stage2(session, fake_client.anthropic, stage2)
     fake_client.complete_job(
         retry.provider_batch_id,
         [json.dumps({"key": key, "error": {"message": "still nonsense"}})
@@ -843,9 +1078,9 @@ def _done_pilot(session, **overrides) -> TaskRun:
     detail = {
         "seed": 172,
         "recipe_ids": [],
-        "provider": "GEMINI->GEMINI",
+        "provider": "GEMINI->ANTHROPIC",
         "stage1_model": "gemini-2.5-flash-lite",
-        "stage2_model": "gemini-2.5-flash",
+        "stage2_model": "claude-haiku-4-5-20251001",
         "prompt_version": PROMPT_VERSION,
         "schema_version": SCHEMA_VERSION,
         "taxonomy_version": TAXONOMY_VERSION,
@@ -863,10 +1098,31 @@ def _done_pilot(session, **overrides) -> TaskRun:
     return run
 
 
-def _gateway_config(session, provider: AIProvider = AIProvider.GEMINI) -> None:
+def _gateway_config(
+    session,
+    provider: AIProvider = AIProvider.GEMINI,
+    stage1_provider: AIProvider | None = None,
+    stage2_provider: AIProvider | None = None,
+) -> None:
+    """Configure the approved GEMINI->ANTHROPIC split by default.
+
+    Pass `provider` alone for the legacy single-provider shape (used by the
+    rejection test); otherwise explicit per-stage providers win with per-stage
+    keys, falling back to the default key.
+    """
     config = get_config(session)
     config.ai_provider = provider
     config.api_key = "test-key"
+    if stage1_provider is None and stage2_provider is None and provider == AIProvider.GEMINI:
+        config.enrichment_stage1_provider = AIProvider.GEMINI
+        config.enrichment_stage1_api_key = "gemini-key"
+        config.enrichment_stage2_provider = AIProvider.ANTHROPIC
+        config.enrichment_stage2_api_key = "anthropic-key"
+    else:
+        config.enrichment_stage1_provider = stage1_provider
+        config.enrichment_stage1_api_key = "gemini-key" if stage1_provider else None
+        config.enrichment_stage2_provider = stage2_provider
+        config.enrichment_stage2_api_key = "anthropic-key" if stage2_provider else None
     session.commit()
 
 
