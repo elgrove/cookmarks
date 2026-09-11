@@ -14,8 +14,6 @@ const recipeSchema = z.object({
 	bookAuthor: z.string(),
 	bookHasCover: z.boolean(),
 	name: z.string(),
-	alternateName: z.string().nullable(),
-	summary: z.string().nullable(),
 	description: z.string().nullable(),
 	ingredientsVerbatim: z.array(z.object({ id: z.string(), position: z.number(), text: z.string() })),
 	instructions: z.array(z.string()),
@@ -40,8 +38,6 @@ const trofie: RecipeDetailData = {
 	bookAuthor: 'Vicky Bennison',
 	bookHasCover: true,
 	name: "Rosetta's Trofie with Basil Sauce",
-	alternateName: null,
-	summary: 'Trofie pasta with basil pesto',
 	description:
 		'A Ligurian classic: hand-rolled trofie tossed through a vivid basil pesto pounded by hand. Rosetta has made it this way for sixty years.',
 	ingredientsVerbatim: lines([
@@ -216,18 +212,6 @@ const unit: VerifiableUnit<Props> = {
 			check: ({ root, props }) => {
 				const h1 = root.querySelector('.display')?.textContent?.trim() ?? '';
 				return h1 === props.recipe.name || `display="${h1}"`;
-			}
-		},
-		{
-			id: 'descriptor',
-			description: 'the alternate name takes precedence over the summary in the heading',
-			check: ({ contract, root, props }) => {
-				const expected = props.recipe.alternateName ?? props.recipe.summary ?? '';
-				const rendered = root.querySelector('.descriptor')?.textContent?.trim() ?? '';
-				return (
-					contract.descriptor === expected && rendered === expected ||
-					`contract=${contract.descriptor} rendered=${rendered} expected=${expected}`
-				);
 			}
 		},
 		{

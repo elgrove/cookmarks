@@ -8,8 +8,6 @@ function recipe(over: Partial<RecipeSummary> = {}): RecipeSummary {
 	return {
 		id: over.id ?? 'r1',
 		name: over.name ?? 'Dal Makhani',
-		alternate_name: over.alternate_name ?? null,
-		summary: over.summary ?? null,
 		book_id: over.book_id ?? 'b1',
 		book_title: over.book_title ?? 'Made in India',
 		book_author: over.book_author ?? 'Meera Sodha',

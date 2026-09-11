@@ -106,16 +106,7 @@ fun RecipesScreen(onOpenRecipe: (String, List<String>) -> Unit, onPlay: (GameSou
                     val r = Api.service.semanticSearch(st.query)
                     st.semanticUnavailable = !r.available
                     st.items = r.items.map {
-                        RecipeSummary(
-                            it.id,
-                            it.name,
-                            it.alternate_name,
-                            it.summary,
-                            it.book_id,
-                            it.book_title,
-                            it.book_author,
-                            it.keywords,
-                        )
+                        RecipeSummary(it.id, it.name, it.book_id, it.book_title, it.book_author, it.keywords)
                     }
                     st.total = r.total
                 }
@@ -413,16 +404,6 @@ private fun RecipeRow(recipe: RecipeSummary, onClick: () -> Unit) {
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
-        (recipe.alternate_name ?: recipe.summary)?.let { descriptor ->
-            Text(
-                text = descriptor,
-                style = MaterialTheme.typography.bodyMedium,
-                color = colors.muted,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 2.dp),
-            )
-        }
         MonoLabel(
             "${recipe.book_author} — ${cleanTitle(recipe.book_title)}",
             colour = colors.faint,

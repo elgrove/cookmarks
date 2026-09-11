@@ -109,13 +109,7 @@ data class ReadingState(
 )
 
 @Serializable
-data class RecipeRow(
-    val id: String,
-    val name: String,
-    val alternate_name: String?,
-    val summary: String?,
-    val keywords: List<String>,
-)
+data class RecipeRow(val id: String, val name: String, val keywords: List<String>)
 
 @Serializable
 data class BookDetail(
@@ -161,8 +155,6 @@ data class RecipeIndexEntry(
 data class RecipeSummary(
     val id: String,
     val name: String,
-    val alternate_name: String?,
-    val summary: String?,
     val book_id: String,
     val book_title: String,
     val book_author: String,
@@ -183,8 +175,6 @@ data class RecipeSearchResults(
 data class SemanticResult(
     val id: String,
     val name: String,
-    val alternate_name: String?,
-    val summary: String?,
     val book_id: String,
     val book_title: String,
     val book_author: String,
@@ -208,8 +198,6 @@ data class RecipeDetail(
     val book_author: String,
     val book_has_cover: Boolean,
     val name: String,
-    val alternate_name: String?,
-    val summary: String?,
     val description: String?,
     val ingredients_verbatim: List<IngredientLine>,
     val canonical_ingredients: List<RecipeCanonicalIngredient>,

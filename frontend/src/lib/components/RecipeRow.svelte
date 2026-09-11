@@ -11,8 +11,6 @@
 	export type RecipeRowData = {
 		id: string;
 		name: string;
-		alternateName?: string | null;
-		summary?: string | null;
 		bookId: string;
 		bookTitle: string;
 		bookAuthor: string;
@@ -37,8 +35,6 @@
 	let {
 		id,
 		name,
-		alternateName = null,
-		summary = null,
 		bookId,
 		bookTitle,
 		bookAuthor,
@@ -62,7 +58,6 @@
 
 	// Calibre titles carry a subtitle after a colon; show the clean pre-colon title.
 	let displayTitle = $derived(cleanTitle(bookTitle));
-	let descriptor = $derived(alternateName ?? summary);
 
 	// Rotating chip tints (DESIGN §3.1).
 	const tints = ['clay', 'blue', 'green'] as const;
@@ -111,9 +106,6 @@
 			</button>
 		{/if}
 	</div>
-	{#if descriptor}
-		<p class="descriptor">{descriptor}</p>
-	{/if}
 	{#if keywords.length}
 		<ul class="chips">
 			{#each keywords as kw, i (kw)}
@@ -181,14 +173,6 @@
 
 	.source:hover {
 		color: var(--ink);
-	}
-	.descriptor {
-		margin: 0.2rem 0 0;
-		font-family: var(--f-serif);
-		font-size: 0.94rem;
-		font-style: italic;
-		line-height: 1.3;
-		color: var(--muted);
 	}
 
 	.sep {

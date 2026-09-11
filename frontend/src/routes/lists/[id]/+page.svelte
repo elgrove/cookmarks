@@ -90,8 +90,6 @@
 				recipes: d.recipes.map((r) => ({
 					id: r.id,
 					name: r.name,
-					alternateName: r.alternate_name,
-					summary: r.summary,
 					bookId: r.book_id,
 					bookTitle: r.book_title,
 					bookAuthor: r.book_author,
