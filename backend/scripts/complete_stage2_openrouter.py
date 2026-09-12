@@ -35,6 +35,7 @@ from app.services.ai.openrouter import OpenRouterProvider
 from app.services.recipe_enrichment.schema import (
     EnrichmentResponse,
     Stage1Response,
+    Stage2Response,
 )
 from app.services.recipe_enrichment.service import (
     apply_enrichment,
@@ -96,9 +97,49 @@ def _enrich_single_recipe(
     last_err: Exception | None = None
 
     try:
-        stage1_response = Stage1Response.model_validate(stage1_dict)
+        stage1_data = {k: v for k, v in stage1_dict.items() if k != "stage2"}
+        stage1_response = Stage1Response.model_validate(stage1_data)
         stage1_names = [i.name for i in stage1_response.ingredients if i.name]
         deduped = deduplicate_ingredient_names(stage1_names)
+
+        existing_stage2 = stage1_dict.get("stage2")
+        if isinstance(existing_stage2, dict):
+            try:
+                keys = existing_stage2.get("k") or existing_stage2.get("key_ingredients")
+                stage2_payload = dict(existing_stage2)
+                if isinstance(keys, list) and stage1_names:
+                    names_folded = {name.casefold(): name for name in stage1_names}
+                    valid_keys: list[str] = [
+                        names_folded[str(k).strip().casefold()]
+                        for k in keys
+                        if str(k).strip().casefold() in names_folded
+                    ]
+                    filtered = (valid_keys or [stage1_names[0]])[:3]
+                    if "k" in stage2_payload:
+                        stage2_payload["k"] = filtered
+                    if "key_ingredients" in stage2_payload:
+                        stage2_payload["key_ingredients"] = filtered
+                elif (not keys or len(keys) == 0) and stage1_names:
+                    if "k" in stage2_payload:
+                        stage2_payload["k"] = [stage1_names[0]]
+                    if "key_ingredients" in stage2_payload:
+                        stage2_payload["key_ingredients"] = [stage1_names[0]]
+
+                stage2_response = Stage2Response.model_validate(stage2_payload)
+                response = EnrichmentResponse.from_stages(stage1_response, stage2_response)
+                with SessionLocal() as session:
+                    apply_enrichment(
+                        session,
+                        recipe_id,
+                        response,
+                        provider=provider,
+                        model="gemini-2.5-flash-lite->claude-haiku-4-5-20251001",
+                        task_run_id=task_run_id,
+                    )
+                    session.commit()
+                return True, Usage(), None
+            except Exception:
+                pass  # Fall back to live OpenRouter completion below
 
         with SessionLocal() as session:
             recipe = session.get(Recipe, recipe_id)
