@@ -1,3 +1,4 @@
+import copy
 import json
 import logging
 import time
@@ -18,6 +19,34 @@ _BACKOFF_FACTOR = 2
 _GEMMA_31B_MODEL = "google/gemma-4-31b-it"
 _GEMMA_31B_ENRICHMENT_MAX_TOKENS = 8_192
 _DEFAULT_STRUCTURED_MAX_TOKENS = 4_096
+
+
+def _to_strict_json_schema(schema: dict) -> dict:
+    """Ensure JSON Schema meets OpenAI and Meta strict structured output requirements.
+
+    In strict mode, every property in 'properties' must be listed in 'required', and
+    'additionalProperties' must be false for every object definition.
+    """
+    strict = copy.deepcopy(schema)
+
+    def _walk(node: Any) -> None:
+        if not isinstance(node, dict):
+            return
+        if node.get("type") == "object" or "properties" in node:
+            props = node.get("properties")
+            if isinstance(props, dict):
+                node["required"] = list(props.keys())
+            node["additionalProperties"] = False
+        for value in node.values():
+            if isinstance(value, dict):
+                _walk(value)
+            elif isinstance(value, list):
+                for item in value:
+                    if isinstance(item, dict):
+                        _walk(item)
+
+    _walk(strict)
+    return strict
 
 
 class OpenRouterProvider(AIProvider):
@@ -59,7 +88,7 @@ class OpenRouterProvider(AIProvider):
                 "json_schema": {
                     "name": "cookmarks_response",
                     "strict": True,
-                    "schema": schema,
+                    "schema": _to_strict_json_schema(schema),
                 },
             }
             payload["provider"] = {"require_parameters": True}

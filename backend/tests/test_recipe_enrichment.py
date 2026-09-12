@@ -333,7 +333,7 @@ def test_stage2_receives_structured_stage1_result_and_owns_key_selection(session
     prompt = build_stage2_prompt(context)
     assert "Key ingredients (k)" in prompt
     assert "Familiarity is not a reason" in prompt
-    assert "foreign dish term or regional style" in prompt
+    assert "Named cultural dishes, regional styles" in prompt
     assert "noodle type or base grain" in prompt
 
     response = EnrichmentResponse.from_stages(

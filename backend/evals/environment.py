@@ -117,6 +117,20 @@ def resolve_api_key(provider: str) -> str:
     if env_var and os.environ.get(env_var):
         return os.environ[env_var]
 
+    if env_var:
+        for candidate in (
+            Path("/home/aaron/dev/cookmarks/.env"),
+            EVALS_DIR.parent.parent / ".env",
+            EVALS_DIR.parent / ".env",
+        ):
+            if candidate.exists():
+                for line in candidate.read_text().splitlines():
+                    line = line.strip()
+                    if line.startswith(f"{env_var}="):
+                        val = line.split("=", 1)[1].strip().strip("\"'")
+                        if val:
+                            return val
+
     keys = _read_config_keys()
     if provider in keys:
         return keys[provider]

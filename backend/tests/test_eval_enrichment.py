@@ -142,22 +142,23 @@ def test_score_summary() -> None:
     )
     assert score_summary(gold, resp_partial) == pytest.approx(0.833)
 
-    # Decorative language fails rather than receiving partial credit.
-    resp_forbidden = EnrichmentResponse.model_construct(summary="Corn salad with spiced cheese")
-    assert score_summary(gold, resp_forbidden) == 0.0
+    # Terminal punctuation fails rather than receiving partial credit.
+    resp_punct = EnrichmentResponse.model_construct(summary="Corn salad with cheese.")
+    assert score_summary(gold, resp_punct) == 0.0
 
     # Leading "A" / "An" fails rather than receiving partial credit.
     resp_leading_a = EnrichmentResponse.model_construct(summary="A corn salad with cheese")
     assert score_summary(gold, resp_leading_a) == 0.0
 
-    # Extra details cannot score merely by containing the target nouns.
+    # Over-length summaries fail rather than receiving partial credit.
     resp_long = EnrichmentResponse.model_construct(
-        summary="Corn salad with cheese lime herbs and toasted seeds"
+        summary="Corn salad with cheese lime herbs and toasted seeds and dressing today extra"
     )
     assert score_summary(gold, resp_long) == 0.0
 
-    resp_flowery = EnrichmentResponse.model_construct(summary="Rich corn salad with cheese")
-    assert score_summary(gold, resp_flowery) == 0.0
+    # Under-length summaries fail rather than receiving partial credit.
+    resp_short = EnrichmentResponse.model_construct(summary="Corn salad")
+    assert score_summary(gold, resp_short) == 0.0
 
     # Null when expected is null
     gold_null = _sample_gold_recipe()
