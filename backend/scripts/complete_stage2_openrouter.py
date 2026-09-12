@@ -92,6 +92,9 @@ def _enrich_single_recipe(
     task_run_id: uuid.UUID | None,
 ) -> tuple[bool, Usage, str | None]:
     """Execute Stage 2 for a single recipe in its own database session."""
+    total_usage = Usage()
+    last_err: Exception | None = None
+
     try:
         stage1_response = Stage1Response.model_validate(stage1_dict)
         stage1_names = [i.name for i in stage1_response.ingredients if i.name]
@@ -103,32 +106,41 @@ def _enrich_single_recipe(
                 return False, Usage(), f"recipe {recipe_id} not found"
             context = build_stage2_context(session, recipe, deduped)
 
-        stage2_response, usage = provider.enrich_recipe_stage2(context, model)
+        for attempt in range(3):
+            try:
+                stage2_response, usage = provider.enrich_recipe_stage2(context, model)
+                total_usage += usage
 
-        try:
-            response = EnrichmentResponse.from_stages(stage1_response, stage2_response)
-        except ValueError:
-            stage2_response, retry_usage = provider.enrich_recipe_stage2(
-                context, model, allow_truncate_keys=True
-            )
-            usage += retry_usage
-            response = EnrichmentResponse.from_stages(stage1_response, stage2_response)
+                try:
+                    response = EnrichmentResponse.from_stages(stage1_response, stage2_response)
+                except ValueError:
+                    stage2_response, retry_usage = provider.enrich_recipe_stage2(
+                        context, model, allow_truncate_keys=True
+                    )
+                    total_usage += retry_usage
+                    response = EnrichmentResponse.from_stages(stage1_response, stage2_response)
 
-        with SessionLocal() as session:
-            apply_enrichment(
-                session,
-                recipe_id,
-                response,
-                provider=provider,
-                model=f"gemini-2.5-flash-lite->{model}",
-                task_run_id=task_run_id,
-            )
-            session.commit()
+                with SessionLocal() as session:
+                    apply_enrichment(
+                        session,
+                        recipe_id,
+                        response,
+                        provider=provider,
+                        model=f"gemini-2.5-flash-lite->{model}",
+                        task_run_id=task_run_id,
+                    )
+                    session.commit()
 
-        return True, usage, None
+                return True, total_usage, None
+            except Exception as exc:
+                last_err = exc
+                if attempt < 2:
+                    time.sleep(1.0 * (attempt + 1))
+
+        return False, total_usage, str(last_err)
 
     except Exception as exc:
-        return False, Usage(), str(exc)
+        return False, total_usage, str(exc)
 
 
 def main() -> None:
