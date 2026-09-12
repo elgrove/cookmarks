@@ -116,17 +116,26 @@ def _stage_models(session: SessionDep) -> tuple[str | None, str | None, str | No
     )
 
 
-def _require_gemini(session: SessionDep) -> tuple[str, str]:
-    """The backfill runs on Gemini Batch only — any other provider is a 422.
+def _require_backfill_providers(session: SessionDep) -> tuple[str, str]:
+    """The backfill runs Stage 1 on Gemini Batch and Stage 2 on Anthropic Batches.
 
-    Both enrichment stages must resolve to Gemini, since both waves submit.
-    Returns the stage model names for the run row.
+    Only the approved `GEMINI->ANTHROPIC` pair is accepted — any other provider
+    configuration is a 422. Both stage API keys must exist. Returns the stage
+    model names for the run row.
     """
     provider, stage1_model, stage2_model = _stage_models(session)
-    if provider != "GEMINI->GEMINI" or not stage1_model or not stage2_model:
+    if provider != "GEMINI->ANTHROPIC" or not stage1_model or not stage2_model:
         raise HTTPException(
             status_code=422,
-            detail="Recipe-enrichment backfill requires the Gemini provider",
+            detail="Recipe-enrichment backfill requires the GEMINI->ANTHROPIC providers",
+        )
+    config = get_config(session)
+    stage1_key = config.enrichment_stage1_api_key or config.api_key
+    stage2_key = config.enrichment_stage2_api_key or config.api_key
+    if not stage1_key or not stage2_key:
+        raise HTTPException(
+            status_code=422,
+            detail="Recipe-enrichment backfill requires API keys for both stages",
         )
     return stage1_model, stage2_model
 
@@ -167,7 +176,7 @@ def _check_pilot(session: SessionDep, pilot_run_id: uuid.UUID, confirmed: bool) 
             detail="pilot_run_id must be a done recipe-enrichment pilot run",
         )
     expected = {
-        "provider": "GEMINI->GEMINI",
+        "provider": "GEMINI->ANTHROPIC",
         "prompt_version": PROMPT_VERSION,
         "schema_version": SCHEMA_VERSION,
         "taxonomy_version": TAXONOMY_VERSION,
@@ -195,14 +204,14 @@ def _check_pilot(session: SessionDep, pilot_run_id: uuid.UUID, confirmed: bool) 
 def trigger_recipe_enrichment_backfill(
     body: EnrichmentBackfillRequest, session: SessionDep
 ) -> TaskRunAck:
-    """Queue the durable Gemini Batch backfill over recipes not yet current.
+    """Queue the durable GEMINI->ANTHROPIC Batch backfill over recipes not yet current.
 
     Launches only with a done, version-matching MY-174 pilot run and an explicit
     reviewed confirmation, and only when no other backfill is active. The pilot
     run ID and approval land on the parent run's detail for audit. The queued
     count is advisory: the worker recounts outstanding recipes at start.
     """
-    stage1_model, stage2_model = _require_gemini(session)
+    stage1_model, stage2_model = _require_backfill_providers(session)
     _require_no_active_backfill(session)
     pilot = _check_pilot(session, body.pilot_run_id, body.confirm_pilot_reviewed)
     max_active = body.max_active_jobs or BATCH_DEFAULT_MAX_ACTIVE_JOBS
@@ -215,7 +224,7 @@ def trigger_recipe_enrichment_backfill(
             "max_active_jobs": max_active,
         },
     )
-    run.provider_name = "GEMINI"
+    run.provider_name = "GEMINI->ANTHROPIC"
     run.model_name = f"{stage1_model} -> {stage2_model}"
     session.commit()
     eligible = len(select_backfill_recipe_ids(session))
@@ -246,7 +255,7 @@ def resume_recipe_enrichment_backfill(
     work. A first-ever launch through this endpoint requires the same reviewed
     pilot approval as the trigger, so the gate cannot be bypassed.
     """
-    stage1_model, stage2_model = _require_gemini(session)
+    stage1_model, stage2_model = _require_backfill_providers(session)
     _require_no_active_backfill(session)
     prior = _prior_backfill(session)
     max_active = body.max_active_jobs or BATCH_DEFAULT_MAX_ACTIVE_JOBS
@@ -272,7 +281,7 @@ def resume_recipe_enrichment_backfill(
         TaskType.RECIPE_ENRICHMENT_BACKFILL,
         detail=detail,
     )
-    run.provider_name = "GEMINI"
+    run.provider_name = "GEMINI->ANTHROPIC"
     run.model_name = f"{stage1_model} -> {stage2_model}"
     session.commit()
     eligible = len(select_backfill_recipe_ids(session))

@@ -1,11 +1,11 @@
-"""Durable Gemini Batch recipe-enrichment backfill (MY-175).
+"""Durable GEMINI->ANTHROPIC Batch recipe-enrichment backfill (MY-175, MY-187).
 
-Two sequential waves reuse exactly the MY-174 stage prompts, Gemini schemas,
-validator and atomic apply service: stage 1 (ingredient structuring) first,
-then stage 2 (facet/keyword assignment) whose contexts are built from the
-stored stage 1 responses. Each wave chunks recipes at 500 items / 50 MiB of
-JSONL and keeps at most four remote jobs active; further chunks wait locally
-prepared.
+Two sequential waves reuse exactly the MY-174 stage prompts, schemas,
+validator and atomic apply service: stage 1 (ingredient structuring) on
+Gemini Batch first, then stage 2 (facet/keyword assignment) on Anthropic
+Message Batches whose contexts are built from the stored stage 1 responses.
+Each wave chunks recipes at 500 items / 50 MiB and keeps at most four remote
+jobs active; further chunks wait locally prepared.
 
 Lifecycle on the parent TaskRun:
 queued → running (prepare/submit) → waiting (remote jobs) → running
@@ -15,11 +15,13 @@ stale items (source changed mid-flight) wait for a later run. Resume creates
 a new parent run selecting only recipes not yet current.
 """
 
+import json
 import logging
 import uuid
 from collections import Counter
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import Any
 
 from pydantic import ValidationError
 from sqlalchemy import func, select
@@ -45,6 +47,7 @@ from app.services.ai import (
     get_config,
     get_recipe_enrichment_providers,
 )
+from app.services.ai.anthropic_batch import AnthropicBatchClient
 from app.services.ai.base import ModelRole, _strip_json_fence
 from app.services.ai.gemini_batch import ACTIVE_STATES, SUCCEEDED_STATES, GeminiBatchClient
 from app.services.embeddings import backfill as backfill_embeddings
@@ -55,11 +58,14 @@ from app.services.recipe_enrichment.batch import (
     BATCH_DEFAULT_MAX_ACTIVE_JOBS,
     BATCH_MAX_ATTEMPTS,
     BATCH_PRICING_SNAPSHOT_VERSION,
+    anthropic_request_key,
+    anthropic_stage2_request,
     batch_cost_usd,
     correlate_results,
     display_name,
     job_key,
     jsonl_size,
+    parse_anthropic_batch_item,
     plan_chunks,
     poll_countdown,
     request_key,
@@ -163,19 +169,27 @@ def _stage_providers(session: Session) -> tuple[AIProvider, AIProvider]:
 
 def _batch_client(
     session: Session,
-) -> tuple[GeminiBatchClient, AIProvider, AIProvider, str, str]:
-    """Build the Batch client plus the stage providers and their model names.
+) -> tuple[
+    GeminiBatchClient, AnthropicBatchClient, AIProvider, AIProvider, str, str
+]:
+    """Build both Batch clients plus the stage providers and their model names.
 
-    The Gemini-only gate lives at the API entry points (trigger/resume return
-    422 otherwise); the worker trusts the run row it was launched from.
+    Stage 1 submits through Gemini Batch, stage 2 through Anthropic Message
+    Batches, each with its own stage API key. The GEMINI->ANTHROPIC gate lives
+    at the API entry points (trigger/resume return 422 otherwise); the worker
+    trusts the run row it was launched from.
     """
     stage1, stage2 = _stage_providers(session)
     config = get_config(session)
-    api_key = config.enrichment_stage1_api_key or config.api_key
-    if not api_key:
-        raise RuntimeError("Gemini provider is configured without an API key")
+    stage1_key = config.enrichment_stage1_api_key or config.api_key
+    if not stage1_key:
+        raise RuntimeError("Stage 1 provider is configured without an API key")
+    stage2_key = config.enrichment_stage2_api_key or config.api_key
+    if not stage2_key:
+        raise RuntimeError("Stage 2 provider is configured without an API key")
     return (
-        GeminiBatchClient(api_key),
+        GeminiBatchClient(stage1_key),
+        AnthropicBatchClient(stage2_key),
         stage1,
         stage2,
         stage1.model_for(ModelRole.RECIPE_INGREDIENTS),
@@ -303,10 +317,56 @@ def build_stage2_payloads(
     return payloads
 
 
+def build_anthropic_stage2_payloads(
+    session: Session, batch: RecipeEnrichmentBatch, model: str
+) -> dict[str, dict[str, Any]]:
+    """Build Anthropic Message Batch requests for a stage 2 batch.
+
+    Same eligibility as `build_stage2_payloads` (ingested stage 1 responses
+    without a stage 2 payload yet); each value is one
+    `anthropic_stage2_request` dict keyed by request key.
+    """
+    eligible = [
+        item for item in batch.items
+        if item.status in (EnrichmentBatchItemStatus.SUCCEEDED, EnrichmentBatchItemStatus.PENDING)
+        and "stage2" not in (item.stage1_response or {})
+        and (item.stage1_response or {}).get("i") is not None
+    ]
+    recipes = _recipe_map(session, [item.recipe_id for item in eligible])
+    payloads: dict[str, dict[str, Any]] = {}
+    for item in eligible:
+        recipe = recipes.get(item.recipe_id)
+        if recipe is None:
+            continue
+        stored = {key: value for key, value in (item.stage1_response or {}).items()
+                  if key != "stage2"}
+        names = deduplicate_ingredient_names([
+            str(entry.get("n", "")) for entry in stored.get("i", [])
+            if isinstance(entry, dict) and entry.get("n")
+        ])
+        stage2_context = build_stage2_context(session, recipe, names)
+        payloads[item.request_key] = anthropic_stage2_request(
+            item.request_key, stage2_context, model
+        )
+    return payloads
+
+
+def _payload_bytes(rows: dict[str, Any]) -> int:
+    """Encoded size of a chunk payload, for JSONL strings or Anthropic dicts."""
+    total = 0
+    for value in rows.values():
+        if isinstance(value, str):
+            total += len(value.encode()) + 1
+        else:
+            total += len(json.dumps(value, ensure_ascii=False).encode()) + 1
+    return total
+
+
 def submit_prepared(
     session: Session,
     run: TaskRun,
-    client: GeminiBatchClient,
+    gemini_client: GeminiBatchClient,
+    anthropic_client: AnthropicBatchClient,
     stage1_model: str,
     stage2_model: str,
     *,
@@ -314,10 +374,11 @@ def submit_prepared(
 ) -> int:
     """Upload + create remote jobs for preparing batches while a slot is free.
 
-    Each wave submits under its own stage model. Stage 1 rows rebuild
-    deterministically from the recipes; stage 2 rows build from ingested stage
-    1 data at submit time. Submitted keys persist on the batch so ingest
-    correlates exactly what was sent. Returns submitted count.
+    Stage 1 submits JSONL through Gemini Batch under the stage 1 model;
+    stage 2 submits Anthropic Message Batch requests under the stage 2 model
+    with the deterministic job key as the `Idempotency-Key`. Submitted keys
+    persist on the batch so ingest correlates exactly what was sent. Returns
+    submitted count.
     """
     active = session.scalar(
         select(func.count())
@@ -339,10 +400,42 @@ def submit_prepared(
     for batch in preparing:
         if active >= max_active:
             break
+        wave_model = stage2_model if batch.stage == "stage2" else stage1_model
         if batch.stage == "stage2":
-            rows = build_stage2_payloads(session, batch)
-        else:
-            rows = _rebuild_stage1_payloads(session, batch)
+            anthropic_rows = build_anthropic_stage2_payloads(session, batch, wave_model)
+            if not anthropic_rows:
+                batch.status = EnrichmentBatchStatus.SUCCEEDED
+                batch.completed_at = datetime.now(UTC)
+                session.commit()
+                continue
+            if (
+                _payload_bytes(anthropic_rows) > BATCH_CHUNK_MAX_BYTES
+                or len(anthropic_rows) > BATCH_CHUNK_MAX_RECIPES
+            ):
+                _split_oversized(session, batch, anthropic_rows)
+                continue
+            # Idempotent create: the deterministic job key is the
+            # Idempotency-Key, so a retry after an ambiguous failure adopts
+            # the existing batch instead of creating a duplicate.
+            created = anthropic_client.create_batch(
+                model=wave_model,
+                requests=[anthropic_rows[key] for key in sorted(anthropic_rows)],
+                job_key=batch.job_key,
+            )
+            batch.provider_batch_id = created.name
+            batch.duplicate_ids = []
+            batch.input_file_id = None
+            batch.provider = "ANTHROPIC"
+            batch.status = EnrichmentBatchStatus.SUBMITTED
+            batch.request_count = len(anthropic_rows)
+            batch.submitted_keys = sorted(anthropic_rows)
+            batch.model = wave_model
+            batch.submitted_at = datetime.now(UTC)
+            session.commit()
+            active += 1
+            submitted += 1
+            continue
+        rows = _rebuild_stage1_payloads(session, batch)
         if not rows:
             batch.status = EnrichmentBatchStatus.SUCCEEDED
             batch.completed_at = datetime.now(UTC)
@@ -353,8 +446,7 @@ def submit_prepared(
             _split_oversized(session, batch, rows)
             continue
         # Non-idempotent create: reconcile by display name before creating.
-        existing = client.find_by_display_name(batch.display_name)
-        wave_model = stage2_model if batch.stage == "stage2" else stage1_model
+        existing = gemini_client.find_by_display_name(batch.display_name)
         if existing:
             adopted = sorted(existing, key=lambda job: job.name)[0]
             batch.provider_batch_id = adopted.name
@@ -362,17 +454,20 @@ def submit_prepared(
                 {job.name for job in existing if job.name != adopted.name}
             )
             for extra in batch.duplicate_ids:
-                client.cancel_job(extra)
+                gemini_client.cancel_job(extra)
         else:
-            input_file_id = client.upload_jsonl(content, display_name=batch.display_name)
+            input_file_id = gemini_client.upload_jsonl(
+                content, display_name=batch.display_name
+            )
             batch.input_file_id = input_file_id
             session.commit()
             # Crash window: remote job may exist while the local ID is not yet
             # saved — the next poll reconciles by display name, adopting it.
-            created = client.create_job(
+            created = gemini_client.create_job(
                 model=wave_model, input_file_id=input_file_id, display_name=batch.display_name
             )
             batch.provider_batch_id = created.name
+        batch.provider = "GEMINI"
         batch.status = EnrichmentBatchStatus.SUBMITTED
         batch.request_count = len(rows)
         batch.submitted_keys = sorted(rows)
@@ -402,7 +497,7 @@ def _rebuild_stage1_payloads(session: Session, batch: RecipeEnrichmentBatch) -> 
 
 
 def _split_oversized(
-    session: Session, batch: RecipeEnrichmentBatch, rows: dict[str, str]
+    session: Session, batch: RecipeEnrichmentBatch, rows: dict[str, Any]
 ) -> None:
     """Split an oversized preparing batch into smaller preparing batches.
 
@@ -410,7 +505,7 @@ def _split_oversized(
     resolved or failed) — so deleting the old batch orphans nothing.
     """
     keys = sorted(rows)
-    sizes = [len(rows[key].encode()) + 1 for key in keys]
+    sizes = [_payload_bytes({keys[index]: rows[keys[index]]}) for index in range(len(keys))]
     groups = plan_chunks(sizes)
     items = {item.request_key: item for item in batch.items}
     leftovers = [item for key, item in items.items() if key not in rows]
@@ -434,7 +529,7 @@ def _split_oversized(
             stage=batch.stage,
             attempt=batch.attempt,
             **_versions(),
-            provider="GEMINI",
+            provider="ANTHROPIC" if batch.stage == "stage2" else "GEMINI",
         )
         session.add(sibling)
         session.flush()
@@ -468,15 +563,102 @@ def _response_usage(response: dict, model: str | None) -> dict:
     }
 
 
-def ingest_succeeded_batch(
-    session: Session, batch: RecipeEnrichmentBatch, lines: list[str]
+def _ingest_anthropic_batch(
+    session: Session,
+    batch: RecipeEnrichmentBatch,
+    results: list[dict[str, Any]],
 ) -> None:
-    """Correlate one completed job's output rows by key and record per-item results."""
+    """Correlate Anthropic batch results by `custom_id` and record per-item results."""
+    expected = set(batch.submitted_keys or [])
+    if not expected:
+        expected = {
+            item.request_key
+            for item in batch.items
+            if item.status is EnrichmentBatchItemStatus.PENDING
+        }
+    by_key: dict[str, dict[str, Any]] = {}
+    problems: list[str] = []
+    seen: set[str] = set()
+    for index, row in enumerate(results, start=1):
+        custom_id = row.get("custom_id")
+        if not isinstance(custom_id, str) or not custom_id:
+            problems.append(f"result {index}: missing custom_id")
+            continue
+        key = anthropic_request_key(custom_id)
+        if key not in expected:
+            problems.append(f"result {index}: unknown key {key}")
+            continue
+        if key in seen:
+            problems.append(f"result {index}: duplicate key {key}")
+            continue
+        seen.add(key)
+        by_key[key] = row
+    for key in sorted(expected - seen):
+        problems.append(f"missing key {key}")
+    items = {item.request_key: item for item in batch.items}
+    for problem in problems:
+        logger.warning("Batch %s result problem: %s", batch.job_key, problem)
+    for key in sorted(expected):
+        item = items.get(key)
+        if item is None:
+            logger.warning("Batch %s result for deleted recipe: %s", batch.job_key, key)
+            continue
+        row = by_key.get(key)
+        if row is None:
+            item.status = EnrichmentBatchItemStatus.FAILED
+            item.provider_error = "missing from provider output"
+            continue
+        parsed, usage, error = parse_anthropic_batch_item(row)
+        usage = dict(usage)
+        usage["model"] = usage.get("model") or batch.model
+        item.usage = usage
+        if error is not None or parsed is None:
+            item.status = EnrichmentBatchItemStatus.FAILED
+            item.provider_error = str(error or "invalid provider response")[:1000]
+            continue
+        try:
+            if batch.stage == "stage1":
+                stage1 = Stage1Response.model_validate(parsed)
+                item.stage1_response = stage1.model_dump(mode="json", by_alias=True)
+                item.stage1_ingredients = [
+                    line.name for line in stage1.ingredients if line.name
+                ]
+            else:
+                stage2 = Stage2Response.model_validate(parsed)
+                item.stage1_response = {
+                    **(item.stage1_response or {}),
+                    "stage2": stage2.model_dump(mode="json", by_alias=True),
+                }
+        except ValidationError as exc:
+            item.status = EnrichmentBatchItemStatus.FAILED
+            item.provider_error = f"invalid structured response: {exc}"[:1000]
+            continue
+        item.status = EnrichmentBatchItemStatus.SUCCEEDED
+    batch.status = EnrichmentBatchStatus.SUCCEEDED
+    batch.completed_at = datetime.now(UTC)
+    session.commit()
+
+
+def ingest_succeeded_batch(
+    session: Session,
+    batch: RecipeEnrichmentBatch,
+    lines: list[str] | list[dict[str, Any]],
+) -> None:
+    """Correlate one completed job's output rows by key and record per-item results.
+
+    Gemini batches arrive as JSONL strings (`key`/`response`/`error`); Anthropic
+    batches arrive as decoded `MessageBatchIndividualResponse` dicts
+    (`custom_id`/`result`). The format follows `batch.provider`.
+    """
+    if batch.provider == "ANTHROPIC":
+        _ingest_anthropic_batch(session, batch, [row for row in lines if isinstance(row, dict)])
+        return
+    text_lines = [line for line in lines if isinstance(line, str)]
     expected = set(batch.submitted_keys or [])
     if not expected:
         expected = {item.request_key for item in batch.items if item.status is
                     EnrichmentBatchItemStatus.PENDING}
-    by_key, problems = correlate_results(lines, expected)
+    by_key, problems = correlate_results(text_lines, expected)
     items = {item.request_key: item for item in batch.items}
     for problem in problems:
         logger.warning("Batch %s result problem: %s", batch.job_key, problem)
@@ -690,7 +872,7 @@ def build_retry_chunks(session: Session, run: TaskRun) -> int:
             stage=stage,
             attempt=attempt,
             **_versions(),
-            provider="GEMINI",
+            provider="ANTHROPIC" if stage == "stage2" else "GEMINI",
         )
         session.add(batch)
         session.flush()
@@ -819,12 +1001,17 @@ def build_progress_detail(session: Session, run: TaskRun) -> dict:
 
 
 def _refresh_submitted(
-    session: Session, run: TaskRun, client: GeminiBatchClient
+    session: Session,
+    run: TaskRun,
+    gemini_client: GeminiBatchClient,
+    anthropic_client: AnthropicBatchClient,
 ) -> tuple[int, str | None]:
     """Poll every submitted batch; ingest completions. Returns (active, error).
 
-    Lookup/download failures are transient up to MAX_CONSECUTIVE_POLL_ERRORS per
-    batch (tracked on the run detail); beyond that the batch fails outright so
+    Gemini batches poll through `GeminiBatchClient`, Anthropic batches through
+    `AnthropicBatchClient` (selected by `batch.provider`). Lookup/download
+    failures are transient up to MAX_CONSECUTIVE_POLL_ERRORS per batch
+    (tracked on the run detail); beyond that the batch fails outright so
     a deterministically broken payload cannot park the run in WAITING forever.
     """
     submitted = session.scalars(
@@ -839,6 +1026,7 @@ def _refresh_submitted(
     last_error: str | None = None
     for batch in submitted:
         assert batch.provider_batch_id is not None
+        client = anthropic_client if batch.provider == "ANTHROPIC" else gemini_client
         try:
             remote = client.get_job(batch.provider_batch_id)
         except Exception as exc:
@@ -858,14 +1046,19 @@ def _refresh_submitted(
                 continue
             try:
                 batch.result_file_id = remote.output_file_id
-                lines = client.download_lines(remote.output_file_id)
+                if batch.provider == "ANTHROPIC":
+                    results = anthropic_client.download_results(batch.provider_batch_id)
+                    error_budget.pop(batch.job_key, None)
+                    ingest_succeeded_batch(session, batch, results)
+                else:
+                    lines = gemini_client.download_lines(remote.output_file_id)
+                    error_budget.pop(batch.job_key, None)
+                    ingest_succeeded_batch(session, batch, lines)
             except Exception as exc:
                 last_error = _note_poll_error(session, run, batch, error_budget, str(exc)[:500])
                 if batch.status is EnrichmentBatchStatus.SUBMITTED:
                     active += 1
                 continue
-            error_budget.pop(batch.job_key, None)
-            ingest_succeeded_batch(session, batch, lines)
         else:
             error_text = remote.error or f"remote job state {remote.state}"
             batch.status = EnrichmentBatchStatus.FAILED
@@ -941,7 +1134,7 @@ def _promote_stage2(session: Session, run: TaskRun) -> None:
                 stage="stage2",
                 attempt=batch.attempt,
                 **_versions(),
-                provider="GEMINI",
+                provider="ANTHROPIC",
             )
             session.add(sibling)
             session.flush()
@@ -1115,8 +1308,10 @@ def run_backfill_prepare_and_submit(run_id: str) -> dict:
         run = session.get(TaskRun, uuid.UUID(run_id))
         if run is None:
             raise ValueError("enrichment backfill run not found")
-        client, _stage1, _stage2, stage1_model, stage2_model = _batch_client(session)
-        run.provider_name = "GEMINI"
+        gemini_client, anthropic_client, _stage1, _stage2, stage1_model, stage2_model = (
+            _batch_client(session)
+        )
+        run.provider_name = "GEMINI->ANTHROPIC"
         run.model_name = f"{stage1_model} -> {stage2_model}"
         session.commit()
         recipe_ids = select_backfill_recipe_ids(session)
@@ -1128,7 +1323,15 @@ def run_backfill_prepare_and_submit(run_id: str) -> dict:
             return detail
         prepare_stage_chunks(session, run, recipe_ids, stage="stage1", attempt=1, first_chunk=0)
         max_active = int(run.detail.get("max_active_jobs", BATCH_DEFAULT_MAX_ACTIVE_JOBS))
-        submit_prepared(session, run, client, stage1_model, stage2_model, max_active=max_active)
+        submit_prepared(
+            session,
+            run,
+            gemini_client,
+            anthropic_client,
+            stage1_model,
+            stage2_model,
+            max_active=max_active,
+        )
         progress = build_progress_detail(session, run)
         polls_done = 0
         countdown = poll_countdown(polls_done)
@@ -1148,20 +1351,41 @@ def poll_backfill(run_id: str, polls_done: int = 0) -> dict:
         if run.status not in (TaskStatus.WAITING, TaskStatus.RUNNING, TaskStatus.QUEUED):
             return dict(run.detail)
         set_running(run_id)
-        client, stage1_provider, stage2_provider, stage1_model, stage2_model = _batch_client(
-            session
+        (
+            gemini_client,
+            anthropic_client,
+            stage1_provider,
+            stage2_provider,
+            stage1_model,
+            stage2_model,
+        ) = _batch_client(session)
+        _active, last_error = _refresh_submitted(
+            session, run, gemini_client, anthropic_client
         )
-        _active, last_error = _refresh_submitted(session, run, client)
         _promote_stage2(session, run)
         max_active = int(run.detail.get("max_active_jobs", BATCH_DEFAULT_MAX_ACTIVE_JOBS))
-        submit_prepared(session, run, client, stage1_model, stage2_model, max_active=max_active)
+        submit_prepared(
+            session,
+            run,
+            gemini_client,
+            anthropic_client,
+            stage1_model,
+            stage2_model,
+            max_active=max_active,
+        )
         apply_counts = apply_ready_stage2(
             session, run, stage1_provider, stage2_provider, stage1_model, stage2_model
         )
         built = build_retry_chunks(session, run)
         if built:
             submit_prepared(
-                session, run, client, stage1_model, stage2_model, max_active=max_active
+                session,
+                run,
+                gemini_client,
+                anthropic_client,
+                stage1_model,
+                stage2_model,
+                max_active=max_active,
             )
         progress = build_progress_detail(session, run)
         progress["applied_now"] = apply_counts.get("applied", 0)

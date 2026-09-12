@@ -1,4 +1,5 @@
 import json
+import re
 from decimal import Decimal
 from unittest.mock import Mock
 
@@ -14,7 +15,14 @@ from app.services.ai.anthropic import AnthropicProvider
 from app.services.ai.gemini import GeminiProvider
 from app.services.ai.registry import get_config, get_recipe_enrichment_providers
 from app.services.ai.stub import StubProvider
-from app.services.recipe_enrichment.batch import stage1_row, stage2_row
+from app.services.recipe_enrichment.batch import (
+    anthropic_custom_id,
+    anthropic_request_key,
+    anthropic_stage2_request,
+    parse_anthropic_batch_item,
+    stage1_row,
+    stage2_row,
+)
 from app.services.recipe_enrichment.prompt import (
     build_prompt,
     build_stage1_prompt,
@@ -783,3 +791,114 @@ def test_batch_rows_set_max_output_tokens() -> None:
 
     s2 = json.loads(stage2_row("k2", context))
     assert s2["request"]["generation_config"]["max_output_tokens"] == 2048
+
+
+def _stage2_context() -> dict:
+    return {
+        "recipe": {
+            "id": "1",
+            "name": "Cake",
+            "book_title": "Baking",
+            "book_author": "Chef",
+            "lines": [{"id": "01", "text": "1 cup flour"}],
+            "ingredients": ["flour"],
+            "instructions": ["Mix and bake."],
+        },
+        "vocabulary": {"cuisines": [], "methods": [], "courses": []},
+    }
+
+
+def test_anthropic_stage2_request_carries_tool_contract() -> None:
+    request = anthropic_stage2_request("k1", _stage2_context(), "claude-haiku-4-5-20251001")
+
+    assert request["custom_id"] == "k1"
+    params = request["params"]
+    assert params["model"] == "claude-haiku-4-5-20251001"
+    assert params["max_tokens"] == 2048
+    assert params["temperature"] == 0
+    assert isinstance(params["system"], str) and params["system"]
+    assert params["messages"][0]["role"] == "user"
+    assert params["tools"] == [
+        {
+            "name": "structured_output",
+            "description": "Output structured data matching the schema",
+            "input_schema": params["tools"][0]["input_schema"],
+        }
+    ]
+    assert params["tool_choice"] == {"type": "tool", "name": "structured_output"}
+
+
+def test_anthropic_custom_id_sanitises_colon_and_round_trips() -> None:
+    key = "123e4567-e89b-12d3-a456-426614174000:abcdef123456"
+    custom_id = anthropic_custom_id(key)
+    assert custom_id == "123e4567-e89b-12d3-a456-426614174000_abcdef123456"
+    assert len(custom_id) <= 64
+    assert re.fullmatch(r"[a-zA-Z0-9_-]{1,64}", custom_id)
+    assert anthropic_request_key(custom_id) == key
+
+    request = anthropic_stage2_request(
+        key, _stage2_context(), "claude-haiku-4-5-20251001"
+    )
+    assert request["custom_id"] == custom_id
+
+
+def _succeeded_item(payload: dict) -> dict:
+    return {
+        "custom_id": "k1",
+        "result": {
+            "type": "succeeded",
+            "message": {
+                "model": "claude-haiku-4-5-20251001",
+                "content": [
+                    {
+                        "type": "tool_use",
+                        "name": "structured_output",
+                        "input": payload,
+                    }
+                ],
+                "usage": {
+                    "input_tokens": 200,
+                    "output_tokens": 30,
+                    "cache_read_input_tokens": 10,
+                    "cache_creation_input_tokens": 5,
+                },
+            },
+        },
+    }
+
+
+def test_parse_anthropic_batch_item_extracts_tool_input_and_usage() -> None:
+    parsed, usage, error = parse_anthropic_batch_item(
+        _succeeded_item({"k": ["flour"], "c": [], "m": [], "o": [], "w": []})
+    )
+
+    assert error is None
+    assert parsed == {"k": ["flour"], "c": [], "m": [], "o": [], "w": []}
+    assert usage == {
+        "model": "claude-haiku-4-5-20251001",
+        "input_tokens": 200,
+        "output_tokens": 30,
+        "cached_tokens": 15,
+    }
+
+
+def test_parse_anthropic_batch_item_reports_provider_errors() -> None:
+    item = {
+        "custom_id": "k1",
+        "result": {"type": "errored", "error": {"message": "overloaded"}},
+    }
+    parsed, _usage, error = parse_anthropic_batch_item(item)
+
+    assert parsed is None
+    assert error == "overloaded"
+
+    cancelled = {"custom_id": "k1", "result": {"type": "canceled"}}
+    parsed, _usage, error = parse_anthropic_batch_item(cancelled)
+    assert parsed is None
+    assert error is not None
+
+    no_tool = _succeeded_item({"k": []})
+    no_tool["result"]["message"]["content"] = [{"type": "text", "text": "hello"}]
+    parsed, _usage, error = parse_anthropic_batch_item(no_tool)
+    assert parsed is None
+    assert error == "no structured tool use in response"
