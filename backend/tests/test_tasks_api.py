@@ -12,7 +12,7 @@ from sqlalchemy import create_engine, event, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.db import configure_sqlite_connection
-from app.models import Base, Book, Config, Recipe, TaskRun
+from app.models import Base, Book, CanonicalIngredient, Config, Recipe, TaskRun
 from app.models.enums import AIProvider, TaskStatus, TaskType
 from app.services.ai import Usage
 from app.tasks.book_keywords import backfill_book_keywords
@@ -60,6 +60,21 @@ def test_trigger_dedup_reports_vocabulary_size_and_dispatches(
     run = _only_run(session)
     assert run.task_type == TaskType.KEYWORD_DEDUP
     assert dedup_dispatched == [(str(run.id),)]
+
+
+def test_trigger_ingredient_dedup_reports_vocabulary_size_and_dispatches(
+    client: TestClient, session: Session, ingredient_dedup_dispatched: list[tuple[Any, ...]]
+) -> None:
+    session.add(CanonicalIngredient(name="Spring onion"))
+    session.commit()
+
+    res = client.post("/api/tasks/dedup-ingredients")
+
+    assert res.status_code == 202
+    assert res.json() == {"task": "ingredient_dedup", "status": "queued", "queued": 1}
+    run = _only_run(session)
+    assert run.task_type == TaskType.INGREDIENT_DEDUP
+    assert ingredient_dedup_dispatched == [(str(run.id),)]
 
 
 def test_trigger_calibre_sync_records_run_and_dispatches(

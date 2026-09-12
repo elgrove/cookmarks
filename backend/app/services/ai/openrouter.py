@@ -29,6 +29,7 @@ class OpenRouterProvider(AIProvider):
         ModelRole.BLOCKS_OF_FILES: "google/gemini-2.5-flash",
         ModelRole.BOOK_KEYWORDS: "google/gemini-2.5-flash",
         ModelRole.KEYWORD_DEDUP: "google/gemini-2.5-flash",
+        ModelRole.INGREDIENT_DEDUP: "google/gemini-2.5-flash",
         ModelRole.ASSISTANT: "google/gemini-2.5-flash",
         ModelRole.RECIPE_ENRICHMENT: "google/gemini-2.5-flash",
         ModelRole.RECIPE_INGREDIENTS: "google/gemini-2.5-flash-lite",

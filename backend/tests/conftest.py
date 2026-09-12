@@ -101,6 +101,20 @@ def dedup_dispatched(monkeypatch: pytest.MonkeyPatch) -> list[tuple[Any, ...]]:
 
 
 @pytest.fixture(autouse=True)
+def ingredient_dedup_dispatched(monkeypatch: pytest.MonkeyPatch) -> list[tuple[Any, ...]]:
+    """Keep canonical-ingredient dedup dispatch off Redis during API tests."""
+    from app.tasks.ingredient_dedup import dedup_ingredients_task
+
+    calls: list[tuple[Any, ...]] = []
+
+    def _record(*args: Any, **_kwargs: Any) -> None:
+        calls.append(args)
+
+    monkeypatch.setattr(dedup_ingredients_task, "delay", _record)
+    return calls
+
+
+@pytest.fixture(autouse=True)
 def calibre_dispatched(monkeypatch: pytest.MonkeyPatch) -> list[tuple[Any, ...]]:
     """Stub the Calibre-sync dispatch so tests never reach a real broker. Records the
     (run_id,) of each enqueued task; request it by name to assert a trigger dispatched

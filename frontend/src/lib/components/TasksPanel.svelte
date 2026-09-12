@@ -9,6 +9,8 @@
 		/** Wired to POST /api/tasks/dedup-keywords — the AI-assisted keyword merge. Same
 		 *  fire-and-forget lifecycle as `onRun`, with no options. */
 		onDedup?: () => Promise<TaskRunAck | void>;
+		/** Wired to POST /api/tasks/dedup-ingredients — canonical ingredient merge. */
+		onDedupIngredients?: () => Promise<TaskRunAck | void>;
 		/** Wired to POST /api/tasks/calibre-sync — re-reads the Calibre library and
 		 *  reconciles books. Same fire-and-forget lifecycle, with no options. */
 		onSync?: () => Promise<TaskRunAck | void>;
@@ -33,11 +35,20 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
 
-	let { onRun, onDedup, onSync, onEnrichmentPilot, onBackfill, onBackfillResume }: TasksPanelProps =
+	let {
+		onRun,
+		onDedup,
+		onDedupIngredients,
+		onSync,
+		onEnrichmentPilot,
+		onBackfill,
+		onBackfillResume
+	}: TasksPanelProps =
 		$props();
 
 	let book = $state<Runner>({ state: 'idle', queued: null });
 	let dedup = $state<Runner>({ state: 'idle', queued: null });
+	let ingredientDedup = $state<Runner>({ state: 'idle', queued: null });
 	let calibre = $state<Runner>({ state: 'idle', queued: null });
 	let enrichment = $state<Runner>({ state: 'idle', queued: null });
 	let backfill = $state<Runner>({ state: 'idle', queued: null });
@@ -67,6 +78,7 @@
 	onDestroy(() => {
 		clearTimeout(book.timer);
 		clearTimeout(dedup.timer);
+		clearTimeout(ingredientDedup.timer);
 		clearTimeout(calibre.timer);
 		clearTimeout(enrichment.timer);
 		clearTimeout(backfill.timer);
@@ -100,6 +112,17 @@
 				? `Analysing ${dedup.queued} keyword${dedup.queued === 1 ? '' : 's'} for merges — duplicates fold shortly.`
 				: 'Nothing to deduplicate: the keyword vocabulary is empty.'
 			: dedup.state === 'error'
+				? ERROR_NOTE
+				: ''
+	);
+	let ingredientDedupNote = $derived(
+		ingredientDedup.state === 'done'
+			? ingredientDedup.queued && ingredientDedup.queued > 0
+				? `Analysing ${ingredientDedup.queued} canonical ingredient${
+						ingredientDedup.queued === 1 ? '' : 's'
+					} for merges — recipe facts update shortly.`
+				: 'Nothing to deduplicate: the canonical ingredient vocabulary is empty.'
+			: ingredientDedup.state === 'error'
 				? ERROR_NOTE
 				: ''
 	);
@@ -138,6 +161,10 @@
 	data-verify-queued={book.queued === null ? '' : String(book.queued)}
 	data-verify-dedup-state={dedup.state}
 	data-verify-dedup-queued={dedup.queued === null ? '' : String(dedup.queued)}
+	data-verify-ingredient-dedup-state={ingredientDedup.state}
+	data-verify-ingredient-dedup-queued={
+		ingredientDedup.queued === null ? '' : String(ingredientDedup.queued)
+	}
 	data-verify-calibre-state={calibre.state}
 	data-verify-enrichment-state={enrichment.state}
 	data-verify-enrichment-queued={enrichment.queued === null ? '' : String(enrichment.queued)}
@@ -212,6 +239,37 @@
 
 	{#if dedupNote}
 		<p class="note" class:err={dedup.state === 'error'} role="status">{dedupNote}</p>
+	{/if}
+
+	<article class="task">
+		<div class="copy">
+			<h2 class="name">Deduplicate ingredients</h2>
+			<p class="desc">
+				Use AI to merge equivalent canonical ingredients while preserving culinary distinctions.
+				Recipe ingredient facts move to the surviving name automatically; source ingredient text stays
+				unchanged.
+			</p>
+		</div>
+
+		<div class="action">
+			<button
+				class="run ingredient-dedup-run"
+				class:done={ingredientDedup.state === 'done'}
+				class:error={ingredientDedup.state === 'error'}
+				type="button"
+				aria-busy={ingredientDedup.state === 'running'}
+				disabled={ingredientDedup.state === 'running'}
+				onclick={() => runTask(ingredientDedup, () => onDedupIngredients?.())}
+			>
+				{label(ingredientDedup.state)}
+			</button>
+		</div>
+	</article>
+
+	{#if ingredientDedupNote}
+		<p class="note" class:err={ingredientDedup.state === 'error'} role="status">
+			{ingredientDedupNote}
+		</p>
 	{/if}
 
 	<article class="task">

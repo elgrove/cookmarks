@@ -21,10 +21,9 @@ from app.services.ai import AIProvider, ModelRole, Usage
 from app.services.keyword_dedup import (
     apply_merges,
     deduplicate_keywords,
-    pre_deduplicate,
     propose_merges,
-    select_candidates,
 )
+from app.services.vocabulary_dedup import pre_deduplicate, select_candidates
 from app.tasks.keyword_dedup import _last_cursor
 
 
@@ -153,8 +152,14 @@ def test_apply_merges_reassigns_recipe_and_book_associations(session: Session) -
     assert "Noodles" in {k.name for k in book.keywords}
     assert "Pasta" not in {k.name for k in book.keywords}
     # The merged-away keyword is gone; the canonical exists exactly once.
-    assert session.scalar(select(func.count()).select_from(Keyword).where(Keyword.name == "Pasta")) == 0
-    assert session.scalar(select(func.count()).select_from(Keyword).where(Keyword.name == "Noodles")) == 1
+    assert (
+        session.scalar(select(func.count()).select_from(Keyword).where(Keyword.name == "Pasta"))
+        == 0
+    )
+    assert (
+        session.scalar(select(func.count()).select_from(Keyword).where(Keyword.name == "Noodles"))
+        == 1
+    )
 
 
 def test_apply_merges_dedupes_when_owner_already_has_both(session: Session) -> None:
@@ -186,7 +191,12 @@ def test_apply_merges_creates_the_canonical_when_absent(session: Session) -> Non
 
     assert applied == 1
     assert "Vegetarian" in {k.name for k in recipe.keywords}
-    assert session.scalar(select(func.count()).select_from(Keyword).where(Keyword.name == "Vegetarian")) == 1
+    assert (
+        session.scalar(
+            select(func.count()).select_from(Keyword).where(Keyword.name == "Vegetarian")
+        )
+        == 1
+    )
 
 
 def test_apply_merges_skips_a_duplicate_with_no_row(session: Session) -> None:
@@ -195,15 +205,16 @@ def test_apply_merges_skips_a_duplicate_with_no_row(session: Session) -> None:
 
     assert applied == 0
     # A duplicate that doesn't exist is skipped before the canonical is touched.
-    assert session.scalar(select(func.count()).select_from(Keyword).where(Keyword.name == "Phantom")) == 0
+    assert (
+        session.scalar(select(func.count()).select_from(Keyword).where(Keyword.name == "Phantom"))
+        == 0
+    )
 
 
 # --- The full run --------------------------------------------------------------------
 
 
-def test_deduplicate_keywords_end_to_end(
-    session: Session, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_deduplicate_keywords_end_to_end(session: Session, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "app.services.keyword_dedup.get_ai_provider",
         lambda _session: _MapProvider({"Pasta": "Noodles"}),
@@ -214,8 +225,8 @@ def test_deduplicate_keywords_end_to_end(
     session.commit()
 
     assert result.merges_applied == 1
-    assert result.keywords_removed == 1
-    assert result.keywords_in == 3  # Pasta, Quick, Italian
+    assert result.vocabulary_removed == 1
+    assert result.vocabulary_in == 3  # Pasta, Quick, Italian
     assert "Noodles" in {k.name for k in recipe.keywords}
 
 
@@ -242,7 +253,7 @@ def test_deduplicate_keywords_with_stub_provider_merges_nothing(
     session.commit()
 
     # The stub echoes every keyword as its own canonical: vocabulary seen, nothing merged.
-    assert result.keywords_in == before
+    assert result.vocabulary_in == before
     assert result.merges_applied == 0
     assert session.scalar(select(func.count()).select_from(Keyword)) == before
 
@@ -289,15 +300,12 @@ def test_propose_merges_drops_a_key_outside_the_candidate_window(
 # --- The rotating candidate window ---------------------------------------------------
 
 
-def test_select_candidates_rotates_without_repeats_and_wraps(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr("app.services.keyword_dedup.DEDUP_CANDIDATE_WINDOW", 2)
+def test_select_candidates_rotates_without_repeats_and_wraps() -> None:
     names = ["Egg", "Fish", "Grain", "Herb", "Ice"]
 
-    first, cursor = select_candidates(names, None)
-    second, cursor = select_candidates(names, cursor)
-    third, cursor = select_candidates(names, cursor)
+    first, cursor = select_candidates(names, None, candidate_window=2)
+    second, cursor = select_candidates(names, cursor, candidate_window=2)
+    third, cursor = select_candidates(names, cursor, candidate_window=2)
 
     assert first == ["Egg", "Fish"]
     assert second == ["Grain", "Herb"]
@@ -306,13 +314,10 @@ def test_select_candidates_rotates_without_repeats_and_wraps(
     assert cursor == "Egg"
 
 
-def test_select_candidates_resumes_past_a_removed_cursor(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr("app.services.keyword_dedup.DEDUP_CANDIDATE_WINDOW", 2)
+def test_select_candidates_resumes_past_a_removed_cursor() -> None:
 
     # "Fish" was merged away since the last run; the window simply starts at the next name.
-    window, _cursor = select_candidates(["Egg", "Grain", "Herb", "Ice"], "Fish")
+    window, _cursor = select_candidates(["Egg", "Grain", "Herb", "Ice"], "Fish", candidate_window=2)
 
     assert window == ["Grain", "Herb"]
 
@@ -339,7 +344,7 @@ def test_deduplicate_keywords_reports_both_stages(
     assert result.pre_merges == 1
     assert result.ai_merges == 1
     assert result.merges_applied == result.pre_merges + result.ai_merges
-    assert result.keywords_removed == result.merges_applied
+    assert result.vocabulary_removed == result.merges_applied
     assert result.cursor_to is not None
 
 

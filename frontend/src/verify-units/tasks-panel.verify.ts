@@ -7,6 +7,7 @@ type Props = TasksPanelProps;
 const RUN = '.run';
 const CHECK = '.regen-check';
 const DEDUP_RUN = '.dedup-run';
+const INGREDIENT_DEDUP_RUN = '.ingredient-dedup-run';
 const ENRICHMENT_RUN = '.enrichment-run';
 const BACKFILL_RUN = '.backfill-run';
 const BACKFILL_RESUME = '.backfill-resume';
@@ -27,6 +28,11 @@ const fixedDedup =
 	(queued: number) =>
 	(): Promise<TaskRunAck> =>
 		Promise.resolve({ task: 'keyword_dedup', status: 'queued', queued });
+
+const fixedIngredientDedup =
+	(queued: number) =>
+	(): Promise<TaskRunAck> =>
+		Promise.resolve({ task: 'ingredient_dedup', status: 'queued', queued });
 
 const fixedEnrichment =
 	(queued: number) =>
@@ -115,6 +121,29 @@ const unit: VerifiableUnit<Props> = {
 			props: { onRun: fixedRun(5), onDedup: () => Promise.reject(new Error('broker down')) },
 			act: async ({ click, wait }) => {
 				click(DEDUP_RUN);
+				await wait(0);
+			}
+		},
+		{
+			id: 'ingredient-dedup-run',
+			description:
+				'running ingredient dedup queues canonical ingredients without changing keyword dedup state',
+			props: { onRun: fixedRun(5), onDedupIngredients: fixedIngredientDedup(24) },
+			act: async ({ click, wait }) => {
+				click(INGREDIENT_DEDUP_RUN);
+				await wait(0);
+			}
+		},
+		{
+			id: 'ingredient-dedup-reject',
+			description: 'probe: a rejected ingredient dedup dispatch is visible as an error',
+			probe: true,
+			props: {
+				onRun: fixedRun(5),
+				onDedupIngredients: () => Promise.reject(new Error('broker down'))
+			},
+			act: async ({ click, wait }) => {
+				click(INGREDIENT_DEDUP_RUN);
 				await wait(0);
 			}
 		},
@@ -276,6 +305,25 @@ const unit: VerifiableUnit<Props> = {
 			check: ({ contract }) =>
 				(contract['dedup-state'] === 'error' && contract['dedup-queued'] === '') ||
 				`dedup-state=${contract['dedup-state']} dedup-queued=${contract['dedup-queued']}`
+		},
+		{
+			id: 'ingredient-dedup-queues',
+			description: 'a successful ingredient dedup run reports its vocabulary size',
+			onlyFixtures: ['ingredient-dedup-run'],
+			check: ({ contract }) =>
+				(contract['ingredient-dedup-state'] === 'done' &&
+					contract['ingredient-dedup-queued'] === '24' &&
+					contract['dedup-state'] === 'idle') ||
+				`ingredient-state=${contract['ingredient-dedup-state']} queued=${contract['ingredient-dedup-queued']}`
+		},
+		{
+			id: 'ingredient-dedup-reject-errors',
+			description: 'a rejected ingredient dedup dispatch never shows a false confirmation',
+			onlyFixtures: ['ingredient-dedup-reject'],
+			check: ({ contract }) =>
+				(contract['ingredient-dedup-state'] === 'error' &&
+					contract['ingredient-dedup-queued'] === '') ||
+				`ingredient-state=${contract['ingredient-dedup-state']} queued=${contract['ingredient-dedup-queued']}`
 		},
 		{
 			id: 'enrichment-queues',

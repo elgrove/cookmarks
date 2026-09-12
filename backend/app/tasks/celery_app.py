@@ -19,6 +19,7 @@ celery_app = Celery(
         "app.tasks.extraction",
         "app.tasks.book_keywords",
         "app.tasks.keyword_dedup",
+        "app.tasks.ingredient_dedup",
         "app.tasks.calibre_sync",
         "app.tasks.ingest",
         "app.tasks.recipe_enrichment",
@@ -33,7 +34,11 @@ celery_app.conf.beat_schedule = {
     "weekly-keyword-dedup": {
         "task": "scheduled_dedup_keywords",
         "schedule": crontab(day_of_week="sun", hour=4, minute=0),
-    }
+    },
+    "weekly-ingredient-dedup": {
+        "task": "scheduled_dedup_ingredients",
+        "schedule": crontab(day_of_week="sun", hour=5, minute=0),
+    },
 }
 
 
