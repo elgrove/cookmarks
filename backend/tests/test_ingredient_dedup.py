@@ -43,7 +43,13 @@ class _MapProvider(AIProvider):
         self.mapping = mapping
 
     def _complete(
-        self, prompt: str, model: str, *, schema: dict | None = None, temp: float = 0
+        self,
+        prompt: str,
+        model: str,
+        *,
+        schema: dict | None = None,
+        temp: float = 0,
+        system: str | None = None,
     ) -> tuple[str, Usage]:
         return json.dumps(self.mapping), Usage()
 
@@ -58,7 +64,13 @@ class _RawProvider(AIProvider):
         self.response = response
 
     def _complete(
-        self, prompt: str, model: str, *, schema: dict | None = None, temp: float = 0
+        self,
+        prompt: str,
+        model: str,
+        *,
+        schema: dict | None = None,
+        temp: float = 0,
+        system: str | None = None,
     ) -> tuple[str, Usage]:
         return self.response, Usage()
 

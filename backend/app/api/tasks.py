@@ -201,7 +201,7 @@ def _check_pilot(session: SessionDep, pilot_run_id: uuid.UUID, confirmed: bool) 
             status_code=422,
             detail="pilot_run_id must be a done recipe-enrichment pilot run",
         )
-    provider, stage1_model, stage2_model = _stage_models(session)
+    _provider, stage1_model, stage2_model = _stage_models(session)
     expected = {
         "provider": "GEMINI->ANTHROPIC",
         "prompt_version": PROMPT_VERSION,
