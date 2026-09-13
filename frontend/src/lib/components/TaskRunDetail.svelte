@@ -34,8 +34,8 @@
 		ingredient_dedup: 'Ingredient dedup',
 		calibre_sync: 'Calibre sync',
 		book_ingest: 'Add book',
-		recipe_enrichment_pilot: 'Enrichment pilot (retired)',
-		recipe_enrichment_backfill: 'Batch backfill (retired)'
+		recipe_enrichment_pilot: 'Enrichment pilot',
+		recipe_enrichment_backfill: 'Batch backfill'
 	};
 	const TYPE_TITLES: Record<Exclude<TaskType, 'extraction'>, string> = {
 		book_keywords: 'Book-keyword tagging',
@@ -43,8 +43,8 @@
 		ingredient_dedup: 'Canonical ingredient dedup',
 		calibre_sync: 'Calibre library sync',
 		book_ingest: 'Book added to the library',
-		recipe_enrichment_pilot: 'Recipe enrichment pilot (retired)',
-		recipe_enrichment_backfill: 'Recipe enrichment batch backfill (retired)'
+		recipe_enrichment_pilot: 'Recipe enrichment pilot',
+		recipe_enrichment_backfill: 'Recipe enrichment batch backfill'
 	};
 
 	const dateFmt = new Intl.DateTimeFormat('en-GB', {

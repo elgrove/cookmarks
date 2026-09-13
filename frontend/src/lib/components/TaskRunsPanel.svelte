@@ -35,8 +35,8 @@
 		ingredient_dedup: 'Ingredient dedup',
 		calibre_sync: 'Calibre sync',
 		book_ingest: 'Add book',
-		recipe_enrichment_pilot: 'Enrichment pilot (retired)',
-		recipe_enrichment_backfill: 'Batch backfill (retired)'
+		recipe_enrichment_pilot: 'Enrichment pilot',
+		recipe_enrichment_backfill: 'Batch backfill'
 	};
 
 	const rowDateFmt = new Intl.DateTimeFormat('en-GB', {
