@@ -65,7 +65,9 @@
 		onDelete,
 		onMarkBookRead,
 		onResetProgress,
-		onToggleQueue
+		onToggleQueue,
+		extractionAvailable = true,
+		ocrAvailable = true
 	}: {
 		book: BookDetailData;
 		onExtract?: () => Promise<void> | void;
@@ -75,6 +77,10 @@
 		onMarkBookRead?: () => Promise<void> | void;
 		onResetProgress?: () => Promise<void> | void;
 		onToggleQueue?: () => Promise<void> | void;
+		/** From GET /api/ai/readiness: false disables extraction with an AI-setup reason. */
+		extractionAvailable?: boolean;
+		/** From GET /api/ai/readiness: a PDF-only book without Gemini OCR explains itself. */
+		ocrAvailable?: boolean;
 	} = $props();
 
 	let coverFailed = $state(false);
@@ -120,6 +126,19 @@
 	let started = $derived(!!book.reading && !book.reading.finished && book.reading.fraction > 0);
 	let readPct = $derived(book.reading ? Math.round(book.reading.fraction * 100) : null);
 	let readable = $derived(book.hasEpub || book.hasPdf);
+	// The extract control distinguishes three disabled states: no readable file, no
+	// AI setup at all, and a PDF-only book without Gemini OCR configuration.
+	let extractUnavailableReason = $derived<
+		'no-file' | 'no-ai-setup' | 'needs-gemini-ocr' | null
+	>(
+		!readable
+			? 'no-file'
+			: !extractionAvailable
+				? 'no-ai-setup'
+				: book.hasPdf && !book.hasEpub && !ocrAvailable
+					? 'needs-gemini-ocr'
+					: null
+	);
 </script>
 
 <article
@@ -145,6 +164,8 @@
 	data-verify-resume-recipe={book.resumeRecipe?.id ?? ''}
 	data-verify-reading-mode={mode ?? ''}
 	data-verify-started={started ? 'true' : 'false'}
+	data-verify-ai-ready={extractionAvailable ? 'true' : 'false'}
+	data-verify-ocr-ready={ocrAvailable ? 'true' : 'false'}
 >
 	<nav class="crumb" aria-label="Breadcrumb">
 		<a href="/books">Books</a><span class="sep">›</span><a
@@ -315,7 +336,8 @@
 					<ExtractButton
 						recipeCount={book.recipeCount}
 						{onExtract}
-						unavailable={!book.hasEpub && !book.hasPdf}
+						unavailable={extractUnavailableReason !== null}
+						unavailableReason={extractUnavailableReason ?? 'no-file'}
 					/>
 				{/if}
 				{#if onDelete}

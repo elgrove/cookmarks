@@ -69,6 +69,16 @@ const unit: VerifiableUnit<Props> = {
 			props: { recipeCount: 0, unavailable: true }
 		},
 		{
+			id: 'no-ai-setup',
+			description: 'no provider key configured — disabled with the AI-setup reason',
+			props: { recipeCount: 0, unavailable: true, unavailableReason: 'no-ai-setup' }
+		},
+		{
+			id: 'needs-gemini-ocr',
+			description: 'a PDF-only book without Gemini — disabled with the OCR reason',
+			props: { recipeCount: 0, unavailable: true, unavailableReason: 'needs-gemini-ocr' }
+		},
+		{
 			id: 'unavailable-click',
 			description: 'probe: clicking the disabled control does not dispatch',
 			probe: true,
@@ -139,6 +149,9 @@ const unit: VerifiableUnit<Props> = {
 			onlyFixtures: ['unavailable', 'unavailable-click'],
 			check: ({ contract, root }) => {
 				if (contract.state !== 'unavailable') return `state=${contract.state}`;
+				if (contract['unavailable-reason'] !== 'no-file') {
+					return `reason=${contract['unavailable-reason']}`;
+				}
 				const btn = root.querySelector<HTMLButtonElement>(BTN);
 				if (!btn?.disabled) return 'the control is not disabled';
 				if (!ariaLabel(root).includes('EPUB or PDF')) return `label=${ariaLabel(root)}`;
@@ -146,6 +159,31 @@ const unit: VerifiableUnit<Props> = {
 					(btn.textContent ?? '').includes('EPUB or PDF') ||
 					`no visible reason: "${btn.textContent}"`
 				);
+			}
+		},
+		{
+			id: 'setup-reasons-explained',
+			description: 'AI-setup and OCR unavailability each name their own reason',
+			onlyFixtures: ['no-ai-setup', 'needs-gemini-ocr'],
+			check: ({ contract, root }) => {
+				if (contract.state !== 'unavailable') return `state=${contract.state}`;
+				const btn = root.querySelector<HTMLButtonElement>(BTN);
+				if (!btn?.disabled) return 'the control is not disabled';
+				const reason = contract['unavailable-reason'];
+				const label = ariaLabel(root);
+				if (reason === 'no-ai-setup') {
+					return (
+						label.includes('needs AI setup') ||
+						`label=${label}`
+					);
+				}
+				if (reason === 'needs-gemini-ocr') {
+					return (
+						label.includes('Gemini OCR setup') ||
+						`label=${label}`
+					);
+				}
+				return `reason=${reason}`;
 			}
 		},
 		{

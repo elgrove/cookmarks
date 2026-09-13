@@ -1,4 +1,6 @@
 <script module lang="ts">
+	export type ExtractUnavailableReason = 'no-file' | 'no-ai-setup' | 'needs-gemini-ocr';
+
 	export type ExtractButtonProps = {
 		/** How many recipes the book already has — switches the label to "Re-extract". */
 		recipeCount?: number;
@@ -6,12 +8,25 @@
 		 *  the page wires this to the POST. Awaited to drive posting → queued. */
 		onExtract?: () => Promise<void> | void;
 		unavailable?: boolean;
+		/** Why the control is unavailable: no readable file, no AI setup, or a
+		 *  PDF-only book without Gemini OCR configuration. */
+		unavailableReason?: ExtractUnavailableReason;
 	};
 
 	type State = 'idle' | 'posting' | 'queued' | 'error' | 'unavailable';
 
-	function stateLabel(state: State, idleLabel: string): string {
-		if (state === 'unavailable') return 'Recipe extraction needs an EPUB or PDF';
+	function unavailableLabel(reason: ExtractUnavailableReason): string {
+		if (reason === 'no-ai-setup') return 'Recipe extraction needs AI setup';
+		if (reason === 'needs-gemini-ocr') return 'PDF extraction needs Gemini OCR setup';
+		return 'Recipe extraction needs an EPUB or PDF';
+	}
+
+	function stateLabel(
+		state: State,
+		idleLabel: string,
+		reason: ExtractUnavailableReason
+	): string {
+		if (state === 'unavailable') return unavailableLabel(reason);
 		if (state === 'posting') return 'Queuing…';
 		if (state === 'queued') return 'Queued';
 		if (state === 'error') return "Couldn't queue — try again";
@@ -22,14 +37,19 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
 
-	let { recipeCount = 0, onExtract, unavailable = false }: ExtractButtonProps = $props();
+	let {
+		recipeCount = 0,
+		onExtract,
+		unavailable = false,
+		unavailableReason = 'no-file'
+	}: ExtractButtonProps = $props();
 
 	let state: State = $state('idle');
 	let timer: ReturnType<typeof setTimeout> | undefined;
 
 	let shown = $derived<State>(unavailable ? 'unavailable' : state);
 	let idleLabel = $derived(recipeCount > 0 ? 'Re-extract recipes' : 'Extract recipes');
-	let label = $derived(stateLabel(shown, idleLabel));
+	let label = $derived(stateLabel(shown, idleLabel, unavailableReason));
 
 	async function extract() {
 		if (shown === 'posting' || shown === 'unavailable') return;
@@ -57,6 +77,7 @@
 	data-verify-unit="extract-button"
 	data-verify-state={shown}
 	data-verify-recipe-count={recipeCount}
+	data-verify-unavailable-reason={unavailable ? unavailableReason : 'none'}
 	aria-label={label}
 	aria-busy={shown === 'posting'}
 	disabled={shown === 'posting' || shown === 'unavailable'}

@@ -15,10 +15,13 @@
 		type ReviewAnswer,
 		type ReviewQuestion
 	} from '$lib/api/task-runs';
+	import { fetchAiReadiness } from '$lib/api/config';
 
 	let status = $state<'loading' | 'error' | 'ready'>('loading');
 	let book = $state<BookDetailData | null>(null);
 	let latestRun = $state<TaskRun | null>(null);
+	let extractionAvailable = $state(true);
+	let ocrAvailable = $state(true);
 
 	// Only a run paused at review surfaces a question; everything else shows nothing.
 	let review = $derived<ReviewQuestion | null>(
@@ -32,6 +35,18 @@
 			// A missing run view must never break the book page; just show no prompt.
 			console.error('failed to load latest extraction run', err);
 			latestRun = null;
+		}
+	}
+
+	async function loadReadiness() {
+		try {
+			const readiness = await fetchAiReadiness();
+			extractionAvailable = readiness.extraction_available;
+			ocrAvailable = readiness.ocr_available;
+		} catch (err) {
+			// Readiness is advisory: on failure the button stays enabled and the
+			// server still enforces setup at trigger time.
+			console.error('failed to load AI readiness', err);
 		}
 	}
 
@@ -74,6 +89,7 @@
 			};
 			status = 'ready';
 			void loadLatestRun(id);
+			void loadReadiness();
 		} catch (err) {
 			console.error('failed to load book', err);
 			status = 'error';
@@ -130,6 +146,8 @@
 	<BookDetail
 		{book}
 		review={$currentUser?.is_admin ? review : null}
+		{extractionAvailable}
+		{ocrAvailable}
 		onAnswer={answerReview}
 		onMarkBookRead={() => setBookRead(true)}
 		onResetProgress={() => setBookRead(false)}

@@ -10,6 +10,8 @@ type Props = {
 	onMarkBookRead?: () => void;
 	onResetProgress?: () => void;
 	onToggleQueue?: () => void;
+	extractionAvailable?: boolean;
+	ocrAvailable?: boolean;
 };
 
 const DELETE_BTN = '.delete-btn';
@@ -273,6 +275,33 @@ const unit: VerifiableUnit<Props> = {
 					resumeRecipe: null
 				},
 				onExtract: () => Promise.resolve()
+			}
+		},
+		{
+			id: 'no-ai-setup',
+			description: 'no provider key configured — extraction is disabled with the setup reason',
+			props: {
+				book: { ...pastaGrannies, recipeCount: 0, recipes: [] },
+				onExtract: () => Promise.resolve(),
+				extractionAvailable: false
+			}
+		},
+		{
+			id: 'pdf-no-gemini',
+			description: 'probe: a PDF-only book without Gemini OCR explains the Gemini requirement',
+			probe: true,
+			props: {
+				book: {
+					...pastaGrannies,
+					hasEpub: false,
+					hasPdf: true,
+					recipeCount: 0,
+					recipes: [],
+					reading: null,
+					resumeRecipe: null
+				},
+				onExtract: () => Promise.resolve(),
+				ocrAvailable: false
 			}
 		},
 		{
@@ -633,6 +662,36 @@ const unit: VerifiableUnit<Props> = {
 				const href = root.querySelector('a.browse')?.getAttribute('href');
 				const want = `/recipes?book_id=${props.book.id}&sort=book`;
 				return href === want || `browse href=${href} expected ${want}`;
+			}
+		},
+		{
+			id: 'no-ai-setup-disables-extraction',
+			description: 'without AI setup the extract control is disabled and names the setup',
+			onlyFixtures: ['no-ai-setup'],
+			check: ({ contract, root }) => {
+				if (contract['ai-ready'] !== 'false') return `ai-ready=${contract['ai-ready']}`;
+				const extract = root.querySelector<HTMLButtonElement>('.extract');
+				if (!extract) return 'the extract control is missing';
+				if (!extract.disabled) return 'extraction is enabled without AI setup';
+				return (
+					(extract.textContent ?? '').includes('needs AI setup') ||
+					`unexpected extract label: "${extract.textContent}"`
+				);
+			}
+		},
+		{
+			id: 'pdf-without-gemini-needs-ocr',
+			description: 'a PDF-only book without Gemini OCR names the Gemini requirement',
+			onlyFixtures: ['pdf-no-gemini'],
+			check: ({ contract, root }) => {
+				if (contract['ocr-ready'] !== 'false') return `ocr-ready=${contract['ocr-ready']}`;
+				const extract = root.querySelector<HTMLButtonElement>('.extract');
+				if (!extract) return 'the extract control is missing';
+				if (!extract.disabled) return 'PDF extraction is enabled without Gemini OCR';
+				return (
+					(extract.textContent ?? '').includes('Gemini OCR setup') ||
+					`unexpected extract label: "${extract.textContent}"`
+				);
 			}
 		},
 		{
