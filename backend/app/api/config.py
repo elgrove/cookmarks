@@ -18,7 +18,6 @@ from app.services.ai import (
     set_provider_order,
     set_task_assignment,
 )
-from app.services.ai.registry import get_provider_config as _get_provider_config
 
 router = APIRouter(tags=["config"])
 
@@ -67,11 +66,6 @@ def update_config(payload: ConfigUpdate, session: SessionDep) -> ConfigRead:
                 fields = entry.model_dump(exclude_unset=True)
                 if "api_key" in fields:
                     set_provider_key(session, entry.provider, entry.api_key)
-                if entry.display_order is not None:
-                    row = _get_provider_config(session, entry.provider.value)
-                    assert row is not None
-                    row.display_order = entry.display_order
-                    session.flush()
                 if entry.add_models:
                     add_provider_models(session, entry.provider, entry.add_models)
                 if entry.remove_models:

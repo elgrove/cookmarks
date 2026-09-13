@@ -134,7 +134,7 @@
 			order.some((p) => {
 				const mode = keyModes[p];
 				if (mode === 'clear') return true;
-				if (mode === 'set' && (keyInputs[p] ?? '').length > 0) return true;
+				if (mode === 'set' && (keyInputs[p] ?? '').trim().length > 0) return true;
 				return false;
 			})
 	);
@@ -248,10 +248,15 @@
 		}
 		const list = modelLists[provider] ?? [];
 		const current = selections[role] ?? null;
+		// Keep the current model when still listed; otherwise prefer the provider's
+		// recommendation over the list's first entry.
+		const recommended = recommendation(role, provider);
 		const model =
 			current !== null && current.provider === provider && list.includes(current.model)
 				? current.model
-				: (list[0] ?? '');
+				: recommended !== null && list.includes(recommended)
+					? recommended
+					: (list[0] ?? '');
 		selections = { ...selections, [role]: { provider, model } };
 	}
 
@@ -295,8 +300,8 @@
 			if (mode === 'clear') {
 				entry.api_key = '';
 				touched = true;
-			} else if (mode === 'set' && (keyInputs[p] ?? '').length > 0) {
-				entry.api_key = keyInputs[p];
+			} else if (mode === 'set' && (keyInputs[p] ?? '').trim().length > 0) {
+				entry.api_key = (keyInputs[p] ?? '').trim();
 				touched = true;
 			}
 			const current = modelLists[p] ?? [];
@@ -726,6 +731,7 @@
 	.provider-head {
 		display: flex;
 		align-items: baseline;
+		flex-wrap: wrap;
 		gap: 0.9rem;
 	}
 	.provider-name {

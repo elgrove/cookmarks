@@ -53,8 +53,6 @@ data class ProviderConfigUpdate(
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val api_key: JsonElement? = null,
     @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val display_order: Int? = null,
-    @EncodeDefault(EncodeDefault.Mode.NEVER)
     val add_models: List<String>? = null,
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val remove_models: List<String>? = null,

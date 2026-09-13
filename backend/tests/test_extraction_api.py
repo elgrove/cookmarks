@@ -115,8 +115,8 @@ def test_trigger_unknown_book_404(client: TestClient, dispatched: list[tuple[Any
 def test_re_extract_label_path_keeps_recipes(
     client: TestClient, session: Session, seeded_epubs: Path
 ) -> None:
-    """Triggering a book that already has recipes still queues a run;     identity is
-    reconciled by the task, so this just confirms the endpoint doesn't gate on count."""
+    """Triggering a book that already has recipes still queues a run; identity
+    is reconciled by the task, so this just confirms the endpoint doesn't gate on count."""
     configure_ai(session)
     book_id = _book_id(client, "With Recipes")
     res = client.post(f"/api/books/{book_id}/extract")

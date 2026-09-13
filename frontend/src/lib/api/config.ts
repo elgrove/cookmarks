@@ -60,7 +60,6 @@ export type Config = z.infer<typeof configSchema>;
 export type ProviderConfigUpdate = {
 	provider: AiProvider;
 	api_key?: string | null;
-	display_order?: number;
 	add_models?: string[];
 	remove_models?: string[];
 };

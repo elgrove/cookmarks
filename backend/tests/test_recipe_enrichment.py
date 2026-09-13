@@ -807,3 +807,41 @@ def test_stage2_retry_maps_unknown_ingredient_to_valid_fallback(session) -> None
     assert recipe.enrichment_state.status is RecipeEnrichmentStatus.COMPLETE
     assert recipe.ingredients[0].is_key is True
     assert recipe.ingredients[0].canonical_name == "light muscovado sugar"
+
+
+def test_explicit_provider_without_model_uses_the_resolved_model(session) -> None:
+    """A caller-supplied provider instance is a different object from the resolved
+    one, so matching runs by provider name: the administrator's pinned model
+    applies instead of the provider default."""
+    configure_ai(session)
+    set_task_assignment(
+        session,
+        ModelRole.RECIPE_INGREDIENTS,
+        [(AIProvider.STUB, "stub-ingredients")],
+    )
+    session.commit()
+
+    recipe = _recipe(session)
+    stage1_provider = Mock()
+    stage1_provider.name = "STUB"
+    stage1_provider.enrich_recipe_stage1.return_value = (
+        Stage1Response.model_validate({"i": [{"id": "01", "n": "salt"}]}),
+        Usage(),
+    )
+    stage2_provider = Mock()
+    stage2_provider.name = "STUB"
+    stage2_provider.enrich_recipe_stage2.return_value = (
+        Stage2Response.model_validate({"key_ingredients": ["salt"]}),
+        Usage(),
+    )
+
+    enrich_recipe(
+        session,
+        recipe.id,
+        stage1_provider=stage1_provider,
+        stage1_fallback_provider=stage1_provider,
+        stage2_provider=stage2_provider,
+    )
+
+    assert stage1_provider.enrich_recipe_stage1.call_args[0][1] == "stub-ingredients"
+    assert stage2_provider.enrich_recipe_stage2.call_args[0][1] == "stub-semantics"

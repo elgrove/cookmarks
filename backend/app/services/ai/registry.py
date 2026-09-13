@@ -193,7 +193,9 @@ def resolve_task(session: Session, role: ModelRole) -> ResolvedTask | None:
         return ResolvedTask(provider=_build(row), model=model)
     for row in eligible_providers(session):
         model = recommendation(row.provider.value, role)
-        if model is not None:
+        # Only a model the administrator still lists is usable: a removed
+        # recommendation must not silently keep serving the task.
+        if model is not None and model in (row.model_ids or []):
             return ResolvedTask(provider=_build(row), model=model)
     return None
 
@@ -282,14 +284,15 @@ def ocr_ready(session: Session) -> bool:
 def set_provider_key(
     session: Session, provider: AIProvider, api_key: str | None
 ) -> AIProviderConfig:
-    """Set (non-empty), clear (empty/None), or keep a provider's key. Creates the
+    """Set (non-empty), clear (empty/None), or keep a provider's key. Surrounding
+    whitespace is stripped — a blank key clears rather than configuring. Creates the
     provider row when missing."""
     row = session.get(AIProviderConfig, provider)
     if row is None:
         ensure_provider_configs(session)
         row = session.get(AIProviderConfig, provider)
     assert row is not None
-    row.api_key = api_key or None
+    row.api_key = (api_key.strip() if api_key else "") or None
     session.flush()
     return row
 
@@ -308,12 +311,15 @@ def set_provider_order(session: Session, ordered: list[AIProvider]) -> None:
 def add_provider_models(
     session: Session, provider: AIProvider, model_ids: list[str]
 ) -> AIProviderConfig:
-    """Append usable model IDs to a provider. Names must be non-empty and new."""
+    """Append usable model IDs to a provider. Names must be non-empty, unique, and
+    fit the 200-character column."""
     cleaned = [model.strip() for model in model_ids]
     if any(not model for model in cleaned):
         raise ValueError("model IDs must be non-empty")
     if len(set(cleaned)) != len(cleaned):
         raise ValueError("model IDs must be unique")
+    if any(len(model) > 200 for model in cleaned):
+        raise ValueError("model IDs must fit in 200 characters")
     row = session.get(AIProviderConfig, provider)
     if row is None:
         ensure_provider_configs(session)
@@ -333,6 +339,8 @@ def remove_provider_models(
 ) -> AIProviderConfig:
     """Remove usable model IDs from a provider. Rejects any model an assignment
     still references, so resolution can never point at an unlisted model."""
+    if len(set(model_ids)) != len(model_ids):
+        raise ValueError("model IDs must be unique")
     row = session.get(AIProviderConfig, provider)
     if row is None:
         raise ValueError(f"unknown provider: {provider.value}")
@@ -380,9 +388,6 @@ def set_task_assignment(
             raise ValueError(f"unknown provider: {provider.value}")
         if model_id not in (row.model_ids or []):
             raise ValueError(f"model {model_id} is not listed for {provider.value}")
-    session.execute(
-        select(AITaskAssignment).where(AITaskAssignment.role == role)
-    )
     for existing in session.scalars(
         select(AITaskAssignment).where(AITaskAssignment.role == role)
     ).all():

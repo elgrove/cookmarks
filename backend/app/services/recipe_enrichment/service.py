@@ -532,21 +532,27 @@ def enrich_recipe(
         session.commit()
     recipe = _recipe_with_facts(session, recipe_id)
     build_context(session, recipe)
-    stage1_model = stage1_model or (
-        configured_stage1_model if stage1_provider is configured_stage1 else None
-    )
+    # An explicit model always wins. Otherwise the resolved model applies whenever
+    # the effective provider is the resolved one — compared by name, since
+    # resolution builds fresh instances on every call. A caller-supplied provider
+    # of another name keeps its own recommendation.
+    if stage1_model is None and (
+        configured_stage1 is not None and stage1_provider.name == configured_stage1.name
+    ):
+        stage1_model = configured_stage1_model
     stage1_model = stage1_model or stage1_provider.model_for(ModelRole.RECIPE_INGREDIENTS)
-    stage1_fallback_model = stage1_fallback_model or (
-        configured_fallback_model
-        if stage1_fallback_provider is configured_fallback
-        else None
-    )
+    if stage1_fallback_model is None and (
+        configured_fallback is not None
+        and stage1_fallback_provider.name == configured_fallback.name
+    ):
+        stage1_fallback_model = configured_fallback_model
     stage1_fallback_model = stage1_fallback_model or stage1_fallback_provider.model_for(
         ModelRole.RECIPE_INGREDIENTS_FALLBACK
     )
-    stage2_model = stage2_model or (
-        configured_stage2_model if stage2_provider is configured_stage2 else None
-    )
+    if stage2_model is None and (
+        configured_stage2 is not None and stage2_provider.name == configured_stage2.name
+    ):
+        stage2_model = configured_stage2_model
     stage2_model = stage2_model or stage2_provider.model_for(ModelRole.RECIPE_SEMANTICS)
     stage1_fallback_used = False
     try:

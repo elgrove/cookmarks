@@ -14,6 +14,7 @@ from app.models.enums import AIProvider, ModelRole
 from app.services.ai import (
     ai_ready,
     ocr_ready,
+    remove_provider_models,
     resolve_embeddings,
     resolve_ingredient_chain,
     resolve_task,
@@ -204,3 +205,14 @@ def test_ai_ready_needs_a_key(session: Session) -> None:
 
     _keyed(session, AIProvider.GEMINI)
     assert ai_ready(session) is True
+
+
+def test_default_resolution_skips_a_removed_recommendation(session: Session) -> None:
+    """Unassigning nothing but removing the recommended model: the default must not
+    serve a model the administrator took off the usable list."""
+    _keyed(session, AIProvider.GEMINI)
+    remove_provider_models(session, AIProvider.GEMINI, ["gemini-2.5-flash"])
+    session.commit()
+
+    resolved = resolve_task(session, ModelRole.ASSISTANT)
+    assert resolved is None

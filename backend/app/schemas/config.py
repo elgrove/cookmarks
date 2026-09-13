@@ -73,15 +73,13 @@ class ConfigRead(BaseModel):
 
 class ProviderConfigUpdate(BaseModel):
     """One provider's changes. `api_key` is tri-state: omitted keeps the stored key,
-    null/empty clears it, a value sets or rotates it. `display_order` reorders; use
-    `set_provider_order` semantics via `provider_order` on ConfigUpdate instead to
-    move several at once."""
+    null/empty clears it, a value sets or rotates it. Display order moves through
+    `provider_order` on ConfigUpdate, so there is exactly one ordering mechanism."""
 
     model_config = ConfigDict(extra="forbid")
 
     provider: AIProvider
-    api_key: str | None = None
-    display_order: int | None = Field(default=None, ge=0)
+    api_key: str | None = Field(default=None, max_length=200)
     add_models: list[str] | None = None
     remove_models: list[str] | None = None
 
@@ -90,7 +88,7 @@ class TaskAssignmentEntry(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     provider: AIProvider
-    model_id: str
+    model_id: str = Field(max_length=200)
 
 
 class TaskAssignmentUpdate(BaseModel):

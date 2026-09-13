@@ -171,6 +171,42 @@ def test_assignment_to_an_unlisted_model_is_rejected(client: TestClient) -> None
     assert response.status_code == 422
 
 
+def test_duplicate_model_removals_are_rejected(client: TestClient) -> None:
+    assert (
+        client.patch(
+            "/api/config",
+            json={
+                "provider_configs": [
+                    {
+                        "provider": "GEMINI",
+                        "remove_models": ["gemini-2.5-flash", "gemini-2.5-flash"],
+                    }
+                ]
+            },
+        ).status_code
+        == 422
+    )
+
+
+def test_whitespace_key_is_not_a_configuration(client: TestClient, session: Session) -> None:
+    body = client.patch(
+        "/api/config",
+        json={"provider_configs": [{"provider": "GEMINI", "api_key": "   "}]},
+    ).json()
+    assert _providers(body)["GEMINI"]["api_key_set"] is False
+    assert session.get(AIProviderConfig, AIProvider.GEMINI).api_key is None
+    assert client.get("/api/ai/readiness").json()["extraction_available"] is False
+
+
+def test_key_whitespace_is_stripped(client: TestClient, session: Session) -> None:
+    body = client.patch(
+        "/api/config",
+        json={"provider_configs": [{"provider": "GEMINI", "api_key": "  sk-secret  "}]},
+    ).json()
+    assert _providers(body)["GEMINI"]["api_key_set"] is True
+    assert session.get(AIProviderConfig, AIProvider.GEMINI).api_key == "sk-secret"
+
+
 def test_blank_and_duplicate_model_additions_are_rejected(client: TestClient) -> None:
     assert (
         client.patch(

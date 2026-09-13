@@ -10,6 +10,7 @@ UUID, as v1 stored them) stay valid against v2's `str(recipe.id)` lookups.
 """
 
 import argparse
+import json
 import sqlite3
 from pathlib import Path
 
@@ -17,6 +18,9 @@ import sqlite_vec
 
 from app.config import settings
 from app.models.enums import AIProvider
+from app.services.ai.anthropic import AnthropicProvider
+from app.services.ai.gemini import GeminiProvider
+from app.services.ai.openrouter import OpenRouterProvider
 
 V1_DEFAULT = Path.home() / "docker" / "cookmarks" / "data" / "db.sqlite3"
 EMBEDDING_DIM = 3072  # v1 Gemini embedding dimensions
@@ -191,12 +195,6 @@ def copy_list_items(src: sqlite3.Connection, tgt: sqlite3.Connection) -> int:
 
 
 def copy_config(src: sqlite3.Connection, tgt: sqlite3.Connection) -> int:
-    import json
-
-    from app.services.ai.anthropic import AnthropicProvider
-    from app.services.ai.gemini import GeminiProvider
-    from app.services.ai.openrouter import OpenRouterProvider
-
     seed_models = {
         cls.name: sorted(set(cls.models.values()))
         for cls in (AnthropicProvider, GeminiProvider, OpenRouterProvider)
