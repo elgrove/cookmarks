@@ -6,8 +6,6 @@ from app.models.calibre_exclusion import CalibreExclusion
 from app.models.config import Config
 from app.models.enums import (
     AIProvider,
-    EnrichmentBatchItemStatus,
-    EnrichmentBatchStatus,
     ExtractionMethod,
     RecipeEnrichmentStatus,
     RecipeFacetKind,
@@ -19,7 +17,6 @@ from app.models.ingredient import CanonicalIngredient, RecipeIngredient
 from app.models.reading_queue import ReadingQueueItem
 from app.models.recipe import Keyword, Recipe, recipe_keywords
 from app.models.recipe_enrichment import RecipeEnrichmentState
-from app.models.recipe_enrichment_batch import RecipeEnrichmentBatch, RecipeEnrichmentBatchItem
 from app.models.recipe_fact import RecipeCuisine, RecipeFacet, RecipeFacetValue
 from app.models.recipe_list import RecipeList, RecipeListItem
 from app.models.recipe_view import RecipeView
@@ -36,16 +33,12 @@ __all__ = [
     "CalibreExclusion",
     "CanonicalIngredient",
     "Config",
-    "EnrichmentBatchItemStatus",
-    "EnrichmentBatchStatus",
     "ExtractionMethod",
     "GameDismissal",
     "Keyword",
     "ReadingQueueItem",
     "Recipe",
     "RecipeCuisine",
-    "RecipeEnrichmentBatch",
-    "RecipeEnrichmentBatchItem",
     "RecipeEnrichmentState",
     "RecipeEnrichmentStatus",
     "RecipeFacet",

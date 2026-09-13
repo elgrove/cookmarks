@@ -7,9 +7,7 @@
 		KeywordDedupDetail,
 		IngredientDedupDetail,
 		CalibreSyncDetail,
-		BookIngestDetail,
-		RecipeEnrichmentPilotDetail,
-		RecipeEnrichmentBackfillDetail
+		BookIngestDetail
 	} from '$lib/api/task-runs';
 
 	export type TaskRunDetailProps = {
@@ -36,8 +34,8 @@
 		ingredient_dedup: 'Ingredient dedup',
 		calibre_sync: 'Calibre sync',
 		book_ingest: 'Add book',
-		recipe_enrichment_pilot: 'Enrichment pilot',
-		recipe_enrichment_backfill: 'Batch backfill'
+		recipe_enrichment_pilot: 'Enrichment pilot (retired)',
+		recipe_enrichment_backfill: 'Batch backfill (retired)'
 	};
 	const TYPE_TITLES: Record<Exclude<TaskType, 'extraction'>, string> = {
 		book_keywords: 'Book-keyword tagging',
@@ -45,8 +43,8 @@
 		ingredient_dedup: 'Canonical ingredient dedup',
 		calibre_sync: 'Calibre library sync',
 		book_ingest: 'Book added to the library',
-		recipe_enrichment_pilot: 'Recipe enrichment pilot',
-		recipe_enrichment_backfill: 'Recipe enrichment batch backfill'
+		recipe_enrichment_pilot: 'Recipe enrichment pilot (retired)',
+		recipe_enrichment_backfill: 'Recipe enrichment batch backfill (retired)'
 	};
 
 	const dateFmt = new Intl.DateTimeFormat('en-GB', {
@@ -191,42 +189,25 @@
 					}
 				];
 			}
-		case 'recipe_enrichment_pilot': {
-				const d = run.detail as unknown as RecipeEnrichmentPilotDetail;
+			// Retired (MY-184): historical rows render one generic summary row.
+			case 'recipe_enrichment_pilot':
+			case 'recipe_enrichment_backfill': {
+				const d = run.detail as unknown as { applied?: number; complete?: number };
 				return [
-					{ label: 'Sample', value: `${d.recipe_ids?.length ?? 0} recipes` },
-					{ label: 'Seed', value: count(d.seed) },
-					{ label: 'Attempted', value: count(d.attempted) },
-					{ label: 'Complete', value: count(d.complete) },
-					{ label: 'Failed', value: count(d.failed) },
-					{ label: 'Stale responses', value: count(d.stale_response) },
+					{
+						label: 'Outcome',
+						value: `${d.applied ?? d.complete ?? 0} applied`,
+						wrap: true
+					},
 					{ label: 'Cost', value: formatCost(run.cost_usd) },
 					{ label: 'Tokens', value: formatTokens(run.input_tokens, run.output_tokens) }
 				];
 			}
-		case 'recipe_enrichment_backfill': {
-			const d = run.detail as unknown as RecipeEnrichmentBackfillDetail;
-			return [
-				{ label: 'Selected', value: count(d.selected) },
-				{ label: 'Applied', value: count(d.applied) },
-				{ label: 'Terminal failures', value: count(d.terminal_failed) },
-				{ label: 'Stale', value: count(d.stale) },
-				{
-					label: 'Cost estimate',
-					value:
-						d.cost_estimate_usd !== undefined
-							? `$${d.cost_estimate_usd} (snapshot ${d.pricing_snapshot_version ?? '—'})`
-							: '—'
-				},
-				{ label: 'Tokens', value: formatTokens(run.input_tokens, run.output_tokens) }
-			];
-		}
 		}
 	}
 </script>
 
 <script lang="ts">
-	import BackfillProgress from './BackfillProgress.svelte';
 	import TaskStatusBadge from './TaskStatusBadge.svelte';
 	import { cleanTitle } from '$lib/title';
 
@@ -302,33 +283,6 @@
 					{/each}
 				</ul>
 			</div>
-		{/if}
-
-		{#if run.task_type === 'recipe_enrichment_pilot'}
-			{@const outcomes = (run.detail as unknown as RecipeEnrichmentPilotDetail).outcomes ?? []}
-			<section class="outcomes" aria-label="Recipe enrichment pilot outcomes">
-				<h4>Pilot outcomes</h4>
-				{#if outcomes.length === 0}
-					<p>No per-recipe outcomes yet.</p>
-				{:else}
-					<ul>
-						{#each outcomes as outcome (outcome.recipe_id)}
-							<li>
-								<code>{outcome.recipe_id}</code> — {outcome.status}
-								{#if outcome.error}<span>: {outcome.error}</span>{/if}
-								{#if outcome.keywords}<span> · {outcome.keywords.join(', ')}</span>{/if}
-							</li>
-						{/each}
-					</ul>
-				{/if}
-			</section>
-		{/if}
-
-		{#if run.task_type === 'recipe_enrichment_backfill'}
-			<BackfillProgress
-				detail={run.detail as unknown as RecipeEnrichmentBackfillDetail}
-				status={run.status}
-			/>
 		{/if}
 	{:else}
 		<p class="empty">Select a run to see its report.</p>
