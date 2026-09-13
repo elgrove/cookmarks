@@ -23,29 +23,61 @@ data class AuthMe(
 )
 
 @Serializable
-data class ProviderInfo(val name: String, val requires_api_key: Boolean)
+data class ProviderConfig(
+    val provider: String,
+    val api_key_set: Boolean,
+    val display_order: Int,
+    val model_ids: List<String>,
+)
+
+@Serializable
+data class TaskAssignment(
+    val role: String,
+    val position: Int,
+    val provider: String,
+    val model_id: String,
+)
 
 @Serializable
 data class ConfigRead(
-    val ai_provider: String?,
-    val api_key_set: Boolean,
-    val assistant_provider: String?,
-    val assistant_api_key_set: Boolean,
+    val providers: List<ProviderConfig>,
+    val task_assignments: List<TaskAssignment>,
+    val recommendations: Map<String, Map<String, String>>,
     val extraction_rate_limit_per_minute: Int,
-    val providers: List<ProviderInfo>,
+)
+
+@OptIn(ExperimentalSerializationApi::class)
+@Serializable
+data class ProviderConfigUpdate(
+    val provider: String,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val api_key: JsonElement? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val display_order: Int? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val add_models: List<String>? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val remove_models: List<String>? = null,
+)
+
+@Serializable
+data class TaskAssignmentEntry(val provider: String, val model_id: String)
+
+@Serializable
+data class TaskAssignmentUpdate(
+    val role: String,
+    val entries: List<TaskAssignmentEntry> = emptyList(),
 )
 
 @OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class ConfigUpdate(
     @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val ai_provider: JsonElement? = null,
+    val provider_configs: List<ProviderConfigUpdate>? = null,
     @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val api_key: JsonElement? = null,
+    val provider_order: List<String>? = null,
     @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val assistant_provider: JsonElement? = null,
-    @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val assistant_api_key: JsonElement? = null,
+    val task_assignments: List<TaskAssignmentUpdate>? = null,
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val extraction_rate_limit_per_minute: Int? = null,
 )

@@ -13,6 +13,7 @@ import com.cookmarks.app.api.KeywordSummary
 import com.cookmarks.app.api.ListDetail
 import com.cookmarks.app.api.ListMembership
 import com.cookmarks.app.api.ListSummary
+import com.cookmarks.app.api.ProviderConfigUpdate
 import com.cookmarks.app.api.ReadingState
 import com.cookmarks.app.api.RecipeDetail
 import com.cookmarks.app.api.RecipeIndexEntry
@@ -25,7 +26,6 @@ import com.cookmarks.app.api.UserRead
 import java.io.File
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonObject
 import org.junit.Assert.assertEquals
@@ -53,26 +53,32 @@ class ContractTest {
     @Test
     fun config() {
         val config = pin<ConfigRead>("config")
-        assertEquals("GEMINI", config.ai_provider)
         assertEquals(3, config.providers.size)
+        assertEquals("GEMINI", config.providers.minBy { it.display_order }.provider)
+        assertEquals(256, config.extraction_rate_limit_per_minute)
     }
 
     @Test
     fun config_update_omits_unchanged_keys() {
         val encoded = Api.json.encodeToString(
             ConfigUpdate(
-                ai_provider = JsonPrimitive("GEMINI"),
                 extraction_rate_limit_per_minute = 120,
             )
         )
         assertTrue("api_key" !in encoded)
-        assertTrue("assistant_api_key" !in encoded)
+        assertTrue("provider_configs" !in encoded)
     }
 
     @Test
     fun config_update_can_clear_a_provider() {
-        val encoded = Api.json.encodeToString(ConfigUpdate(ai_provider = JsonNull))
-        assertTrue("\"ai_provider\":null" in encoded)
+        val encoded = Api.json.encodeToString(
+            ConfigUpdate(
+                provider_configs = listOf(
+                    ProviderConfigUpdate(provider = "GEMINI", api_key = JsonNull)
+                )
+            )
+        )
+        assertTrue("\"api_key\":null" in encoded)
     }
 
     @Test

@@ -6,13 +6,14 @@ the keyword-specific vocabulary query, AI request, and association reassignment.
 
 import logging
 from dataclasses import replace
+from functools import partial
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.models.book import book_keywords
 from app.models.recipe import Keyword, recipe_keywords
-from app.services.ai import AIProvider, get_ai_provider
+from app.services.ai import AIProvider, ModelRole, resolve_task
 from app.services.keywords import get_or_create_keyword
 from app.services.vocabulary_dedup import (
     DEFAULT_CANDIDATE_WINDOW,
@@ -32,13 +33,23 @@ DedupResult = VocabularyDedupResult
 
 
 def propose_merges(
-    provider: AIProvider, names: list[str], cursor: str | None = None
+    provider: AIProvider,
+    names: list[str],
+    cursor: str | None = None,
+    model: str | None = None,
 ) -> tuple[dict[str, str], DedupResult]:
-    """Ask the keyword model through the reusable vocabulary-deduplication flow."""
+    """Ask the keyword model through the reusable vocabulary-deduplication flow. An
+    explicit `model` pins the call (task resolution); omitted, the provider's
+    recommendation applies."""
+    propose = (
+        partial(provider.deduplicate_keywords, model=model)
+        if model is not None
+        else provider.deduplicate_keywords
+    )
     return propose_vocabulary_merges(
         names,
         cursor,
-        provider.deduplicate_keywords,
+        propose,
         candidate_window=DEDUP_CANDIDATE_WINDOW,
         target_is_valid=lambda _target, _vocabulary: True,
     )
@@ -92,8 +103,8 @@ def _vocabulary_by_usage(session: Session) -> list[str]:
 
 def deduplicate_keywords(session: Session, cursor: str | None = None) -> DedupResult:
     """Run one keyword pass in the caller's transaction."""
-    provider = get_ai_provider(session)
-    if provider is None:
+    resolved = resolve_task(session, ModelRole.KEYWORD_DEDUP)
+    if resolved is None:
         logger.debug("No AI provider configured; skipping keyword dedup")
         return DedupResult()
 
@@ -101,7 +112,9 @@ def deduplicate_keywords(session: Session, cursor: str | None = None) -> DedupRe
     if not names:
         return DedupResult()
 
-    merges, stats = propose_merges(provider, names, cursor)
+    merges, stats = propose_merges(
+        resolved.provider, names, cursor, model=resolved.model
+    )
     applied = apply_merges(session, merges)
     logger.info(
         f"Keyword dedup: applied {applied} merge(s) "

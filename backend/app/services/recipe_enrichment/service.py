@@ -25,7 +25,8 @@ from app.services.ai import (
     ModelRole,
     Usage,
     get_ai_provider,
-    get_recipe_enrichment_providers,
+    resolve_ingredient_chain,
+    resolve_task,
 )
 from app.services.keywords import get_or_create_keyword
 from app.services.recipe_enrichment.schema import (
@@ -485,14 +486,44 @@ def enrich_recipe(
             return {"skipped": 1}, Usage()
         configured_stage1 = None
         configured_stage2 = None
-        if stage1_provider is None or stage1_fallback_provider is None or stage2_provider is None:
-            configured_stage1, configured_stage2 = get_recipe_enrichment_providers(session)
-        base_provider = provider or stage1_provider or configured_stage1 or get_ai_provider(session)
+        configured_fallback = None
+        configured_stage1_model = None
+        configured_stage2_model = None
+        configured_fallback_model = None
+        if (
+            stage1_provider is None
+            or stage1_fallback_provider is None
+            or stage2_provider is None
+            or stage1_model is None
+            or stage1_fallback_model is None
+            or stage2_model is None
+        ):
+            chain = resolve_ingredient_chain(session)
+            if not chain:
+                raise RuntimeError("No usable AI provider is configured")
+            configured_stage1, configured_stage1_model = chain[0].provider, chain[0].model
+            if len(chain) > 1:
+                configured_fallback, configured_fallback_model = (
+                    chain[1].provider,
+                    chain[1].model,
+                )
+            else:
+                configured_fallback, configured_fallback_model = (
+                    chain[0].provider,
+                    chain[0].model,
+                )
+            semantics = resolve_task(session, ModelRole.RECIPE_SEMANTICS)
+            if semantics is None:
+                raise RuntimeError("No usable AI provider is configured")
+            configured_stage2, configured_stage2_model = semantics.provider, semantics.model
+        base_provider = (
+            provider or stage1_provider or configured_stage1 or get_ai_provider(session)
+        )
         if base_provider is None:
             raise RuntimeError("No usable AI provider is configured")
         stage1_provider = stage1_provider or configured_stage1 or base_provider
         stage2_provider = stage2_provider or configured_stage2 or base_provider
-        stage1_fallback_provider = stage1_fallback_provider or configured_stage2 or base_provider
+        stage1_fallback_provider = stage1_fallback_provider or configured_fallback or base_provider
         if state is None:
             raise EnrichmentValidationError("recipe has no enrichment state")
         ensure_source_fingerprint(recipe)
@@ -501,9 +532,20 @@ def enrich_recipe(
         session.commit()
     recipe = _recipe_with_facts(session, recipe_id)
     build_context(session, recipe)
+    stage1_model = stage1_model or (
+        configured_stage1_model if stage1_provider is configured_stage1 else None
+    )
     stage1_model = stage1_model or stage1_provider.model_for(ModelRole.RECIPE_INGREDIENTS)
+    stage1_fallback_model = stage1_fallback_model or (
+        configured_fallback_model
+        if stage1_fallback_provider is configured_fallback
+        else None
+    )
     stage1_fallback_model = stage1_fallback_model or stage1_fallback_provider.model_for(
         ModelRole.RECIPE_INGREDIENTS_FALLBACK
+    )
+    stage2_model = stage2_model or (
+        configured_stage2_model if stage2_provider is configured_stage2 else None
     )
     stage2_model = stage2_model or stage2_provider.model_for(ModelRole.RECIPE_SEMANTICS)
     stage1_fallback_used = False

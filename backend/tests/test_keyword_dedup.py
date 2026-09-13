@@ -17,7 +17,7 @@ from app.models.book import Book
 from app.models.enums import TaskStatus, TaskType
 from app.models.recipe import Keyword, Recipe
 from app.models.task_run import TaskRun
-from app.services.ai import AIProvider, ModelRole, Usage
+from app.services.ai import AIProvider, ModelRole, ResolvedTask, Usage
 from app.services.keyword_dedup import (
     apply_merges,
     deduplicate_keywords,
@@ -216,8 +216,10 @@ def test_apply_merges_skips_a_duplicate_with_no_row(session: Session) -> None:
 
 def test_deduplicate_keywords_end_to_end(session: Session, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        "app.services.keyword_dedup.get_ai_provider",
-        lambda _session: _MapProvider({"Pasta": "Noodles"}),
+        "app.services.keyword_dedup.resolve_task",
+        lambda _session, _role: ResolvedTask(
+            _MapProvider({"Pasta": "Noodles"}), "test-model"
+        ),
     )
     recipe = _recipe_zero(session)
 
@@ -245,7 +247,8 @@ def test_deduplicate_keywords_with_stub_provider_merges_nothing(
     from app.services.ai import StubProvider
 
     monkeypatch.setattr(
-        "app.services.keyword_dedup.get_ai_provider", lambda _session: StubProvider("")
+        "app.services.keyword_dedup.resolve_task",
+        lambda _session, _role: ResolvedTask(StubProvider(""), "stub-dedup"),
     )
     before = session.scalar(select(func.count()).select_from(Keyword))
 
@@ -333,8 +336,10 @@ def test_deduplicate_keywords_reports_both_stages(
     recipe.keywords.append(Keyword(name="Pastas"))
     session.commit()
     monkeypatch.setattr(
-        "app.services.keyword_dedup.get_ai_provider",
-        lambda _session: _MapProvider({"Quick": "Fast"}),
+        "app.services.keyword_dedup.resolve_task",
+        lambda _session, _role: ResolvedTask(
+            _MapProvider({"Quick": "Fast"}), "test-model"
+        ),
     )
 
     result = deduplicate_keywords(session)

@@ -1,7 +1,7 @@
 """Run the extraction pipeline per task and score the output.
 
 For each task (a pipeline role), every candidate model is pinned to *just that task*
-via ``Config.model_overrides`` — other roles stay at the provider default — and run
+via an explicit task assignment — other roles stay at the provider default — and run
 against the books that exercise the task. The blocks task forces block extraction,
 skipping the image-match check that can misjudge a book. A score difference is thus
 attributable to that one task's model. Rich per-book artefacts land under ``runs/``;

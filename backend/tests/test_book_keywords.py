@@ -6,10 +6,9 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.book import Book
-from app.models.enums import AIProvider
 from app.models.recipe import Keyword
-from app.services.ai import get_config
 from app.services.book_keywords import generate_book_keywords
+from tests.conftest import configure_ai
 
 
 def _with_recipes(session: Session) -> Book:
@@ -35,9 +34,7 @@ def test_book_detail_exposes_book_keywords(client: TestClient) -> None:
 
 
 def test_generate_assigns_keywords_from_shared_vocabulary(session: Session) -> None:
-    config = get_config(session)
-    config.ai_provider = AIProvider.STUB
-    session.commit()
+    configure_ai(session)
 
     book = _with_recipes(session)
     # A tag the stub will emit already exists (shared with the wider vocabulary);

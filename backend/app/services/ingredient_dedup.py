@@ -6,12 +6,13 @@ the ingredient-specific vocabulary query, AI request, and recipe-fact reassignme
 
 import logging
 from dataclasses import replace
+from functools import partial
 
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.models.ingredient import CanonicalIngredient, RecipeIngredient
-from app.services.ai import AIProvider, get_ai_provider
+from app.services.ai import AIProvider, ModelRole, resolve_task
 from app.services.recipe_facts import get_or_create_canonical_ingredient
 from app.services.vocabulary_dedup import (
     DEFAULT_CANDIDATE_WINDOW,
@@ -31,13 +32,21 @@ DedupResult = VocabularyDedupResult
 
 
 def propose_merges(
-    provider: AIProvider, names: list[str], cursor: str | None = None
+    provider: AIProvider,
+    names: list[str],
+    cursor: str | None = None,
+    model: str | None = None,
 ) -> tuple[dict[str, str], DedupResult]:
     """Ask the ingredient model through the reusable vocabulary-deduplication flow."""
+    propose = (
+        partial(provider.deduplicate_ingredients, model=model)
+        if model is not None
+        else provider.deduplicate_ingredients
+    )
     return propose_vocabulary_merges(
         names,
         cursor,
-        provider.deduplicate_ingredients,
+        propose,
         candidate_window=DEDUP_CANDIDATE_WINDOW,
     )
 
@@ -83,8 +92,8 @@ def _vocabulary_by_usage(session: Session) -> list[str]:
 
 def deduplicate_ingredients(session: Session, cursor: str | None = None) -> DedupResult:
     """Run one canonical-ingredient pass in the caller's transaction."""
-    provider = get_ai_provider(session)
-    if provider is None:
+    resolved = resolve_task(session, ModelRole.INGREDIENT_DEDUP)
+    if resolved is None:
         logger.debug("No AI provider configured; skipping ingredient dedup")
         return DedupResult()
 
@@ -92,7 +101,9 @@ def deduplicate_ingredients(session: Session, cursor: str | None = None) -> Dedu
     if not names:
         return DedupResult()
 
-    merges, stats = propose_merges(provider, names, cursor)
+    merges, stats = propose_merges(
+        resolved.provider, names, cursor, model=resolved.model
+    )
     applied = apply_merges(session, merges)
     logger.info(
         f"Ingredient dedup: applied {applied} merge(s) "

@@ -10,11 +10,12 @@ from pathlib import Path
 from typing import Any
 
 from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
 
 from app.schemas.assistant import ConversationDetail, ConversationSummary
 from app.schemas.auth import AuthMe, UserRead
 from app.schemas.book import BookDetail, BookFilter, BookReadState, BookSummary, RecipeIndexEntry
-from app.schemas.config import ConfigRead
+from app.schemas.config import AIReadiness, ConfigRead
 from app.schemas.extraction import ReviewQuestion
 from app.schemas.game import DismissState, GameRecipeIds
 from app.schemas.home import HomeData
@@ -31,6 +32,7 @@ from app.schemas.recipe import (
 from app.schemas.recipe_list import BulkListResult, ListDetail, ListMembership, ListSummary
 from app.schemas.task_run import TaskRunRead
 from app.schemas.tasks import TaskRunAck
+from tests.conftest import configure_ai
 
 CONTRACT_DIR = Path(__file__).resolve().parents[2] / "contract"
 
@@ -262,7 +264,10 @@ def test_task_run_model_matches_contract() -> None:
     assert dumped == example
 
 
-def test_extract_endpoint_keys_match_contract(client: TestClient, seeded_epubs: Path) -> None:
+def test_extract_endpoint_keys_match_contract(
+    client: TestClient, seeded_epubs: Path, session: Session
+) -> None:
+    configure_ai(session)
     example = _example("taskrun.example.json")
     book = next(b for b in client.get("/api/books").json() if b["title"] == "No Recipes Yet")
     body = client.post(f"/api/books/{book['id']}/extract").json()
@@ -270,8 +275,9 @@ def test_extract_endpoint_keys_match_contract(client: TestClient, seeded_epubs: 
 
 
 def test_task_runs_index_endpoint_keys_match_contract(
-    client: TestClient, seeded_epubs: Path
+    client: TestClient, seeded_epubs: Path, session: Session
 ) -> None:
+    configure_ai(session)
     example = _example("taskrun.example.json")
     book = next(b for b in client.get("/api/books").json() if b["title"] == "No Recipes Yet")
     client.post(f"/api/books/{book['id']}/extract")
@@ -303,6 +309,18 @@ def test_config_endpoint_keys_match_contract(client: TestClient) -> None:
     body = client.get("/api/config").json()
     assert set(body.keys()) == set(example.keys())
     assert set(body["providers"][0].keys()) == set(example["providers"][0].keys())
+
+
+def test_ai_readiness_model_matches_contract() -> None:
+    example = _example("ai-readiness.example.json")
+    dumped = AIReadiness.model_validate(example).model_dump(mode="json")
+    assert dumped == example
+
+
+def test_ai_readiness_endpoint_keys_match_contract(client: TestClient) -> None:
+    example = _example("ai-readiness.example.json")
+    body = client.get("/api/ai/readiness").json()
+    assert set(body.keys()) == set(example.keys())
 
 
 def test_task_run_ack_model_matches_contract() -> None:

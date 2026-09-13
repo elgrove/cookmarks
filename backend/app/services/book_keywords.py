@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.models.book import Book
 from app.models.recipe import Recipe
-from app.services.ai import get_ai_provider
+from app.services.ai import ModelRole, resolve_task
 from app.services.keywords import get_or_create_keyword
 
 logger = logging.getLogger(__name__)
@@ -67,14 +67,14 @@ def generate_book_keywords(session: Session, book: Book) -> list[str]:
     no-op (returns []) when no AI provider is configured or the model gives nothing
     usable, so it never wipes good tags on a transient empty response. Writes ride
     the caller's transaction — the caller commits."""
-    provider = get_ai_provider(session)
-    if provider is None:
+    resolved = resolve_task(session, ModelRole.BOOK_KEYWORDS)
+    if resolved is None:
         logger.debug("No AI provider configured; skipping book-keyword generation")
         return []
 
     digest = book_keyword_digest(session, book)
     try:
-        names, _usage = provider.generate_book_keywords(digest)
+        names, _usage = resolved.provider.generate_book_keywords(digest, model=resolved.model)
     except Exception:
         logger.exception(f"Book-keyword generation failed for {book.title}")
         return []

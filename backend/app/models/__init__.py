@@ -1,3 +1,4 @@
+from app.models.ai_config import AIProviderConfig, AITaskAssignment
 from app.models.assistant import AssistantConversation, AssistantTurn
 from app.models.base import Base
 from app.models.book import Book, book_keywords
@@ -7,6 +8,7 @@ from app.models.config import Config
 from app.models.enums import (
     AIProvider,
     ExtractionMethod,
+    ModelRole,
     RecipeEnrichmentStatus,
     RecipeFacetKind,
     TaskStatus,
@@ -25,6 +27,8 @@ from app.models.user import User, UserSession
 
 __all__ = [
     "AIProvider",
+    "AIProviderConfig",
+    "AITaskAssignment",
     "AssistantConversation",
     "AssistantTurn",
     "Base",
@@ -36,6 +40,7 @@ __all__ = [
     "ExtractionMethod",
     "GameDismissal",
     "Keyword",
+    "ModelRole",
     "ReadingQueueItem",
     "Recipe",
     "RecipeCuisine",

@@ -19,7 +19,7 @@ from app.models.book import Book
 from app.models.enums import ExtractionMethod, TaskStatus
 from app.models.task_run import TaskRun
 from app.schemas.extraction import RecipeData
-from app.services.ai import AIProvider, ModelRole, Usage, get_ai_provider, get_config
+from app.services.ai import ModelRole, Usage, get_config, require_task
 from app.services.epub import (
     MANY_RECIPES_PER_FILE_THRESHOLD,
     get_block_content,
@@ -51,13 +51,6 @@ def _load_run(session: Session, report_id: str) -> TaskRun:
     if run is None:
         raise ValueError(f"TaskRun {report_id} not found")
     return run
-
-
-def _require_provider(session: Session) -> AIProvider:
-    provider = get_ai_provider(session)
-    if provider is None:
-        raise RuntimeError("No usable AI provider is configured")
-    return provider
 
 
 def _apply_usage(run: TaskRun, usage: Usage) -> None:
@@ -99,9 +92,11 @@ def analyse_epub(state: ExtractionState) -> dict:
                 logger.info(f"Using pre-set image-match decision: {images_can_be_matched}")
             else:
                 sample_content = get_sample_chapters_content(epub_path, chapter_files)
-                provider = _require_provider(session)
+                provider, image_model = require_task(
+                    session, ModelRole.IMAGE_MATCH, model_override=run.model_name
+                )
                 images_can_be_matched, usage = provider.check_if_can_match_images(
-                    sample_content, model=run.model_name
+                    sample_content, model=image_model
                 )
                 _apply_usage(run, usage)
                 run.images_can_be_matched = images_can_be_matched
@@ -152,15 +147,17 @@ def ocr_pdf(state: ExtractionState) -> dict:
         book = session.get(Book, uuid.UUID(state["book_id"]))
         if book is None:
             raise ValueError(f"Book {state['book_id']} not found")
-        provider = _require_provider(session)
+        provider, model = require_task(
+            session, ModelRole.OCR, model_override=run.model_name
+        )
         if not provider.supports_vision:
             raise NotImplementedError(f"{provider.name} cannot read images")
-        model = run.model_name or provider.model_for(ModelRole.OCR)
         run.model_name = model
+        _, extraction_model = require_task(session, ModelRole.BLOCKS_OF_FILES)
         run.detail = {
             **run.detail,
             "ocr_model": model,
-            "extraction_model": provider.model_for(ModelRole.BLOCKS_OF_FILES),
+            "extraction_model": extraction_model,
         }
         run.extraction_method = ExtractionMethod.PDF_OCR
         total_pages = page_count(Path(state["pdf_path"]))
@@ -192,9 +189,10 @@ def extract_pdf(state: ExtractionState) -> dict:
         book = session.get(Book, uuid.UUID(state["book_id"]))
         if book is None:
             raise ValueError(f"Book {state['book_id']} not found")
-        provider = _require_provider(session)
-        ocr_model = run.model_name or provider.model_for(ModelRole.OCR)
-        extraction_model = provider.model_for(ModelRole.BLOCKS_OF_FILES)
+        provider, ocr_model = require_task(
+            session, ModelRole.OCR, model_override=run.model_name
+        )
+        _, extraction_model = require_task(session, ModelRole.BLOCKS_OF_FILES)
         page_range = state.get("page_range")
         start, end = tuple(page_range) if page_range else (1, state["page_count"])
         page_text = ocr_book(book, provider, pages=(start, end), model=ocr_model)
@@ -254,22 +252,21 @@ def extract_file(state: ExtractionState) -> dict:
         chapter_files = state["chapter_files"]
 
         config = get_config(session)
-        provider = _require_provider(session)
-        rate_limiter = RateLimitedExecutor(
-            max_workers=settings.extraction_threads,
-            rate_per_minute=config.extraction_rate_limit_per_minute,
-        )
-
         is_many_per_file = len(chapter_files) <= MANY_RECIPES_PER_FILE_THRESHOLD
         role = (
             ModelRole.MANY_RECIPES_PER_FILE if is_many_per_file else ModelRole.ONE_RECIPE_PER_FILE
+        )
+        provider, resolved_model = require_task(session, role)
+        rate_limiter = RateLimitedExecutor(
+            max_workers=settings.extraction_threads,
+            rate_per_minute=config.extraction_rate_limit_per_minute,
         )
 
         if run.model_name:
             model = run.model_name
             logger.info(f"Using user-specified model override: {model}")
         else:
-            model = provider.model_for(role)
+            model = resolved_model
             run.model_name = model
             session.commit()
 
@@ -331,13 +328,13 @@ def extract_block(state: ExtractionState) -> dict:
         logger.info(f"Split {len(chapter_files)} chapters into {len(blocks)} blocks")
 
         config = get_config(session)
-        provider = _require_provider(session)
+        provider, resolved_model = require_task(session, ModelRole.BLOCKS_OF_FILES)
 
         if run.model_name:
             model = run.model_name
             logger.info(f"Using user-specified model override: {model}")
         else:
-            model = provider.model_for(ModelRole.BLOCKS_OF_FILES)
+            model = resolved_model
             run.model_name = model
             session.commit()
 
