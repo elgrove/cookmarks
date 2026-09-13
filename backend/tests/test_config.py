@@ -18,6 +18,12 @@ def _providers(body: dict) -> dict:
     return {row["provider"]: row for row in body["providers"]}
 
 
+def _stored(session: Session) -> AIProviderConfig:
+    row = session.get(AIProviderConfig, AIProvider.GEMINI)
+    assert row is not None
+    return row
+
+
 def test_read_config_seeds_providers_without_keys(client: TestClient) -> None:
     body = client.get("/api/config").json()
     providers = _providers(body)
@@ -42,7 +48,7 @@ def test_setting_a_provider_key_flips_the_flag_but_never_echoes_it(
     assert _providers(body)["GEMINI"]["api_key_set"] is True
     assert "sk-secret" not in str(body)
 
-    assert session.get(AIProviderConfig, AIProvider.GEMINI).api_key == "sk-secret"
+    assert _stored(session).api_key == "sk-secret"
     assert client.get("/api/config").json()["providers"][1]["api_key_set"] is True
 
 
@@ -57,7 +63,7 @@ def test_clearing_a_key_with_empty_string_or_null(client: TestClient, session: S
             json={"provider_configs": [{"provider": "GEMINI", "api_key": clear}]},
         ).json()
         assert _providers(body)["GEMINI"]["api_key_set"] is False
-    assert session.get(AIProviderConfig, AIProvider.GEMINI).api_key is None
+    assert _stored(session).api_key is None
 
 
 def test_omitting_a_key_leaves_it_unchanged(client: TestClient, session: Session) -> None:
@@ -70,7 +76,7 @@ def test_omitting_a_key_leaves_it_unchanged(client: TestClient, session: Session
     ).json()
     assert _providers(body)["GEMINI"]["api_key_set"] is True
     assert body["extraction_rate_limit_per_minute"] == 64
-    assert session.get(AIProviderConfig, AIProvider.GEMINI).api_key == "sk-secret"
+    assert _stored(session).api_key == "sk-secret"
 
 
 def test_rate_limit_below_one_is_rejected(client: TestClient) -> None:
@@ -194,7 +200,7 @@ def test_whitespace_key_is_not_a_configuration(client: TestClient, session: Sess
         json={"provider_configs": [{"provider": "GEMINI", "api_key": "   "}]},
     ).json()
     assert _providers(body)["GEMINI"]["api_key_set"] is False
-    assert session.get(AIProviderConfig, AIProvider.GEMINI).api_key is None
+    assert _stored(session).api_key is None
     assert client.get("/api/ai/readiness").json()["extraction_available"] is False
 
 
@@ -204,7 +210,7 @@ def test_key_whitespace_is_stripped(client: TestClient, session: Session) -> Non
         json={"provider_configs": [{"provider": "GEMINI", "api_key": "  sk-secret  "}]},
     ).json()
     assert _providers(body)["GEMINI"]["api_key_set"] is True
-    assert session.get(AIProviderConfig, AIProvider.GEMINI).api_key == "sk-secret"
+    assert _stored(session).api_key == "sk-secret"
 
 
 def test_blank_and_duplicate_model_additions_are_rejected(client: TestClient) -> None:

@@ -194,8 +194,9 @@ def test_embeddings_need_an_embedding_capable_provider(session: Session) -> None
     assert resolve_embeddings(session) is None
 
     _keyed(session, AIProvider.GEMINI)
-    assert resolve_embeddings(session) is not None
-    assert resolve_embeddings(session).name == "GEMINI"
+    provider = resolve_embeddings(session)
+    assert provider is not None
+    assert provider.name == "GEMINI"
 
 
 def test_ai_ready_needs_a_key(session: Session) -> None:
