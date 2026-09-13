@@ -1,13 +1,21 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import AdminTabs, { type AdminTab } from '$lib/components/AdminTabs.svelte';
+	import AIConfiguration from '$lib/components/AIConfiguration.svelte';
 	import ConfigSettings, {
 		type ConfigSettingsConfig
 	} from '$lib/components/ConfigSettings.svelte';
 	import TasksPanel from '$lib/components/TasksPanel.svelte';
 	import TaskRunsPanel from '$lib/components/TaskRunsPanel.svelte';
 	import UsersPanel from '$lib/components/UsersPanel.svelte';
-	import { fetchConfig, updateConfig, type Config, type ConfigUpdate } from '$lib/api/config';
+	import {
+		fetchAiReadiness,
+		fetchConfig,
+		updateConfig,
+		type AiReadiness,
+		type Config,
+		type ConfigUpdate
+	} from '$lib/api/config';
 	import {
 		triggerBookKeywords,
 		triggerDedupKeywords,
@@ -30,6 +38,7 @@
 
 	const allTabs: AdminTab[] = [
 		{ id: 'settings', label: 'Settings' },
+		{ id: 'ai-configuration', label: 'AI Configuration' },
 		{ id: 'tasks', label: 'Tasks' },
 		{ id: 'task-runs', label: 'Task Runs' },
 		{ id: 'users', label: 'Users' }
@@ -39,32 +48,23 @@
 
 	let status = $state<'loading' | 'error' | 'ready'>('loading');
 	let config = $state<Config | null>(null);
+	let readiness = $state<AiReadiness | null>(null);
 
 	// Task-run history loads lazily the first time its tab is opened, with its own state
 	// so a settings failure (or never opening this tab) never touches it.
 	let runsStatus = $state<'idle' | 'loading' | 'error' | 'ready'>('idle');
 	let runs = $state<TaskRun[]>([]);
 
-	// Map the snake_case wire shape to the component's camelCase props.
+	// Map the snake_case wire shape to the component's camelCase props. The Settings
+	// tab keeps user preferences and the extraction rate limit; AI providers, models
+	// and task assignments live in the AI Configuration tab.
 	let settingsConfig = $derived<ConfigSettingsConfig | null>(
 		isAdmin
 			? config
 				? {
 						isAdmin: true,
 						userInstructions: $currentUser?.user_instructions ?? null,
-						extractionProvider: config.ai_provider,
-						extractionApiKeySet: config.api_key_set,
-						assistantProvider: config.assistant_provider,
-						assistantApiKeySet: config.assistant_api_key_set,
-						enrichmentStage1Provider: config.enrichment_stage1_provider,
-						enrichmentStage1ApiKeySet: config.enrichment_stage1_api_key_set,
-						enrichmentStage2Provider: config.enrichment_stage2_provider,
-						enrichmentStage2ApiKeySet: config.enrichment_stage2_api_key_set,
-						rateLimit: config.extraction_rate_limit_per_minute,
-						providers: config.providers.map((p) => ({
-							name: p.name,
-							requiresApiKey: p.requires_api_key
-						}))
+						rateLimit: config.extraction_rate_limit_per_minute
 					}
 				: null
 			: {
@@ -80,7 +80,7 @@
 		}
 		status = 'loading';
 		try {
-			config = await fetchConfig();
+			[config, readiness] = await Promise.all([fetchConfig(), fetchAiReadiness()]);
 			status = 'ready';
 		} catch (err) {
 			console.error('failed to load config', err);
@@ -91,6 +91,7 @@
 	// The PATCH returns the refreshed (key-free) config; assigning it re-seeds the form.
 	async function save(patch: ConfigUpdate) {
 		config = await updateConfig(patch);
+		readiness = await fetchAiReadiness();
 	}
 
 	async function saveUserInstructions(instructions: string | null) {
@@ -157,6 +158,15 @@
 			<p class="msg">Loading settings…</p>
 		{:else}
 			<p class="msg">Couldn’t load settings.</p>
+			<button class="retry" onclick={load}>Try again</button>
+		{/if}
+	{:else if active === 'ai-configuration'}
+		{#if status === 'ready' && config}
+			<AIConfiguration {config} {readiness} onSave={save} />
+		{:else if status === 'loading'}
+			<p class="msg">Loading AI configuration…</p>
+		{:else}
+			<p class="msg">Couldn’t load AI configuration.</p>
 			<button class="retry" onclick={load}>Try again</button>
 		{/if}
 	{:else if active === 'tasks'}
