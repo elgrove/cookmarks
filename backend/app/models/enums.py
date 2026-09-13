@@ -11,7 +11,12 @@ class AIProvider(StrEnum):
 class TaskType(StrEnum):
     """Which kind of background job a task run records. Extraction is one type among
     several maintenance jobs (book-keyword tagging, keyword dedup, Calibre sync, adding
-    a book to the library)."""
+    a book to the library).
+
+    RECIPE_ENRICHMENT_PILOT and RECIPE_ENRICHMENT_BACKFILL are retired: nothing
+    creates them any more (their endpoints and workers are removed), but the
+    members stay so historical runs from the completed backfill still load.
+    """
 
     EXTRACTION = "extraction"
     BOOK_KEYWORDS = "book_keywords"
@@ -51,23 +56,6 @@ class RecipeEnrichmentStatus(StrEnum):
     RUNNING = "running"
     COMPLETE = "complete"
     FAILED = "failed"
-
-
-class EnrichmentBatchStatus(StrEnum):
-    PREPARING = "preparing"
-    SUBMITTED = "submitted"
-    SUCCEEDED = "succeeded"
-    FAILED = "failed"
-    CANCELLED = "cancelled"
-    APPLIED = "applied"
-
-
-class EnrichmentBatchItemStatus(StrEnum):
-    PENDING = "pending"
-    SUCCEEDED = "succeeded"
-    FAILED = "failed"
-    STALE = "stale"
-    APPLIED = "applied"
 
 
 class RecipeFacetKind(StrEnum):

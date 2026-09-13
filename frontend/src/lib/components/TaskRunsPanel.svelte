@@ -7,9 +7,7 @@
 		KeywordDedupDetail,
 		IngredientDedupDetail,
 		CalibreSyncDetail,
-		BookIngestDetail,
-		RecipeEnrichmentPilotDetail,
-		RecipeEnrichmentBackfillDetail
+		BookIngestDetail
 	} from '$lib/api/task-runs';
 
 	export type TaskRunsPanelProps = {
@@ -27,9 +25,7 @@
 		{ id: 'keyword_dedup', label: 'Dedup' },
 		{ id: 'ingredient_dedup', label: 'Ingredients' },
 		{ id: 'calibre_sync', label: 'Calibre' },
-		{ id: 'book_ingest', label: 'Added books' },
-		{ id: 'recipe_enrichment_pilot', label: 'Enrichment pilot' },
-		{ id: 'recipe_enrichment_backfill', label: 'Batch backfill' }
+		{ id: 'book_ingest', label: 'Added books' }
 	];
 
 	const TYPE_LABELS: Record<TaskType, string> = {
@@ -76,13 +72,14 @@
 			case 'book_ingest':
 				return (run.detail as unknown as BookIngestDetail).title || 'Add book';
 			case 'recipe_enrichment_pilot': {
-				const d = run.detail as unknown as RecipeEnrichmentPilotDetail;
-				return `${d.complete ?? 0} complete · ${d.failed ?? 0} failed`;
-			}
-			case 'recipe_enrichment_backfill': {
-				const d = run.detail as unknown as RecipeEnrichmentBackfillDetail;
-				return `${d.applied ?? 0} applied · ${d.terminal_failed ?? 0} failed`;
-			}
+			// Retired (MY-184): a one-line summary for historical rows, read loosely.
+			const d = run.detail as unknown as { complete?: number; failed?: number };
+			return `${d.complete ?? 0} complete · ${d.failed ?? 0} failed`;
+		}
+		case 'recipe_enrichment_backfill': {
+			const d = run.detail as unknown as { applied?: number; terminal_failed?: number };
+			return `${d.applied ?? 0} applied · ${d.terminal_failed ?? 0} failed`;
+		}
 		}
 	}
 </script>

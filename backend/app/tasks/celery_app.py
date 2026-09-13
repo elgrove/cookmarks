@@ -22,8 +22,6 @@ celery_app = Celery(
         "app.tasks.ingredient_dedup",
         "app.tasks.calibre_sync",
         "app.tasks.ingest",
-        "app.tasks.recipe_enrichment",
-        "app.tasks.enrichment_backfill",
     ],
 )
 
