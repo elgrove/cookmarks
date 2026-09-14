@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.models.enums import AIProvider, TaskStatus, TaskType
 from app.models.task_run import TaskRun
-from app.services.ai import get_config
+from tests.conftest import configure_ai
 
 
 def _book_id(client: TestClient, title: str) -> str:
@@ -80,9 +80,7 @@ def test_list_runs_rejects_invalid_pagination(client: TestClient) -> None:
 def test_trigger_creates_queued_run_and_dispatches(
     client: TestClient, session: Session, dispatched: list[tuple[Any, ...]], seeded_epubs: Path
 ) -> None:
-    config = get_config(session)
-    config.ai_provider = AIProvider.STUB
-    session.commit()
+    configure_ai(session)
 
     book_id = _book_id(client, "No Recipes Yet")
     res = client.post(f"/api/books/{book_id}/extract")
@@ -117,8 +115,9 @@ def test_trigger_unknown_book_404(client: TestClient, dispatched: list[tuple[Any
 def test_re_extract_label_path_keeps_recipes(
     client: TestClient, session: Session, seeded_epubs: Path
 ) -> None:
-    """Triggering a book that already has recipes still queues a run; identity is
-    reconciled by the task, so this just confirms the endpoint doesn't gate on count."""
+    """Triggering a book that already has recipes still queues a run; identity
+    is reconciled by the task, so this just confirms the endpoint doesn't gate on count."""
+    configure_ai(session)
     book_id = _book_id(client, "With Recipes")
     res = client.post(f"/api/books/{book_id}/extract")
     assert res.status_code == 202
@@ -230,10 +229,14 @@ def test_resume_run_from_other_book_404(
 
 def test_a_pdf_only_book_can_be_extracted(
     client: TestClient,
+    session: Session,
     dispatched: list[tuple[Any, ...]],
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    # PDF-only extraction needs Gemini OCR configuration, even though the run itself
+    # never reaches the worker in this test.
+    configure_ai(session, AIProvider.GEMINI, api_key="gemini-key")
     book_dir = tmp_path / "Author One" / "With Recipes (1)"
     book_dir.mkdir(parents=True)
     (book_dir / "book.pdf").write_bytes(b"%PDF-1.7 not a real pdf, just bytes")
@@ -257,4 +260,42 @@ def test_a_book_without_epub_or_pdf_cannot_be_extracted(
     res = client.post(f"/api/books/{book_id}/extract")
     assert res.status_code == 422
     assert "EPUB or PDF" in res.json()["detail"]
+    assert dispatched == []
+
+
+def test_trigger_without_ai_setup_is_a_422(
+    client: TestClient,
+    session: Session,
+    dispatched: list[tuple[Any, ...]],
+    seeded_epubs: Path,
+) -> None:
+    """No keyed provider: the trigger refuses to queue work the worker could never
+    run, instead of recording a run doomed to fail."""
+    book_id = _book_id(client, "No Recipes Yet")
+    res = client.post(f"/api/books/{book_id}/extract")
+    assert res.status_code == 422
+    assert "AI setup" in res.json()["detail"]
+    assert dispatched == []
+    assert session.scalars(select(TaskRun)).all() == []
+
+
+def test_pdf_only_trigger_without_gemini_needs_ocr_setup(
+    client: TestClient,
+    session: Session,
+    dispatched: list[tuple[Any, ...]],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A keyed non-Gemini provider runs EPUB extraction but not PDF-only: OCR still
+    needs Gemini until MY-190."""
+    configure_ai(session, AIProvider.ANTHROPIC, api_key="anthropic-key")
+    book_dir = tmp_path / "Author One" / "With Recipes (1)"
+    book_dir.mkdir(parents=True)
+    (book_dir / "book.pdf").write_bytes(b"%PDF-1.7 not a real pdf, just bytes")
+    monkeypatch.setattr(settings, "calibre_library_path", tmp_path)
+    book_id = _book_id(client, "With Recipes")
+
+    res = client.post(f"/api/books/{book_id}/extract")
+    assert res.status_code == 422
+    assert "Gemini" in res.json()["detail"]
     assert dispatched == []

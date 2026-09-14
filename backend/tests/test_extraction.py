@@ -31,7 +31,7 @@ from app.services.ai import (
     StubProvider,
     Usage,
     get_ai_provider,
-    get_config,
+    upsert_provider_config,
 )
 from app.services.extraction import graph
 from app.services.extraction.graph import get_extraction_graph
@@ -259,15 +259,12 @@ def test_provider_registry(db: sessionmaker[Session]) -> None:
         assert get_ai_provider(s) is None  # unconfigured
 
     with db() as s:
-        c = get_config(s)
-        c.ai_provider = AIProviderEnum.GEMINI
-        c.api_key = None
+        upsert_provider_config(s, AIProviderEnum.GEMINI)
         s.commit()
         assert get_ai_provider(s) is None  # network provider needs a key
 
     with db() as s:
-        c = get_config(s)
-        c.ai_provider = AIProviderEnum.STUB
+        upsert_provider_config(s, AIProviderEnum.STUB)
         s.commit()
         provider = get_ai_provider(s)
         assert isinstance(provider, StubProvider)
@@ -372,8 +369,7 @@ def test_analyse_epub_block_path(
     db: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     with db() as s:
-        c = get_config(s)
-        c.ai_provider = AIProviderEnum.STUB
+        upsert_provider_config(s, AIProviderEnum.STUB, api_key="test-key")
         s.commit()
         book = _make_book(s)
         run = _make_run(s, book)
@@ -641,8 +637,7 @@ def test_end_to_end_stub_review_then_resume(e2e: tuple[sessionmaker[Session], Pa
     factory, library = e2e
 
     with factory() as s:
-        c = get_config(s)
-        c.ai_provider = AIProviderEnum.STUB
+        upsert_provider_config(s, AIProviderEnum.STUB, api_key="test-key")
         s.commit()
         book = Book(
             calibre_id=1,
@@ -685,8 +680,7 @@ def test_end_to_end_pdf_ocr_reuses_cache_and_reconciles(
 ) -> None:
     factory, library = e2e
     with factory() as session:
-        config = get_config(session)
-        config.ai_provider = AIProviderEnum.STUB
+        upsert_provider_config(session, AIProviderEnum.STUB, api_key="test-key")
         session.commit()
         book = Book(calibre_id=4, title="PDF Cookbook", author="Stub Author", path="Stub/PDF (4)")
         session.add(book)
@@ -726,8 +720,7 @@ def test_unreadable_epub_fails_the_run_instead_of_asking_for_review(
     factory, library = e2e
 
     with factory() as s:
-        c = get_config(s)
-        c.ai_provider = AIProviderEnum.STUB
+        upsert_provider_config(s, AIProviderEnum.STUB, api_key="test-key")
         s.commit()
         book = Book(calibre_id=2, title="Corrupt", author="A", path="A/Corrupt (2)")
         s.add(book)
@@ -917,6 +910,7 @@ def test_enrich_extracted_recipes_concurrent(
     monkeypatch.setattr("app.tasks.extraction.enrich_recipe", mock_enrich_recipe)
 
     with db() as session:
+        upsert_provider_config(session, AIProviderEnum.STUB, api_key="test-key")
         book = _make_book(session)
         run = TaskRun(
             task_type=TaskType.EXTRACTION,
@@ -982,6 +976,7 @@ def test_enrich_extracted_recipes_isolates_failures(
     monkeypatch.setattr("app.tasks.extraction.enrich_recipe", mock_enrich_recipe)
 
     with db() as session:
+        upsert_provider_config(session, AIProviderEnum.STUB, api_key="test-key")
         book = _make_book(session)
         run = TaskRun(
             task_type=TaskType.EXTRACTION,

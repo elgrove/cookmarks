@@ -8,6 +8,30 @@ class AIProvider(StrEnum):
     STUB = "STUB"
 
 
+class ModelRole(StrEnum):
+    """The job a model is being asked to do. Each provider maps these roles to its
+    own model names, so model selection is decoupled from the stored extraction
+    method (file/block) and from any one provider's catalogue.
+
+    Lives here rather than in `app.services.ai.base` so the AI-configuration tables
+    (`AIProviderConfig`, `AITaskAssignment`) and the config schemas can reference it
+    without importing the provider layer. `base.py` re-exports it for its callers."""
+
+    IMAGE_MATCH = "image_match"
+    OCR = "ocr"
+    MANY_RECIPES_PER_FILE = "many_recipes_per_file"
+    ONE_RECIPE_PER_FILE = "one_recipe_per_file"
+    BLOCKS_OF_FILES = "blocks_of_files"
+    BOOK_KEYWORDS = "book_keywords"
+    KEYWORD_DEDUP = "keyword_dedup"
+    INGREDIENT_DEDUP = "ingredient_dedup"
+    ASSISTANT = "assistant"
+    RECIPE_ENRICHMENT = "recipe_enrichment"
+    RECIPE_INGREDIENTS = "recipe_ingredients"
+    RECIPE_INGREDIENTS_FALLBACK = "recipe_ingredients_fallback"
+    RECIPE_SEMANTICS = "recipe_semantics"
+
+
 class TaskType(StrEnum):
     """Which kind of background job a task run records. Extraction is one type among
     several maintenance jobs (book-keyword tagging, keyword dedup, Calibre sync, adding

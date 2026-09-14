@@ -11,9 +11,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.models.enums import TaskStatus, TaskType
+from app.models.enums import AIProvider, TaskStatus, TaskType
 from app.models.task_run import TaskRun
 from app.tasks.ingest import _queue_extraction
+from tests.conftest import configure_ai
 
 EPUB_BYTES = b"PK\x03\x04" + b"\x00" * 64
 
@@ -142,6 +143,8 @@ def test_extract_after_add_is_queued_for_a_pdf(
     (book_dir / "book.pdf").write_bytes(b"%PDF-1.7 not a real pdf, just bytes")
     monkeypatch.setattr(settings, "calibre_library_path", tmp_path)
     monkeypatch.setattr("app.tasks.ingest.SessionLocal", lambda: nullcontext(session))
+    # PDF-only extraction needs Gemini OCR configuration.
+    configure_ai(session, AIProvider.GEMINI, api_key="gemini-key")
 
     queued, skipped = _queue_extraction(1)
 

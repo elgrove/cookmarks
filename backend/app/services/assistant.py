@@ -35,7 +35,7 @@ from app.services.ai.anthropic import AnthropicProvider
 from app.services.ai.base import AIProvider, ModelRole
 from app.services.ai.gemini import GeminiProvider
 from app.services.ai.openrouter import OpenRouterProvider
-from app.services.ai.registry import get_assistant_provider
+from app.services.ai.registry import resolve_task
 from app.services.ai.stub import StubProvider
 from app.services.prompts import ASSISTANT_SYSTEM_PROMPT
 
@@ -328,9 +328,9 @@ def _list_size(session: Session, list_id: uuid.UUID) -> int:
     return session.scalar(select(func.count()).where(RecipeListItem.recipe_list_id == list_id)) or 0
 
 
-def _model(provider: AIProvider) -> Model | None:
-    """The Pydantic AI model for the configured provider's assistant role."""
-    name = provider.model_for(ModelRole.ASSISTANT)
+def _model(provider: AIProvider, model: str) -> Model | None:
+    """The Pydantic AI model for the task's resolved provider and model."""
+    name = model
     if provider.name == AnthropicProvider.name:
         return AnthropicModel(name, provider=PydanticAnthropicProvider(api_key=provider.api_key))
     if provider.name == GeminiProvider.name:
@@ -352,10 +352,10 @@ def _assistant_instructions(ctx: RunContext[AssistantDeps]) -> str:
 
 
 def build_agent(session: Session) -> Agent[AssistantDeps, str] | None:
-    provider = get_assistant_provider(session)
-    if provider is None:
+    resolved = resolve_task(session, ModelRole.ASSISTANT)
+    if resolved is None:
         return None
-    model = _model(provider)
+    model = _model(resolved.provider, resolved.model)
     if model is None:
         return None
     return Agent(

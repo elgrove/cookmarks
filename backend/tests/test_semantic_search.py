@@ -6,12 +6,11 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.models.enums import AIProvider
 from app.models.recipe import Recipe
 from app.services import embeddings
-from app.services.ai import get_config
 from app.services.ai.base import EmbedTask
 from app.services.ai.stub import StubProvider
+from tests.conftest import configure_ai
 
 
 class _CountingStub(StubProvider):
@@ -27,9 +26,7 @@ class _CountingStub(StubProvider):
 
 
 def _configure_stub(session: Session) -> None:
-    config = get_config(session)
-    config.ai_provider = AIProvider.STUB
-    session.commit()
+    configure_ai(session)
 
 
 def _seeded_recipes(session: Session) -> list[Recipe]:

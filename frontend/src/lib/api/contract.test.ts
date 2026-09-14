@@ -29,7 +29,7 @@ import {
 } from './lists';
 import { taskRunSchema, reviewQuestionSchema } from './task-runs';
 import { stagedBookSchema } from './ingest';
-import { configSchema } from './config';
+import { configSchema, aiReadinessSchema } from './config';
 import { taskRunAckSchema } from './tasks';
 import { authMeSchema, userSchema } from './auth';
 import { conversationDetailSchema, conversationsResponseSchema, conversationSummarySchema } from './assistant';
@@ -277,9 +277,20 @@ describe('api wire contract', () => {
 
 	it('rejects a config example with a drifted field name', () => {
 		const example = load('config.example.json');
-		const { api_key_set, ...rest } = example;
-		const drifted = { ...rest, apiKeySet: api_key_set };
+		const { extraction_rate_limit_per_minute, ...rest } = example;
+		const drifted = { ...rest, extractionRateLimitPerMinute: extraction_rate_limit_per_minute };
 		expect(() => configSchema.parse(drifted)).toThrow();
+	});
+
+	it('accepts the AI readiness example', () => {
+		expect(() => aiReadinessSchema.parse(load('ai-readiness.example.json'))).not.toThrow();
+	});
+
+	it('rejects an AI readiness example with a drifted field name', () => {
+		const example = load('ai-readiness.example.json');
+		const { extraction_available, ...rest } = example;
+		const drifted = { ...rest, extractionAvailable: extraction_available };
+		expect(() => aiReadinessSchema.parse(drifted)).toThrow();
 	});
 
 	it('accepts the task-run-ack example', () => {

@@ -14,6 +14,8 @@ from app.config import settings
 from app.db import configure_sqlite_connection, get_session
 from app.main import app
 from app.models import Base, Book, Keyword, Recipe, RecipeIngredient, User
+from app.models.enums import AIProvider
+from app.services.ai import upsert_provider_config
 from app.services.auth import hash_password
 from app.services.embeddings import _clear_query_embed_cache
 
@@ -162,6 +164,18 @@ def _reset_caches() -> Iterator[None]:
 # run rather than per test.
 TESTER_PASSWORD = "test-secret"
 TESTER_HASH = hash_password(TESTER_PASSWORD)
+
+
+def configure_ai(
+    session: Session, provider: AIProvider = AIProvider.STUB, api_key: str = "test-key"
+) -> None:
+    """Configure an AI provider in the test DB: a provider row with the seeded model
+    list (and key when given), committed. The offline stub is the default — enough
+    for every service to resolve without a network. The dummy key marks the setup
+    ready, mirroring production's "at least one keyed provider" rule; the stub
+    itself ignores the key."""
+    upsert_provider_config(session, provider, api_key=api_key)
+    session.commit()
 
 
 def _seed(session: Session) -> None:

@@ -16,7 +16,7 @@ from app.models.enums import TaskStatus, TaskType
 from app.models.ingredient import CanonicalIngredient
 from app.models.recipe import Recipe
 from app.models.task_run import TaskRun
-from app.services.ai import AIProvider, ModelRole, Usage
+from app.services.ai import AIProvider, ModelRole, ResolvedTask, Usage
 from app.services.ingredient_dedup import (
     DedupResult,
     _vocabulary_by_usage,
@@ -166,8 +166,10 @@ def test_deduplicate_ingredients_uses_ai_map(
     recipe.ingredients[0].canonical_ingredient = scallion
     session.commit()
     monkeypatch.setattr(
-        "app.services.ingredient_dedup.get_ai_provider",
-        lambda _session: _MapProvider({"Scallion": "Spring onion"}),
+        "app.services.ingredient_dedup.resolve_task",
+        lambda _session, _role: ResolvedTask(
+            _MapProvider({"Scallion": "Spring onion"}), "test-model"
+        ),
     )
 
     result = deduplicate_ingredients(session)

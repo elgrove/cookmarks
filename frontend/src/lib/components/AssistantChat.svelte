@@ -18,6 +18,7 @@
 	import AssistantHistory from './AssistantHistory.svelte';
 	import AssistantThread, { type ThreadMessage } from './AssistantThread.svelte';
 	import { chatUrl, fetchConversation } from '$lib/api/assistant';
+	import { fetchAiReadiness } from '$lib/api/config';
 
 	let {
 		conversations,
@@ -33,7 +34,9 @@
 	let chat = $state<Chat | null>(null);
 
 	// A Chat is bound to one conversation's endpoint, so switching conversations builds
-	// a new one, seeded with the history the server replayed.
+	// a new one, seeded with the history the server replayed. Assistant readiness
+	// loads first so the composer disables before sending, not after a 409 — the
+	// transport hook stays as the backstop for a key removed mid-conversation.
 	$effect(() => {
 		const id = activeId;
 		if (!id) {
@@ -43,6 +46,13 @@
 		let stale = false;
 		unavailable = false;
 		error = null;
+		fetchAiReadiness()
+			.then((readiness) => {
+				if (!stale) unavailable = !readiness.assistant_available;
+			})
+			.catch((err) => {
+				console.error('failed to load assistant readiness', err);
+			});
 		fetchConversation(id)
 			.then((conversation) => {
 				if (stale) return;

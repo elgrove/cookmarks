@@ -89,7 +89,7 @@ const unit: VerifiableUnit<Props> = {
 		},
 		{
 			id: 'unavailable',
-			description: 'no AI provider configured (the chat endpoint answered 409)',
+			description: 'no provider key configured (readiness) — the composer is held with a setup link',
 			props: { messages: [], unavailable: true }
 		},
 		{

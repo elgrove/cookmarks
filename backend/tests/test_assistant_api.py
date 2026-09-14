@@ -16,11 +16,11 @@ from pydantic_ai.models.function import AgentInfo, DeltaToolCall, FunctionModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Config, User
+from app.models import User
 from app.models.assistant import AssistantConversation, AssistantTurn
-from app.models.enums import AIProvider
 from app.services import assistant as assistant_service
 from app.services.users import create_user
+from tests.conftest import configure_ai
 
 
 def _submit(text: str) -> dict[str, Any]:
@@ -69,10 +69,7 @@ def _tool_then_answer(tool: str, args: dict) -> FunctionModel:
 
 @pytest.fixture
 def configured(session: Session) -> None:
-    config = session.get(Config, 1) or Config(id=1)
-    config.assistant_provider = AIProvider.STUB
-    session.add(config)
-    session.commit()
+    configure_ai(session)
 
 
 @pytest.fixture
@@ -81,7 +78,9 @@ def scripted(monkeypatch: pytest.MonkeyPatch) -> Callable[[FunctionModel], None]
     configuration rules (and its tools) exactly as they are in production."""
 
     def _use(model: FunctionModel) -> None:
-        monkeypatch.setattr(assistant_service, "_model", lambda _provider: model)
+        monkeypatch.setattr(
+            assistant_service, "_model", lambda _provider, _model: model
+        )
 
     return _use
 

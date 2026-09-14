@@ -12,14 +12,14 @@ from app.config import settings
 from app.db import SessionLocal
 from app.epub import epub_path, has_epub, has_pdf, pdf_path
 from app.models.book import Book
-from app.models.enums import RecipeEnrichmentStatus, TaskStatus, TaskType
+from app.models.enums import ModelRole, RecipeEnrichmentStatus, TaskStatus, TaskType
 from app.models.ingredient import RecipeIngredient
 from app.models.recipe import Recipe
 from app.models.recipe_enrichment import RecipeEnrichmentState
 from app.models.task_run import TaskRun
 from app.schemas.extraction import RecipeData
-from app.services.ai import AIProvider, Usage, get_ai_provider, get_config
-from app.services.ai.registry import get_recipe_enrichment_providers
+from app.services.ai import AIProvider, Usage, ai_ready, get_ai_provider
+from app.services.ai.registry import ocr_ready, resolve_ingredient_chain, resolve_task
 from app.services.book_keywords import generate_book_keywords
 from app.services.embeddings import embed_recipes
 from app.services.extraction.graph import get_extraction_graph
@@ -39,6 +39,12 @@ def enqueue_extract_recipes(book_id: str, run_id: str) -> None:
 
 
 EXTRACTION_NEEDS_BOOK_FILE = "recipe extraction needs an EPUB or PDF"
+EXTRACTION_NEEDS_AI_SETUP = (
+    "recipe extraction needs AI setup — add a provider API key in the AI Configuration tab"
+)
+EXTRACTION_NEEDS_GEMINI_OCR = (
+    "PDF-only extraction needs Gemini OCR configuration — add a Gemini API key"
+)
 
 
 class NotExtractableError(Exception):
@@ -49,13 +55,20 @@ def queue_extraction(session: Session, book: Book) -> TaskRun:
     """Record a QUEUED extraction run for a book and dispatch it. Shared by the manual
     trigger and the ingest task's extract-after-add, so both leave the same record.
 
-    Raises NotExtractableError for a book with no supported file."""
+    Raises NotExtractableError for a book with no supported file, with no AI setup,
+    or (PDF-only without an EPUB) with no Gemini OCR configuration — so a direct
+    request cannot queue work the worker could never run."""
     if not has_epub(book) and not has_pdf(book):
         raise NotExtractableError(EXTRACTION_NEEDS_BOOK_FILE)
+    if not ai_ready(session):
+        raise NotExtractableError(EXTRACTION_NEEDS_AI_SETUP)
+    if has_pdf(book) and not has_epub(book) and not ocr_ready(session):
+        raise NotExtractableError(EXTRACTION_NEEDS_GEMINI_OCR)
+    provider = get_ai_provider(session)
     run = TaskRun(
         task_type=TaskType.EXTRACTION,
         book_id=book.id,
-        provider_name=get_config(session).ai_provider,
+        provider_name=provider.name if provider is not None else None,
         status=TaskStatus.QUEUED,
     )
     session.add(run)
@@ -208,6 +221,9 @@ def _enrich_recipe_worker(
     stage1_provider: AIProvider | None,
     stage1_fallback_provider: AIProvider | None,
     stage2_provider: AIProvider | None,
+    stage1_model: str | None = None,
+    stage1_fallback_model: str | None = None,
+    stage2_model: str | None = None,
 ) -> tuple[dict[str, int] | None, Usage, str | None]:
     with SessionLocal() as thread_session:
         try:
@@ -217,6 +233,9 @@ def _enrich_recipe_worker(
                 stage1_provider=stage1_provider,
                 stage1_fallback_provider=stage1_fallback_provider,
                 stage2_provider=stage2_provider,
+                stage1_model=stage1_model,
+                stage1_fallback_model=stage1_fallback_model,
+                stage2_model=stage2_model,
                 task_run_id=run_id,
             )
             return result, usage, None
@@ -241,11 +260,22 @@ def enrich_extracted_recipes(session: Session, run: TaskRun) -> dict:
     upsert_facet_vocabulary(session)
     session.commit()
 
-    configured_stage1, configured_stage2 = get_recipe_enrichment_providers(session)
-    base_provider = configured_stage1 or configured_stage2 or get_ai_provider(session)
-    stage1_provider = configured_stage1 or base_provider
-    stage2_provider = configured_stage2 or base_provider
-    stage1_fallback_provider = configured_stage2 or base_provider
+    chain = resolve_ingredient_chain(session)
+    semantics = resolve_task(session, ModelRole.RECIPE_SEMANTICS)
+    if not chain or semantics is None:
+        logger.warning("No usable AI provider is configured; skipping enrichment")
+        return {
+            "enrichment": {
+                "attempted": len(recipe_ids),
+                "complete": 0,
+                "failed": 0,
+                "stale_response": 0,
+            }
+        }
+    stage1_provider, stage1_model = chain[0].provider, chain[0].model
+    fallback = chain[1] if len(chain) > 1 else chain[0]
+    stage1_fallback_provider, stage1_fallback_model = fallback.provider, fallback.model
+    stage2_provider, stage2_model = semantics.provider, semantics.model
     session.rollback()
 
     complete = failed = stale = 0
@@ -264,6 +294,9 @@ def enrich_extracted_recipes(session: Session, run: TaskRun) -> dict:
                 stage1_provider,
                 stage1_fallback_provider,
                 stage2_provider,
+                stage1_model,
+                stage1_fallback_model,
+                stage2_model,
             ): recipe_id
             for recipe_id in recipe_ids
         }
@@ -348,11 +381,11 @@ def extract_recipes_from_book(book_id: str, extraction_id: str | None = None) ->
         if extraction_id:
             run = session.get(TaskRun, uuid.UUID(extraction_id))
         if run is None:
-            config = get_config(session)
+            provider = get_ai_provider(session)
             run = TaskRun(
                 task_type=TaskType.EXTRACTION,
                 book_id=book.id,
-                provider_name=config.ai_provider,
+                provider_name=provider.name if provider is not None else None,
             )
             session.add(run)
 

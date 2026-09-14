@@ -10,6 +10,7 @@ UUID, as v1 stored them) stay valid against v2's `str(recipe.id)` lookups.
 """
 
 import argparse
+import json
 import sqlite3
 from pathlib import Path
 
@@ -17,6 +18,9 @@ import sqlite_vec
 
 from app.config import settings
 from app.models.enums import AIProvider
+from app.services.ai.anthropic import AnthropicProvider
+from app.services.ai.gemini import GeminiProvider
+from app.services.ai.openrouter import OpenRouterProvider
 
 V1_DEFAULT = Path.home() / "docker" / "cookmarks" / "data" / "db.sqlite3"
 EMBEDDING_DIM = 3072  # v1 Gemini embedding dimensions
@@ -99,6 +103,8 @@ COPIES: list[tuple[str, list[str], str]] = [
 
 # Reverse of insertion order, for FK-safe clearing.
 DELETE_ORDER = [
+    "ai_task_assignments",
+    "ai_provider_configs",
     "config",
     "recipe_list_items",
     "recipe_keywords",
@@ -189,12 +195,28 @@ def copy_list_items(src: sqlite3.Connection, tgt: sqlite3.Connection) -> int:
 
 
 def copy_config(src: sqlite3.Connection, tgt: sqlite3.Connection) -> int:
+    seed_models = {
+        cls.name: sorted(set(cls.models.values()))
+        for cls in (AnthropicProvider, GeminiProvider, OpenRouterProvider)
+    }
     valid = {p.value for p in AIProvider}
     rows = src.execute("SELECT id, ai_provider, api_key FROM core_config").fetchall()
-    out = [
-        (cid, provider if provider in valid else None, key or None) for cid, provider, key in rows
-    ]
-    tgt.executemany("INSERT INTO config (id, ai_provider, api_key) VALUES (?, ?, ?)", out)
+    # The v1 provider/key becomes the v2 provider row for that provider; the shared
+    # config table keeps only the singleton row for the non-AI settings.
+    out = [(cid, provider if provider in valid else None, key or None) for cid, provider, key in rows]
+    tgt.executemany("INSERT INTO config (id) VALUES (?)", [(cid,) for cid, _, _ in out])
+    for order, (name, models) in enumerate(seed_models.items()):
+        tgt.execute(
+            """INSERT INTO ai_provider_configs (provider, api_key, display_order, model_ids)
+               VALUES (?, NULL, ?, ?)""",
+            (name, order, json.dumps(models)),
+        )
+    for _, provider, key in out:
+        if provider is not None and provider in seed_models:
+            tgt.execute(
+                "UPDATE ai_provider_configs SET api_key=? WHERE provider=?",
+                (key, provider),
+            )
     tgt.commit()
     return len(out)
 

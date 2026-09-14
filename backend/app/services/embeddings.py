@@ -18,7 +18,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.models.recipe import Recipe
-from app.services.ai import get_ai_provider
+from app.services.ai import resolve_embeddings
 from app.services.ai.base import AIProvider, EmbedTask
 from app.services.vector_store import VectorStore
 
@@ -74,7 +74,7 @@ def embed_recipes(
     """Embed and store vectors for `recipes` via the VectorStore. A no-op (returns 0)
     when no embedding-capable provider is configured, so extraction still completes
     without one. Does not commit — the caller owns the transaction."""
-    provider = provider or get_ai_provider(session)
+    provider = provider or resolve_embeddings(session)
     if provider is None or not provider.supports_embeddings:
         logger.warning("No embedding-capable AI provider; skipping %d recipe(s)", len(recipes))
         return 0
@@ -97,7 +97,7 @@ def search(
     """Nearest recipes to `query` by cosine distance, closest first — (recipe_id,
     distance). Returns None when semantic search is unavailable (no embedding-capable
     provider), distinct from an empty result set."""
-    provider = provider or get_ai_provider(session)
+    provider = provider or resolve_embeddings(session)
     if provider is None or not provider.supports_embeddings:
         return None
     query_vector = _embed_query(provider, query)
@@ -107,7 +107,7 @@ def search(
 def backfill(session: Session, provider: AIProvider | None = None) -> int:
     """Embed every recipe that has no stored vector. Commits. Returns how many were
     embedded. Fills gaps after import or extractions that ran without a provider."""
-    provider = provider or get_ai_provider(session)
+    provider = provider or resolve_embeddings(session)
     if provider is None or not provider.supports_embeddings:
         logger.warning("No embedding-capable AI provider; nothing to backfill")
         return 0

@@ -1,16 +1,69 @@
 {
-  "ai_provider": "GEMINI",
-  "api_key_set": true,
-  "assistant_provider": "ANTHROPIC",
-  "assistant_api_key_set": true,
-  "enrichment_stage1_provider": "GEMINI",
-  "enrichment_stage1_api_key_set": true,
-  "enrichment_stage2_provider": "ANTHROPIC",
-  "enrichment_stage2_api_key_set": true,
-  "extraction_rate_limit_per_minute": 256,
   "providers": [
-    { "name": "ANTHROPIC", "requires_api_key": true },
-    { "name": "GEMINI", "requires_api_key": true },
-    { "name": "OPENROUTER", "requires_api_key": true }
-  ]
+    {
+      "provider": "GEMINI",
+      "api_key_set": true,
+      "display_order": 0,
+      "model_ids": ["gemini-2.5-flash", "gemini-2.5-flash-lite"]
+    },
+    {
+      "provider": "ANTHROPIC",
+      "api_key_set": true,
+      "display_order": 1,
+      "model_ids": ["claude-haiku-4-5-20251001", "claude-sonnet-5"]
+    },
+    {
+      "provider": "OPENROUTER",
+      "api_key_set": false,
+      "display_order": 2,
+      "model_ids": [
+        "anthropic/claude-haiku-4.5",
+        "google/gemini-2.5-flash",
+        "google/gemini-2.5-flash-lite",
+        "openai/gpt-oss-120b"
+      ]
+    }
+  ],
+  "task_assignments": [
+    {
+      "role": "assistant",
+      "position": 0,
+      "provider": "ANTHROPIC",
+      "model_id": "claude-sonnet-5"
+    },
+    {
+      "role": "recipe_ingredients",
+      "position": 0,
+      "provider": "GEMINI",
+      "model_id": "gemini-2.5-flash-lite"
+    },
+    {
+      "role": "recipe_ingredients",
+      "position": 1,
+      "provider": "ANTHROPIC",
+      "model_id": "claude-haiku-4-5-20251001"
+    },
+    {
+      "role": "recipe_semantics",
+      "position": 0,
+      "provider": "ANTHROPIC",
+      "model_id": "claude-haiku-4-5-20251001"
+    }
+  ],
+  "recommendations": {
+    "ANTHROPIC": {
+      "assistant": "claude-sonnet-5",
+      "recipe_ingredients": "claude-haiku-4-5-20251001"
+    },
+    "GEMINI": {
+      "assistant": "gemini-2.5-flash",
+      "ocr": "gemini-2.5-flash",
+      "recipe_ingredients": "gemini-2.5-flash-lite"
+    },
+    "OPENROUTER": {
+      "assistant": "google/gemini-2.5-flash",
+      "recipe_ingredients": "google/gemini-2.5-flash-lite"
+    }
+  },
+  "extraction_rate_limit_per_minute": 256
 }

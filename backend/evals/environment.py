@@ -22,8 +22,15 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.config import settings
 from app.models import Base, Book
-from app.models.enums import AIProvider
-from app.services.ai import get_config, provider_requires_api_key
+from app.models.ai_config import AIProviderConfig
+from app.models.enums import AIProvider, ModelRole
+from app.services.ai import (
+    ensure_provider_configs,
+    provider_requires_api_key,
+    set_provider_order,
+    set_task_assignment,
+    upsert_provider_config,
+)
 from app.services.extraction import graph
 from app.services.extraction.graph import get_extraction_graph
 from evals.config import EVALS_DIR
@@ -85,22 +92,18 @@ def _read_config_keys() -> dict[str, str]:
         try:
             conn = sqlite3.connect(str(db_path))
             try:
-                row = conn.execute(
-                    "SELECT ai_provider, api_key, assistant_provider, assistant_api_key FROM config WHERE id = 1"
-                ).fetchone()
+                rows = conn.execute(
+                    "SELECT provider, api_key FROM ai_provider_configs"
+                    " WHERE api_key IS NOT NULL AND api_key != ''"
+                ).fetchall()
             finally:
                 conn.close()
         except sqlite3.OperationalError:
             continue
-        if not row:
-            continue
         keys: dict[str, str] = {}
-        if row[0] and row[1]:
-            keys[str(row[0])] = str(row[1])
-            keys[str(row[0]).lower()] = str(row[1])
-        if len(row) > 3 and row[2] and row[3]:
-            keys[str(row[2])] = str(row[3])
-            keys[str(row[2]).lower()] = str(row[3])
+        for provider, api_key in rows:
+            keys[str(provider)] = str(api_key)
+            keys[str(provider).lower()] = str(api_key)
         if keys:
             return keys
     return {}
@@ -172,24 +175,42 @@ def set_provider(
     api_key: str,
     model_overrides: dict[str, str] | None = None,
 ) -> None:
-    """Point the eval DB's singleton Config at a provider + key (and optional per-role
-    model overrides) for the next book run."""
+    """Point the eval DB at a provider + key for the next book run: the provider row
+    goes first in display order (so unassigned tasks resolve to it), and per-role
+    model overrides become explicit task assignments."""
+    name = AIProvider(provider)
     with factory() as session:
-        config = get_config(session)
-        config.ai_provider = AIProvider(provider)
-        config.api_key = api_key
-        config.model_overrides = model_overrides
+        upsert_provider_config(session, name, api_key=api_key)
+        rows = ensure_provider_configs(session)
+        set_provider_order(
+            session, [name] + [row.provider for row in rows if row.provider != name]
+        )
+        for role_value, model in (model_overrides or {}).items():
+            try:
+                role = ModelRole(role_value)
+            except ValueError:
+                continue
+            row = session.get(AIProviderConfig, name)
+            assert row is not None
+            if model not in (row.model_ids or []):
+                row.model_ids = [*(row.model_ids or []), model]
+                session.flush()
+            set_task_assignment(session, role, [(name, model)])
         session.commit()
 
 
 def set_assistant_provider(
     factory: sessionmaker[Session], provider: str, api_key: str, model: str
 ) -> None:
+    name = AIProvider(provider)
     with factory() as session:
-        config = get_config(session)
-        config.assistant_provider = AIProvider(provider)
-        config.assistant_api_key = api_key
-        config.model_overrides = {"assistant": model}
+        upsert_provider_config(session, name, api_key=api_key)
+        row = session.get(AIProviderConfig, name)
+        assert row is not None
+        if model not in (row.model_ids or []):
+            row.model_ids = [*(row.model_ids or []), model]
+            session.flush()
+        set_task_assignment(session, ModelRole.ASSISTANT, [(name, model)])
         session.commit()
 
 

@@ -12,8 +12,9 @@ from sqlalchemy import create_engine, event, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.db import configure_sqlite_connection
-from app.models import Base, Book, CanonicalIngredient, Config, Recipe, TaskRun
+from app.models import Base, Book, CanonicalIngredient, Recipe, TaskRun
 from app.models.enums import AIProvider, TaskStatus, TaskType
+from app.services.ai import upsert_provider_config
 from app.tasks.book_keywords import backfill_book_keywords
 
 
@@ -124,7 +125,7 @@ def _queued_run(factory: sessionmaker[Session], task_type: TaskType) -> str:
 def _seed_book(factory: sessionmaker[Session], *, provider: AIProvider | None) -> None:
     with factory() as session:
         if provider is not None:
-            session.add(Config(id=1, ai_provider=provider))
+            upsert_provider_config(session, provider, api_key="test-key")
         book = Book(calibre_id=1, title="A Book", author="An Author", path="A/Book (1)")
         session.add(book)
         session.flush()

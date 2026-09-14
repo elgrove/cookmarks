@@ -10,8 +10,12 @@ from app.models.recipe import Keyword, Recipe
 from app.models.recipe_enrichment import RecipeEnrichmentState
 from app.services.ai import AIResponseError, ModelRole, Usage
 from app.services.ai.anthropic import AnthropicProvider
-from app.services.ai.gemini import GeminiProvider
-from app.services.ai.registry import get_config, get_recipe_enrichment_providers
+from app.services.ai.registry import (
+    resolve_ingredient_chain,
+    resolve_task,
+    set_task_assignment,
+    upsert_provider_config,
+)
 from app.services.ai.stub import StubProvider
 from app.services.recipe_enrichment.prompt import (
     build_prompt,
@@ -35,6 +39,7 @@ from app.services.recipe_enrichment.service import (
     validate_stage1_response,
 )
 from app.services.recipe_facts import create_canonical_ingredient
+from tests.conftest import configure_ai
 
 
 def _recipe(session) -> Recipe:
@@ -162,6 +167,7 @@ def test_response_normalises_prunes_and_truncates_residual_keywords(session) -> 
 
 
 def test_stub_enrichment_is_separate_and_offline(session) -> None:
+    configure_ai(session)
     recipe = _recipe(session)
     assert recipe.enrichment_state is not None
     recipe.enrichment_state.source_fingerprint = None  # migration-era row
@@ -632,30 +638,44 @@ def test_unknown_stage2_ingredient_retries_stage2_when_stage1_does_not_find_it(s
     assert semantic.enrich_recipe_stage2.call_count == 2
 
 
-def test_explicit_enrichment_provider_settings_route_flash_lite_and_haiku(session) -> None:
-    config = get_config(session)
-    config.enrichment_stage1_provider = AIProvider.GEMINI
-    config.enrichment_stage1_api_key = "gemini-key"
-    config.enrichment_stage2_provider = AIProvider.ANTHROPIC
-    config.enrichment_stage2_api_key = "anthropic-key"
+def test_explicit_enrichment_assignments_route_flash_lite_and_haiku(session) -> None:
+    upsert_provider_config(session, AIProvider.GEMINI, api_key="gemini-key")
+    upsert_provider_config(session, AIProvider.ANTHROPIC, api_key="anthropic-key")
+    set_task_assignment(
+        session,
+        ModelRole.RECIPE_INGREDIENTS,
+        [(AIProvider.GEMINI, "gemini-2.5-flash-lite")],
+    )
+    set_task_assignment(
+        session,
+        ModelRole.RECIPE_SEMANTICS,
+        [(AIProvider.ANTHROPIC, "claude-haiku-4-5-20251001")],
+    )
     session.commit()
 
-    stage1, stage2 = get_recipe_enrichment_providers(session)
+    chain = resolve_ingredient_chain(session)
+    assert [(entry.provider.name, entry.model) for entry in chain] == [
+        ("GEMINI", "gemini-2.5-flash-lite")
+    ]
+    semantics = resolve_task(session, ModelRole.RECIPE_SEMANTICS)
+    assert semantics is not None
+    assert isinstance(semantics.provider, AnthropicProvider)
+    assert semantics.model == "claude-haiku-4-5-20251001"
 
-    assert isinstance(stage1, GeminiProvider)
-    assert isinstance(stage2, AnthropicProvider)
-    assert stage1.model_for(ModelRole.RECIPE_INGREDIENTS) == "gemini-2.5-flash-lite"
-    assert stage2.model_for(ModelRole.RECIPE_SEMANTICS) == "claude-haiku-4-5-20251001"
 
-
-def test_configured_enrichment_provider_without_key_does_not_switch_silently(session) -> None:
-    config = get_config(session)
-    config.enrichment_stage1_provider = AIProvider.GEMINI
-    config.enrichment_stage1_api_key = None
+def test_assignment_to_a_keyless_provider_falls_back_to_default(session) -> None:
+    upsert_provider_config(session, AIProvider.GEMINI)
+    upsert_provider_config(session, AIProvider.ANTHROPIC, api_key="anthropic-key")
+    set_task_assignment(
+        session,
+        ModelRole.RECIPE_SEMANTICS,
+        [(AIProvider.GEMINI, "gemini-2.5-flash")],
+    )
     session.commit()
 
-    with pytest.raises(RuntimeError, match="configured without an API key"):
-        get_recipe_enrichment_providers(session)
+    semantics = resolve_task(session, ModelRole.RECIPE_SEMANTICS)
+    assert semantics is not None
+    assert semantics.provider.name == "ANTHROPIC"
 
 
 def test_repeated_new_canonical_ingredient_resolves_to_one_identity(session) -> None:
@@ -746,6 +766,7 @@ def test_unknown_and_duplicate_methods_and_courses_are_filtered_and_deduplicated
 
 
 def test_stage2_retry_maps_unknown_ingredient_to_valid_fallback(session) -> None:
+    configure_ai(session)
     recipe = _recipe(session)
     recipe.ingredients[0].text = "muscovado sugar"
     session.commit()
@@ -786,3 +807,41 @@ def test_stage2_retry_maps_unknown_ingredient_to_valid_fallback(session) -> None
     assert recipe.enrichment_state.status is RecipeEnrichmentStatus.COMPLETE
     assert recipe.ingredients[0].is_key is True
     assert recipe.ingredients[0].canonical_name == "light muscovado sugar"
+
+
+def test_explicit_provider_without_model_uses_the_resolved_model(session) -> None:
+    """A caller-supplied provider instance is a different object from the resolved
+    one, so matching runs by provider name: the administrator's pinned model
+    applies instead of the provider default."""
+    configure_ai(session)
+    set_task_assignment(
+        session,
+        ModelRole.RECIPE_INGREDIENTS,
+        [(AIProvider.STUB, "stub-ingredients")],
+    )
+    session.commit()
+
+    recipe = _recipe(session)
+    stage1_provider = Mock()
+    stage1_provider.name = "STUB"
+    stage1_provider.enrich_recipe_stage1.return_value = (
+        Stage1Response.model_validate({"i": [{"id": "01", "n": "salt"}]}),
+        Usage(),
+    )
+    stage2_provider = Mock()
+    stage2_provider.name = "STUB"
+    stage2_provider.enrich_recipe_stage2.return_value = (
+        Stage2Response.model_validate({"key_ingredients": ["salt"]}),
+        Usage(),
+    )
+
+    enrich_recipe(
+        session,
+        recipe.id,
+        stage1_provider=stage1_provider,
+        stage1_fallback_provider=stage1_provider,
+        stage2_provider=stage2_provider,
+    )
+
+    assert stage1_provider.enrich_recipe_stage1.call_args[0][1] == "stub-ingredients"
+    assert stage2_provider.enrich_recipe_stage2.call_args[0][1] == "stub-semantics"

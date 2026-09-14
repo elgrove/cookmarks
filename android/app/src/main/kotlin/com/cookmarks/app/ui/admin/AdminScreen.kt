@@ -52,6 +52,7 @@ import com.cookmarks.app.api.ConfigRead
 import com.cookmarks.app.api.ConfigUpdate
 import com.cookmarks.app.api.PasswordChange
 import com.cookmarks.app.api.PasswordReset
+import com.cookmarks.app.api.ProviderConfigUpdate
 import com.cookmarks.app.api.TaskRun
 import com.cookmarks.app.api.TaskRunAck
 import com.cookmarks.app.api.UserCreate
@@ -271,36 +272,53 @@ private fun SettingsTab() {
 private fun SettingsSection(config: ConfigRead, onSaved: () -> Unit) {
     val colors = CmTheme.colors
     val scope = rememberCoroutineScope()
-    var extractionProvider by remember(config) { mutableStateOf(config.ai_provider) }
-    var assistantProvider by remember(config) { mutableStateOf(config.assistant_provider) }
-    var extractionKey by remember(config) { mutableStateOf("") }
-    var assistantKey by remember(config) { mutableStateOf("") }
-    var clearExtractionKey by remember(config) { mutableStateOf(false) }
-    var clearAssistantKey by remember(config) { mutableStateOf(false) }
+    val ordered = remember(config) { config.providers.sortedBy { it.display_order } }
+    var keys by remember(config) { mutableStateOf(ordered.associate { it.provider to "" }) }
+    var clearing by remember(config) { mutableStateOf(setOf<String>()) }
     var rateLimit by remember(config) { mutableStateOf(config.extraction_rate_limit_per_minute.toString()) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
+    Section("AI providers") {
+        Text(
+            "One API key per provider. Models and task assignments are managed in the web AI Configuration tab.",
+            style = MaterialTheme.typography.bodySmall,
+            color = colors.faint,
+            modifier = Modifier.padding(bottom = 8.dp),
+        )
+        ordered.forEach { provider ->
+            val label = provider.provider.lowercase().replaceFirstChar(Char::uppercase)
+            Text(
+                label,
+                style = MaterialTheme.typography.bodyLarge,
+                color = colors.ink,
+                modifier = Modifier.padding(top = 10.dp),
+            )
+            KeyEditor(
+                provider.api_key_set,
+                keys[provider.provider].orEmpty(),
+                provider.provider in clearing,
+                {
+                    keys = keys + (provider.provider to it)
+                    clearing = clearing - provider.provider
+                },
+            ) {
+                clearing = if (provider.provider in clearing) {
+                    clearing - provider.provider
+                } else {
+                    clearing + provider.provider
+                }
+            }
+        }
+    }
+
     Section("Recipe extraction") {
-        ProviderPicker(config, extractionProvider) { extractionProvider = it }
-        KeyEditor(config.api_key_set, extractionKey, clearExtractionKey, {
-            extractionKey = it
-            clearExtractionKey = false
-        }) { clearExtractionKey = !clearExtractionKey }
         NumberField(
             rateLimit,
             { rateLimit = it.filter(Char::isDigit) },
             "Requests per minute",
             Modifier.padding(top = 12.dp),
         )
-    }
-
-    Section("Assistant") {
-        ProviderPicker(config, assistantProvider) { assistantProvider = it }
-        KeyEditor(config.assistant_api_key_set, assistantKey, clearAssistantKey, {
-            assistantKey = it
-            clearAssistantKey = false
-        }) { clearAssistantKey = !clearAssistantKey }
     }
 
     val parsedRate = rateLimit.toIntOrNull()
@@ -310,20 +328,24 @@ private fun SettingsSection(config: ConfigRead, onSaved: () -> Unit) {
             error = null
             scope.launch {
                 try {
+                    val keyUpdates = ordered.mapNotNull { provider ->
+                        val name = provider.provider
+                        val typed = keys[name].orEmpty()
+                        when {
+                            name in clearing -> ProviderConfigUpdate(
+                                provider = name,
+                                api_key = JsonPrimitive(""),
+                            )
+                            typed.isNotEmpty() -> ProviderConfigUpdate(
+                                provider = name,
+                                api_key = JsonPrimitive(typed),
+                            )
+                            else -> null
+                        }
+                    }
                     Api.service.updateConfig(
                         ConfigUpdate(
-                            ai_provider = extractionProvider?.let(::JsonPrimitive) ?: JsonNull,
-                            api_key = if (clearExtractionKey) {
-                                JsonPrimitive("")
-                            } else {
-                                extractionKey.takeIf(String::isNotEmpty)?.let(::JsonPrimitive)
-                            },
-                            assistant_provider = assistantProvider?.let(::JsonPrimitive) ?: JsonNull,
-                            assistant_api_key = if (clearAssistantKey) {
-                                JsonPrimitive("")
-                            } else {
-                                assistantKey.takeIf(String::isNotEmpty)?.let(::JsonPrimitive)
-                            },
+                            provider_configs = keyUpdates.ifEmpty { null },
                             extraction_rate_limit_per_minute = parsedRate,
                         )
                     )
@@ -344,35 +366,6 @@ private fun SettingsSection(config: ConfigRead, onSaved: () -> Unit) {
             color = colors.faint,
             modifier = Modifier.padding(top = 10.dp),
         )
-    }
-}
-
-@Composable
-private fun ProviderPicker(config: ConfigRead, selectedProvider: String?, onSelect: (String?) -> Unit) {
-    val colors = CmTheme.colors
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        (listOf<String?>(null) + config.providers.map { it.name }).forEach { provider ->
-            val active = provider == selectedProvider
-            val label = provider?.lowercase()?.replaceFirstChar(Char::uppercase) ?: "None"
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(role = Role.RadioButton, onClickLabel = "Select $label") {
-                        onSelect(provider)
-                    }
-                    .semantics { selected = active }
-                    .padding(vertical = 9.dp),
-            ) {
-                Text(
-                    label,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = if (active) colors.clay else colors.ink,
-                    modifier = Modifier.weight(1f),
-                )
-                if (active) MonoLabel("Selected", colour = colors.faint)
-            }
-        }
     }
 }
 

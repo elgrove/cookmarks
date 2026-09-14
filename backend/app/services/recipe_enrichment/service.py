@@ -25,7 +25,8 @@ from app.services.ai import (
     ModelRole,
     Usage,
     get_ai_provider,
-    get_recipe_enrichment_providers,
+    resolve_ingredient_chain,
+    resolve_task,
 )
 from app.services.keywords import get_or_create_keyword
 from app.services.recipe_enrichment.schema import (
@@ -485,14 +486,44 @@ def enrich_recipe(
             return {"skipped": 1}, Usage()
         configured_stage1 = None
         configured_stage2 = None
-        if stage1_provider is None or stage1_fallback_provider is None or stage2_provider is None:
-            configured_stage1, configured_stage2 = get_recipe_enrichment_providers(session)
-        base_provider = provider or stage1_provider or configured_stage1 or get_ai_provider(session)
+        configured_fallback = None
+        configured_stage1_model = None
+        configured_stage2_model = None
+        configured_fallback_model = None
+        if (
+            stage1_provider is None
+            or stage1_fallback_provider is None
+            or stage2_provider is None
+            or stage1_model is None
+            or stage1_fallback_model is None
+            or stage2_model is None
+        ):
+            chain = resolve_ingredient_chain(session)
+            if not chain:
+                raise RuntimeError("No usable AI provider is configured")
+            configured_stage1, configured_stage1_model = chain[0].provider, chain[0].model
+            if len(chain) > 1:
+                configured_fallback, configured_fallback_model = (
+                    chain[1].provider,
+                    chain[1].model,
+                )
+            else:
+                configured_fallback, configured_fallback_model = (
+                    chain[0].provider,
+                    chain[0].model,
+                )
+            semantics = resolve_task(session, ModelRole.RECIPE_SEMANTICS)
+            if semantics is None:
+                raise RuntimeError("No usable AI provider is configured")
+            configured_stage2, configured_stage2_model = semantics.provider, semantics.model
+        base_provider = (
+            provider or stage1_provider or configured_stage1 or get_ai_provider(session)
+        )
         if base_provider is None:
             raise RuntimeError("No usable AI provider is configured")
         stage1_provider = stage1_provider or configured_stage1 or base_provider
         stage2_provider = stage2_provider or configured_stage2 or base_provider
-        stage1_fallback_provider = stage1_fallback_provider or configured_stage2 or base_provider
+        stage1_fallback_provider = stage1_fallback_provider or configured_fallback or base_provider
         if state is None:
             raise EnrichmentValidationError("recipe has no enrichment state")
         ensure_source_fingerprint(recipe)
@@ -501,10 +532,27 @@ def enrich_recipe(
         session.commit()
     recipe = _recipe_with_facts(session, recipe_id)
     build_context(session, recipe)
+    # An explicit model always wins. Otherwise the resolved model applies whenever
+    # the effective provider is the resolved one — compared by name, since
+    # resolution builds fresh instances on every call. A caller-supplied provider
+    # of another name keeps its own recommendation.
+    if stage1_model is None and (
+        configured_stage1 is not None and stage1_provider.name == configured_stage1.name
+    ):
+        stage1_model = configured_stage1_model
     stage1_model = stage1_model or stage1_provider.model_for(ModelRole.RECIPE_INGREDIENTS)
+    if stage1_fallback_model is None and (
+        configured_fallback is not None
+        and stage1_fallback_provider.name == configured_fallback.name
+    ):
+        stage1_fallback_model = configured_fallback_model
     stage1_fallback_model = stage1_fallback_model or stage1_fallback_provider.model_for(
         ModelRole.RECIPE_INGREDIENTS_FALLBACK
     )
+    if stage2_model is None and (
+        configured_stage2 is not None and stage2_provider.name == configured_stage2.name
+    ):
+        stage2_model = configured_stage2_model
     stage2_model = stage2_model or stage2_provider.model_for(ModelRole.RECIPE_SEMANTICS)
     stage1_fallback_used = False
     try:

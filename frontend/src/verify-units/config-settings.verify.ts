@@ -6,25 +6,10 @@ import type { VerifiableUnit } from '$lib/verify/types';
 
 type Props = ConfigSettingsProps;
 
-const PROVIDERS: NonNullable<ConfigSettingsConfig['providers']> = [
-	{ name: 'ANTHROPIC', requiresApiKey: true },
-	{ name: 'GEMINI', requiresApiKey: true },
-	{ name: 'OPENROUTER', requiresApiKey: true }
-];
-
 const config = (over: Partial<ConfigSettingsConfig> = {}): ConfigSettingsConfig => ({
 	isAdmin: true,
 	userInstructions: null,
-	extractionProvider: null,
-	extractionApiKeySet: false,
-	assistantProvider: null,
-	assistantApiKeySet: false,
-	enrichmentStage1Provider: null,
-	enrichmentStage1ApiKeySet: false,
-	enrichmentStage2Provider: null,
-	enrichmentStage2ApiKeySet: false,
 	rateLimit: 256,
-	providers: PROVIDERS,
 	...over
 });
 
@@ -39,36 +24,14 @@ const unit: VerifiableUnit<Props> = {
 	id: 'config-settings',
 	title: 'Config settings',
 	description:
-		'The Settings form over user instructions and AI configuration: user instructions for the assistant, theme preference, AI providers, write-only API keys (set/not-set, replace, clear — never echoed), and extraction rate limit. Non-admin users see only user instructions and appearance. Saving drives idle → saving → saved, or → error if the save rejects.',
+		'The Settings form over user instructions, appearance, and (admin-only) the extraction rate limit. AI providers, models and task assignments live in the AI Configuration tab. Saving drives idle → saving → saved, or → error if the save rejects.',
 	kind: 'component',
 	component: ConfigSettings,
 	fixtures: [
 		{
 			id: 'unset',
-			description: 'a fresh config — no provider, no key, default rate limit; the resting state',
+			description: 'a fresh config — default rate limit; the resting state',
 			props: { config: config() }
-		},
-		{
-			id: 'gemini-set',
-			description: 'provider Gemini with a key already stored — the key reads "set", not its value',
-			props: { config: config({ extractionProvider: 'GEMINI', extractionApiKeySet: true }) }
-		},
-		{
-			id: 'assistant-set',
-			description: 'assistant Anthropic with a key already stored',
-			props: { config: config({ assistantProvider: 'ANTHROPIC', assistantApiKeySet: true }) }
-		},
-		{
-			id: 'enrichment-providers-set',
-			description: 'Flash Lite parsing and Haiku semantics have separate stored keys',
-			props: {
-				config: config({
-					enrichmentStage1Provider: 'GEMINI',
-					enrichmentStage1ApiKeySet: true,
-					enrichmentStage2Provider: 'ANTHROPIC',
-					enrichmentStage2ApiKeySet: true
-				})
-			}
 		},
 		{
 			id: 'non-admin',
@@ -115,7 +78,7 @@ const unit: VerifiableUnit<Props> = {
 			id: 'edit-save',
 			description: 'changing the rate limit and saving settles on the saved confirmation',
 			props: {
-				config: config({ extractionProvider: 'GEMINI', extractionApiKeySet: true }),
+				config: config(),
 				onSave: () => Promise.resolve()
 			},
 			act: async ({ type, click, wait }) => {
@@ -129,7 +92,7 @@ const unit: VerifiableUnit<Props> = {
 			description: 'probe: a rejected PATCH surfaces an error state, never a false "saved"',
 			probe: true,
 			props: {
-				config: config({ extractionProvider: 'GEMINI', extractionApiKeySet: true }),
+				config: config(),
 				onSave: () => Promise.reject(new Error('save failed'))
 			},
 			act: async ({ type, click, wait }) => {
@@ -139,54 +102,37 @@ const unit: VerifiableUnit<Props> = {
 			}
 		},
 		{
-			id: 'clear-key',
-			description: 'probe: clearing a stored key marks the form dirty with a pending clear',
-			probe: true,
-			props: { config: config({ extractionProvider: 'GEMINI', extractionApiKeySet: true }) },
-			act: async ({ click, wait }) => {
-				click('.extraction-key-clear');
-				await wait(0);
-			}
-		},
-		{
 			id: 'huge-rate',
 			description: 'probe: an absurd rate limit still renders one labelled numeric control',
 			probe: true,
-			props: {
-				config: config({ extractionProvider: 'GEMINI', extractionApiKeySet: true, rateLimit: 999999999 })
-			}
+			props: { config: config({ rateLimit: 999999999 }) }
 		},
 		{
 			id: 'contract-lie',
 			description: 'sentinel: a deliberately-failing invariant proves the harness reports truthfully',
 			expectFail: true,
-			props: { config: config({ extractionProvider: 'GEMINI', extractionApiKeySet: true }) }
+			props: { config: config() }
 		}
 	],
 	invariants: [
 		{
 			id: 'unset-resting',
-			description: 'no provider, no key, not dirty, idle',
+			description: 'default rate limit, not dirty, idle',
 			onlyFixtures: ['unset'],
-			check: ({ contract }) => {
-				if (contract['extraction-provider'] !== 'none') return `provider=${contract['extraction-provider']}`;
-				if (contract['extraction-key-set'] !== 'false') return `key-set=${contract['extraction-key-set']}`;
-				if (contract['assistant-provider'] !== 'none') return `assistant=${contract['assistant-provider']}`;
+			check: ({ contract, root }) => {
+				if (contract['rate-limit'] !== '256') return `rate=${contract['rate-limit']}`;
 				if (contract.dirty !== 'false') return `dirty=${contract.dirty}`;
+				if (rateValue(root) !== '256') return `input=${rateValue(root)}`;
 				return contract.state === 'idle' || `state=${contract.state}`;
 			}
 		},
 		{
 			id: 'non-admin-hides-admin-fields',
-			description: 'non-admin user hides extraction and assistant admin controls',
+			description: 'non-admin user hides the rate limit control',
 			onlyFixtures: ['non-admin'],
 			check: ({ contract, root }) => {
 				if (contract['is-admin'] !== 'false') return `is-admin=${contract['is-admin']}`;
 				if (root.querySelector('#user-instructions') === null) return 'missing user instructions textarea';
-				if (root.querySelector('#extraction-provider') !== null) return 'extraction provider visible for non-admin';
-				if (root.querySelector('#assistant-provider') !== null) return 'assistant provider visible for non-admin';
-				if (root.querySelector('#enrichment-stage1-provider') !== null) return 'enrichment Stage 1 provider visible for non-admin';
-				if (root.querySelector('#enrichment-stage2-provider') !== null) return 'enrichment Stage 2 provider visible for non-admin';
 				return root.querySelector('#rate-limit') === null || 'rate limit visible for non-admin';
 			}
 		},
@@ -207,39 +153,6 @@ const unit: VerifiableUnit<Props> = {
 			}
 		},
 		{
-			id: 'key-set-not-echoed',
-			description: 'a stored key reads as set (keep action), and never appears as text',
-			onlyFixtures: ['gemini-set'],
-			check: ({ contract, root }) => {
-				if (contract['extraction-key-set'] !== 'true') return `key-set=${contract['extraction-key-set']}`;
-				if (contract['extraction-key-action'] !== 'keep') return `key-action=${contract['extraction-key-action']}`;
-				return root.querySelector('input[type="password"]') === null || 'key input exposed';
-			}
-		},
-		{
-			id: 'assistant-key-set',
-			description: 'the assistant key reads as set and is not shown',
-			onlyFixtures: ['assistant-set'],
-			check: ({ contract, root }) => {
-				if (contract['assistant-key-set'] !== 'true') return `key-set=${contract['assistant-key-set']}`;
-				if (contract['assistant-key-action'] !== 'keep') return `key-action=${contract['assistant-key-action']}`;
-				return root.querySelector('#assistant-api-key') === null || 'assistant key input exposed';
-			}
-		},
-		{
-			id: 'enrichment-keys-set',
-			description: 'both recipe enrichment providers and write-only key states are explicit',
-			onlyFixtures: ['enrichment-providers-set'],
-			check: ({ contract, root }) => {
-				if (contract['enrichment-stage1-provider'] !== 'GEMINI') return `stage1=${contract['enrichment-stage1-provider']}`;
-				if (contract['enrichment-stage2-provider'] !== 'ANTHROPIC') return `stage2=${contract['enrichment-stage2-provider']}`;
-				if (contract['enrichment-stage1-key-action'] !== 'keep') return `stage1-key=${contract['enrichment-stage1-key-action']}`;
-				if (contract['enrichment-stage2-key-action'] !== 'keep') return `stage2-key=${contract['enrichment-stage2-key-action']}`;
-				if (root.querySelector('#enrichment-stage1-api-key')) return 'Stage 1 key input exposed';
-				return root.querySelector('#enrichment-stage2-api-key') === null || 'Stage 2 key input exposed';
-			}
-		},
-		{
 			id: 'edit-save-settles',
 			description: 'a successful save lands on the saved state',
 			onlyFixtures: ['edit-save'],
@@ -250,15 +163,6 @@ const unit: VerifiableUnit<Props> = {
 			description: 'a rejected save lands on the error state (never a false saved)',
 			onlyFixtures: ['save-reject'],
 			check: ({ contract }) => contract.state === 'error' || `state=${contract.state}`
-		},
-		{
-			id: 'clear-marks-dirty',
-			description: 'clearing a stored key sets a pending clear and marks the form dirty',
-			onlyFixtures: ['clear-key'],
-			check: ({ contract }) => {
-				if (contract['extraction-key-action'] !== 'clear') return `key-action=${contract['extraction-key-action']}`;
-				return contract.dirty === 'true' || `dirty=${contract.dirty}`;
-			}
 		},
 		{
 			id: 'huge-rate-rendered',
