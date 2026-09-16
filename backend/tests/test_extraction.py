@@ -245,6 +245,24 @@ def test_recipe_data_rejects_empty_ingredients() -> None:
         RecipeData(name="x", recipeIngredients=[], recipeInstructions=["y"])
 
 
+def test_recipe_data_accepts_at_most_ten_keywords() -> None:
+    recipe = RecipeData(
+        name="x",
+        recipeIngredients=[{"text": "x"}],
+        recipeInstructions=["y"],
+        keywords=[str(index) for index in range(10)],
+    )
+    assert len(recipe.keywords) == 10
+
+    with pytest.raises(ValueError):
+        RecipeData(
+            name="x",
+            recipeIngredients=[{"text": "x"}],
+            recipeInstructions=["y"],
+            keywords=[str(index) for index in range(11)],
+        )
+
+
 def test_usage_accumulation_preserves_none() -> None:
     total = Usage() + Usage(cost_usd=Decimal("0.01"), input_tokens=100)
     total = total + Usage(cost_usd=Decimal("0.02"), output_tokens=5)
@@ -477,7 +495,7 @@ def test_finalise_marks_done(db: sessionmaker[Session]) -> None:
 # --------------------------------------------------------------------------- #
 
 
-def test_save_creates_recipes_without_first_pass_keywords(db: sessionmaker[Session]) -> None:
+def test_save_creates_recipes_with_extracted_keywords(db: sessionmaker[Session]) -> None:
     raw = [
         {
             "name": "Pasta",
@@ -494,7 +512,7 @@ def test_save_creates_recipes_without_first_pass_keywords(db: sessionmaker[Sessi
         assert count == 1
         recipes = s.scalars(select(Recipe)).all()
         assert len(recipes) == 1
-        assert recipes[0].keywords == []
+        assert [keyword.name for keyword in recipes[0].keywords] == ["Italian", "Quick"]
         assert recipes[0].order == 1
 
 
@@ -532,7 +550,7 @@ def test_save_reconciles_by_name_in_place(db: sessionmaker[Session]) -> None:
         assert recipes[0].id == recipe_id  # stable identity across re-extraction
         assert recipes[0].description == "updated"
         assert recipes[0].order == 5
-        assert recipes[0].keywords == []
+        assert [keyword.name for keyword in recipes[0].keywords] == ["Italian"]
 
 
 def test_finalisation_embeds_and_tags_only_after_enrichment(

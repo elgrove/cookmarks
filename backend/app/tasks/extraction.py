@@ -24,6 +24,7 @@ from app.services.book_keywords import generate_book_keywords
 from app.services.embeddings import embed_recipes
 from app.services.extraction.graph import get_extraction_graph
 from app.services.extraction.review import VALID_HUMAN_RESPONSES
+from app.services.keywords import get_or_create_keyword
 from app.services.recipe_enrichment.service import aggregate_metrics, enrich_recipe
 from app.services.recipe_facts import upsert_facet_vocabulary
 from app.tasks.celery_app import celery_app
@@ -149,8 +150,7 @@ def _upsert_recipe(session: Session, book: Book, run: TaskRun, data: RecipeData)
     recipe.instructions = data.instructions
     recipe.yields = data.yields
     recipe.image = data.image or None
-    # Structured enrichment owns recipe keywords. Re-extraction deliberately leaves
-    # the prior five visible until its replacement enrichment succeeds.
+    recipe.keywords = [get_or_create_keyword(session, name.strip()) for name in data.keywords]
     if fingerprint != previous_fingerprint:
         # SQLite checks the (recipe_id, position) uniqueness while it flushes. Delete
         # the old rows first, before inserting replacement lines at the same positions.
