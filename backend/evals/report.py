@@ -108,7 +108,7 @@ def leaderboard(records: list[LedgerRecord]) -> str:
                 )
             )
         rows.sort(key=lambda r: r[0], reverse=True)
-        headers = ["Model", "Books", "F1", "Comp", "P", "R", "KW J", "KW #", "Cost", "Time"]
+        headers = ["Model", "Books", "F1", "Comp", "P", "R", "Legacy KW", "KW #", "Cost", "Time"]
         sections.append(f"{task}  (run {latest_run})\n" + _table(headers, [r[1] for r in rows]))
 
     return "Leaderboard by task (latest run per task)\n\n" + "\n\n".join(sections)
@@ -135,5 +135,5 @@ def task_history(records: list[LedgerRecord], task: str) -> str:
         ]
         for r in sorted(subset, key=lambda r: (r.run_id, r.model_id))
     ]
-    headers = ["Run", "Date", "SHA", "Model", "Book", "F1", "Comp", "KW J", "KW #", "Cost"]
+    headers = ["Run", "Date", "SHA", "Model", "Book", "F1", "Comp", "Legacy KW", "KW #", "Cost"]
     return f"{task} — history\n\n" + _table(headers, rows)

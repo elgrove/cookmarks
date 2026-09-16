@@ -105,7 +105,7 @@ def _thread_id(run_id: str) -> str:
 
 
 def generate_recipe_embeddings(session: Session, recipes: list[Recipe]) -> None:
-    """Embed the enriched recipes in one batch. This is best-effort: a no-op when no
+    """Embed the extracted recipes in one batch. This is best-effort: a no-op when no
     embedding-capable provider is configured, so extraction always completes. Writes
     ride the caller's transaction."""
     try:
@@ -121,6 +121,39 @@ def _generate_book_keywords(session: Session, book: Book) -> None:
         generate_book_keywords(session, book)
     except Exception:
         logger.exception(f"Book-keyword generation failed for {book.title}")
+
+
+def _replace_ingredient_lines(session: Session, recipe: Recipe, source_text: list[str]) -> None:
+    """Replace source lines while retaining facts on lines whose text still matches."""
+    reusable: dict[str, list[RecipeIngredient]] = {}
+    for line in recipe.ingredients:
+        key = " ".join(line.text.casefold().split())
+        reusable.setdefault(key, []).append(line)
+
+    # Move existing rows out of the non-negative position range before rows are
+    # reordered. SQLite checks the unique (recipe_id, position) constraint per update.
+    for index, line in enumerate(recipe.ingredients, start=1):
+        line.position = -index
+    if recipe.ingredients:
+        session.flush()
+
+    replacement: list[RecipeIngredient] = []
+    for position, text in enumerate(source_text):
+        key = " ".join(text.casefold().split())
+        candidates = reusable.get(key, [])
+        if candidates:
+            line = candidates.pop(0)
+            line.position = position
+            line.text = text
+        else:
+            line = RecipeIngredient(
+                position=position,
+                text=text,
+                canonical_ingredient_id=None,
+                is_key=False,
+            )
+        replacement.append(line)
+    recipe.ingredients = replacement
 
 
 def _upsert_recipe(session: Session, book: Book, run: TaskRun, data: RecipeData) -> Recipe:
@@ -146,28 +179,23 @@ def _upsert_recipe(session: Session, book: Book, run: TaskRun, data: RecipeData)
     recipe.instructions = data.instructions
     recipe.yields = data.yields
     recipe.image = data.image or None
-    recipe.keywords = [get_or_create_keyword(session, name.strip()) for name in data.keywords]
+    if "keywords" in data.model_fields_set:
+        recipe.keywords = [get_or_create_keyword(session, name) for name in data.keywords]
     if fingerprint != previous_fingerprint:
-        # SQLite checks the (recipe_id, position) uniqueness while it flushes. Delete
-        # the old rows first, before inserting replacement lines at the same positions.
-        if recipe.ingredients:
-            recipe.ingredients.clear()
-            session.flush()
-        recipe.ingredients = [
-            RecipeIngredient(position=position, text=text, canonical_ingredient_id=None, is_key=False)
-            for position, text in enumerate(source_text)
-        ]
-        recipe.facets.clear()
-        recipe.cuisines.clear()
+        _replace_ingredient_lines(session, recipe, source_text)
         if recipe.enrichment_state is None:
-            recipe.enrichment_state = RecipeEnrichmentState(recipe_id=recipe.id)
-        state = recipe.enrichment_state
-        assert state is not None
-        state.status = RecipeEnrichmentStatus.PENDING
-        state.source_fingerprint = fingerprint
-        state.last_error = None
-        state.started_at = None
-        state.completed_at = None
+            recipe.enrichment_state = RecipeEnrichmentState(
+                recipe_id=recipe.id,
+                status=RecipeEnrichmentStatus.PENDING,
+                source_fingerprint=fingerprint,
+            )
+        elif recipe.enrichment_state.status != RecipeEnrichmentStatus.COMPLETE:
+            state = recipe.enrichment_state
+            state.status = RecipeEnrichmentStatus.PENDING
+            state.source_fingerprint = fingerprint
+            state.last_error = None
+            state.started_at = None
+            state.completed_at = None
     elif recipe.enrichment_state is None:
         recipe.enrichment_state = RecipeEnrichmentState(
             recipe_id=recipe.id,

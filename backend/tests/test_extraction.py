@@ -18,8 +18,16 @@ from app.db import configure_sqlite_connection
 from app.models import Base
 from app.models.book import Book
 from app.models.enums import AIProvider as AIProviderEnum
-from app.models.enums import ExtractionMethod, TaskStatus, TaskType
+from app.models.enums import (
+    ExtractionMethod,
+    RecipeEnrichmentStatus,
+    RecipeFacetKind,
+    TaskStatus,
+    TaskType,
+)
+from app.models.ingredient import CanonicalIngredient
 from app.models.recipe import Recipe
+from app.models.recipe_fact import RecipeCuisine, RecipeFacet, RecipeFacetValue
 from app.models.task_run import TaskRun
 from app.schemas.extraction import RecipeData, RecipeIngredientData
 from app.schemas.task_run import TaskRunRead
@@ -260,6 +268,24 @@ def test_recipe_data_accepts_at_most_ten_keywords() -> None:
         )
 
 
+def test_recipe_data_normalises_keywords() -> None:
+    recipe = RecipeData(
+        name="x",
+        recipeIngredients=[RecipeIngredientData(text="x")],
+        recipeInstructions=["y"],
+        keywords=[" Quick ", "quick", "Dinner"],
+    )
+    assert recipe.keywords == ["Quick", "Dinner"]
+
+    with pytest.raises(ValueError, match="must not be blank"):
+        RecipeData(
+            name="x",
+            recipeIngredients=[RecipeIngredientData(text="x")],
+            recipeInstructions=["y"],
+            keywords=[" "],
+        )
+
+
 def test_usage_accumulation_preserves_none() -> None:
     total = Usage() + Usage(cost_usd=Decimal("0.01"), input_tokens=100)
     total = total + Usage(cost_usd=Decimal("0.02"), output_tokens=5)
@@ -310,10 +336,14 @@ def test_provider_vision_capability() -> None:
 
 def test_deduplicate_recipes_keeps_fullest_in_first_position() -> None:
     short = RecipeData(
-        name="Curry", recipeIngredients=[RecipeIngredientData(text="spice")], recipeInstructions=["Cook."]
+        name="Curry",
+        recipeIngredients=[RecipeIngredientData(text="spice")],
+        recipeInstructions=["Cook."],
     )
     other = RecipeData(
-        name="Rice", recipeIngredients=[RecipeIngredientData(text="rice")], recipeInstructions=["Boil."]
+        name="Rice",
+        recipeIngredients=[RecipeIngredientData(text="rice")],
+        recipeInstructions=["Boil."],
     )
     full = RecipeData(
         name=" curry ",
@@ -548,6 +578,70 @@ def test_save_reconciles_by_name_in_place(db: sessionmaker[Session]) -> None:
         assert recipes[0].description == "updated"
         assert recipes[0].order == 5
         assert [keyword.name for keyword in recipes[0].keywords] == ["Italian"]
+
+
+def test_reextraction_preserves_existing_structured_data(db: sessionmaker[Session]) -> None:
+    first = [
+        {
+            "name": "Pasta",
+            "recipeIngredients": [{"text": "100g pasta"}],
+            "recipeInstructions": ["Cook."],
+            "keywords": ["Italian", "Quick"],
+        }
+    ]
+    with db() as session:
+        book = _make_book(session)
+        run = _make_run(session, book)
+        save_recipes_from_graph_state(session, book, run, first)
+        recipe = session.scalars(select(Recipe)).one()
+        canonical = CanonicalIngredient(name="Pasta")
+        facet_value = RecipeFacetValue(
+            kind=RecipeFacetKind.COURSE,
+            value_id="main",
+            name="Main",
+            vocabulary_version="test",
+        )
+        session.add_all([canonical, facet_value])
+        session.flush()
+        recipe.ingredients[0].canonical_ingredient_id = canonical.id
+        recipe.ingredients[0].is_key = True
+        original_line_id = recipe.ingredients[0].id
+        recipe.facets = [RecipeFacet(facet_value_id=facet_value.id)]
+        recipe.cuisines = [RecipeCuisine(cuisine_id="italian")]
+        recipe.alternate_name = "Pasta Supper"
+        recipe.summary = "A quick pasta dish."
+        assert recipe.enrichment_state is not None
+        recipe.enrichment_state.status = RecipeEnrichmentStatus.COMPLETE
+        original_fingerprint = recipe.enrichment_state.source_fingerprint
+        session.commit()
+
+    second = [
+        {
+            "name": "Pasta",
+            "description": "A revised source description.",
+            "recipeIngredients": [{"text": "100g pasta"}, {"text": "salt"}],
+            "recipeInstructions": ["Cook well."],
+        }
+    ]
+    with db() as session:
+        book = session.scalars(select(Book)).one()
+        run = _make_run(session, book)
+        save_recipes_from_graph_state(session, book, run, second)
+        recipe = session.scalars(select(Recipe)).one()
+
+        assert [line.text for line in recipe.ingredients] == ["100g pasta", "salt"]
+        assert recipe.ingredients[0].id == original_line_id
+        assert recipe.ingredients[0].canonical_ingredient_id is not None
+        assert recipe.ingredients[0].is_key is True
+        assert recipe.ingredients[1].canonical_ingredient_id is None
+        assert [fact.facet_value.name for fact in recipe.facets] == ["Main"]
+        assert [cuisine.cuisine_id for cuisine in recipe.cuisines] == ["italian"]
+        assert recipe.alternate_name == "Pasta Supper"
+        assert recipe.summary == "A quick pasta dish."
+        assert {keyword.name for keyword in recipe.keywords} == {"Italian", "Quick"}
+        assert recipe.enrichment_state is not None
+        assert recipe.enrichment_state.status == RecipeEnrichmentStatus.COMPLETE
+        assert recipe.enrichment_state.source_fingerprint == original_fingerprint
 
 
 def test_finalisation_preserves_extracted_keywords_then_embeds_and_tags(

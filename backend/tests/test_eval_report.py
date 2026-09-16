@@ -54,12 +54,14 @@ def test_leaderboard_ranks_models_within_task_latest_run() -> None:
     out = leaderboard(records)
     assert out.index("OPENROUTER:oss") < out.index("GEMINI:flash")  # 0.90 ranks above 0.80
     assert "0.500" not in out  # stale run excluded
-    assert "KW J" in out and "KW #" in out
+    assert "Legacy KW" in out and "KW #" in out
 
 
 def test_leaderboard_separates_tasks() -> None:
     records = [
-        _record("many_recipes_per_file", "GEMINI:flash-lite", "20260101T000000Z", "craveable", 0.95),
+        _record(
+            "many_recipes_per_file", "GEMINI:flash-lite", "20260101T000000Z", "craveable", 0.95
+        ),
         _record("blocks_of_files", "GEMINI:flash", "20260101T000000Z", "nothing-fancy", 0.88),
     ]
     out = leaderboard(records)

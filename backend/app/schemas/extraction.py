@@ -1,6 +1,6 @@
 import string
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.services.extraction.review import REVIEW_CHOICES, REVIEW_QUESTION
 
@@ -53,6 +53,21 @@ class RecipeData(BaseModel):
     book_order: int | None = Field(None, alias="bookOrder")
 
     model_config = ConfigDict(populate_by_name=True)
+
+    @field_validator("keywords")
+    @classmethod
+    def normalise_keywords(cls, values: list[str]) -> list[str]:
+        cleaned: list[str] = []
+        seen: set[str] = set()
+        for value in values:
+            keyword = value.strip()
+            if not keyword:
+                raise ValueError("keywords must not be blank")
+            folded = keyword.casefold()
+            if folded not in seen:
+                cleaned.append(keyword)
+                seen.add(folded)
+        return cleaned
 
     def model_post_init(self, _context: object) -> None:
         self.name = string.capwords(self.name)

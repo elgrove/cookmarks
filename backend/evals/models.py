@@ -61,8 +61,8 @@ class FieldScores(BaseModel):
     yield_match: float
     image_match: float | None
     keywords_jaccard: float
-    gold_keywords_count: int
-    predicted_keywords_count: int
+    gold_keywords_count: int = 0
+    predicted_keywords_count: int = 0
     composite: float
 
 
