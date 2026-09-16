@@ -27,6 +27,8 @@ def _record(task: str, model_id: str, run_id: str, book: str, f1: float) -> Ledg
         composite_mean=f1,
         ingredients_jaccard_mean=f1,
         instructions_jaccard_mean=f1,
+        keywords_jaccard_mean=0.75,
+        keywords_count_mean=7.5,
         cost_usd=0.01,
         input_tokens=100,
         output_tokens=20,
@@ -52,6 +54,7 @@ def test_leaderboard_ranks_models_within_task_latest_run() -> None:
     out = leaderboard(records)
     assert out.index("OPENROUTER:oss") < out.index("GEMINI:flash")  # 0.90 ranks above 0.80
     assert "0.500" not in out  # stale run excluded
+    assert "KW J" in out and "KW #" in out
 
 
 def test_leaderboard_separates_tasks() -> None:
