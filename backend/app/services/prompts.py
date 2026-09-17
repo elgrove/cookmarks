@@ -47,6 +47,8 @@ EXTRACT_RECIPES_PROMPT = """- Your job is to extract recipes from cookbook conte
 - Not all recipes have an image but look for figcaption tags, nearby text labels or any other clues linking each recipe to an image. Provide the relative path as shown in the EPUB file structure (e.g. '../images/recipe.jpg' or 'images/p026.jpg').
 - Some books use an image to define a bullet point or other icon, a tell for this is seeing it more than once in a chapter. We want to ignore these images.
 - Return up to 10 useful recipe keywords. Do not fill all 10 slots when fewer keywords are useful.
+- Return all keywords in lower case. Include useful cuisine, course, key-ingredient, dish-format, method, dietary, occasion, season, heat, and mood terms when the source supports them.
+- Keyword examples: a quick vegetarian aubergine bake can use ["main", "vegetarian", "aubergine", "bake", "quick"]; a Japanese chilled crab starter can use ["starter", "japanese", "crab", "cucumber", "chilled"]; a spicy Thai pork curry can use ["main", "thai", "pork", "curry", "spicy"].
 - Always use UK English terms in the keywords, never use Americanisms, for example use 'starter' but never 'appetizer', 'grill' never 'broil', 'aubergine' never 'eggplant', 'mince' never 'ground meat', etc)
 - Return only a valid JSON array of recipe objects
 - If you cannot find a recipe meeting the definition above in the content, return empty array []

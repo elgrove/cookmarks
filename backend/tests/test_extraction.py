@@ -275,7 +275,15 @@ def test_recipe_data_normalises_keywords() -> None:
         recipeInstructions=["y"],
         keywords=[" Quick ", "quick", "Dinner"],
     )
-    assert recipe.keywords == ["Quick", "Dinner"]
+    assert recipe.keywords == ["quick", "dinner"]
+
+    duplicates = RecipeData(
+        name="x",
+        recipeIngredients=[RecipeIngredientData(text="x")],
+        recipeInstructions=["y"],
+        keywords=["Quick"] * 11,
+    )
+    assert duplicates.keywords == ["quick"]
 
     with pytest.raises(ValueError, match="must not be blank"):
         RecipeData(
@@ -539,7 +547,7 @@ def test_save_creates_recipes_with_extracted_keywords(db: sessionmaker[Session])
         assert count == 1
         recipes = s.scalars(select(Recipe)).all()
         assert len(recipes) == 1
-        assert [keyword.name for keyword in recipes[0].keywords] == ["Italian", "Quick"]
+        assert [keyword.name for keyword in recipes[0].keywords] == ["italian", "quick"]
         assert recipes[0].order == 1
 
 
@@ -577,7 +585,7 @@ def test_save_reconciles_by_name_in_place(db: sessionmaker[Session]) -> None:
         assert recipes[0].id == recipe_id  # stable identity across re-extraction
         assert recipes[0].description == "updated"
         assert recipes[0].order == 5
-        assert [keyword.name for keyword in recipes[0].keywords] == ["Italian"]
+        assert [keyword.name for keyword in recipes[0].keywords] == ["italian"]
 
 
 def test_reextraction_preserves_existing_structured_data(db: sessionmaker[Session]) -> None:
@@ -638,7 +646,7 @@ def test_reextraction_preserves_existing_structured_data(db: sessionmaker[Sessio
         assert [cuisine.cuisine_id for cuisine in recipe.cuisines] == ["italian"]
         assert recipe.alternate_name == "Pasta Supper"
         assert recipe.summary == "A quick pasta dish."
-        assert {keyword.name for keyword in recipe.keywords} == {"Italian", "Quick"}
+        assert {keyword.name for keyword in recipe.keywords} == {"italian", "quick"}
         assert recipe.enrichment_state is not None
         assert recipe.enrichment_state.status == RecipeEnrichmentStatus.COMPLETE
         assert recipe.enrichment_state.source_fingerprint == original_fingerprint
@@ -658,7 +666,7 @@ def test_finalisation_preserves_extracted_keywords_then_embeds_and_tags(
 
     def embed(session: Session, recipes: list[Recipe]) -> None:
         assert calls == []
-        assert [keyword.name for keyword in recipes[0].keywords] == ["Italian", "Quick"]
+        assert [keyword.name for keyword in recipes[0].keywords] == ["italian", "quick"]
         calls.append("embed")
 
     def tag(session: Session, book: Book) -> None:
@@ -772,7 +780,7 @@ def test_end_to_end_stub_review_then_resume(e2e: tuple[sessionmaker[Session], Pa
         recipes = s.scalars(select(Recipe)).all()
         assert len(recipes) == 2
         assert all(r.book_id == uuid.UUID(book_id) for r in recipes)
-        assert all({keyword.name for keyword in r.keywords} == {"Dev", "Stub"} for r in recipes)
+        assert all({keyword.name for keyword in r.keywords} == {"dev", "stub"} for r in recipes)
         run = s.scalars(select(TaskRun)).one()
         assert run.status == TaskStatus.DONE
         assert run.recipes_found == 2

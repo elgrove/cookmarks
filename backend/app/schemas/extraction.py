@@ -54,13 +54,13 @@ class RecipeData(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True)
 
-    @field_validator("keywords")
+    @field_validator("keywords", mode="before")
     @classmethod
     def normalise_keywords(cls, values: list[str]) -> list[str]:
         cleaned: list[str] = []
         seen: set[str] = set()
         for value in values:
-            keyword = value.strip()
+            keyword = value.strip().lower()
             if not keyword:
                 raise ValueError("keywords must not be blank")
             folded = keyword.casefold()
