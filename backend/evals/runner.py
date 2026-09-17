@@ -213,6 +213,8 @@ def _to_ledger(
         composite_mean=br.metrics.get("composite_mean", 0.0),
         ingredients_jaccard_mean=br.metrics.get("ingredients_jaccard_mean", 0.0),
         instructions_jaccard_mean=br.metrics.get("instructions_jaccard_mean", 0.0),
+        keywords_jaccard_mean=br.metrics.get("keywords_jaccard_mean"),
+        keywords_count_mean=br.metrics.get("keywords_count_mean"),
         cost_usd=br.cost_usd,
         input_tokens=br.input_tokens,
         output_tokens=br.output_tokens,
@@ -245,6 +247,8 @@ def _book_line(task: str, model_id: str, br: BookResult) -> str:
     return (
         f"  {task:22s} {model_id:34s} {br.book:14s} "
         f"F1={br.f1:.3f} comp={br.metrics.get('composite_mean', 0.0):.3f} "
+        f"keywords={br.metrics.get('keywords_count_mean', 0.0):.1f} "
+        f"kw-jaccard={br.metrics.get('keywords_jaccard_mean', 0.0):.3f} "
         f"{br.num_matched}/{br.num_gold} matched, {len(br.hallucinated)} extra "
         f"| {cost} {br.duration_s:.0f}s [{br.extraction_method}]"
     )

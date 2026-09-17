@@ -29,12 +29,19 @@ class _Agg:
     composite: float
     precision: float
     recall: float
+    keywords_jaccard: float | None
+    keywords_count: float | None
     cost_usd: float | None
     duration_s: float
 
 
 def _mean(values: list[float]) -> float:
     return sum(values) / len(values) if values else 0.0
+
+
+def _optional_mean(values: list[float | None]) -> float | None:
+    present = [value for value in values if value is not None]
+    return _mean(present) if present else None
 
 
 def _aggregate(records: list[LedgerRecord]) -> _Agg:
@@ -45,6 +52,8 @@ def _aggregate(records: list[LedgerRecord]) -> _Agg:
         composite=_mean([r.composite_mean for r in records]),
         precision=_mean([r.precision for r in records]),
         recall=_mean([r.recall for r in records]),
+        keywords_jaccard=_optional_mean([r.keywords_jaccard_mean for r in records]),
+        keywords_count=_optional_mean([r.keywords_count_mean for r in records]),
         cost_usd=sum(costs) if costs else None,
         duration_s=sum(r.duration_s for r in records),
     )
@@ -91,13 +100,15 @@ def leaderboard(records: list[LedgerRecord]) -> str:
                         f"{agg.composite:.3f}",
                         f"{agg.precision:.3f}",
                         f"{agg.recall:.3f}",
+                        f"{agg.keywords_jaccard:.3f}" if agg.keywords_jaccard is not None else "—",
+                        f"{agg.keywords_count:.1f}" if agg.keywords_count is not None else "—",
                         _cost(agg.cost_usd),
                         f"{agg.duration_s:.0f}s",
                     ],
                 )
             )
         rows.sort(key=lambda r: r[0], reverse=True)
-        headers = ["Model", "Books", "F1", "Comp", "P", "R", "Cost", "Time"]
+        headers = ["Model", "Books", "F1", "Comp", "P", "R", "Legacy KW", "KW #", "Cost", "Time"]
         sections.append(f"{task}  (run {latest_run})\n" + _table(headers, [r[1] for r in rows]))
 
     return "Leaderboard by task (latest run per task)\n\n" + "\n\n".join(sections)
@@ -118,9 +129,11 @@ def task_history(records: list[LedgerRecord], task: str) -> str:
             r.book,
             f"{r.f1:.3f}",
             f"{r.composite_mean:.3f}",
+            f"{r.keywords_jaccard_mean:.3f}" if r.keywords_jaccard_mean is not None else "—",
+            f"{r.keywords_count_mean:.1f}" if r.keywords_count_mean is not None else "—",
             _cost(r.cost_usd),
         ]
         for r in sorted(subset, key=lambda r: (r.run_id, r.model_id))
     ]
-    headers = ["Run", "Date", "SHA", "Model", "Book", "F1", "Comp", "Cost"]
+    headers = ["Run", "Date", "SHA", "Model", "Book", "F1", "Comp", "Legacy KW", "KW #", "Cost"]
     return f"{task} — history\n\n" + _table(headers, rows)

@@ -61,6 +61,8 @@ class FieldScores(BaseModel):
     yield_match: float
     image_match: float | None
     keywords_jaccard: float
+    gold_keywords_count: int = 0
+    predicted_keywords_count: int = 0
     composite: float
 
 
@@ -116,6 +118,8 @@ class LedgerRecord(BaseModel):
     composite_mean: float
     ingredients_jaccard_mean: float
     instructions_jaccard_mean: float
+    keywords_jaccard_mean: float | None = None
+    keywords_count_mean: float | None = None
     cost_usd: float | None
     input_tokens: int | None
     output_tokens: int | None

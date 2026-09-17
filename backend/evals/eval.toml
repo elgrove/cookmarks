@@ -79,6 +79,9 @@ fuzzy_threshold = 85
 # Per-recipe composite weights, renormalised over the fields actually present.
 # Yield is lightly weighted: it's a soft, heavily-formatted field that smaller models
 # often render tersely ('2' vs 'Serves 2') without that being a real quality miss.
+# Keywords are reported separately as set overlap and mean count. They are not part of
+# this source-fidelity composite because some historical gold rows contain more than
+# the current limit of 10 keywords.
 name = 0.25
 ingredients = 0.30
 instructions = 0.30

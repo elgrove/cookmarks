@@ -1,6 +1,4 @@
 import io
-import threading
-import time
 import uuid
 import zipfile
 from collections.abc import Iterator
@@ -20,8 +18,16 @@ from app.db import configure_sqlite_connection
 from app.models import Base
 from app.models.book import Book
 from app.models.enums import AIProvider as AIProviderEnum
-from app.models.enums import ExtractionMethod, TaskStatus, TaskType
-from app.models.recipe import Keyword, Recipe
+from app.models.enums import (
+    ExtractionMethod,
+    RecipeEnrichmentStatus,
+    RecipeFacetKind,
+    TaskStatus,
+    TaskType,
+)
+from app.models.ingredient import CanonicalIngredient
+from app.models.recipe import Recipe
+from app.models.recipe_fact import RecipeCuisine, RecipeFacet, RecipeFacetValue
 from app.models.task_run import TaskRun
 from app.schemas.extraction import RecipeData, RecipeIngredientData
 from app.schemas.task_run import TaskRunRead
@@ -39,7 +45,6 @@ from app.services.extraction.state import ExtractionState
 from app.services.extraction.utils import deduplicate_recipes_by_title, find_decorative_images
 from app.tasks.extraction import (
     _finalise_result,
-    enrich_extracted_recipes,
     extract_recipes_from_book,
     extract_recipes_from_book_task,
     generate_recipe_embeddings,
@@ -245,6 +250,50 @@ def test_recipe_data_rejects_empty_ingredients() -> None:
         RecipeData(name="x", recipeIngredients=[], recipeInstructions=["y"])
 
 
+def test_recipe_data_accepts_at_most_ten_keywords() -> None:
+    recipe = RecipeData(
+        name="x",
+        recipeIngredients=[RecipeIngredientData(text="x")],
+        recipeInstructions=["y"],
+        keywords=[str(index) for index in range(10)],
+    )
+    assert len(recipe.keywords) == 10
+
+    with pytest.raises(ValueError):
+        RecipeData(
+            name="x",
+            recipeIngredients=[RecipeIngredientData(text="x")],
+            recipeInstructions=["y"],
+            keywords=[str(index) for index in range(11)],
+        )
+
+
+def test_recipe_data_normalises_keywords() -> None:
+    recipe = RecipeData(
+        name="x",
+        recipeIngredients=[RecipeIngredientData(text="x")],
+        recipeInstructions=["y"],
+        keywords=[" Quick ", "quick", "Dinner"],
+    )
+    assert recipe.keywords == ["quick", "dinner"]
+
+    duplicates = RecipeData(
+        name="x",
+        recipeIngredients=[RecipeIngredientData(text="x")],
+        recipeInstructions=["y"],
+        keywords=["Quick"] * 11,
+    )
+    assert duplicates.keywords == ["quick"]
+
+    with pytest.raises(ValueError, match="must not be blank"):
+        RecipeData(
+            name="x",
+            recipeIngredients=[RecipeIngredientData(text="x")],
+            recipeInstructions=["y"],
+            keywords=[" "],
+        )
+
+
 def test_usage_accumulation_preserves_none() -> None:
     total = Usage() + Usage(cost_usd=Decimal("0.01"), input_tokens=100)
     total = total + Usage(cost_usd=Decimal("0.02"), output_tokens=5)
@@ -295,10 +344,14 @@ def test_provider_vision_capability() -> None:
 
 def test_deduplicate_recipes_keeps_fullest_in_first_position() -> None:
     short = RecipeData(
-        name="Curry", recipeIngredients=[RecipeIngredientData(text="spice")], recipeInstructions=["Cook."]
+        name="Curry",
+        recipeIngredients=[RecipeIngredientData(text="spice")],
+        recipeInstructions=["Cook."],
     )
     other = RecipeData(
-        name="Rice", recipeIngredients=[RecipeIngredientData(text="rice")], recipeInstructions=["Boil."]
+        name="Rice",
+        recipeIngredients=[RecipeIngredientData(text="rice")],
+        recipeInstructions=["Boil."],
     )
     full = RecipeData(
         name=" curry ",
@@ -477,7 +530,7 @@ def test_finalise_marks_done(db: sessionmaker[Session]) -> None:
 # --------------------------------------------------------------------------- #
 
 
-def test_save_creates_recipes_without_first_pass_keywords(db: sessionmaker[Session]) -> None:
+def test_save_creates_recipes_with_extracted_keywords(db: sessionmaker[Session]) -> None:
     raw = [
         {
             "name": "Pasta",
@@ -494,7 +547,7 @@ def test_save_creates_recipes_without_first_pass_keywords(db: sessionmaker[Sessi
         assert count == 1
         recipes = s.scalars(select(Recipe)).all()
         assert len(recipes) == 1
-        assert recipes[0].keywords == []
+        assert [keyword.name for keyword in recipes[0].keywords] == ["italian", "quick"]
         assert recipes[0].order == 1
 
 
@@ -532,10 +585,74 @@ def test_save_reconciles_by_name_in_place(db: sessionmaker[Session]) -> None:
         assert recipes[0].id == recipe_id  # stable identity across re-extraction
         assert recipes[0].description == "updated"
         assert recipes[0].order == 5
-        assert recipes[0].keywords == []
+        assert [keyword.name for keyword in recipes[0].keywords] == ["italian"]
 
 
-def test_finalisation_embeds_and_tags_only_after_enrichment(
+def test_reextraction_preserves_existing_structured_data(db: sessionmaker[Session]) -> None:
+    first = [
+        {
+            "name": "Pasta",
+            "recipeIngredients": [{"text": "100g pasta"}],
+            "recipeInstructions": ["Cook."],
+            "keywords": ["Italian", "Quick"],
+        }
+    ]
+    with db() as session:
+        book = _make_book(session)
+        run = _make_run(session, book)
+        save_recipes_from_graph_state(session, book, run, first)
+        recipe = session.scalars(select(Recipe)).one()
+        canonical = CanonicalIngredient(name="Pasta")
+        facet_value = RecipeFacetValue(
+            kind=RecipeFacetKind.COURSE,
+            value_id="main",
+            name="Main",
+            vocabulary_version="test",
+        )
+        session.add_all([canonical, facet_value])
+        session.flush()
+        recipe.ingredients[0].canonical_ingredient_id = canonical.id
+        recipe.ingredients[0].is_key = True
+        original_line_id = recipe.ingredients[0].id
+        recipe.facets = [RecipeFacet(facet_value_id=facet_value.id)]
+        recipe.cuisines = [RecipeCuisine(cuisine_id="italian")]
+        recipe.alternate_name = "Pasta Supper"
+        recipe.summary = "A quick pasta dish."
+        assert recipe.enrichment_state is not None
+        recipe.enrichment_state.status = RecipeEnrichmentStatus.COMPLETE
+        original_fingerprint = recipe.enrichment_state.source_fingerprint
+        session.commit()
+
+    second = [
+        {
+            "name": "Pasta",
+            "description": "A revised source description.",
+            "recipeIngredients": [{"text": "100g pasta"}, {"text": "salt"}],
+            "recipeInstructions": ["Cook well."],
+        }
+    ]
+    with db() as session:
+        book = session.scalars(select(Book)).one()
+        run = _make_run(session, book)
+        save_recipes_from_graph_state(session, book, run, second)
+        recipe = session.scalars(select(Recipe)).one()
+
+        assert [line.text for line in recipe.ingredients] == ["100g pasta", "salt"]
+        assert recipe.ingredients[0].id == original_line_id
+        assert recipe.ingredients[0].canonical_ingredient_id is not None
+        assert recipe.ingredients[0].is_key is True
+        assert recipe.ingredients[1].canonical_ingredient_id is None
+        assert [fact.facet_value.name for fact in recipe.facets] == ["Main"]
+        assert [cuisine.cuisine_id for cuisine in recipe.cuisines] == ["italian"]
+        assert recipe.alternate_name == "Pasta Supper"
+        assert recipe.summary == "A quick pasta dish."
+        assert {keyword.name for keyword in recipe.keywords} == {"italian", "quick"}
+        assert recipe.enrichment_state is not None
+        assert recipe.enrichment_state.status == RecipeEnrichmentStatus.COMPLETE
+        assert recipe.enrichment_state.source_fingerprint == original_fingerprint
+
+
+def test_finalisation_preserves_extracted_keywords_then_embeds_and_tags(
     db: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     with db() as s:
@@ -547,22 +664,15 @@ def test_finalisation_embeds_and_tags_only_after_enrichment(
 
     calls: list[str] = []
 
-    def enrich(session: Session, run: TaskRun) -> dict:
-        recipe = session.scalars(select(Recipe).where(Recipe.extraction_run_id == run.id)).one()
-        recipe.keywords = [Keyword(name="Enriched")]
-        calls.append("enrich")
-        return {"enrichment": {"complete": 1}}
-
     def embed(session: Session, recipes: list[Recipe]) -> None:
-        assert calls == ["enrich"]
-        assert [keyword.name for keyword in recipes[0].keywords] == ["Enriched"]
+        assert calls == []
+        assert [keyword.name for keyword in recipes[0].keywords] == ["italian", "quick"]
         calls.append("embed")
 
     def tag(session: Session, book: Book) -> None:
-        assert calls == ["enrich", "embed"]
+        assert calls == ["embed"]
         calls.append("tag")
 
-    monkeypatch.setattr("app.tasks.extraction.enrich_extracted_recipes", enrich)
     monkeypatch.setattr("app.tasks.extraction.generate_recipe_embeddings", embed)
     monkeypatch.setattr("app.tasks.extraction._generate_book_keywords", tag)
 
@@ -574,13 +684,14 @@ def test_finalisation_embeds_and_tags_only_after_enrichment(
                     "name": "Pasta",
                     "recipeIngredients": [{"text": "pasta"}],
                     "recipeInstructions": ["Cook."],
+                    "keywords": ["Italian", "Quick"],
                 }
             ]
         },
     )
 
     assert message == "Extracted 1 recipes for Test Cookbook"
-    assert calls == ["enrich", "embed", "tag"]
+    assert calls == ["embed", "tag"]
 
 
 def test_embedding_failure_does_not_stop_extraction(
@@ -669,7 +780,7 @@ def test_end_to_end_stub_review_then_resume(e2e: tuple[sessionmaker[Session], Pa
         recipes = s.scalars(select(Recipe)).all()
         assert len(recipes) == 2
         assert all(r.book_id == uuid.UUID(book_id) for r in recipes)
-        assert all(len(r.keywords) == 5 for r in recipes)
+        assert all({keyword.name for keyword in r.keywords} == {"dev", "stub"} for r in recipes)
         run = s.scalars(select(TaskRun)).one()
         assert run.status == TaskStatus.DONE
         assert run.recipes_found == 2
@@ -856,156 +967,3 @@ def test_find_decorative_images_keeps_dish_photos(tmp_path: Path) -> None:
 
 def test_find_decorative_images_keeps_all_when_epub_unreadable(tmp_path: Path) -> None:
     assert find_decorative_images(tmp_path / "missing.epub", ["photo.jpg"]) == set()
-
-
-def test_enrich_extracted_recipes_empty_run(db: sessionmaker[Session]) -> None:
-    with db() as session:
-        book = _make_book(session)
-        run = TaskRun(
-            task_type=TaskType.EXTRACTION,
-            status=TaskStatus.RUNNING,
-            book_id=book.id,
-        )
-        session.add(run)
-        session.commit()
-
-        result = enrich_extracted_recipes(session, run)
-        assert result == {
-            "enrichment": {
-                "attempted": 0,
-                "complete": 0,
-                "failed": 0,
-                "stale_response": 0,
-            }
-        }
-
-
-def test_enrich_extracted_recipes_concurrent(
-    db: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch
-) -> None:
-    active_threads: set[int] = set()
-    max_active_threads = 0
-    lock = threading.Lock()
-
-    def mock_enrich_recipe(
-        session: Session,
-        recipe_id: uuid.UUID,
-        **kwargs: Any,
-    ) -> tuple[dict[str, int], Usage]:
-        nonlocal max_active_threads
-        thread_id = threading.get_ident()
-        with lock:
-            active_threads.add(thread_id)
-            if len(active_threads) > max_active_threads:
-                max_active_threads = len(active_threads)
-        time.sleep(0.05)
-        with lock:
-            active_threads.remove(thread_id)
-
-        return (
-            {"canonical_ingredients": 2, "key_ingredients": 1},
-            Usage(input_tokens=100, output_tokens=50, cost_usd=Decimal("0.002")),
-        )
-
-    monkeypatch.setattr("app.tasks.extraction.enrich_recipe", mock_enrich_recipe)
-
-    with db() as session:
-        upsert_provider_config(session, AIProviderEnum.STUB, api_key="test-key")
-        book = _make_book(session)
-        run = TaskRun(
-            task_type=TaskType.EXTRACTION,
-            status=TaskStatus.RUNNING,
-            book_id=book.id,
-        )
-        session.add(run)
-        session.flush()
-
-        for i in range(4):
-            recipe = Recipe(
-                book_id=book.id,
-                extraction_run_id=run.id,
-                order=i,
-                name=f"Recipe {i}",
-                instructions=[],
-            )
-            session.add(recipe)
-        session.commit()
-
-        result = enrich_extracted_recipes(session, run)
-
-        assert max_active_threads > 1
-        enrichment_data = result["enrichment"]
-        assert enrichment_data["attempted"] == 4
-        assert enrichment_data["complete"] == 4
-        assert enrichment_data["failed"] == 0
-        assert enrichment_data["stale_response"] == 0
-        assert enrichment_data["canonical_ingredients"] == 8
-        assert enrichment_data["key_ingredients"] == 4
-
-        assert run.input_tokens == 400
-        assert run.output_tokens == 200
-        assert run.cost_usd == Decimal("0.008")
-
-
-def test_enrich_extracted_recipes_isolates_failures(
-    db: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch
-) -> None:
-    calls = 0
-    lock = threading.Lock()
-
-    def mock_enrich_recipe(
-        session: Session,
-        recipe_id: uuid.UUID,
-        **kwargs: Any,
-    ) -> tuple[dict[str, int], Usage]:
-        nonlocal calls
-        with lock:
-            calls += 1
-            current = calls
-
-        if current == 1:
-            raise RuntimeError("Generic enrichment crash")
-        elif current == 2:
-            raise ValueError("Stale source fingerprint detected")
-        else:
-            return (
-                {"canonical_ingredients": 1},
-                Usage(input_tokens=50, output_tokens=25, cost_usd=Decimal("0.001")),
-            )
-
-    monkeypatch.setattr("app.tasks.extraction.enrich_recipe", mock_enrich_recipe)
-
-    with db() as session:
-        upsert_provider_config(session, AIProviderEnum.STUB, api_key="test-key")
-        book = _make_book(session)
-        run = TaskRun(
-            task_type=TaskType.EXTRACTION,
-            status=TaskStatus.RUNNING,
-            book_id=book.id,
-        )
-        session.add(run)
-        session.flush()
-
-        for i in range(3):
-            recipe = Recipe(
-                book_id=book.id,
-                extraction_run_id=run.id,
-                order=i,
-                name=f"Recipe {i}",
-                instructions=[],
-            )
-            session.add(recipe)
-        session.commit()
-
-        result = enrich_extracted_recipes(session, run)
-
-        enrichment_data = result["enrichment"]
-        assert enrichment_data["attempted"] == 3
-        assert enrichment_data["complete"] == 1
-        assert enrichment_data["failed"] == 2
-        assert enrichment_data["stale_response"] == 1
-        assert enrichment_data["canonical_ingredients"] == 1
-
-        assert run.input_tokens == 50
-        assert run.output_tokens == 25
-        assert run.cost_usd == Decimal("0.001")

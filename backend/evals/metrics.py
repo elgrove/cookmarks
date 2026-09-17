@@ -95,6 +95,8 @@ def score_pair(gold: EvalRecipe, predicted: EvalRecipe, weights: Weights) -> Fie
         yield_match=yield_match,
         image_match=image_match,
         keywords_jaccard=jaccard(g_kw, p_kw),
+        gold_keywords_count=len(g_kw),
+        predicted_keywords_count=len(p_kw),
         composite=_composite(
             name_similarity, ingredients_jaccard, instructions_jaccard, yield_match,
             image_match, weights,
@@ -120,6 +122,11 @@ def aggregate(scores: list[FieldScores]) -> dict[str, float]:
         "yield_match_mean": mean([s.yield_match for s in scores]),
         "image_match_mean": mean(image_values) if image_values else 0.0,
         "keywords_jaccard_mean": mean([s.keywords_jaccard for s in scores]),
+        "gold_keywords_count_mean": mean([float(s.gold_keywords_count) for s in scores]),
+        "keywords_count_mean": mean([float(s.predicted_keywords_count) for s in scores]),
+        "keywords_at_limit_rate": mean(
+            [1.0 if s.predicted_keywords_count == 10 else 0.0 for s in scores]
+        ),
         "ingredients_missing_mean": mean([float(s.ingredients_missing) for s in scores]),
         "ingredients_extra_mean": mean([float(s.ingredients_extra) for s in scores]),
         "instructions_missing_mean": mean([float(s.instructions_missing) for s in scores]),
