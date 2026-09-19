@@ -136,6 +136,8 @@ def test_score_pair_identical_is_perfect() -> None:
     assert scores.composite == pytest.approx(1.0)
     assert scores.ingredients_missing == 0 and scores.ingredients_extra == 0
     assert scores.image_match == 1.0
+    assert scores.gold_keywords_count == 2
+    assert scores.predicted_keywords_count == 2
 
 
 def test_score_pair_partial_ingredients() -> None:
@@ -175,3 +177,22 @@ def test_aggregate_image_mean_ignores_none() -> None:
     agg = aggregate([with_image, without_image])
     assert agg["image_match_mean"] == 1.0  # only the one with a gold image counted
     assert agg["composite_mean"] == pytest.approx(1.0)
+
+
+def test_aggregate_reports_keyword_count_and_limit_use() -> None:
+    first = score_pair(
+        _recipe("A", keywords=["One", "Two", "Three"]),
+        _recipe("A", keywords=["One", "Two"]),
+        WEIGHTS,
+    )
+    second = score_pair(
+        _recipe("B", keywords=[str(index) for index in range(12)]),
+        _recipe("B", keywords=[str(index) for index in range(10)]),
+        WEIGHTS,
+    )
+
+    agg = aggregate([first, second])
+
+    assert agg["gold_keywords_count_mean"] == 7.5
+    assert agg["keywords_count_mean"] == 6.0
+    assert agg["keywords_at_limit_rate"] == 0.5

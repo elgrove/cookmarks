@@ -1,31 +1,28 @@
 import json
 import logging
 import uuid
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime
 from hashlib import sha256
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.config import settings
 from app.db import SessionLocal
 from app.epub import epub_path, has_epub, has_pdf, pdf_path
 from app.models.book import Book
-from app.models.enums import ModelRole, RecipeEnrichmentStatus, TaskStatus, TaskType
+from app.models.enums import RecipeEnrichmentStatus, TaskStatus, TaskType
 from app.models.ingredient import RecipeIngredient
 from app.models.recipe import Recipe
 from app.models.recipe_enrichment import RecipeEnrichmentState
 from app.models.task_run import TaskRun
 from app.schemas.extraction import RecipeData
-from app.services.ai import AIProvider, Usage, ai_ready, get_ai_provider
-from app.services.ai.registry import ocr_ready, resolve_ingredient_chain, resolve_task
+from app.services.ai import ai_ready, get_ai_provider
+from app.services.ai.registry import ocr_ready
 from app.services.book_keywords import generate_book_keywords
 from app.services.embeddings import embed_recipes
 from app.services.extraction.graph import get_extraction_graph
 from app.services.extraction.review import VALID_HUMAN_RESPONSES
-from app.services.recipe_enrichment.service import aggregate_metrics, enrich_recipe
-from app.services.recipe_facts import upsert_facet_vocabulary
+from app.services.keywords import get_or_create_keyword
 from app.tasks.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
@@ -108,7 +105,7 @@ def _thread_id(run_id: str) -> str:
 
 
 def generate_recipe_embeddings(session: Session, recipes: list[Recipe]) -> None:
-    """Embed the enriched recipes in one batch. This is best-effort: a no-op when no
+    """Embed the extracted recipes in one batch. This is best-effort: a no-op when no
     embedding-capable provider is configured, so extraction always completes. Writes
     ride the caller's transaction."""
     try:
@@ -124,6 +121,39 @@ def _generate_book_keywords(session: Session, book: Book) -> None:
         generate_book_keywords(session, book)
     except Exception:
         logger.exception(f"Book-keyword generation failed for {book.title}")
+
+
+def _replace_ingredient_lines(session: Session, recipe: Recipe, source_text: list[str]) -> None:
+    """Replace source lines while retaining facts on lines whose text still matches."""
+    reusable: dict[str, list[RecipeIngredient]] = {}
+    for line in recipe.ingredients:
+        key = " ".join(line.text.casefold().split())
+        reusable.setdefault(key, []).append(line)
+
+    # Move existing rows out of the non-negative position range before rows are
+    # reordered. SQLite checks the unique (recipe_id, position) constraint per update.
+    for index, line in enumerate(recipe.ingredients, start=1):
+        line.position = -index
+    if recipe.ingredients:
+        session.flush()
+
+    replacement: list[RecipeIngredient] = []
+    for position, text in enumerate(source_text):
+        key = " ".join(text.casefold().split())
+        candidates = reusable.get(key, [])
+        if candidates:
+            line = candidates.pop(0)
+            line.position = position
+            line.text = text
+        else:
+            line = RecipeIngredient(
+                position=position,
+                text=text,
+                canonical_ingredient_id=None,
+                is_key=False,
+            )
+        replacement.append(line)
+    recipe.ingredients = replacement
 
 
 def _upsert_recipe(session: Session, book: Book, run: TaskRun, data: RecipeData) -> Recipe:
@@ -149,29 +179,23 @@ def _upsert_recipe(session: Session, book: Book, run: TaskRun, data: RecipeData)
     recipe.instructions = data.instructions
     recipe.yields = data.yields
     recipe.image = data.image or None
-    # Structured enrichment owns recipe keywords. Re-extraction deliberately leaves
-    # the prior five visible until its replacement enrichment succeeds.
+    if "keywords" in data.model_fields_set:
+        recipe.keywords = [get_or_create_keyword(session, name) for name in data.keywords]
     if fingerprint != previous_fingerprint:
-        # SQLite checks the (recipe_id, position) uniqueness while it flushes. Delete
-        # the old rows first, before inserting replacement lines at the same positions.
-        if recipe.ingredients:
-            recipe.ingredients.clear()
-            session.flush()
-        recipe.ingredients = [
-            RecipeIngredient(position=position, text=text, canonical_ingredient_id=None, is_key=False)
-            for position, text in enumerate(source_text)
-        ]
-        recipe.facets.clear()
-        recipe.cuisines.clear()
+        _replace_ingredient_lines(session, recipe, source_text)
         if recipe.enrichment_state is None:
-            recipe.enrichment_state = RecipeEnrichmentState(recipe_id=recipe.id)
-        state = recipe.enrichment_state
-        assert state is not None
-        state.status = RecipeEnrichmentStatus.PENDING
-        state.source_fingerprint = fingerprint
-        state.last_error = None
-        state.started_at = None
-        state.completed_at = None
+            recipe.enrichment_state = RecipeEnrichmentState(
+                recipe_id=recipe.id,
+                status=RecipeEnrichmentStatus.PENDING,
+                source_fingerprint=fingerprint,
+            )
+        elif recipe.enrichment_state.status != RecipeEnrichmentStatus.COMPLETE:
+            state = recipe.enrichment_state
+            state.status = RecipeEnrichmentStatus.PENDING
+            state.source_fingerprint = fingerprint
+            state.last_error = None
+            state.started_at = None
+            state.completed_at = None
     elif recipe.enrichment_state is None:
         recipe.enrichment_state = RecipeEnrichmentState(
             recipe_id=recipe.id,
@@ -215,127 +239,6 @@ def save_recipes_from_graph_state(
     return len(saved)
 
 
-def _enrich_recipe_worker(
-    recipe_id: uuid.UUID,
-    run_id: uuid.UUID,
-    stage1_provider: AIProvider | None,
-    stage1_fallback_provider: AIProvider | None,
-    stage2_provider: AIProvider | None,
-    stage1_model: str | None = None,
-    stage1_fallback_model: str | None = None,
-    stage2_model: str | None = None,
-) -> tuple[dict[str, int] | None, Usage, str | None]:
-    with SessionLocal() as thread_session:
-        try:
-            result, usage = enrich_recipe(
-                thread_session,
-                recipe_id,
-                stage1_provider=stage1_provider,
-                stage1_fallback_provider=stage1_fallback_provider,
-                stage2_provider=stage2_provider,
-                stage1_model=stage1_model,
-                stage1_fallback_model=stage1_fallback_model,
-                stage2_model=stage2_model,
-                task_run_id=run_id,
-            )
-            return result, usage, None
-        except Exception as exc:
-            logger.warning("Enrichment failed for recipe %s: %s", recipe_id, exc)
-            return None, Usage(), str(exc)
-
-
-def enrich_extracted_recipes(session: Session, run: TaskRun) -> dict:
-    """Enrich every just-extracted recipe concurrently: one failure never loses a book."""
-    recipe_ids = list(session.scalars(select(Recipe.id).where(Recipe.extraction_run_id == run.id)))
-    if not recipe_ids:
-        return {
-            "enrichment": {
-                "attempted": 0,
-                "complete": 0,
-                "failed": 0,
-                "stale_response": 0,
-            }
-        }
-
-    upsert_facet_vocabulary(session)
-    session.commit()
-
-    chain = resolve_ingredient_chain(session)
-    semantics = resolve_task(session, ModelRole.RECIPE_SEMANTICS)
-    if not chain or semantics is None:
-        logger.warning("No usable AI provider is configured; skipping enrichment")
-        return {
-            "enrichment": {
-                "attempted": len(recipe_ids),
-                "complete": 0,
-                "failed": 0,
-                "stale_response": 0,
-            }
-        }
-    stage1_provider, stage1_model = chain[0].provider, chain[0].model
-    fallback = chain[1] if len(chain) > 1 else chain[0]
-    stage1_fallback_provider, stage1_fallback_model = fallback.provider, fallback.model
-    stage2_provider, stage2_model = semantics.provider, semantics.model
-    session.rollback()
-
-    complete = failed = stale = 0
-    results: list[dict[str, int]] = []
-
-    max_workers = min(len(recipe_ids), settings.extraction_threads)
-    if max_workers < 1:
-        max_workers = 1
-
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = {
-            executor.submit(
-                _enrich_recipe_worker,
-                recipe_id,
-                run.id,
-                stage1_provider,
-                stage1_fallback_provider,
-                stage2_provider,
-                stage1_model,
-                stage1_fallback_model,
-                stage2_model,
-            ): recipe_id
-            for recipe_id in recipe_ids
-        }
-        for future in as_completed(futures):
-            recipe_id = futures[future]
-            try:
-                result, usage, error = future.result()
-            except Exception as exc:
-                result, usage, error = None, Usage(), str(exc)
-                logger.warning("Enrichment worker thread raised for recipe %s: %s", recipe_id, exc)
-
-            if error is not None:
-                failed += 1
-                if "stale" in error.lower():
-                    stale += 1
-            elif result is not None and result.get("skipped"):
-                continue
-            elif result is not None:
-                complete += 1
-                results.append(result)
-                if usage.cost_usd is not None:
-                    run.cost_usd = (run.cost_usd or 0) + usage.cost_usd
-                if usage.input_tokens is not None:
-                    run.input_tokens = (run.input_tokens or 0) + usage.input_tokens
-                if usage.output_tokens is not None:
-                    run.output_tokens = (run.output_tokens or 0) + usage.output_tokens
-
-    metrics = aggregate_metrics(results)
-    return {
-        "enrichment": {
-            "attempted": len(recipe_ids),
-            "complete": complete,
-            "failed": failed,
-            "stale_response": stale,
-            **metrics,
-        }
-    }
-
-
 def _finalise_result(run_id: str, result: dict | None) -> str:
     """Inspect the run after a graph invocation: persist recipes when done, or report
     the review pause. `result` is the graph's final state (None never reaches here on
@@ -355,7 +258,6 @@ def _finalise_result(run_id: str, result: dict | None) -> str:
                 return "Book not found"
             raw_recipes = (result or {}).get("raw_recipes", [])
             created = save_recipes_from_graph_state(session, book, run, raw_recipes)
-            run.detail = {**run.detail, **enrich_extracted_recipes(session, run)}
             recipes = list(
                 session.scalars(select(Recipe).where(Recipe.extraction_run_id == run.id))
             )
