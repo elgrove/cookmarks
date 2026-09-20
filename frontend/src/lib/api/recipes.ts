@@ -9,6 +9,7 @@ export const recipeNeighbourSchema = z.object({
 export const ingredientLineSchema = z.object({
 	id: z.string().uuid(),
 	position: z.number().int().nonnegative(),
+	kind: z.null(),
 	text: z.string()
 });
 
@@ -19,11 +20,17 @@ export const recipeCanonicalIngredientSchema = z.object({
 });
 
 export const recipeFactSchema = z.object({
-	id: z.string(), name: z.string(), is_primary: z.boolean()
+	id: z.string(),
+	name: z.string(),
+	is_primary: z.boolean(),
+	source: z.literal('inferred'),
+	evidence: z.null()
 });
 
 export const recipeCuisineSchema = z.object({
-	id: z.string()
+	id: z.string(),
+	source: z.literal('inferred'),
+	evidence: z.null()
 });
 
 // Mirrors the RecipeDetail wire shape from GET /api/recipes/{id} (snake_case).
@@ -36,6 +43,7 @@ export const recipeDetailSchema = z.object({
 	name: z.string(),
 	description: z.string().nullable(),
 	ingredients_verbatim: z.array(ingredientLineSchema),
+	ingredients: z.array(z.record(z.unknown())),
 	canonical_ingredients: z.array(recipeCanonicalIngredientSchema),
 	enrichment_status: z.enum(['pending', 'running', 'complete', 'failed']),
 	cuisines: z.array(recipeCuisineSchema),

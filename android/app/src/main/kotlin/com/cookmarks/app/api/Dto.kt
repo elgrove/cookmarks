@@ -119,6 +119,7 @@ data class RecipeNeighbour(val id: String, val name: String)
 data class IngredientLine(
     val id: String,
     val position: Int,
+    val kind: String? = null,
     val text: String,
 )
 

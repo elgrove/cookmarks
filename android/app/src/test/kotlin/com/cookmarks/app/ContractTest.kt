@@ -24,6 +24,7 @@ import com.cookmarks.app.api.TaskRun
 import com.cookmarks.app.api.TaskRunAck
 import com.cookmarks.app.api.UserRead
 import java.io.File
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.decodeFromJsonElement
@@ -31,6 +32,76 @@ import kotlinx.serialization.json.jsonObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+
+@Serializable
+private data class LegacyIngredientLine(
+    val id: String,
+    val position: Int,
+    val kind: String?,
+    val text: String,
+)
+
+@Serializable
+private data class LegacyIngredientOccurrence(
+    val id: String,
+    val line_id: String,
+    val position: Int,
+    val ingredient_id: String,
+    val ingredient_name: String,
+    val quantity: String?,
+    val unit: String?,
+    val preparation: String?,
+    val optional: Boolean,
+    val alternative_group: Int?,
+    val is_key: Boolean,
+    val parse_method: String,
+    val resolution_method: String,
+)
+
+@Serializable
+private data class LegacyRecipeFact(
+    val id: String,
+    val name: String,
+    val is_primary: Boolean,
+    val source: String,
+    val evidence: String?,
+)
+
+@Serializable
+private data class LegacyRecipeCuisine(
+    val id: String,
+    val source: String,
+    val evidence: String?,
+)
+
+@Serializable
+private data class LegacyRecipeNeighbour(val id: String, val name: String)
+
+@Serializable
+private data class LegacyRecipeDetail(
+    val id: String,
+    val book_id: String,
+    val book_title: String,
+    val book_author: String,
+    val book_has_cover: Boolean,
+    val name: String,
+    val description: String?,
+    val ingredients_verbatim: List<LegacyIngredientLine>,
+    val ingredients: List<LegacyIngredientOccurrence>,
+    val enrichment_status: String,
+    val cuisines: List<LegacyRecipeCuisine>,
+    val methods: List<LegacyRecipeFact>,
+    val courses: List<LegacyRecipeFact>,
+    val instructions: List<String>,
+    val yields: String?,
+    val keywords: List<String>,
+    val has_image: Boolean,
+    val is_favourite: Boolean,
+    val context: String,
+    val in_book: Boolean?,
+    val previous: LegacyRecipeNeighbour?,
+    val next: LegacyRecipeNeighbour?,
+)
 
 class ContractTest {
     private val contract = File("../../contract")
@@ -128,8 +199,17 @@ class ContractTest {
     fun recipe_detail() {
         val recipe = pin<RecipeDetail>("recipe")
         assertEquals(3, recipe.ingredients_verbatim.size)
+        assertTrue(recipe.ingredients_verbatim.all { it.kind == null })
         assertEquals(0, recipe.canonical_ingredients.size)
         assertEquals("book", recipe.context)
+    }
+
+    @Test
+    fun released_recipe_detail_remains_compatible() {
+        val recipe = pin<LegacyRecipeDetail>("recipe")
+        assertTrue(recipe.ingredients_verbatim.all { it.kind == null })
+        assertTrue(recipe.ingredients.isEmpty())
+        assertEquals("inferred", recipe.methods.single().source)
     }
 
     @Test
