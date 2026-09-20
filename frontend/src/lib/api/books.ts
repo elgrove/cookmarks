@@ -193,7 +193,15 @@ export async function updateBook(
 		let detail = '';
 		try {
 			const body = await res.json();
-			detail = typeof body?.detail === 'string' ? body.detail : JSON.stringify(body?.detail ?? '');
+			const raw = body?.detail;
+			// FastAPI validation failures arrive as an array of {msg, ...} — surface
+			// the first message rather than serialised JSON.
+			detail =
+				typeof raw === 'string'
+					? raw
+					: Array.isArray(raw) && typeof raw[0]?.msg === 'string'
+						? raw[0].msg
+						: '';
 		} catch {
 			detail = '';
 		}

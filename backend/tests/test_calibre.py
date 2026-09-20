@@ -149,9 +149,9 @@ def test_sync_keeps_books_absent_from_calibre(session: Session) -> None:
     assert result.created == ["Unrelated"]
     assert result.skipped == []
 
-    orphan = session.scalars(select(Book).where(Book.calibre_id == 1)).one()
-    assert orphan.title == "With Recipes"
-    assert len(orphan.recipes) == 3  # nothing cascaded
+    remaining = session.scalars(select(Book).where(Book.calibre_id == 1)).one()
+    assert remaining.title == "With Recipes"
+    assert len(remaining.recipes) == 3  # nothing cascaded
     assert session.scalars(select(Book).where(Book.calibre_id == 2)).one().title == (
         "No Recipes Yet"
     )

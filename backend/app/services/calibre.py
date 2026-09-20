@@ -168,11 +168,11 @@ def sync_calibre(
     metadata after import. Ids on the `CalibreExclusion` list are skipped entirely,
     so a deleted book never comes back. Books absent from `calibre_books` stay in
     Cookmarks untouched; repeated imports are idempotent."""
-    existing_ids = set(session.scalars(select(Book.calibre_id)).all())
-    excluded_ids = set(session.scalars(select(CalibreExclusion.calibre_id)).all())
     existing_titles: dict[int, str] = {
         row[0]: row[1] for row in session.execute(select(Book.calibre_id, Book.title)).all()
     }
+    existing_ids = set(existing_titles)
+    excluded_ids = set(session.scalars(select(CalibreExclusion.calibre_id)).all())
     created: list[str] = []
     skipped: list[str] = []
     excluded: list[str] = []

@@ -90,8 +90,9 @@
 		ocrAvailable?: boolean;
 	} = $props();
 
-	// Local display copy: the route owns the fetch, but applying the editor's
-	// returned canonical metadata here paints the masthead/tags/rail immediately.
+	// Local display copy of the book prop: applying the editor's returned canonical
+	// metadata here paints the masthead/tags/rail immediately, while the effect
+	// below keeps it following the route's own state afterwards.
 	let book = $state(initialBook);
 	$effect(() => {
 		book = initialBook;

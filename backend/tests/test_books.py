@@ -8,7 +8,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.models import Book, CalibreExclusion, Recipe, RecipeListItem, User
+from app.models import Book, CalibreExclusion, Keyword, Recipe, RecipeListItem, User
+from app.services.calibre import CalibreBook, sync_calibre
 from app.services.users import create_user
 from app.services.vector_store import EMBEDDING_DIMENSIONS, VectorStore
 
@@ -464,8 +465,6 @@ def test_delete_book_is_not_restored_by_a_later_import(
     client: TestClient, session: Session
 ) -> None:
     """Deleting records the exclusion, so the append-only import skips it."""
-    from app.services.calibre import CalibreBook, sync_calibre
-
     book_id = _book_id(client, "With Recipes")
     assert client.delete(f"/api/books/{book_id}").status_code == 204
 
@@ -492,9 +491,7 @@ def test_delete_book_is_not_restored_by_a_later_import(
 def test_delete_book_forbidden_for_non_admin(
     client: TestClient, session: Session, act_as: Callable[[str], User]
 ) -> None:
-    from app.services.users import create_user as _create_user
-
-    _create_user(session, "plain", "plain-password", is_admin=False)
+    create_user(session, "plain", "plain-password", is_admin=False)
     act_as("plain")
     book_id = _book_id(client, "With Recipes")
     assert client.delete(f"/api/books/{book_id}").status_code == 403
@@ -535,7 +532,7 @@ def test_update_book_clears_optional_fields(client: TestClient) -> None:
     book_id = _book_id(client, "With Recipes")
     assert client.patch(
         f"/api/books/{book_id}", json={"isbn": "123", "description": "x"}
-    ).status_code == (200)
+    ).status_code == 200
     resp = client.patch(
         f"/api/books/{book_id}",
         json={"isbn": "", "pubdate": None, "description": "", "keywords": []},
@@ -567,6 +564,8 @@ def test_update_book_rejects_blank_title_and_author(client: TestClient) -> None:
     book_id = _book_id(client, "With Recipes")
     assert client.patch(f"/api/books/{book_id}", json={"title": "   "}).status_code == 422
     assert client.patch(f"/api/books/{book_id}", json={"author": ""}).status_code == 422
+    assert client.patch(f"/api/books/{book_id}", json={"title": None}).status_code == 422
+    assert client.patch(f"/api/books/{book_id}", json={"author": None}).status_code == 422
     assert client.get(f"/api/books/{book_id}").json()["title"] == "With Recipes"
 
 
@@ -576,12 +575,24 @@ def test_update_book_rejects_overlong_values(client: TestClient) -> None:
     assert client.patch(f"/api/books/{book_id}", json={"isbn": "x" * 51}).status_code == 422
 
 
+def test_update_book_keywords_reuse_the_shared_row_across_case(
+    client: TestClient, session: Session
+) -> None:
+    """A differently-cased tag reuses the existing keyword row instead of forking the
+    shared vocabulary."""
+    book_id = _book_id(client, "With Recipes")
+    assert client.patch(f"/api/books/{book_id}", json={"keywords": ["Pasta"]}).status_code == 200
+    assert client.patch(f"/api/books/{book_id}", json={"keywords": ["pasta"]}).status_code == 200
+    body = client.get(f"/api/books/{book_id}").json()
+    assert body["keywords"] == ["Pasta"]
+    rows = session.scalars(select(Keyword).where(Keyword.name.ilike("pasta"))).all()
+    assert len(rows) == 1
+
+
 def test_update_book_forbidden_for_non_admin(
     client: TestClient, session: Session, act_as: Callable[[str], User]
 ) -> None:
-    from app.services.users import create_user as _create_user
-
-    _create_user(session, "plain", "plain-password", is_admin=False)
+    create_user(session, "plain", "plain-password", is_admin=False)
     act_as("plain")
     book_id = _book_id(client, "With Recipes")
     assert client.patch(f"/api/books/{book_id}", json={"title": "x"}).status_code == 403

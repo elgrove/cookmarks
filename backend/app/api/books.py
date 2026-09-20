@@ -172,6 +172,10 @@ def update_book(
     if book is None:
         raise HTTPException(status_code=404, detail="book not found")
     provided = body.model_fields_set
+    if "title" in provided and body.title is None:
+        raise HTTPException(status_code=422, detail="title must not be null")
+    if "author" in provided and body.author is None:
+        raise HTTPException(status_code=422, detail="author must not be null")
     if "title" in provided and body.title is not None:
         book.title = body.title
     if "author" in provided and body.author is not None:

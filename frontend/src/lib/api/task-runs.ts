@@ -129,10 +129,10 @@ export interface BookIngestDetail {
 }
 export interface CalibreSyncDetail {
 	created: string[];
-	skipped: string[];
 	excluded: string[];
-	// Historical runs (pre append-only import) may carry these; the detail renderer
-	// reads them defensively but new runs never populate them.
+	// New runs always populate `skipped`; pre-change historical rows carry
+	// `updated`/`orphaned`/`deleted` instead — every read stays defensive.
+	skipped?: string[];
 	updated?: string[];
 	orphaned?: string[];
 	deleted?: string[];

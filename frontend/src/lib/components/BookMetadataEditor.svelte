@@ -101,7 +101,7 @@
 			author: author.trim(),
 			isbn: isbn.trim() === '' ? null : isbn.trim(),
 			pubdate: pubdate.trim() === '' ? null : pubdate.trim(),
-			description,
+			description: description.trim(),
 			keywords: [...keywords]
 		};
 		try {

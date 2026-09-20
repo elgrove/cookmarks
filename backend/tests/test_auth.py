@@ -152,9 +152,7 @@ def test_non_admin_reads_but_cannot_reach_admin_surfaces(
     book_id = session.scalar(select(Book.id))
     assert anon.delete(f"/api/books/{book_id}").status_code == 403
     assert anon.post(f"/api/books/{book_id}/extract").status_code == 403
-    assert anon.patch(f"/api/books/{book_id}", json={"title": "x", "author": "y"}).status_code == (
-        403
-    )
+    assert anon.patch(f"/api/books/{book_id}", json={"title": "x"}).status_code == 403
 
 
 def test_admin_reaches_admin_surfaces(anon: TestClient) -> None:
