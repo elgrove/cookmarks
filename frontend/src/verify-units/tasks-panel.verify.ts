@@ -33,7 +33,7 @@ const unit: VerifiableUnit<Props> = {
 	id: 'tasks-panel',
 	title: 'Tasks panel',
 	description:
-		'The admin Tasks tab: on-demand book keywords (with regenerate-all), keyword dedup, ingredient dedup and Calibre sync — each driving idle → running → queued (fire-and-forget), or → error if the dispatch rejects.',
+		'The admin Tasks tab: on-demand book keywords (with regenerate-all), keyword dedup, ingredient dedup and Calibre import — each driving idle → running → queued (fire-and-forget), or → error if the dispatch rejects.',
 	kind: 'component',
 	component: TasksPanel,
 	fixtures: [

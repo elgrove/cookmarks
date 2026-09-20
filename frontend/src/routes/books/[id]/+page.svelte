@@ -3,7 +3,15 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import BookDetail, { type BookDetailData } from '$lib/components/BookDetail.svelte';
-	import { deleteBook, fetchBookDetail, markBookRead, resetBookProgress } from '$lib/api/books';
+	import {
+		deleteBook,
+		fetchBookDetail,
+		markBookRead,
+		resetBookProgress,
+		updateBook,
+		type BookDetailResponse,
+		type BookMetadataUpdate
+	} from '$lib/api/books';
 	import { queueBook, unqueueBook } from '$lib/api/reading-queue';
 	import { cleanTitle, pageTitle } from '$lib/title';
 	import { currentUser } from '$lib/auth';
@@ -59,34 +67,7 @@
 		}
 		try {
 			const b = await fetchBookDetail(id);
-			book = {
-				id: b.id,
-				title: b.title,
-				author: b.author,
-				isbn: b.isbn,
-				pubdate: b.pubdate,
-				description: b.description,
-				recipeCount: b.recipe_count,
-				hasCover: b.has_cover,
-				hasEpub: b.has_epub,
-				hasPdf: b.has_pdf,
-				added: b.added,
-				keywords: b.keywords,
-				recipes: b.recipes.map((r) => ({
-					id: r.id,
-					name: r.name,
-					keywords: r.keywords
-				})),
-				queued: b.queued,
-				reading: b.reading
-					? {
-							mode: b.reading.mode,
-							fraction: b.reading.fraction,
-							finished: b.reading.finished
-						}
-					: null,
-				resumeRecipe: b.resume_recipe
-			};
+			book = toBookDetail(b);
 			status = 'ready';
 			void loadLatestRun(id);
 			void loadReadiness();
@@ -94,6 +75,47 @@
 			console.error('failed to load book', err);
 			status = 'error';
 		}
+	}
+
+	function toBookDetail(b: BookDetailResponse): BookDetailData {
+		return {
+			id: b.id,
+			title: b.title,
+			author: b.author,
+			isbn: b.isbn,
+			pubdate: b.pubdate,
+			description: b.description,
+			recipeCount: b.recipe_count,
+			hasCover: b.has_cover,
+			hasEpub: b.has_epub,
+			hasPdf: b.has_pdf,
+			added: b.added,
+			keywords: b.keywords,
+			recipes: b.recipes.map((r) => ({
+				id: r.id,
+				name: r.name,
+				keywords: r.keywords
+			})),
+			queued: b.queued,
+			reading: b.reading
+				? {
+						mode: b.reading.mode,
+						fraction: b.reading.fraction,
+						finished: b.reading.finished
+					}
+				: null,
+			resumeRecipe: b.resume_recipe
+		};
+	}
+
+	// Admin metadata edit: persist via PATCH and apply the canonical response to
+	// route state, so the page title and visible metadata change without navigation.
+	// The returned detail also flows back into BookDetail, which paints immediately.
+	async function saveMetadata(update: BookMetadataUpdate) {
+		if (!book) return;
+		const updated = await updateBook(book.id, update);
+		book = toBookDetail(updated);
+		return book;
 	}
 
 	// Finishing or resetting paints immediately, then reloads from the server: the
@@ -158,11 +180,12 @@
 				}
 			: undefined}
 		onDelete={$currentUser?.is_admin
-			? async ({ exclude, fromLibrary }) => {
-					await deleteBook(book!.id, { exclude, fromLibrary });
+			? async () => {
+					await deleteBook(book!.id);
 					await goto('/books');
 				}
 			: undefined}
+		onUpdate={$currentUser?.is_admin ? saveMetadata : undefined}
 	/>
 {:else}
 	<div class="status">

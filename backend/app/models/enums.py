@@ -34,12 +34,11 @@ class ModelRole(StrEnum):
 
 class TaskType(StrEnum):
     """Which kind of background job a task run records. Extraction is one type among
-    several maintenance jobs (book-keyword tagging, keyword dedup, Calibre sync, adding
-    a book to the library).
+    several maintenance jobs (book-keyword tagging, keyword dedup, Calibre import).
 
-    RECIPE_ENRICHMENT_PILOT and RECIPE_ENRICHMENT_BACKFILL are retired: nothing
-    creates them any more (their endpoints and workers are removed), but the
-    members stay so historical runs from the completed backfill still load.
+    BOOK_INGEST, RECIPE_ENRICHMENT_PILOT and RECIPE_ENRICHMENT_BACKFILL are retired:
+    nothing creates them any more (their endpoints and workers are removed), but the
+    members stay so historical runs still load.
     """
 
     EXTRACTION = "extraction"

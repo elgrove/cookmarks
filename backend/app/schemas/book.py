@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models.enums import ReadingMode
 from app.schemas.recipe import RecipeNeighbour, RecipeRow
@@ -71,6 +71,66 @@ class BookDetail(BaseModel):
     # Where reading the recipes picks up: the furthest one reached, or the first in book
     # order for a book not yet read. None for a book with nothing extracted.
     resume_recipe: RecipeNeighbour | None
+
+
+class BookUpdate(BaseModel):
+    """Admin metadata edit: every field optional, only provided fields change. Title
+    and author must be non-blank when provided (ISBN, publication date, description
+    and keywords can be cleared). Text is trimmed; blank keyword values are dropped
+    and names are deduplicated case-insensitively, keeping the first display
+    spelling. Lengths mirror the database columns so an overlong value 422s instead
+    of failing at commit."""
+
+    title: str | None = Field(default=None, max_length=500)
+    author: str | None = Field(default=None, max_length=500)
+    isbn: str | None = Field(default=None, max_length=50)
+    pubdate: date | None = None
+    description: str | None = None
+    keywords: list[str] | None = None
+
+    @field_validator("title", "author")
+    @classmethod
+    def _require_non_blank(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        if not value.strip():
+            raise ValueError("must not be blank")
+        return value.strip()
+
+    @field_validator("isbn")
+    @classmethod
+    def _trim_isbn(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = value.strip()
+        return stripped or None
+
+    @field_validator("description")
+    @classmethod
+    def _trim_description(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return value.strip()
+
+    @field_validator("keywords")
+    @classmethod
+    def _clean_keywords(cls, value: list[str] | None) -> list[str] | None:
+        if value is None:
+            return None
+        seen: set[str] = set()
+        cleaned: list[str] = []
+        for raw in value:
+            name = raw.strip()
+            if not name:
+                continue
+            if len(name) > 200:
+                raise ValueError("keyword must be at most 200 characters")
+            folded = name.casefold()
+            if folded in seen:
+                continue
+            seen.add(folded)
+            cleaned.append(name)
+        return cleaned
 
 
 class ReadingUpdate(BaseModel):

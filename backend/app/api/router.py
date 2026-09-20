@@ -10,7 +10,6 @@ from app.api import (
     game,
     health,
     home,
-    ingest,
     lists,
     reading_queue,
     recipes,
@@ -42,7 +41,6 @@ api_router.include_router(lists.router, dependencies=_USER)
 api_router.include_router(reading_queue.router, dependencies=_USER)
 api_router.include_router(tickets.router, dependencies=_USER)
 api_router.include_router(config.router, dependencies=_ADMIN)
-api_router.include_router(ingest.router, dependencies=_ADMIN)
 api_router.include_router(tasks.router, dependencies=_ADMIN)
 api_router.include_router(task_runs.router, dependencies=_ADMIN)
 api_router.include_router(users.router, dependencies=_ADMIN)

@@ -8,8 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.models import CalibreExclusion, Recipe, RecipeListItem, User
-from app.services.ingest import IngestError
+from app.models import Book, CalibreExclusion, Recipe, RecipeListItem, User
 from app.services.users import create_user
 from app.services.vector_store import EMBEDDING_DIMENSIONS, VectorStore
 
@@ -452,56 +451,137 @@ def test_delete_book_404_for_unknown_book(client: TestClient) -> None:
     assert client.delete(f"/api/books/{uuid.uuid4()}").status_code == 404
 
 
-def test_delete_book_without_exclude_records_no_exclusion(
-    client: TestClient, session: Session
-) -> None:
-    assert client.delete(f"/api/books/{_book_id(client, 'With Recipes')}").status_code == 204
-    assert session.scalars(select(CalibreExclusion)).all() == []
-
-
-def test_delete_book_with_exclude_records_the_calibre_id(
-    client: TestClient, session: Session
-) -> None:
+def test_delete_book_always_records_the_calibre_id(client: TestClient, session: Session) -> None:
     book_id = _book_id(client, "With Recipes")
-    assert client.delete(f"/api/books/{book_id}?exclude=true").status_code == 204
+    assert client.delete(f"/api/books/{book_id}").status_code == 204
 
     exclusion = session.scalars(select(CalibreExclusion)).one()
     assert exclusion.calibre_id == 1
     assert exclusion.title == "With Recipes"
 
 
-def test_delete_from_library_removes_the_calibre_entry_and_needs_no_exclusion(
-    client: TestClient, session: Session, monkeypatch: pytest.MonkeyPatch
+def test_delete_book_is_not_restored_by_a_later_import(
+    client: TestClient, session: Session
 ) -> None:
-    removed: list[int] = []
-    monkeypatch.setattr("app.api.books.remove_from_library", removed.append)
+    """Deleting records the exclusion, so the append-only import skips it."""
+    from app.services.calibre import CalibreBook, sync_calibre
+
     book_id = _book_id(client, "With Recipes")
+    assert client.delete(f"/api/books/{book_id}").status_code == 204
 
-    assert client.delete(f"/api/books/{book_id}?from_library=true").status_code == 204
+    result = sync_calibre(
+        session,
+        [
+            CalibreBook(
+                calibre_id=1,
+                title="With Recipes",
+                author="Author One",
+                isbn="",
+                pubdate=None,
+                description="",
+                path="Author One/With Recipes (1)",
+                calibre_added_at=None,
+            )
+        ],
+    )
+    assert result.excluded == ["With Recipes"]
+    assert result.created == []
+    assert session.scalars(select(Book).where(Book.calibre_id == 1)).all() == []
 
-    assert removed == [1]
-    assert client.get(f"/api/books/{book_id}").status_code == 404
-    # Nothing is left in Calibre to re-sync, so an exclusion would be noise.
-    assert session.scalars(select(CalibreExclusion)).all() == []
 
-
-def test_delete_from_library_keeps_the_book_when_calibre_refuses(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch
+def test_delete_book_forbidden_for_non_admin(
+    client: TestClient, session: Session, act_as: Callable[[str], User]
 ) -> None:
-    def _refuse(_calibre_id: int) -> None:
-        raise IngestError("calibredb failed: library is locked")
+    from app.services.users import create_user as _create_user
 
-    monkeypatch.setattr("app.api.books.remove_from_library", _refuse)
+    _create_user(session, "plain", "plain-password", is_admin=False)
+    act_as("plain")
     book_id = _book_id(client, "With Recipes")
-
-    assert client.delete(f"/api/books/{book_id}?from_library=true").status_code == 502
-    # A half-done delete is worse than none: the book survives intact.
+    assert client.delete(f"/api/books/{book_id}").status_code == 403
     assert client.get(f"/api/books/{book_id}").status_code == 200
 
 
-def test_delete_cannot_both_exclude_and_remove_from_the_library(client: TestClient) -> None:
+def test_update_book_edits_metadata(client: TestClient, session: Session) -> None:
     book_id = _book_id(client, "With Recipes")
-    res = client.delete(f"/api/books/{book_id}?exclude=true&from_library=true")
+    resp = client.patch(
+        f"/api/books/{book_id}",
+        json={"title": "  With Recipes, Revised  ", "author": "New Author"},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert set(body.keys()) == DETAIL_KEYS
+    assert body["title"] == "With Recipes, Revised"
+    assert body["author"] == "New Author"
 
-    assert res.status_code == 422
-    assert client.get(f"/api/books/{book_id}").status_code == 200
+    book = session.get(Book, uuid.UUID(book_id))
+    assert book is not None
+    assert (book.title, book.author) == ("With Recipes, Revised", "New Author")
+    # The folded search fields move in the same transaction.
+    assert book.title_folded == "with recipes, revised"
+    assert book.author_folded == "new author"
+
+
+def test_update_book_replaces_keywords_case_insensitively(client: TestClient) -> None:
+    book_id = _book_id(client, "With Recipes")
+    resp = client.patch(
+        f"/api/books/{book_id}",
+        json={"keywords": [" Pasta ", "", "pasta", "Quick", " QUICK "]},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["keywords"] == ["Pasta", "Quick"]
+
+
+def test_update_book_clears_optional_fields(client: TestClient) -> None:
+    book_id = _book_id(client, "With Recipes")
+    assert client.patch(
+        f"/api/books/{book_id}", json={"isbn": "123", "description": "x"}
+    ).status_code == (200)
+    resp = client.patch(
+        f"/api/books/{book_id}",
+        json={"isbn": "", "pubdate": None, "description": "", "keywords": []},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["isbn"] is None
+    assert body["pubdate"] is None
+    assert body["description"] == ""
+    assert body["keywords"] == []
+
+
+def test_update_book_partial_update_leaves_the_rest(client: TestClient) -> None:
+    book_id = _book_id(client, "With Recipes")
+    before = client.get(f"/api/books/{book_id}").json()
+    resp = client.patch(f"/api/books/{book_id}", json={"author": "Only Author Changed"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["author"] == "Only Author Changed"
+    assert body["title"] == before["title"]
+    assert body["keywords"] == before["keywords"]
+
+
+def test_update_book_404_for_unknown_book(client: TestClient) -> None:
+    assert client.patch(f"/api/books/{uuid.uuid4()}", json={"title": "x"}).status_code == 404
+
+
+def test_update_book_rejects_blank_title_and_author(client: TestClient) -> None:
+    book_id = _book_id(client, "With Recipes")
+    assert client.patch(f"/api/books/{book_id}", json={"title": "   "}).status_code == 422
+    assert client.patch(f"/api/books/{book_id}", json={"author": ""}).status_code == 422
+    assert client.get(f"/api/books/{book_id}").json()["title"] == "With Recipes"
+
+
+def test_update_book_rejects_overlong_values(client: TestClient) -> None:
+    book_id = _book_id(client, "With Recipes")
+    assert client.patch(f"/api/books/{book_id}", json={"title": "x" * 501}).status_code == 422
+    assert client.patch(f"/api/books/{book_id}", json={"isbn": "x" * 51}).status_code == 422
+
+
+def test_update_book_forbidden_for_non_admin(
+    client: TestClient, session: Session, act_as: Callable[[str], User]
+) -> None:
+    from app.services.users import create_user as _create_user
+
+    _create_user(session, "plain", "plain-password", is_admin=False)
+    act_as("plain")
+    book_id = _book_id(client, "With Recipes")
+    assert client.patch(f"/api/books/{book_id}", json={"title": "x"}).status_code == 403

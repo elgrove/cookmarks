@@ -33,7 +33,9 @@
 		book_keywords: 'Book keywords',
 		keyword_dedup: 'Keyword dedup',
 		ingredient_dedup: 'Ingredient dedup',
-		calibre_sync: 'Calibre sync',
+		calibre_sync: 'Calibre import',
+		// Retired (MY-201): the Add-book feature is removed; kept so historical runs
+		// stay readable and filterable.
 		book_ingest: 'Add book',
 		recipe_enrichment_pilot: 'Enrichment pilot',
 		recipe_enrichment_backfill: 'Batch backfill'
@@ -67,7 +69,7 @@
 				return plural((run.detail as unknown as IngredientDedupDetail).merges_applied ?? 0, 'merge');
 			case 'calibre_sync': {
 				const d = run.detail as unknown as CalibreSyncDetail;
-				return `${d.created?.length ?? 0} new · ${d.updated?.length ?? 0} updated`;
+				return `${d.created?.length ?? 0} new · ${d.skipped?.length ?? d.updated?.length ?? 0} skipped`;
 			}
 			case 'book_ingest':
 				return (run.detail as unknown as BookIngestDetail).title || 'Add book';

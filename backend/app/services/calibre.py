@@ -1,18 +1,15 @@
-"""Read books live from a Calibre library and reconcile them into the v2 DB.
+"""Read books live from a Calibre library and import them into the v2 DB.
 
-Calibre keeps its catalogue in `<library>/metadata.db`. We read it (never write),
-select the cookbooks (a configurable tag plus a list of formats, defaulting to "Food"
-and EPUB or PDF) and upsert `Book` rows by `calibre_id`. `path` is treated as a
-refreshable pointer.
-Recipe identity and organisation (favourites, lists, AI keywords) hang off stable
-recipe UUIDs and are never touched for a book that is still in the library. A book
-whose `calibre_id` has left the library altogether is deleted, cascading to its
-recipes; one that is merely outside the tag/format selection is reported as orphaned
-and left alone, so untagging a book can't silently destroy its recipes.
+Calibre is a read-only source of new books: we read its catalogue
+(`<library>/metadata.db`), select the cookbooks (a configurable tag plus a list of
+formats, defaulting to "Food" and EPUB or PDF) and create `Book` rows by `calibre_id`
+only when that id is not already present and not excluded. After import Cookmarks owns
+its metadata and collection state — synchronisation never updates or deletes an
+existing book, including its path and bibliographic fields.
 
 The read layer (`read_books`) takes an open connection so it runs against either a
 real metadata.db or an in-memory fixture; `read_calibre_books` wraps it with the
-file-open. The reconcile (`sync_calibre`) takes already-read records, so it is
+file-open. The import (`sync_calibre`) takes already-read records, so it is
 decoupled from sqlite entirely. The later operator endpoint reuses both.
 """
 
@@ -72,15 +69,12 @@ class CalibreBook:
 
 @dataclass(frozen=True)
 class SyncResult:
-    """Outcome of a sync, by book title. `deleted` books are gone from the Calibre
-    library entirely (removed here too, recipes and all); `orphaned` ones are still in
-    the library but outside the tag/format selection — reported and left untouched;
-    `excluded` ones are on the exclusion list and were skipped."""
+    """Outcome of an import, by book title. `created` books are new rows; `skipped`
+    ones already existed and were left byte-for-byte unchanged; `excluded` ones are
+    on the exclusion list and were skipped."""
 
     created: list[str]
-    updated: list[str]
-    orphaned: list[str]
-    deleted: list[str]
+    skipped: list[str]
     excluded: list[str]
 
 
@@ -119,7 +113,7 @@ def read_books(conn: sqlite3.Connection, *, tag: str, book_formats: list[str]) -
     """Run the selection query over an open Calibre connection. A book holding several
     of the wanted formats still yields one row — the query selects distinct books."""
     if not book_formats:
-        # `IN ()` is false for every row, which would report the whole library orphaned.
+        # `IN ()` is false for every row, which would import nothing.
         raise ValueError("at least one book format must be selected")
     query = _SELECT_BOOKS.format(formats=", ".join("?" * len(book_formats)))
     rows = conn.execute(query, (tag, *book_formats)).fetchall()
@@ -151,17 +145,6 @@ def read_calibre_books(
         conn.close()
 
 
-def read_library_book_ids(library_path: Path) -> set[int]:
-    """Every book id in the library, whatever its tags or formats. Sync uses this to
-    tell "deleted from Calibre" (gone from here) apart from "no longer a cookbook"
-    (still here, outside the tag/format selection)."""
-    conn = open_calibre_db(library_path)
-    try:
-        return {row[0] for row in conn.execute("SELECT id FROM books")}
-    finally:
-        conn.close()
-
-
 def delete_books(session: Session, books: Iterable[Book]) -> None:
     """Delete books and everything hanging off them. The row delete cascades to recipes,
     runs and link tables through the schema's foreign keys, but the vec0 embedding table
@@ -178,79 +161,53 @@ def delete_books(session: Session, books: Iterable[Book]) -> None:
 def sync_calibre(
     session: Session,
     calibre_books: list[CalibreBook],
-    *,
-    library_ids: set[int] | None = None,
 ) -> SyncResult:
-    """Upsert Calibre books by `calibre_id`, refreshing bibliographic fields and the
-    `path` pointer. Recipes, list membership and keywords are never touched on a book
-    that survives. Ids on the `CalibreExclusion` list are skipped entirely, so a book
-    deleted-and-excluded in the app never comes back.
-
-    Books in v2 but absent from `calibre_books` are reported as orphaned. Pass
-    `library_ids` (every id in the library) to also delete the ones that have left
-    Calibre entirely — they cascade to their recipes, whose embeddings are purged
-    alongside since the vec0 table has no foreign key. Without it nothing is deleted."""
-    existing = {book.calibre_id: book for book in session.scalars(select(Book)).all()}
+    """Import Calibre books by `calibre_id`, creating only unseen, non-excluded ids.
+    Existing books are reported as skipped and left byte-for-byte unchanged in
+    Cookmarks — including path and bibliographic fields — so Cookmarks owns its
+    metadata after import. Ids on the `CalibreExclusion` list are skipped entirely,
+    so a deleted book never comes back. Books absent from `calibre_books` stay in
+    Cookmarks untouched; repeated imports are idempotent."""
+    existing_ids = set(session.scalars(select(Book.calibre_id)).all())
     excluded_ids = set(session.scalars(select(CalibreExclusion.calibre_id)).all())
+    existing_titles: dict[int, str] = {
+        row[0]: row[1] for row in session.execute(select(Book.calibre_id, Book.title)).all()
+    }
     created: list[str] = []
-    updated: list[str] = []
+    skipped: list[str] = []
     excluded: list[str] = []
-    seen: set[int] = set()
 
     for cb in calibre_books:
         if cb.calibre_id in excluded_ids:
             excluded.append(cb.title)
             continue
-        seen.add(cb.calibre_id)
-        book = existing.get(cb.calibre_id)
-        if book is None:
-            session.add(
-                Book(
-                    calibre_id=cb.calibre_id,
-                    title=cb.title,
-                    author=cb.author,
-                    isbn=cb.isbn,
-                    pubdate=cb.pubdate,
-                    description=cb.description,
-                    path=cb.path,
-                    calibre_added_at=cb.calibre_added_at,
-                )
+        if cb.calibre_id in existing_ids:
+            skipped.append(existing_titles.get(cb.calibre_id, cb.title))
+            continue
+        session.add(
+            Book(
+                calibre_id=cb.calibre_id,
+                title=cb.title,
+                author=cb.author,
+                isbn=cb.isbn,
+                pubdate=cb.pubdate,
+                description=cb.description,
+                path=cb.path,
+                calibre_added_at=cb.calibre_added_at,
             )
-            created.append(cb.title)
-        else:
-            book.title = cb.title
-            book.author = cb.author
-            book.isbn = cb.isbn
-            book.pubdate = cb.pubdate
-            book.description = cb.description
-            book.path = cb.path
-            book.calibre_added_at = cb.calibre_added_at
-            updated.append(cb.title)
-
-    # An excluded id that somehow still has a row is reported as excluded, not orphaned.
-    missing = [
-        book for cid, book in existing.items() if cid not in seen and cid not in excluded_ids
-    ]
-    gone = [] if library_ids is None else [b for b in missing if b.calibre_id not in library_ids]
-    gone_ids = {book.calibre_id for book in gone}
-    orphaned = [book.title for book in missing if book.calibre_id not in gone_ids]
-
-    delete_books(session, gone)
-    deleted = [book.title for book in gone]
+        )
+        created.append(cb.title)
+        existing_ids.add(cb.calibre_id)
 
     session.commit()
     logger.info(
-        "Calibre sync: %d created, %d updated, %d orphaned, %d deleted, %d excluded",
+        "Calibre import: %d created, %d skipped, %d excluded",
         len(created),
-        len(updated),
-        len(orphaned),
-        len(deleted),
+        len(skipped),
         len(excluded),
     )
     return SyncResult(
         created=created,
-        updated=updated,
-        orphaned=orphaned,
-        deleted=deleted,
+        skipped=skipped,
         excluded=excluded,
     )

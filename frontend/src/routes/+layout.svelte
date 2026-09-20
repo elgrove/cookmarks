@@ -102,13 +102,6 @@
 			class:active={$page.url.pathname.startsWith('/assistant')}
 			href="/assistant">Assistant</a
 		>
-		{#if $currentUser?.is_admin}
-			<a
-				class="navlink"
-				class:active={$page.url.pathname.startsWith('/add')}
-				href="/add">Add</a
-			>
-		{/if}
 		{#if showAccount}
 			<a
 				class="who"

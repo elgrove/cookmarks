@@ -21,11 +21,10 @@ celery_app = Celery(
         "app.tasks.keyword_dedup",
         "app.tasks.ingredient_dedup",
         "app.tasks.calibre_sync",
-        "app.tasks.ingest",
     ],
 )
 
-# The vocabulary only drifts as books are ingested, and each run sweeps one candidate
+# The vocabulary only drifts as books are imported, and each run sweeps one candidate
 # window, so a weekly beat keeps it tidy without a person remembering to press the button.
 celery_app.conf.timezone = "UTC"
 celery_app.conf.beat_schedule = {

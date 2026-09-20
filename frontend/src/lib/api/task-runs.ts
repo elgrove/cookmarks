@@ -27,6 +27,8 @@ export const taskTypeSchema = z.enum([
 	'keyword_dedup',
 	'ingredient_dedup',
 	'calibre_sync',
+	// Retired: nothing creates book_ingest runs any more (the Add-book feature is
+	// removed), but historical runs still arrive over the wire and must parse.
 	'book_ingest',
 	// Retired (MY-184): nothing creates these any more, but historical runs from
 	// the completed backfill still arrive over the wire and must parse.
@@ -105,6 +107,8 @@ export interface IngredientDedupDetail {
 	cursor_to?: string | null;
 }
 export interface BookIngestDetail {
+	// Retired (MY-201): the Add-book feature is removed and nothing creates these
+	// runs any more. Kept so historical production rows still render in Task Runs.
 	// The job as submitted — kept on the run so the worker reads it from its own row,
 	// and so a duplicate-failed run can be re-submitted as a replace without re-staging.
 	staging_id: string;
@@ -125,10 +129,13 @@ export interface BookIngestDetail {
 }
 export interface CalibreSyncDetail {
 	created: string[];
-	updated: string[];
-	orphaned: string[];
-	deleted: string[];
+	skipped: string[];
 	excluded: string[];
+	// Historical runs (pre append-only import) may carry these; the detail renderer
+	// reads them defensively but new runs never populate them.
+	updated?: string[];
+	orphaned?: string[];
+	deleted?: string[];
 }
 
 /** Every task run, newest first — the unified admin reporting index. `type` filters to

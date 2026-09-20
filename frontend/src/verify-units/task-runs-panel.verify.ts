@@ -142,7 +142,7 @@ const unit: VerifiableUnit<Props> = {
 								id: `x${i}`,
 								task_type: (['book_keywords', 'keyword_dedup', 'calibre_sync'] as const)[i % 3],
 								status: (['queued', 'running', 'review', 'done', 'failed'] as const)[i % 5],
-								detail: { books_tagged: i, merges_applied: i, created: [], updated: [] }
+								detail: { books_tagged: i, merges_applied: i, created: [], skipped: [] }
 							})
 				)
 			}
