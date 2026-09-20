@@ -102,6 +102,20 @@ def dedup_dispatched(monkeypatch: pytest.MonkeyPatch) -> list[tuple[Any, ...]]:
 
 
 @pytest.fixture(autouse=True)
+def classification_dispatched(monkeypatch: pytest.MonkeyPatch) -> list[tuple[Any, ...]]:
+    """Keep keyword-classification dispatch off Redis during API tests."""
+    from app.tasks.keyword_classification import classify_keywords_task
+
+    calls: list[tuple[Any, ...]] = []
+
+    def _record(*args: Any, **_kwargs: Any) -> None:
+        calls.append(args)
+
+    monkeypatch.setattr(classify_keywords_task, "delay", _record)
+    return calls
+
+
+@pytest.fixture(autouse=True)
 def ingredient_dedup_dispatched(monkeypatch: pytest.MonkeyPatch) -> list[tuple[Any, ...]]:
     """Keep canonical-ingredient dedup dispatch off Redis during API tests."""
     from app.tasks.ingredient_dedup import dedup_ingredients_task

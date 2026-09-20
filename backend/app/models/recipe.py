@@ -2,10 +2,11 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import JSON, Column, DateTime, ForeignKey, String, Table, Text
+from sqlalchemy import JSON, Column, DateTime, Enum, ForeignKey, String, Table, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
 from app.models.base import Base, UUIDAuditBase
+from app.models.enums import KeywordCategory, enum_values
 from app.text import fold
 
 if TYPE_CHECKING:
@@ -42,6 +43,10 @@ class Keyword(UUIDAuditBase):
     __tablename__ = "keywords"
 
     name: Mapped[str] = mapped_column(String(200), unique=True, index=True)
+    category: Mapped[KeywordCategory | None] = mapped_column(
+        Enum(KeywordCategory, values_callable=enum_values)
+    )
+    classified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
 
     recipes: Mapped[list["Recipe"]] = relationship(
         secondary=recipe_keywords, back_populates="keywords"

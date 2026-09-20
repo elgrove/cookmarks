@@ -4,6 +4,7 @@
 		TaskType,
 		ExtractionDetail,
 		BookKeywordsDetail,
+		KeywordClassificationDetail,
 		KeywordDedupDetail,
 		IngredientDedupDetail,
 		CalibreSyncDetail,
@@ -22,6 +23,7 @@
 		{ id: 'all', label: 'All' },
 		{ id: 'extraction', label: 'Extraction' },
 		{ id: 'book_keywords', label: 'Keywords' },
+		{ id: 'keyword_classification', label: 'Classification' },
 		{ id: 'keyword_dedup', label: 'Dedup' },
 		{ id: 'ingredient_dedup', label: 'Ingredients' },
 		{ id: 'calibre_sync', label: 'Calibre' },
@@ -31,6 +33,7 @@
 	const TYPE_LABELS: Record<TaskType, string> = {
 		extraction: 'Extraction',
 		book_keywords: 'Book keywords',
+		keyword_classification: 'Keyword classification',
 		keyword_dedup: 'Keyword dedup',
 		ingredient_dedup: 'Ingredient dedup',
 		calibre_sync: 'Calibre import',
@@ -63,6 +66,10 @@
 				return plural((run.detail as unknown as ExtractionDetail).recipes_found ?? 0, 'recipe');
 			case 'book_keywords':
 				return `${(run.detail as unknown as BookKeywordsDetail).books_tagged ?? 0} tagged`;
+			case 'keyword_classification': {
+				const d = run.detail as unknown as KeywordClassificationDetail;
+				return `${d.examined ?? 0} examined · ${d.failed_batches ?? 0} failed batches`;
+			}
 			case 'keyword_dedup':
 				return plural((run.detail as unknown as KeywordDedupDetail).merges_applied ?? 0, 'merge');
 			case 'ingredient_dedup':

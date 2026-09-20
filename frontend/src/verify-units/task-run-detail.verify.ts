@@ -121,6 +121,33 @@ const unit: VerifiableUnit<Props> = {
 			props: { run: maintenance({ detail: { books_tagged: 5, regenerate: false } }) }
 		},
 		{
+			id: 'keyword-classification',
+			description: 'a keyword-classification run reports model, usage, categories and failures',
+			props: {
+				run: maintenance({
+					id: 'm7',
+					task_type: 'keyword_classification',
+					provider_name: 'GEMINI',
+					model_name: 'gemini-2.5-flash-lite',
+					cost_usd: '0.0031',
+					input_tokens: 1200,
+					output_tokens: 320,
+					detail: {
+						pending: 100,
+						examined: 100,
+						classified_by_category: {
+							cuisine_region: 14,
+							course: 9,
+							key_ingredient: 31,
+							method: 18
+						},
+						no_category: 28,
+						failed_batches: 0
+					}
+				})
+			}
+		},
+		{
 			id: 'keyword-dedup',
 			description:
 				'a keyword-dedup run shows keywords analysed, the candidate window and the deterministic/AI split',
@@ -378,6 +405,24 @@ const unit: VerifiableUnit<Props> = {
 				const text = root.textContent ?? '';
 				if (!text.includes('Books tagged')) return 'books-tagged row missing';
 				return text.includes('Book-keyword tagging') || 'title missing';
+			}
+		},
+		{
+			id: 'classification-rows',
+			description: 'classification shows every category, model, usage, and null outcomes',
+			onlyFixtures: ['keyword-classification'],
+			check: ({ contract, root }) => {
+				if (contract['task-type'] !== 'keyword_classification')
+					return `task-type=${contract['task-type']}`;
+				const text = root.textContent ?? '';
+				return (
+					(text.includes('Keyword vocabulary classification') &&
+						text.includes('Cuisine / region') &&
+						text.includes('No category') &&
+						text.includes('Failed batches') &&
+						text.includes('gemini-2.5-flash-lite')) ||
+					'classification report rows missing'
+				);
 			}
 		},
 		{

@@ -49,6 +49,7 @@ class GeminiProvider(AIProvider):
         ModelRole.ONE_RECIPE_PER_FILE: "gemini-2.5-flash-lite",
         ModelRole.BLOCKS_OF_FILES: "gemini-2.5-flash",
         ModelRole.BOOK_KEYWORDS: "gemini-2.5-flash",
+        ModelRole.KEYWORD_CLASSIFICATION: "gemini-2.5-flash-lite",
         ModelRole.KEYWORD_DEDUP: "gemini-2.5-flash",
         ModelRole.INGREDIENT_DEDUP: "gemini-2.5-flash",
         ModelRole.ASSISTANT: "gemini-2.5-flash",
