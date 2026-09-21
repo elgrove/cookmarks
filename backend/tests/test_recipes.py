@@ -26,6 +26,7 @@ RECIPE_KEYS = {
     "summary",
     "description",
     "ingredients_verbatim",
+    "ingredients",
     "canonical_ingredients",
     "enrichment_status",
     "cuisines",
@@ -276,6 +277,11 @@ def test_recipe_detail_content(client: TestClient) -> None:
         "100g anchovy",
         "2 tbsp olive oil",
     ]
+    assert all(
+        set(line) == {"id", "position", "kind", "text"} and line["kind"] is None
+        for line in body["ingredients_verbatim"]
+    )
+    assert body["ingredients"] == []
     assert body["canonical_ingredients"] == []
     assert body["enrichment_status"] == "pending"
     assert body["instructions"] == ["Boil the pasta.", "Toss with the oil and serve."]

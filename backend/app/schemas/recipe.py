@@ -118,6 +118,9 @@ class IngredientLineRead(BaseModel):
 
     id: uuid.UUID
     position: int
+    # Compatibility for Android builds released while ingredient lines carried
+    # a kind. Kotlin serialization requires nullable fields without defaults.
+    kind: None = None
     text: str
 
 
@@ -139,10 +142,14 @@ class RecipeFactRead(BaseModel):
     id: str
     name: str
     is_primary: bool
+    source: Literal["inferred"] = "inferred"
+    evidence: None = None
 
 
 class RecipeCuisineRead(BaseModel):
     id: str
+    source: Literal["inferred"] = "inferred"
+    evidence: None = None
 
 
 class RecipeDetail(BaseModel):
@@ -172,6 +179,9 @@ class RecipeDetail(BaseModel):
     summary: str | None
     description: str | None
     ingredients_verbatim: list[IngredientLineRead]
+    # Compatibility for the Android release that consumed parsed occurrences.
+    # The retired occurrence data is no longer persisted, so this stays empty.
+    ingredients: list[dict[str, object]] = Field(default_factory=list)
     canonical_ingredients: list[RecipeCanonicalIngredientRead]
     enrichment_status: RecipeEnrichmentStatus
     cuisines: list[RecipeCuisineRead]
