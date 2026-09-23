@@ -32,7 +32,9 @@
 		book_keywords: 'Book keywords',
 		keyword_dedup: 'Keyword dedup',
 		ingredient_dedup: 'Ingredient dedup',
-		calibre_sync: 'Calibre sync',
+		calibre_sync: 'Calibre import',
+		// Retired (MY-201): the Add-book feature is removed; kept so historical runs
+		// stay readable.
 		book_ingest: 'Add book',
 		recipe_enrichment_pilot: 'Enrichment pilot',
 		recipe_enrichment_backfill: 'Batch backfill'
@@ -41,7 +43,9 @@
 		book_keywords: 'Book-keyword tagging',
 		keyword_dedup: 'Keyword vocabulary dedup',
 		ingredient_dedup: 'Canonical ingredient dedup',
-		calibre_sync: 'Calibre library sync',
+		calibre_sync: 'Calibre library import',
+		// Retired (MY-201): the Add-book feature is removed; kept so historical runs
+		// stay readable.
 		book_ingest: 'Book added to the library',
 		recipe_enrichment_pilot: 'Recipe enrichment pilot',
 		recipe_enrichment_backfill: 'Recipe enrichment batch backfill'
@@ -161,13 +165,23 @@
 			}
 			case 'calibre_sync': {
 				const d = run.detail as unknown as CalibreSyncDetail;
-				return [
+				const rows: Row[] = [
 					{ label: 'Created', value: count(d.created?.length) },
-					{ label: 'Updated', value: count(d.updated?.length) },
-					{ label: 'Orphaned', value: count(d.orphaned?.length) },
-					{ label: 'Deleted', value: count(d.deleted?.length) },
+					{
+						label: 'Skipped',
+						value: count(d.skipped?.length ?? d.updated?.length)
+					},
 					{ label: 'Excluded', value: count(d.excluded?.length) }
 				];
+				// Historical runs (pre append-only import) may carry these; show them
+				// when present so old reports stay readable.
+				if (d.updated !== undefined)
+					rows.push({ label: 'Updated (historical)', value: count(d.updated?.length) });
+				if (d.orphaned !== undefined)
+					rows.push({ label: 'Orphaned (historical)', value: count(d.orphaned?.length) });
+				if (d.deleted !== undefined)
+					rows.push({ label: 'Deleted (historical)', value: count(d.deleted?.length) });
+				return rows;
 			}
 			case 'book_ingest': {
 				const d = run.detail as unknown as BookIngestDetail;

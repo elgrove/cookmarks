@@ -19,7 +19,7 @@ class TaskRunRead(BaseModel):
     view. `book_id`/`book_title` are populated only for extraction runs; `pending_question`
     only while an extraction is paused at REVIEW. `detail` carries each type's own metrics
     (extraction: method/chapters/recipes/images; book-keywords: tagged/eligible; dedup:
-    keywords in/merges/removed; calibre: created/updated/orphaned)."""
+    keywords in/merges/removed; calibre: created/skipped/excluded)."""
 
     model_config = ConfigDict(from_attributes=True)
 

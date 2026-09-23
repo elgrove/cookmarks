@@ -155,16 +155,59 @@ export async function resetBookProgress(
 	return bookReadStateSchema.parse(await res.json());
 }
 
-/** Delete a book and everything under it. With `exclude`, its Calibre id joins the
- *  exclusion list so the next library sync doesn't bring it back. */
+/** Delete a book from Cookmarks. Deletion always records the book's Calibre id in
+ *  the exclusion list, so a later import cannot restore it. */
 export async function deleteBook(
 	id: string,
-	{ exclude = false, fromLibrary = false }: { exclude?: boolean; fromLibrary?: boolean } = {},
 	fetchFn: typeof fetch = fetch
 ): Promise<void> {
-	const query = `exclude=${exclude}&from_library=${fromLibrary}`;
-	const res = await fetchFn(`/api/books/${id}?${query}`, { method: 'DELETE' });
+	const res = await fetchFn(`/api/books/${id}`, { method: 'DELETE' });
 	if (!res.ok) throw new Error(`DELETE /api/books/${id} → ${res.status}`);
+}
+
+// The admin metadata edit (PATCH /api/books/{id}): every field optional, only
+// provided fields change. Mirrors BookUpdate (snake_case); the response is the
+// canonical BookDetail.
+export interface BookMetadataUpdate {
+	title?: string;
+	author?: string;
+	isbn?: string | null;
+	pubdate?: string | null;
+	description?: string | null;
+	keywords?: string[];
+}
+
+/** Edit a book's metadata (admin only) and return the canonical detail. `fetchFn`
+ *  is injectable for SSR/tests. */
+export async function updateBook(
+	id: string,
+	update: BookMetadataUpdate,
+	fetchFn: typeof fetch = fetch
+): Promise<BookDetailResponse> {
+	const res = await fetchFn(`/api/books/${id}`, {
+		method: 'PATCH',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify(update)
+	});
+	if (!res.ok) {
+		let detail = '';
+		try {
+			const body = await res.json();
+			const raw = body?.detail;
+			// FastAPI validation failures arrive as an array of {msg, ...} — surface
+			// the first message rather than serialised JSON.
+			detail =
+				typeof raw === 'string'
+					? raw
+					: Array.isArray(raw) && typeof raw[0]?.msg === 'string'
+						? raw[0].msg
+						: '';
+		} catch {
+			detail = '';
+		}
+		throw new Error(detail || `PATCH /api/books/${id} → ${res.status}`);
+	}
+	return bookDetailSchema.parse(await res.json());
 }
 
 /** URL of a book's own file — EPUB or PDF, whichever the library holds (served by

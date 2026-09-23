@@ -111,7 +111,7 @@
 	);
 	let calibreNote = $derived(
 		calibre.state === 'done'
-			? 'Syncing the Calibre library — new and changed books land shortly. See the result in Task Runs.'
+			? 'Importing new books from the Calibre library — unseen titles land shortly. See the result in Task Runs.'
 			: calibre.state === 'error'
 				? ERROR_NOTE
 				: ''
@@ -234,13 +234,11 @@
 
 	<article class="task">
 		<div class="copy">
-			<h2 class="name">Sync Calibre library</h2>
+			<h2 class="name">Import new books</h2>
 			<p class="desc">
-				Re-read the Calibre library and reconcile it — add newly-tagged cookbooks, refresh changed
-				metadata, flag books that have left the tag/format selection, and remove books deleted
-				from the library along with their recipes. Recipes, favourites and lists are untouched
-				for books that remain. The run's result (created, updated, orphaned, deleted) lands in
-				Task Runs.
+				Read the Calibre library and import unseen cookbooks — books already in Cookmarks
+				are left unchanged, and deleted books are never restored. The run's result
+				(created, skipped, excluded) lands in Task Runs.
 			</p>
 		</div>
 

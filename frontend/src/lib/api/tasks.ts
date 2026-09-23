@@ -45,9 +45,10 @@ export async function triggerDedupIngredients(fetchFn: typeof fetch = fetch): Pr
 	return taskRunAckSchema.parse(await res.json());
 }
 
-/** Queue a sync of the Calibre library into the v2 DB, upserting books by calibre_id.
- *  Fire-and-forget: the sync runs on the background worker and its result lands on the
- *  task run. `queued` is 0 (the book count isn't known until the worker reads the
+/** Queue an import of new books from the Calibre library into the v2 DB. Existing
+ *  books are left unchanged.
+ *  Fire-and-forget: the import runs on the background worker and its result lands on
+ *  the task run. `queued` is 0 (the book count isn't known until the worker reads the
  *  library). `fetchFn` is injectable for SSR/tests. */
 export async function triggerCalibreSync(fetchFn: typeof fetch = fetch): Promise<TaskRunAck> {
 	const res = await fetchFn('/api/tasks/calibre-sync', { method: 'POST' });

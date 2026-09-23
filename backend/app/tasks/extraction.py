@@ -49,8 +49,7 @@ class NotExtractableError(Exception):
 
 
 def queue_extraction(session: Session, book: Book) -> TaskRun:
-    """Record a QUEUED extraction run for a book and dispatch it. Shared by the manual
-    trigger and the ingest task's extract-after-add, so both leave the same record.
+    """Record a QUEUED extraction run for a book and dispatch it.
 
     Raises NotExtractableError for a book with no supported file, with no AI setup,
     or (PDF-only without an EPUB) with no Gemini OCR configuration — so a direct

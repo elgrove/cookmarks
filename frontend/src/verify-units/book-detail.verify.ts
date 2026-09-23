@@ -6,7 +6,15 @@ import { z } from 'zod';
 type Props = {
 	book: BookDetailData;
 	onExtract?: () => Promise<void> | void;
-	onDelete?: (opts: { exclude: boolean; fromLibrary: boolean }) => void;
+	onDelete?: () => void;
+	onUpdate?: (update: {
+		title?: string;
+		author?: string;
+		isbn?: string | null;
+		pubdate?: string | null;
+		description?: string | null;
+		keywords?: string[];
+	}) => Promise<BookDetailData | void>;
 	onMarkBookRead?: () => void;
 	onResetProgress?: () => void;
 	onToggleQueue?: () => void;
@@ -16,8 +24,9 @@ type Props = {
 
 const DELETE_BTN = '.delete-btn';
 const CONFIRM_DELETE = '.confirm-delete';
-const EXCLUDE = '.exclude input[value="exclude"]';
-const FROM_LIBRARY = '.exclude input[value="library"]';
+const EDIT_OPEN = '.edit-open';
+const EDIT_SAVE = '.edit-save';
+const EDIT_TITLE = '.edit-title';
 const MARK_READ = '.mark-read';
 const QUEUE_TOGGLE = '.queue-toggle';
 const RESET_BTN = '.reset-btn';
@@ -350,13 +359,13 @@ const unit: VerifiableUnit<Props> = {
 		},
 		{
 			id: 'delete-confirm',
-			description: 'the delete action opens a confirm step with the exclusion box unticked',
+			description: 'the delete action opens an explicit confirm step',
 			props: { book: pastaGrannies, onDelete: () => {} },
 			act: ({ click }) => click(DELETE_BTN)
 		},
 		{
 			id: 'delete-plain',
-			description: 'confirming without ticking the box deletes but records no exclusion',
+			description: 'confirming deletes the book and closes the panel',
 			props: { book: pastaGrannies, onDelete: () => {} },
 			act: ({ click }) => {
 				click(DELETE_BTN);
@@ -364,23 +373,32 @@ const unit: VerifiableUnit<Props> = {
 			}
 		},
 		{
-			id: 'delete-excluded',
-			description: 'choosing exclusion before confirming deletes and skips it on future syncs',
-			props: { book: pastaGrannies, onDelete: () => {} },
-			act: ({ click }) => {
-				click(DELETE_BTN);
-				click(EXCLUDE);
-				click(CONFIRM_DELETE);
-			}
+			id: 'edit-hidden',
+			description: 'without an update callback no Edit action renders',
+			props: { book: pastaGrannies, onDelete: () => {} }
 		},
 		{
-			id: 'delete-from-library',
-			description: 'the widest scope also takes the book out of the Calibre library itself',
-			props: { book: pastaGrannies, onDelete: () => {} },
-			act: ({ click }) => {
-				click(DELETE_BTN);
-				click(FROM_LIBRARY);
-				click(CONFIRM_DELETE);
+			id: 'edit-shown',
+			description: 'with an update callback the Edit action renders',
+			props: { book: pastaGrannies, onDelete: () => {}, onUpdate: async () => {} }
+		},
+		{
+			id: 'edit-saves-canonical',
+			description: 'saving metadata paints the returned canonical title without navigation',
+			props: {
+				book: pastaGrannies,
+				onDelete: () => {},
+				onUpdate: async () => ({
+					...pastaGrannies,
+					title: 'Pasta Grannies (Revised)',
+					author: 'Vicky Bennison'
+				})
+			},
+			act: async ({ click, type, wait }) => {
+				click(EDIT_OPEN);
+				type(EDIT_TITLE, 'Pasta Grannies (Revised)');
+				click(EDIT_SAVE);
+				await wait(0);
 			}
 		},
 		{
@@ -713,23 +731,16 @@ const unit: VerifiableUnit<Props> = {
 		},
 		{
 			id: 'delete-confirm-step',
-			description: 'the confirm step offers the three scopes, resting on the narrowest',
+			description: 'the confirm step is explicit: names the stakes, offers delete + cancel',
 			onlyFixtures: ['delete-confirm', 'delete-confirm-empty-book'],
 			check: ({ contract, root }) => {
 				if (contract['delete-mode'] !== 'confirm') return `delete-mode=${contract['delete-mode']}`;
-				if (contract['delete-scope'] !== 'app')
-					return `delete-scope=${contract['delete-scope']} — must rest on the narrowest`;
-				if (contract['delete-exclude'] !== 'false')
-					return `delete-exclude=${contract['delete-exclude']} — must default off`;
 				if (!root.querySelector(CONFIRM_DELETE)) return 'confirm button missing';
-				const box = root.querySelector<HTMLInputElement>(EXCLUDE);
-				if (!box) return 'exclusion choice missing';
-				if (box.checked) return 'exclusion pre-selected';
-				const library = root.querySelector<HTMLInputElement>(FROM_LIBRARY);
-				if (!library || library.checked) return 'library scope missing or pre-selected';
+				const prompt = root.querySelector('.confirm .prompt')?.textContent ?? '';
+				if (!prompt.includes('Delete this book from Cookmarks?'))
+					return `prompt="${prompt.trim()}"`;
 				return (
-					(box.closest('label')?.textContent ?? '').includes('Calibre') ||
-					'exclusion choice is not labelled'
+					prompt.includes('not be imported again') || `prompt omits no-reimport: "${prompt.trim()}"`
 				);
 			}
 		},
@@ -739,7 +750,8 @@ const unit: VerifiableUnit<Props> = {
 			onlyFixtures: ['delete-confirm', 'delete-confirm-empty-book'],
 			check: ({ root, props }) => {
 				const prompt = root.querySelector('.confirm .prompt')?.textContent ?? '';
-				if (!prompt.includes('Delete this book?')) return `prompt="${prompt.trim()}"`;
+				if (!prompt.includes('Delete this book from Cookmarks?'))
+					return `prompt="${prompt.trim()}"`;
 				const mentions = prompt.includes(String(props.book.recipeCount));
 				if (props.book.recipeCount === 0)
 					return !prompt.includes('recipe') || `empty book warns about recipes: "${prompt.trim()}"`;
@@ -748,17 +760,36 @@ const unit: VerifiableUnit<Props> = {
 		},
 		{
 			id: 'delete-fires-handler',
-			description: 'confirming fires the delete handler with the chosen scope, and closes the panel',
-			onlyFixtures: ['delete-plain', 'delete-excluded', 'delete-from-library'],
-			check: ({ contract, fixture }) => {
-				const want =
-					fixture.id === 'delete-excluded'
-						? 'exclude'
-						: fixture.id === 'delete-from-library'
-							? 'library'
-							: 'plain';
-				if (contract.deleted !== want) return `deleted=${contract.deleted} expected ${want}`;
+			description: 'confirming fires the delete handler and closes the panel',
+			onlyFixtures: ['delete-plain'],
+			check: ({ contract }) => {
+				if (contract.deleted !== 'deleted') return `deleted=${contract.deleted} expected deleted`;
 				return contract['delete-mode'] === 'view' || `delete-mode=${contract['delete-mode']}`;
+			}
+		},
+		{
+			id: 'edit-action-gated',
+			description: 'the Edit action renders only when the update callback is supplied',
+			onlyFixtures: ['edit-hidden', 'edit-shown'],
+			check: ({ contract, root, fixture }) => {
+				const want = fixture.id === 'edit-shown';
+				if (contract['can-edit'] !== String(want))
+					return `can-edit=${contract['can-edit']} expected ${want}`;
+				const shown = root.querySelector(EDIT_OPEN) !== null;
+				return shown === want || `Edit action shown=${shown}, expected ${want}`;
+			}
+		},
+		{
+			id: 'edit-saves-paints-canonical',
+			description: 'saving paints the returned canonical title in the masthead',
+			onlyFixtures: ['edit-saves-canonical'],
+			check: ({ contract, root }) => {
+				if (contract['can-edit'] !== 'true') return `can-edit=${contract['can-edit']}`;
+				const h1 = root.querySelector('.display')?.textContent?.trim() ?? '';
+				if (h1 !== 'Pasta Grannies (Revised)') return `display="${h1}"`;
+				return (
+					root.querySelector(EDIT_OPEN) !== null || 'Edit action missing after save'
+				);
 			}
 		},
 		{

@@ -6,15 +6,19 @@ the vocabulary stays shared (a tag on a book and the same tag on a recipe are on
 row, and counts unify across the app).
 """
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.recipe import Keyword
 
 
 def get_or_create_keyword(session: Session, name: str) -> Keyword:
-    """Return the `Keyword` row for `name`, creating and flushing it if absent."""
-    keyword = session.scalar(select(Keyword).where(Keyword.name == name))
+    """Return the `Keyword` row for `name`, creating and flushing it if absent. The
+    match is case-insensitive, so human-typed tags reuse the existing row (keeping
+    its first display spelling) instead of forking the shared vocabulary by case."""
+    keyword = session.scalar(
+        select(Keyword).where(func.lower(Keyword.name) == name.lower())
+    )
     if keyword is None:
         keyword = Keyword(name=name)
         session.add(keyword)

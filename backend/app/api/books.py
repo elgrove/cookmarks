@@ -24,13 +24,14 @@ from app.schemas.book import (
     BookFilter,
     BookReadState,
     BookSummary,
+    BookUpdate,
     ReadingState,
     ReadingUpdate,
     RecipeIndexEntry,
 )
 from app.schemas.recipe import RecipeNeighbour, RecipeRow
 from app.services.calibre import delete_books
-from app.services.ingest import IngestError, remove_from_library
+from app.services.keywords import get_or_create_keyword
 from app.services.reading import (
     finish_reading,
     forget_reading,
@@ -105,22 +106,28 @@ def get_book(book_id: uuid.UUID, session: SessionDep, user: CurrentUser) -> Book
     book = session.get(Book, book_id)
     if book is None:
         raise HTTPException(status_code=404, detail="book not found")
+    return _book_detail(session, user, book)
+
+
+def _book_detail(
+    session: Session, user: CurrentUser, book: Book
+) -> BookDetail:
     total = (
-        session.scalar(select(func.count(Recipe.id)).where(Recipe.book_id == book_id)) or 0
+        session.scalar(select(func.count(Recipe.id)).where(Recipe.book_id == book.id)) or 0
     )
     # A random sample of the book's recipes; selectinload avoids an N+1 on keywords.
     recipes = (
         session.scalars(
             select(Recipe)
-            .where(Recipe.book_id == book_id)
+            .where(Recipe.book_id == book.id)
             .order_by(func.random())
             .limit(10)
             .options(selectinload(Recipe.keywords))
         )
         .all()
     )
-    reading = get_reading(session, user.id, book_id)
-    resume = resume_recipe(session, reading, book_id)
+    reading = get_reading(session, user.id, book.id)
+    resume = resume_recipe(session, reading, book.id)
     return BookDetail(
         id=book.id,
         title=book.title,
@@ -144,10 +151,46 @@ def get_book(book_id: uuid.UUID, session: SessionDep, user: CurrentUser) -> Book
             )
             for r in recipes
         ],
-        queued=is_queued(session, user.id, book_id),
+        queued=is_queued(session, user.id, book.id),
         reading=_reading_state(session, reading, total),
         resume_recipe=RecipeNeighbour(id=resume.id, name=resume.name) if resume else None,
     )
+
+
+@router.patch(
+    "/books/{book_id}",
+    response_model=BookDetail,
+    dependencies=[Depends(require_admin)],
+)
+def update_book(
+    book_id: uuid.UUID, body: BookUpdate, session: SessionDep, user: CurrentUser
+) -> BookDetail:
+    """Edit a book's Cookmarks metadata (admin only). Only provided fields change;
+    the Calibre library is never touched. The `Book` validator refreshes the folded
+    search fields in the same transaction."""
+    book = session.get(Book, book_id)
+    if book is None:
+        raise HTTPException(status_code=404, detail="book not found")
+    provided = body.model_fields_set
+    if "title" in provided and body.title is None:
+        raise HTTPException(status_code=422, detail="title must not be null")
+    if "author" in provided and body.author is None:
+        raise HTTPException(status_code=422, detail="author must not be null")
+    if "title" in provided and body.title is not None:
+        book.title = body.title
+    if "author" in provided and body.author is not None:
+        book.author = body.author
+    if "isbn" in provided:
+        book.isbn = body.isbn
+    if "pubdate" in provided:
+        book.pubdate = body.pubdate
+    if "description" in provided:
+        book.description = body.description if body.description is not None else ""
+    if "keywords" in provided:
+        book.keywords = [get_or_create_keyword(session, name) for name in body.keywords or []]
+    session.commit()
+    session.refresh(book)
+    return _book_detail(session, user, book)
 
 
 def _reading_state(
@@ -232,30 +275,16 @@ def reset_book_progress(
 def delete_book(
     book_id: uuid.UUID,
     session: SessionDep,
-    exclude: bool = False,
-    from_library: bool = False,
 ) -> Response:
-    """Delete a book and everything under it (recipes, runs, list membership, embeddings).
-    With `exclude=true` the book's Calibre id is added to the exclusion list so the next
-    sync skips it — without that, a book still in the library is re-created on the next
-    sync (recipes gone). With `from_library=true` the book is removed from the Calibre
-    library itself, which needs no exclusion because there is nothing left to re-sync."""
+    """Delete a book from Cookmarks and everything under it (recipes, runs, list
+    membership, embeddings). The book's Calibre id is always recorded in the
+    exclusion list so a later import cannot restore it. Calibre itself is never
+    touched."""
     book = session.get(Book, book_id)
     if book is None:
         raise HTTPException(status_code=404, detail="book not found")
-    if exclude and from_library:
-        raise HTTPException(
-            status_code=422, detail="a book removed from the library needs no exclusion"
-        )
-    if from_library:
-        # Before the row goes: a failure here must leave the book whole, not half-deleted.
-        try:
-            remove_from_library(book.calibre_id)
-        except IngestError as exc:
-            raise HTTPException(status_code=502, detail=str(exc)) from exc
-    if exclude:
-        # merge, not add: deleting the same Calibre book twice must not clash on the PK.
-        session.merge(CalibreExclusion(calibre_id=book.calibre_id, title=book.title))
+    # merge, not add: deleting the same Calibre book twice must not clash on the PK.
+    session.merge(CalibreExclusion(calibre_id=book.calibre_id, title=book.title))
     delete_books(session, [book])
     session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

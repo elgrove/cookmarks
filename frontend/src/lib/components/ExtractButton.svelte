@@ -129,5 +129,12 @@
 	}
 	.mark {
 		font-weight: 400;
+		/* Same fixed box as the book action icons, so the mark sits on the
+		   same vertical line down the action list. */
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 1.25em;
+		line-height: 1;
 	}
 </style>

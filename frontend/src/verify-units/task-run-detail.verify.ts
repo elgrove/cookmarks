@@ -197,17 +197,33 @@ const unit: VerifiableUnit<Props> = {
 		},
 		{
 			id: 'calibre-sync',
-			description: 'a Calibre sync shows created / updated / orphaned / deleted / excluded counts',
+			description: 'a Calibre import shows created / skipped / excluded counts',
 			props: {
 				run: maintenance({
 					id: 'm3',
 					task_type: 'calibre_sync',
 					detail: {
 						created: ['A Book', 'Another'],
+						skipped: ['A Third'],
+						excluded: ['A Book Kept Out']
+					}
+				})
+			}
+		},
+		{
+			id: 'calibre-sync-historical',
+			description: 'a historical Calibre sync still renders its updated / orphaned / deleted rows',
+			props: {
+				run: maintenance({
+					id: 'm5',
+					task_type: 'calibre_sync',
+					detail: {
+						created: ['A Book'],
+						skipped: ['A Third'],
+						excluded: [],
 						updated: ['A Third'],
 						orphaned: [],
-						deleted: ['A Removed Book'],
-						excluded: ['A Book Kept Out']
+						deleted: ['A Removed Book']
 					}
 				})
 			}
@@ -424,18 +440,30 @@ const unit: VerifiableUnit<Props> = {
 		},
 		{
 			id: 'calibre-rows',
-			description: 'a Calibre sync shows created/updated/orphaned/deleted/excluded',
+			description: 'a Calibre import shows created/skipped/excluded',
 			onlyFixtures: ['calibre-sync'],
 			check: ({ contract, root }) => {
 				if (contract['task-type'] !== 'calibre_sync') return `task-type=${contract['task-type']}`;
 				const text = root.textContent ?? '';
 				return (
 					(text.includes('Created') &&
-						text.includes('Updated') &&
-						text.includes('Orphaned') &&
-						text.includes('Deleted') &&
+						text.includes('Skipped') &&
 						text.includes('Excluded')) ||
 					'calibre rows missing'
+				);
+			}
+		},
+		{
+			id: 'calibre-historical-rows',
+			description: 'a historical Calibre sync keeps its legacy rows readable',
+			onlyFixtures: ['calibre-sync-historical'],
+			check: ({ root }) => {
+				const text = root.textContent ?? '';
+				return (
+					(text.includes('Created') &&
+						text.includes('Skipped') &&
+						text.includes('historical')) ||
+					'historical calibre rows missing'
 				);
 			}
 		},

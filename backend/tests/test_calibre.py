@@ -7,9 +7,8 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Book, CalibreExclusion, Recipe
+from app.models import Book, CalibreExclusion
 from app.services.calibre import CalibreBook, read_books, read_calibre_books, sync_calibre
-from app.services.vector_store import EMBEDDING_DIMENSIONS, VectorStore
 
 FIXTURE_SQL = Path(__file__).parent / "fixtures" / "calibre_metadata.sql"
 FOOD = "Food"
@@ -108,69 +107,58 @@ def test_read_calibre_books_missing_db_raises(tmp_path: Path) -> None:
         read_calibre_books(tmp_path, tag=FOOD, book_formats=EPUB)
 
 
-# --- reconcile layer (seeded session has books calibre_id 1 and 2) ---------------
+# --- import layer (seeded session has books calibre_id 1 and 2) ------------------
 
 
 def test_sync_creates_new_books(session: Session) -> None:
     result = sync_calibre(session, [_make_book(100, "Brand New", path="x/Brand New (100)")])
     assert result.created == ["Brand New"]
+    assert result.skipped == []
+    assert result.excluded == []
     created = session.scalars(select(Book).where(Book.calibre_id == 100)).one()
     assert created.path == "x/Brand New (100)"
 
 
-def test_sync_updates_in_place_preserving_recipes_and_keywords(session: Session) -> None:
+def test_sync_leaves_existing_books_byte_for_byte_unchanged(session: Session) -> None:
     before = session.scalars(select(Book).where(Book.calibre_id == 1)).one()
-    book_id, recipe_count, keyword_count = before.id, len(before.recipes), len(before.keywords)
+    book_id = before.id
+    title, author, path = before.title, before.author, before.path
+    isbn, pubdate, description = before.isbn, before.pubdate, before.description
+    recipe_count, keyword_count = len(before.recipes), len(before.keywords)
     assert recipe_count == 3 and keyword_count == 2  # guard the fixture's premise
 
     result = sync_calibre(
         session,
         [_make_book(1, "With Recipes, 2nd ed.", author="Revised Author", path="new/path (1)")],
     )
-    assert result.updated == ["With Recipes, 2nd ed."]
     assert result.created == []
+    assert result.skipped == ["With Recipes"]
+    assert result.excluded == []
 
     after = session.scalars(select(Book).where(Book.calibre_id == 1)).one()
     assert after.id == book_id  # same row — stable UUID, not wipe-and-recreate
-    assert after.title == "With Recipes, 2nd ed."
-    assert after.author == "Revised Author"
-    assert after.path == "new/path (1)"
+    assert (after.title, after.author, after.path) == (title, author, path)
+    assert (after.isbn, after.pubdate, after.description) == (isbn, pubdate, description)
     assert len(after.recipes) == recipe_count  # recipes/favourites survive
     assert len(after.keywords) == keyword_count  # AI keywords untouched
 
 
-def test_sync_reports_orphans_without_deleting(session: Session) -> None:
-    # A selection that omits both seeded books — they orphan but must survive intact.
+def test_sync_keeps_books_absent_from_calibre(session: Session) -> None:
+    # A selection that omits both seeded books — they stay in Cookmarks untouched.
     result = sync_calibre(session, [_make_book(999, "Unrelated")])
-    assert set(result.orphaned) == {"With Recipes", "No Recipes Yet"}
+    assert result.created == ["Unrelated"]
+    assert result.skipped == []
 
-    orphan = session.scalars(select(Book).where(Book.calibre_id == 1)).one()
-    assert len(orphan.recipes) == 3  # nothing cascaded
-
-
-def test_sync_deletes_books_gone_from_the_library(session: Session) -> None:
-    """A book whose calibre_id has left the library goes with its recipes and their
-    embeddings; one that is merely outside the tag/format selection is only reported."""
-    doomed = session.scalars(select(Book).where(Book.calibre_id == 1)).one()
-    recipe_ids = [recipe.id for recipe in doomed.recipes]
-    assert len(recipe_ids) == 3  # guard the fixture's premise
-    store = VectorStore(session)
-    for recipe_id in recipe_ids:
-        store.upsert(recipe_id, [0.1] * EMBEDDING_DIMENSIONS)
-
-    # Book 1 is gone from Calibre; book 2 is still there, just outside the selection.
-    result = sync_calibre(session, [_make_book(999, "Unrelated")], library_ids={2, 999})
-
-    assert result.deleted == ["With Recipes"]
-    assert result.orphaned == ["No Recipes Yet"]
-    assert session.scalars(select(Book).where(Book.calibre_id == 1)).all() == []
-    assert session.scalars(select(Recipe).where(Recipe.id.in_(recipe_ids))).all() == []
-    assert VectorStore(session).embedded_ids().isdisjoint(recipe_ids)
-    assert session.scalars(select(Book).where(Book.calibre_id == 2)).one().title == "No Recipes Yet"
+    remaining = session.scalars(select(Book).where(Book.calibre_id == 1)).one()
+    assert remaining.title == "With Recipes"
+    assert len(remaining.recipes) == 3  # nothing cascaded
+    assert session.scalars(select(Book).where(Book.calibre_id == 2)).one().title == (
+        "No Recipes Yet"
+    )
 
 
 def test_sync_skips_excluded_books(session: Session) -> None:
-    """An excluded Calibre id is never re-created, however many times the sync runs."""
+    """An excluded Calibre id is never re-created, however many times the import runs."""
     session.add(CalibreExclusion(calibre_id=100, title="Brand New"))
     session.commit()
 
@@ -178,16 +166,19 @@ def test_sync_skips_excluded_books(session: Session) -> None:
 
     assert result.excluded == ["Brand New"]
     assert result.created == ["Allowed"]
+    assert result.skipped == []
     assert session.scalars(select(Book).where(Book.calibre_id == 100)).all() == []
 
 
 def test_sync_is_idempotent(session: Session) -> None:
     books = [_make_book(1, "With Recipes"), _make_book(2, "No Recipes Yet")]
-    sync_calibre(session, books)
+    first = sync_calibre(session, books)
+    assert first.created == []
+    assert sorted(first.skipped) == ["No Recipes Yet", "With Recipes"]
     second = sync_calibre(session, books)
     assert second.created == []
-    assert sorted(second.updated) == ["No Recipes Yet", "With Recipes"]
-    assert second.orphaned == []
+    assert sorted(second.skipped) == ["No Recipes Yet", "With Recipes"]
+    assert second.excluded == []
     assert len(session.scalars(select(Book).where(Book.calibre_id == 1)).all()) == 1
 
 
@@ -200,5 +191,8 @@ def test_read_then_sync_end_to_end(calibre_conn: sqlite3.Connection, session: Se
         "Cooking With Bad Dates",
         "Cookbook (Both Formats)",
     }
-    assert set(result.orphaned) == {"With Recipes", "No Recipes Yet"}
+    # The seeded books are absent from Calibre and stay in Cookmarks untouched —
+    # only encountered rows are reported as skipped.
+    assert result.skipped == []
+    assert result.excluded == []
     assert len(session.scalars(select(Book).where(Book.calibre_id == 1)).one().recipes) == 3

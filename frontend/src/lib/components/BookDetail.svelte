@@ -53,16 +53,19 @@
 	import { plainText } from '$lib/html';
 	import { cleanTitle, titleSubtitle } from '$lib/title';
 	import { keywordHref } from '$lib/api/recipes';
+	import type { BookMetadataUpdate } from '$lib/api/books';
 	import ExtractButton from '$lib/components/ExtractButton.svelte';
+	import BookMetadataEditor from '$lib/components/BookMetadataEditor.svelte';
 	import ReviewPrompt from '$lib/components/ReviewPrompt.svelte';
 	import type { ReviewQuestion } from '$lib/api/task-runs';
 
 	let {
-		book,
+		book: initialBook,
 		onExtract,
 		review = null,
 		onAnswer,
 		onDelete,
+		onUpdate,
 		onMarkBookRead,
 		onResetProgress,
 		onToggleQueue,
@@ -73,7 +76,11 @@
 		onExtract?: () => Promise<void> | void;
 		review?: ReviewQuestion | null;
 		onAnswer?: (value: string) => Promise<void> | void;
-		onDelete?: (opts: { exclude: boolean; fromLibrary: boolean }) => Promise<void> | void;
+		onDelete?: () => Promise<void> | void;
+		/** Admin metadata edit: receives the form's update, persists it, and resolves
+		 *  with the canonical book to display (or void when the owner re-renders
+		 *  from its own state). Absent for non-admins — no edit control renders. */
+		onUpdate?: (update: BookMetadataUpdate) => Promise<BookDetailData | void>;
 		onMarkBookRead?: () => Promise<void> | void;
 		onResetProgress?: () => Promise<void> | void;
 		onToggleQueue?: () => Promise<void> | void;
@@ -83,12 +90,22 @@
 		ocrAvailable?: boolean;
 	} = $props();
 
+	// Local display copy of the book prop: applying the editor's returned canonical
+	// metadata here paints the masthead/tags/rail immediately, while the effect
+	// below keeps it following the route's own state afterwards.
+	let book = $state(initialBook);
+	$effect(() => {
+		book = initialBook;
+	});
+
+	async function saveMetadata(update: BookMetadataUpdate) {
+		const updated = await onUpdate?.(update);
+		if (updated) book = updated;
+	}
+
 	let coverFailed = $state(false);
 	let expanded = $state(false);
 	let deleteMode = $state<'view' | 'confirm'>('view');
-	// How far the delete reaches: out of the app only (the next sync brings it back),
-	// out of the app and off future syncs, or out of the Calibre library altogether.
-	let deleteScope = $state<'app' | 'exclude' | 'library'>('app');
 	let deleted = $state('');
 	let resetMode = $state<'view' | 'confirm'>('view');
 	// The last read-state action asked for, so the harness can verify the intent
@@ -98,8 +115,8 @@
 	let queueAction = $state('');
 
 	function confirmDelete() {
-		deleted = deleteScope === 'app' ? 'plain' : deleteScope;
-		onDelete?.({ exclude: deleteScope === 'exclude', fromLibrary: deleteScope === 'library' });
+		deleted = 'deleted';
+		onDelete?.();
 		deleteMode = 'view';
 	}
 
@@ -154,9 +171,8 @@
 	data-verify-empty={book.recipeCount === 0 ? 'true' : 'false'}
 	data-verify-keywords={book.keywords.length}
 	data-verify-delete-mode={deleteMode}
-	data-verify-delete-exclude={deleteScope === 'exclude' ? 'true' : 'false'}
-	data-verify-delete-scope={deleteScope}
 	data-verify-deleted={deleted}
+	data-verify-can-edit={onUpdate ? 'true' : 'false'}
 	data-verify-seen-action={seenAction}
 	data-verify-queued={book.queued ? 'true' : 'false'}
 	data-verify-queue-action={queueAction}
@@ -344,27 +360,12 @@
 					{#if deleteMode === 'confirm'}
 						<div class="confirm">
 							<p class="prompt">
-								Delete this book?
+								Delete this book from Cookmarks? It will not be imported again.
 								{#if book.recipeCount > 0}
 									Its {book.recipeCount}
 									{book.recipeCount === 1 ? 'recipe' : 'recipes'} are removed for good.
 								{/if}
 							</p>
-							<fieldset class="scope">
-								<legend>How far does it go?</legend>
-								<label class="exclude">
-									<input type="radio" value="app" bind:group={deleteScope} />
-									From Cookmarks only — the next Calibre sync brings it back
-								</label>
-								<label class="exclude">
-									<input type="radio" value="exclude" bind:group={deleteScope} />
-									From Cookmarks, and exclude it from future Calibre syncs
-								</label>
-								<label class="exclude">
-									<input type="radio" value="library" bind:group={deleteScope} />
-									From the Calibre library too — the book file is deleted for good
-								</label>
-							</fieldset>
 							<button class="btn danger confirm-delete" type="button" onclick={confirmDelete}>
 								Delete book
 							</button>
@@ -373,7 +374,6 @@
 								type="button"
 								onclick={() => {
 									deleteMode = 'view';
-									deleteScope = 'app';
 								}}
 							>
 								Cancel
@@ -386,8 +386,37 @@
 							onclick={() => (deleteMode = 'confirm')}
 						>
 							Delete book
+							<span class="ar" aria-hidden="true"
+								><svg
+									viewBox="0 0 24 24"
+									width="1em"
+									height="1em"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									aria-hidden="true"
+									><polyline points="3 6 5 6 21 6" /><path
+										d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
+									/></svg
+								></span
+							>
 						</button>
 					{/if}
+				{/if}
+				{#if onUpdate}
+					<BookMetadataEditor
+						initial={{
+							title: book.title,
+							author: book.author,
+							isbn: book.isbn,
+							pubdate: book.pubdate,
+							description: book.description,
+							keywords: book.keywords
+						}}
+						onSave={saveMetadata}
+					/>
 				{/if}
 			</div>
 
@@ -713,6 +742,16 @@
 	}
 	.btn .ar {
 		font-weight: 400;
+		/* Fixed box so every trailing icon — › + − ✓ ↺ ✎ and the trash
+		   figure — sits on the same vertical line down the action list. */
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 1.25em;
+		line-height: 1;
+	}
+	.btn .ar svg {
+		display: block;
 	}
 	.btn.primary {
 		background: var(--ink);
@@ -757,35 +796,6 @@
 		line-height: 1.45;
 		color: var(--muted);
 		margin: 0;
-	}
-	.scope {
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
-		border: none;
-		margin: 0;
-		padding: 0;
-	}
-	.scope legend {
-		font-family: var(--f-mono);
-		font-size: 0.64rem;
-		letter-spacing: 0.08em;
-		text-transform: uppercase;
-		color: var(--muted);
-		padding: 0 0 0.4rem;
-	}
-	.exclude {
-		display: flex;
-		align-items: flex-start;
-		gap: 0.5rem;
-		font-family: var(--f-grotesk);
-		font-size: 0.85rem;
-		color: var(--ink);
-		cursor: pointer;
-	}
-	.exclude input {
-		accent-color: var(--accent);
-		margin-top: 0.15rem;
 	}
 
 	dl.meta {
