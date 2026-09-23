@@ -68,6 +68,10 @@
 		error = '';
 	}
 
+	function onKeydown(e: KeyboardEvent) {
+		if (e.key === 'Escape') closeForm();
+	}
+
 	function commitKeywordInput() {
 		const parts = splitKeywords(keywordInput);
 		if (parts.length === 0) return;
@@ -122,6 +126,8 @@
 	}
 </script>
 
+<svelte:window onkeydown={open ? onKeydown : undefined} />
+
 <section
 	class="editor"
 	data-verify-unit="book-metadata-editor"
@@ -131,127 +137,141 @@
 	data-verify-error={error ? 'true' : 'false'}
 	data-verify-keywords={keywords.length}
 >
-	{#if !open}
-		<button type="button" class="btn ghost edit-open" onclick={openForm}>Edit details</button>
-	{:else}
-		<form
-			class="form"
-			aria-label="Edit book details"
-			onsubmit={(e) => {
-				e.preventDefault();
-				void save();
+	<button type="button" class="btn ghost edit-open" onclick={openForm}
+		>Edit book <span class="ar" aria-hidden="true">✎</span></button
+	>
+	{#if open}
+		<div
+			class="overlay"
+			role="presentation"
+			onclick={(e) => {
+				if (e.target === e.currentTarget) closeForm();
 			}}
 		>
-			<div class="field">
-				<label for="bme-title">Title</label>
-				<input
-					id="bme-title"
-					name="title"
-					type="text"
-					class="edit-title"
-					bind:value={title}
-					required
-					autocomplete="off"
-				/>
-			</div>
-			<div class="field">
-				<label for="bme-author">Author</label>
-				<input
-					id="bme-author"
-					name="author"
-					type="text"
-					class="edit-author"
-					bind:value={author}
-					required
-					autocomplete="off"
-				/>
-			</div>
-			<div class="field">
-				<label for="bme-isbn">ISBN</label>
-				<input
-					id="bme-isbn"
-					name="isbn"
-					type="text"
-					class="edit-isbn"
-					bind:value={isbn}
-					autocomplete="off"
-				/>
-			</div>
-			<div class="field">
-				<label for="bme-pubdate">Publication date</label>
-				<input
-					id="bme-pubdate"
-					name="pubdate"
-					type="date"
-					class="edit-pubdate"
-					bind:value={pubdate}
-				/>
-			</div>
-			<div class="field">
-				<label for="bme-description">Description</label>
-				<textarea
-					id="bme-description"
-					name="description"
-					class="edit-description"
-					rows="4"
-					bind:value={description}
-				></textarea>
-			</div>
-			<div class="field">
-				<label for="bme-keywords">Keywords</label>
-				{#if keywords.length > 0}
-					<ul class="tokens" aria-label="Current keywords">
-						{#each keywords as kw, i (kw)}
-							<li class="token">
-								<span>{kw}</span>
-								<button
-									type="button"
-									class="kw-remove"
-									data-keyword={kw}
-									aria-label={`Remove keyword ${kw}`}
-									onclick={() => removeKeyword(i)}
-								>
-									×
-								</button>
-							</li>
-						{/each}
-					</ul>
-				{/if}
-				<input
-					id="bme-keywords"
-					name="keywords"
-					type="text"
-					class="kw-input"
-					placeholder="Add keywords, separated by commas"
-					bind:value={keywordInput}
-					autocomplete="off"
-					onkeydown={(e) => {
-						if (e.key === 'Enter' || e.key === ',') {
-							e.preventDefault();
-							commitKeywordInput();
-						}
+			<div class="panel" role="dialog" aria-modal="true" aria-labelledby="bme-heading">
+				<header>
+					<h2 id="bme-heading">Edit book</h2>
+				</header>
+				<form
+					class="form"
+					aria-label="Edit book details"
+					onsubmit={(e) => {
+						e.preventDefault();
+						void save();
 					}}
-					onblur={commitKeywordInput}
-				/>
-			</div>
-			{#if !valid}
-				<p class="err" role="alert">Title and author are required.</p>
-			{/if}
-			{#if error}
-				<p class="err server-error" role="alert">{error}</p>
-			{/if}
-			<div class="row">
-				<button
-					type="submit"
-					class="btn primary edit-save"
-					disabled={!valid || saving}
-					aria-busy={saving}
 				>
-					{saving ? 'Saving…' : 'Save'}
-				</button>
-				<button type="button" class="btn ghost edit-cancel" onclick={closeForm}>Cancel</button>
+					<div class="field">
+						<label for="bme-title">Title</label>
+						<input
+							id="bme-title"
+							name="title"
+							type="text"
+							class="edit-title"
+							bind:value={title}
+							required
+							autocomplete="off"
+						/>
+					</div>
+					<div class="field">
+						<label for="bme-author">Author</label>
+						<input
+							id="bme-author"
+							name="author"
+							type="text"
+							class="edit-author"
+							bind:value={author}
+							required
+							autocomplete="off"
+						/>
+					</div>
+					<div class="field">
+						<label for="bme-isbn">ISBN</label>
+						<input
+							id="bme-isbn"
+							name="isbn"
+							type="text"
+							class="edit-isbn"
+							bind:value={isbn}
+							autocomplete="off"
+						/>
+					</div>
+					<div class="field">
+						<label for="bme-pubdate">Publication date</label>
+						<input
+							id="bme-pubdate"
+							name="pubdate"
+							type="date"
+							class="edit-pubdate"
+							bind:value={pubdate}
+						/>
+					</div>
+					<div class="field">
+						<label for="bme-description">Description</label>
+						<textarea
+							id="bme-description"
+							name="description"
+							class="edit-description"
+							rows="4"
+							bind:value={description}
+						></textarea>
+					</div>
+					<div class="field">
+						<label for="bme-keywords">Keywords</label>
+						{#if keywords.length > 0}
+							<ul class="tokens" aria-label="Current keywords">
+								{#each keywords as kw, i (kw)}
+									<li class="token">
+										<span>{kw}</span>
+										<button
+											type="button"
+											class="kw-remove"
+											data-keyword={kw}
+											aria-label={`Remove keyword ${kw}`}
+											onclick={() => removeKeyword(i)}
+										>
+											×
+										</button>
+									</li>
+								{/each}
+							</ul>
+						{/if}
+						<input
+							id="bme-keywords"
+							name="keywords"
+							type="text"
+							class="kw-input"
+							placeholder="Add keywords, separated by commas"
+							bind:value={keywordInput}
+							autocomplete="off"
+							onkeydown={(e) => {
+								if (e.key === 'Enter' || e.key === ',') {
+									e.preventDefault();
+									commitKeywordInput();
+								}
+							}}
+							onblur={commitKeywordInput}
+						/>
+					</div>
+					{#if !valid}
+						<p class="err" role="alert">Title and author are required.</p>
+					{/if}
+					{#if error}
+						<p class="err server-error" role="alert">{error}</p>
+					{/if}
+					<div class="row">
+						<button type="button" class="btn ghost edit-cancel" onclick={closeForm}>Cancel</button>
+						<button
+							type="submit"
+							class="btn primary edit-save"
+							disabled={!valid || saving}
+							aria-busy={saving}
+						>
+							{saving ? 'Saving…' : 'Save'}
+						</button>
+					</div>
+				</form>
 			</div>
-		</form>
+		</div>
 	{/if}
 </section>
 
@@ -299,14 +319,72 @@
 		border-color: var(--accent);
 		color: var(--accent-deep);
 	}
+	.btn .ar {
+		font-weight: 400;
+		/* Same fixed box as the book action list, so the pencil sits on the
+		   same vertical line as the other trailing icons. */
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 1.25em;
+		line-height: 1;
+	}
+	/* The closed action sits in the book action list: full-width row with a
+	   trailing icon, like the other actions. */
+	.edit-open {
+		display: flex;
+		width: 100%;
+		align-items: center;
+		justify-content: space-between;
+		text-align: center;
+	}
+	.overlay {
+		position: fixed;
+		inset: 0;
+		z-index: 60;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 1rem;
+		background: rgba(20, 20, 19, 0.45);
+		animation: fade 0.18s var(--ease-out) both;
+	}
+	.panel {
+		width: min(40rem, 100%);
+		max-height: calc(100dvh - 2rem);
+		overflow-y: auto;
+		background: var(--bg);
+		border: var(--border-strong);
+		border-radius: 6px;
+		box-shadow: 0 24px 60px rgba(20, 20, 19, 0.22);
+		animation: fadeUp 0.24s var(--ease-out) both;
+	}
+	/* Scrim fades in without moving — keep entrance motion on the panel only. */
+	@keyframes fade {
+		from {
+			opacity: 0;
+		}
+		to {
+			opacity: 1;
+		}
+	}
+	header {
+		padding: 1.5rem 1.75rem 1.25rem;
+		border-bottom: var(--border);
+	}
+	header h2 {
+		margin: 0;
+		font-family: var(--f-serif);
+		font-weight: 600;
+		font-size: 1.5rem;
+		letter-spacing: -0.01em;
+		color: var(--ink);
+	}
 	.form {
 		display: flex;
 		flex-direction: column;
 		gap: 0.9rem;
-		padding: 1rem;
-		border: 1px solid var(--line-strong);
-		border-radius: 3px;
-		background: var(--bg);
+		padding: 1.5rem 1.75rem;
 	}
 	.field {
 		display: flex;
@@ -346,7 +424,7 @@
 		flex-wrap: wrap;
 		gap: 0.4rem;
 		list-style: none;
-		margin: 0;
+		margin: 0 0 0.6rem;
 		padding: 0;
 	}
 	.token {
@@ -386,9 +464,21 @@
 	}
 	.row {
 		display: flex;
-		gap: 0.6rem;
+		justify-content: flex-end;
+		gap: 0.75rem;
+		margin-top: 0.25rem;
 	}
 	.row .btn {
-		flex: 1;
+		padding: 0.55rem 1.3rem;
+	}
+	@media (max-width: 760px) {
+		header,
+		.form {
+			padding-left: 1.25rem;
+			padding-right: 1.25rem;
+		}
+		header h2 {
+			font-size: 1.3rem;
+		}
 	}
 </style>

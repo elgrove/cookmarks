@@ -49,7 +49,7 @@ const unit: VerifiableUnit<Props> = {
 	id: 'book-metadata-editor',
 	title: 'Book metadata editor',
 	description:
-		'The admin metadata editor on a book: closed it is a single "Edit details" action; open it offers labelled controls for title, author, ISBN, publication date, description and keyword tokens, with Save/Cancel. Required-field and server errors never close the form; success closes it.',
+		'The admin metadata editor on a book: closed it is a single "Edit book" action; open it offers labelled controls for title, author, ISBN, publication date, description and keyword tokens, with Save/Cancel. Required-field and server errors never close the form; success closes it.',
 	kind: 'component',
 	component: BookMetadataEditor,
 	propsSchema: z.object({ initial: draftSchema }),

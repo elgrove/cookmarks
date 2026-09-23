@@ -386,6 +386,22 @@
 							onclick={() => (deleteMode = 'confirm')}
 						>
 							Delete book
+							<span class="ar" aria-hidden="true"
+								><svg
+									viewBox="0 0 24 24"
+									width="1em"
+									height="1em"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									aria-hidden="true"
+									><polyline points="3 6 5 6 21 6" /><path
+										d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
+									/></svg
+								></span
+							>
 						</button>
 					{/if}
 				{/if}
@@ -726,6 +742,16 @@
 	}
 	.btn .ar {
 		font-weight: 400;
+		/* Fixed box so every trailing icon — › + − ✓ ↺ ✎ and the trash
+		   figure — sits on the same vertical line down the action list. */
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 1.25em;
+		line-height: 1;
+	}
+	.btn .ar svg {
+		display: block;
 	}
 	.btn.primary {
 		background: var(--ink);
