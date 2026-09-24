@@ -141,7 +141,7 @@ Here is the whole keyword vocabulary. Any of these may be used as a canonical ke
 Here are the candidate keywords. Propose merges ONLY for these:
 {candidates}
 
-Every key in the returned object MUST be one of the candidate keywords. A value may be any keyword in the vocabulary above.
+Every key in the returned object MUST be one of the candidate keywords. Every value MUST exactly copy an existing keyword from the vocabulary above. Never invent a new spelling or change its case.
 
 Return ONLY a valid JSON object. No other text.
 """

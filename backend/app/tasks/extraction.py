@@ -23,7 +23,7 @@ from app.services.embeddings import embed_recipes
 from app.services.extraction.graph import get_extraction_graph
 from app.services.extraction.review import VALID_HUMAN_RESPONSES
 from app.services.keyword_classification import classify_keyword_rows
-from app.services.keywords import get_or_create_keyword
+from app.services.keywords import get_or_create_keywords
 from app.tasks.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
@@ -201,9 +201,7 @@ def _upsert_recipe(
     recipe.yields = data.yields
     recipe.image = data.image or None
     if "keywords" in data.model_fields_set:
-        recipe.keywords = [
-            get_or_create_keyword(session, name, created=created_keywords) for name in data.keywords
-        ]
+        recipe.keywords = get_or_create_keywords(session, data.keywords, created=created_keywords)
     if fingerprint != previous_fingerprint:
         _replace_ingredient_lines(session, recipe, source_text)
         if recipe.enrichment_state is None:

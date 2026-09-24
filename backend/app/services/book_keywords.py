@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.models.book import Book
 from app.models.recipe import Recipe
 from app.services.ai import ModelRole, resolve_task
-from app.services.keywords import get_or_create_keyword
+from app.services.keywords import get_or_create_keywords
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +83,8 @@ def generate_book_keywords(session: Session, book: Book) -> list[str]:
         logger.info(f"No book keywords generated for {book.title}")
         return []
 
-    book.keywords = [get_or_create_keyword(session, name) for name in names]
+    book.keywords = get_or_create_keywords(session, names)
+    names = [keyword.name for keyword in book.keywords]
     session.flush()
     logger.info(f"Generated {len(names)} book keyword(s) for {book.title}")
     return names

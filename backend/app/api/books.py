@@ -31,7 +31,7 @@ from app.schemas.book import (
 )
 from app.schemas.recipe import RecipeNeighbour, RecipeRow
 from app.services.calibre import delete_books
-from app.services.keywords import get_or_create_keyword
+from app.services.keywords import get_or_create_keywords
 from app.services.reading import (
     finish_reading,
     forget_reading,
@@ -187,7 +187,7 @@ def update_book(
     if "description" in provided:
         book.description = body.description if body.description is not None else ""
     if "keywords" in provided:
-        book.keywords = [get_or_create_keyword(session, name) for name in body.keywords or []]
+        book.keywords = get_or_create_keywords(session, body.keywords or [])
     session.commit()
     session.refresh(book)
     return _book_detail(session, user, book)

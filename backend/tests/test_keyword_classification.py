@@ -145,7 +145,7 @@ def test_pending_sweep_uses_batch_boundaries_and_accumulates_usage(
     session: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _clear_pending(session)
-    keywords = [Keyword(name=name) for name in ["bake", "dinner", "pasta"]]
+    keywords = [Keyword(name=name) for name in ["bake", "dinner", "grain"]]
     session.add_all(keywords)
     session.commit()
     provider = ReplyProvider(
@@ -154,7 +154,7 @@ def test_pending_sweep_uses_batch_boundaries_and_accumulates_usage(
                 {"name": "bake", "category": "method"},
                 {"name": "dinner", "category": "course"},
             ],
-            [{"name": "pasta", "category": None}],
+            [{"name": "grain", "category": None}],
         ]
     )
     _resolve(monkeypatch, provider)

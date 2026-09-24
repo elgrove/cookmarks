@@ -7,7 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
 from app.models.base import Base, UUIDAuditBase
 from app.models.enums import KeywordCategory, enum_values
-from app.text import fold
+from app.text import fold, normalise_keyword
 
 if TYPE_CHECKING:
     from app.models.book import Book
@@ -47,6 +47,10 @@ class Keyword(UUIDAuditBase):
         Enum(KeywordCategory, values_callable=enum_values)
     )
     classified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+
+    @validates("name")
+    def _normalise_name(self, _key: str, value: str) -> str:
+        return normalise_keyword(value)
 
     recipes: Mapped[list["Recipe"]] = relationship(
         secondary=recipe_keywords, back_populates="keywords"

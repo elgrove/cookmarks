@@ -126,7 +126,7 @@ def test_search_matches_book_author(client: TestClient) -> None:
 def test_keyword_filter(client: TestClient) -> None:
     body = client.get("/api/recipes", params={"keyword": "Pasta"}).json()
     assert body["total"] == 1
-    assert body["items"][0]["keywords"] == ["Pasta", "Quick"]
+    assert body["items"][0]["keywords"] == ["pasta", "quick"]
 
 
 def test_keyword_filter_unknown_is_empty(client: TestClient) -> None:
@@ -207,8 +207,8 @@ def test_facets_rank_cooccurring_keywords(client: TestClient) -> None:
     # are its keywords, counted over the matching set.
     body = client.get("/api/recipes", params={"q": "recipe"}).json()
     assert body["facets"] == [
-        {"name": "Pasta", "recipe_count": 1},
-        {"name": "Quick", "recipe_count": 1},
+        {"name": "pasta", "recipe_count": 1},
+        {"name": "quick", "recipe_count": 1},
     ]
 
 
@@ -216,23 +216,23 @@ def test_facets_exclude_selected_keywords(client: TestClient) -> None:
     # With Pasta selected, the facet list offers what narrows *further* — Quick —
     # and drops the already-chosen Pasta.
     body = client.get("/api/recipes", params={"keyword": "Pasta"}).json()
-    assert body["facets"] == [{"name": "Quick", "recipe_count": 1}]
+    assert body["facets"] == [{"name": "quick", "recipe_count": 1}]
 
 
 def test_facets_respect_the_query(client: TestClient) -> None:
     # "anchovy" narrows to Recipe 0 alone; the facets are that recipe's keywords.
     body = client.get("/api/recipes", params={"q": "anchovy"}).json()
     assert body["facets"] == [
-        {"name": "Pasta", "recipe_count": 1},
-        {"name": "Quick", "recipe_count": 1},
+        {"name": "pasta", "recipe_count": 1},
+        {"name": "quick", "recipe_count": 1},
     ]
 
 
 def test_keywords_endpoint(client: TestClient) -> None:
     body = client.get("/api/keywords").json()
     assert body == [
-        {"name": "Pasta", "recipe_count": 1},
-        {"name": "Quick", "recipe_count": 1},
+        {"name": "pasta", "recipe_count": 1},
+        {"name": "quick", "recipe_count": 1},
     ]
 
 
@@ -240,22 +240,22 @@ def test_keywords_limit_caps_result(client: TestClient) -> None:
     # The client only renders the most-used keywords; the limit keeps the endpoint
     # from serialising the whole corpus. Ordered by count desc, name asc → Pasta.
     body = client.get("/api/keywords", params={"limit": 1}).json()
-    assert body == [{"name": "Pasta", "recipe_count": 1}]
+    assert body == [{"name": "pasta", "recipe_count": 1}]
 
 
 def test_keywords_endpoint_is_cached_until_cleared(client: TestClient, session: Session) -> None:
     # Computed once per process, then served from memory.
-    assert [k["name"] for k in client.get("/api/keywords").json()] == ["Pasta", "Quick"]
+    assert [k["name"] for k in client.get("/api/keywords").json()] == ["pasta", "quick"]
     # A keyword added afterwards isn't reflected — the cached top-N is served as-is.
     # It must be on a recipe to qualify: /api/keywords is recipe-scoped.
     recipe = session.scalars(select(Recipe)).first()
     assert recipe is not None
     recipe.keywords.append(Keyword(name="Zzz"))
     session.commit()
-    assert [k["name"] for k in client.get("/api/keywords").json()] == ["Pasta", "Quick"]
+    assert [k["name"] for k in client.get("/api/keywords").json()] == ["pasta", "quick"]
     # Clearing the cache (as the extraction task will on write) picks it up.
     _clear_keyword_cache()
-    assert "Zzz" in [k["name"] for k in client.get("/api/keywords").json()]
+    assert "zzz" in [k["name"] for k in client.get("/api/keywords").json()]
 
 
 # --- Recipe detail + prev/next navigation --------------------------------------
@@ -286,7 +286,7 @@ def test_recipe_detail_content(client: TestClient) -> None:
     assert body["enrichment_status"] == "pending"
     assert body["instructions"] == ["Boil the pasta.", "Toss with the oil and serve."]
     # Keywords come back sorted by name.
-    assert body["keywords"] == ["Pasta", "Quick"]
+    assert body["keywords"] == ["pasta", "quick"]
     assert body["has_image"] is True
 
 

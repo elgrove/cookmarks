@@ -28,7 +28,7 @@ from app.services.ai import (
     resolve_ingredient_chain,
     resolve_task,
 )
-from app.services.keywords import get_or_create_keyword
+from app.services.keywords import get_or_create_keywords
 from app.services.recipe_enrichment.schema import (
     PROMPT_VERSION,
     SCHEMA_VERSION,
@@ -390,7 +390,7 @@ def _apply_response(
             )
         )
     recipe.cuisines = [RecipeCuisine(cuisine_id=cuisine_id) for cuisine_id in response.cuisines]
-    recipe.keywords = [get_or_create_keyword(session, value.strip()) for value in response.keywords]
+    recipe.keywords = get_or_create_keywords(session, response.keywords)
     recipe.alternate_name = response.alternate_name
     recipe.summary = response.summary
     state.status = RecipeEnrichmentStatus.COMPLETE
