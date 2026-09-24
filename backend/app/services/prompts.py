@@ -83,6 +83,26 @@ Cookbook:
 
 Return ONLY a JSON array of keyword strings. No other text."""
 
+KEYWORD_CLASSIFICATION_PROMPT = """Classify each cookbook-recipe keyword into at most one browsing category.
+
+Allowed categories:
+- cuisine_region: a cuisine, country, region, or established regional food tradition
+- course: the recipe's meal course or serving role
+- key_ingredient: a principal ingredient or ingredient family
+- method: a cooking method or preparation technique
+
+Rules:
+- Return exactly one result for every candidate and no other results.
+- Copy each candidate name exactly. Do not rename, merge, split, or normalise it.
+- Use only the four category values above, or null when none applies.
+- Decide from the complete phrase. Do not classify a phrase only because one word inside it matches a category. For example, "spring onion", "winter squash", and "summer squash" are ingredients, not seasons.
+- Dietary, season, occasion, heat, mood, dish format, and other tags get null unless the complete phrase also clearly belongs to one allowed category.
+
+Candidates:
+{candidates}
+
+Return ONLY a JSON array of objects with keys "name" and "category". No other text."""
+
 DEDUPLICATE_KEYWORDS_PROMPT = """You are tasked with deduplicating keywords. These are keywords/tags of recipes extracted from cookbooks.
 We already have the ability to search through ingredients in our application. We want to make searching/filtering with keywords effective.
 Analyse the candidate keywords below and identify those that are variations of each other (e.g., different capitalisation, pluralisation, or hyphenation), or are very similar and serve the same purpose as tags/keywords.
@@ -121,7 +141,7 @@ Here is the whole keyword vocabulary. Any of these may be used as a canonical ke
 Here are the candidate keywords. Propose merges ONLY for these:
 {candidates}
 
-Every key in the returned object MUST be one of the candidate keywords. A value may be any keyword in the vocabulary above.
+Every key in the returned object MUST be one of the candidate keywords. Every value MUST exactly copy an existing keyword from the vocabulary above. Never invent a new spelling or change its case.
 
 Return ONLY a valid JSON object. No other text.
 """

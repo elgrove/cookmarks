@@ -118,7 +118,7 @@ def test_book_detail_recipes_capped_and_shaped(client: TestClient) -> None:
     # The seeded "Recipe 0" carries two keywords, sorted.
     keyworded = next((r for r in recipes if r["name"] == "Recipe 0"), None)
     if keyworded is not None:
-        assert keyworded["keywords"] == ["Pasta", "Quick"]
+        assert keyworded["keywords"] == ["pasta", "quick"]
 
 
 def test_book_detail_empty_recipes(client: TestClient) -> None:
@@ -525,7 +525,7 @@ def test_update_book_replaces_keywords_case_insensitively(client: TestClient) ->
         json={"keywords": [" Pasta ", "", "pasta", "Quick", " QUICK "]},
     )
     assert resp.status_code == 200
-    assert resp.json()["keywords"] == ["Pasta", "Quick"]
+    assert resp.json()["keywords"] == ["pasta", "quick"]
 
 
 def test_update_book_clears_optional_fields(client: TestClient) -> None:
@@ -578,13 +578,12 @@ def test_update_book_rejects_overlong_values(client: TestClient) -> None:
 def test_update_book_keywords_reuse_the_shared_row_across_case(
     client: TestClient, session: Session
 ) -> None:
-    """A differently-cased tag reuses the existing keyword row instead of forking the
-    shared vocabulary."""
+    """A differently-cased tag reuses the lower-case shared keyword identity."""
     book_id = _book_id(client, "With Recipes")
     assert client.patch(f"/api/books/{book_id}", json={"keywords": ["Pasta"]}).status_code == 200
     assert client.patch(f"/api/books/{book_id}", json={"keywords": ["pasta"]}).status_code == 200
     body = client.get(f"/api/books/{book_id}").json()
-    assert body["keywords"] == ["Pasta"]
+    assert body["keywords"] == ["pasta"]
     rows = session.scalars(select(Keyword).where(Keyword.name.ilike("pasta"))).all()
     assert len(rows) == 1
 

@@ -20,8 +20,8 @@ def test_books_endpoint_exposes_book_keywords(client: TestClient) -> None:
     extracted = next(b for b in books if b["title"] == "With Recipes")
     pending = next(b for b in books if b["title"] == "No Recipes Yet")
 
-    # Sorted, and the shared "Pasta" tag appears here as well as on a recipe.
-    assert extracted["keywords"] == ["Italian", "Pasta"]
+    # Sorted, and the shared "pasta" tag appears here as well as on a recipe.
+    assert extracted["keywords"] == ["italian", "pasta"]
     assert pending["keywords"] == []
 
 
@@ -30,7 +30,7 @@ def test_book_detail_exposes_book_keywords(client: TestClient) -> None:
         b["id"] for b in client.get("/api/books").json() if b["title"] == "With Recipes"
     )
     detail = client.get(f"/api/books/{book_id}").json()
-    assert detail["keywords"] == ["Italian", "Pasta"]
+    assert detail["keywords"] == ["italian", "pasta"]
 
 
 def test_generate_assigns_keywords_from_shared_vocabulary(session: Session) -> None:
@@ -46,11 +46,11 @@ def test_generate_assigns_keywords_from_shared_vocabulary(session: Session) -> N
     session.commit()
 
     assert names  # the stub yields a deterministic, non-empty set
-    assert "Cookbook" in names
+    assert "cookbook" in names
     # The book's keywords are replaced wholesale by the freshly generated set.
     assert {k.name for k in book.keywords} == set(names)
     # Shared vocabulary: exactly one "Cookbook" row, reused rather than duplicated.
-    assert session.scalar(select(func.count()).select_from(Keyword).where(Keyword.name == "Cookbook")) == 1
+    assert session.scalar(select(func.count()).select_from(Keyword).where(Keyword.name == "cookbook")) == 1
 
 
 def test_generate_is_a_noop_without_a_provider(session: Session) -> None:

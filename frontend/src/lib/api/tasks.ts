@@ -37,6 +37,13 @@ export async function triggerDedupKeywords(fetchFn: typeof fetch = fetch): Promi
 	return taskRunAckSchema.parse(await res.json());
 }
 
+/** Queue classification of every keyword that has not yet been examined. */
+export async function triggerClassifyKeywords(fetchFn: typeof fetch = fetch): Promise<TaskRunAck> {
+	const res = await fetchFn('/api/tasks/classify-keywords', { method: 'POST' });
+	if (!res.ok) throw new Error(`POST /api/tasks/classify-keywords → ${res.status}`);
+	return taskRunAckSchema.parse(await res.json());
+}
+
 /** Queue an AI-assisted merge of canonical ingredient variants. The worker repoints
  * recipe ingredient facts before removing duplicates; `queued` is the vocabulary size. */
 export async function triggerDedupIngredients(fetchFn: typeof fetch = fetch): Promise<TaskRunAck> {

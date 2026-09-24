@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from enum import Enum
 from pathlib import Path
-from typing import ClassVar, TypeVar
+from typing import ClassVar, TypeVar, cast
 
 from pydantic import ValidationError
 
@@ -18,6 +18,7 @@ from app.services.prompts import (
     DEDUPLICATE_KEYWORDS_PROMPT,
     EXTRACT_RECIPES_PROMPT,
     IMAGE_MATCH_CHECK_PROMPT,
+    KEYWORD_CLASSIFICATION_PROMPT,
 )
 from app.services.recipe_enrichment.prompt import (
     build_prompt,
@@ -89,6 +90,34 @@ class Usage:
             thinking_tokens=_sum_optional(self.thinking_tokens, other.thinking_tokens),
             finish_reason=other.finish_reason or self.finish_reason,
         )
+
+
+@dataclass(frozen=True)
+class KeywordClassification:
+    name: str
+    category: str | None
+
+
+KEYWORD_CLASSIFICATION_SCHEMA = {
+    "type": "array",
+    "items": {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string"},
+            "category": {
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "enum": ["cuisine_region", "course", "key_ingredient", "method"],
+                    },
+                    {"type": "null"},
+                ]
+            },
+        },
+        "required": ["name", "category"],
+        "additionalProperties": False,
+    },
+}
 
 
 class AIResponseError(RuntimeError):
@@ -402,6 +431,48 @@ class AIProvider(abc.ABC):
             return [], usage
 
         return _clean_keywords(raw, MAX_BOOK_KEYWORDS), usage
+
+    def classify_keywords(
+        self, candidates: list[str], model: str | None = None
+    ) -> tuple[list[KeywordClassification], Usage]:
+        """Classify an exact keyword-name batch. The service validates coverage,
+        uniqueness, allowed values, and unknown names before it writes any rows."""
+        if not candidates:
+            return [], Usage()
+        model = model or self.model_for(ModelRole.KEYWORD_CLASSIFICATION)
+        prompt = KEYWORD_CLASSIFICATION_PROMPT.format(candidates=json.dumps(candidates))
+        response, usage = self._complete(
+            prompt, model, schema=KEYWORD_CLASSIFICATION_SCHEMA, temp=0
+        )
+        if not response:
+            raise AIResponseError("Keyword classification returned an empty response", usage)
+        try:
+            raw = json.loads(_strip_json_fence(response))
+        except json.JSONDecodeError as exc:
+            raise AIResponseError("Keyword classification returned invalid JSON", usage) from exc
+        if not isinstance(raw, list):
+            raise AIResponseError("Keyword classification response was not an array", usage)
+        results: list[KeywordClassification] = []
+        for index, item in enumerate(raw):
+            if not isinstance(item, dict):
+                raise AIResponseError(
+                    f"Keyword classification result {index} was not an object", usage
+                )
+            record = cast(dict[str, object], item)
+            if set(record) != {"name", "category"}:
+                raise AIResponseError(
+                    f"Keyword classification result {index} must contain exactly "
+                    "'name' and 'category'",
+                    usage,
+                )
+            name = record.get("name")
+            category = record.get("category")
+            if not isinstance(name, str) or not (category is None or isinstance(category, str)):
+                raise AIResponseError(
+                    f"Keyword classification result {index} had invalid field types", usage
+                )
+            results.append(KeywordClassification(name=name, category=category))
+        return results, usage
 
     def deduplicate_keywords(
         self, keywords: list[str], candidates: list[str], model: str | None = None

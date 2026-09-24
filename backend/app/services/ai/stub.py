@@ -9,6 +9,7 @@ from app.services.prompts import (
     DEDUPLICATE_INGREDIENTS_PROMPT,
     DEDUPLICATE_KEYWORDS_PROMPT,
     IMAGE_MATCH_CHECK_PROMPT,
+    KEYWORD_CLASSIFICATION_PROMPT,
 )
 
 
@@ -43,6 +44,7 @@ class StubProvider(AIProvider):
         ModelRole.ONE_RECIPE_PER_FILE: "stub-extract",
         ModelRole.BLOCKS_OF_FILES: "stub-extract",
         ModelRole.BOOK_KEYWORDS: "stub-keywords",
+        ModelRole.KEYWORD_CLASSIFICATION: "stub-keyword-classification",
         ModelRole.KEYWORD_DEDUP: "stub-dedup",
         ModelRole.INGREDIENT_DEDUP: "stub-ingredient-dedup",
         ModelRole.ASSISTANT: "stub-assistant",
@@ -74,6 +76,10 @@ class StubProvider(AIProvider):
             keywords = json.loads(prompt[prompt.rfind("[") : prompt.rfind("]") + 1])
             return json.dumps({k: k for k in keywords}), usage
 
+        if prompt.startswith(KEYWORD_CLASSIFICATION_PROMPT[:40]):
+            candidates = json.loads(prompt[prompt.rfind("[") : prompt.rfind("]") + 1])
+            return json.dumps([{"name": name, "category": None} for name in candidates]), usage
+
         if prompt.startswith(DEDUPLICATE_INGREDIENTS_PROMPT[:40]):
             ingredients = json.loads(prompt[prompt.rfind("[") : prompt.rfind("]") + 1])
             return json.dumps({ingredient: ingredient for ingredient in ingredients}), usage
@@ -93,8 +99,14 @@ class StubProvider(AIProvider):
                 ingredients.append({"id": line["id"], "n": f"Stub Ingredient {token} {index}"})
             return json.dumps({"i": ingredients}), usage
 
-        if (system and system.startswith("Recipe facets prompt")) or prompt.startswith("Recipe facets prompt"):
-            recipe_text = prompt.rsplit("Recipe context:\n", 1)[1] if "Recipe context:\n" in prompt else prompt
+        if (system and system.startswith("Recipe facets prompt")) or prompt.startswith(
+            "Recipe facets prompt"
+        ):
+            recipe_text = (
+                prompt.rsplit("Recipe context:\n", 1)[1]
+                if "Recipe context:\n" in prompt
+                else prompt
+            )
             try:
                 recipe = json.loads(recipe_text)
             except json.JSONDecodeError:

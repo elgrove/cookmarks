@@ -142,22 +142,24 @@ def test_propose_merges_drops_self_maps_and_cycles() -> None:
 def test_apply_merges_reassigns_recipe_and_book_associations(session: Session) -> None:
     recipe = _recipe_zero(session)
     book = _with_recipes(session)
-    # "Pasta" is shared: on recipe 0 and on the book (the single shared vocabulary).
-    applied = apply_merges(session, {"Pasta": "Noodles"})
+    session.add(Keyword(name="noodles"))
+    session.flush()
+    # "pasta" is shared: on recipe 0 and on the book (the single shared vocabulary).
+    applied = apply_merges(session, {"pasta": "noodles"})
     session.commit()
 
     assert applied == 1
-    assert "Noodles" in {k.name for k in recipe.keywords}
-    assert "Pasta" not in {k.name for k in recipe.keywords}
-    assert "Noodles" in {k.name for k in book.keywords}
-    assert "Pasta" not in {k.name for k in book.keywords}
+    assert "noodles" in {k.name for k in recipe.keywords}
+    assert "pasta" not in {k.name for k in recipe.keywords}
+    assert "noodles" in {k.name for k in book.keywords}
+    assert "pasta" not in {k.name for k in book.keywords}
     # The merged-away keyword is gone; the canonical exists exactly once.
     assert (
-        session.scalar(select(func.count()).select_from(Keyword).where(Keyword.name == "Pasta"))
+        session.scalar(select(func.count()).select_from(Keyword).where(Keyword.name == "pasta"))
         == 0
     )
     assert (
-        session.scalar(select(func.count()).select_from(Keyword).where(Keyword.name == "Noodles"))
+        session.scalar(select(func.count()).select_from(Keyword).where(Keyword.name == "noodles"))
         == 1
     )
 
@@ -170,32 +172,32 @@ def test_apply_merges_dedupes_when_owner_already_has_both(session: Session) -> N
     recipe.keywords.extend([veg, vegetarian])
     session.commit()
 
-    applied = apply_merges(session, {"Veg": "Vegetarian"})
+    applied = apply_merges(session, {"veg": "vegetarian"})
     session.commit()
 
     assert applied == 1
     # No duplicate association: "Vegetarian" appears exactly once on the recipe.
-    assert [k.name for k in recipe.keywords].count("Vegetarian") == 1
-    assert "Veg" not in {k.name for k in recipe.keywords}
+    assert [k.name for k in recipe.keywords].count("vegetarian") == 1
+    assert "veg" not in {k.name for k in recipe.keywords}
 
 
-def test_apply_merges_creates_the_canonical_when_absent(session: Session) -> None:
+def test_apply_merges_rejects_an_absent_canonical(session: Session) -> None:
     recipe = _recipe_zero(session)
     veggie = Keyword(name="Veggie")
     session.add(veggie)
     recipe.keywords.append(veggie)
     session.commit()
 
-    applied = apply_merges(session, {"Veggie": "Vegetarian"})
+    applied = apply_merges(session, {"veggie": "vegetarian"})
     session.commit()
 
-    assert applied == 1
-    assert "Vegetarian" in {k.name for k in recipe.keywords}
+    assert applied == 0
+    assert "veggie" in {k.name for k in recipe.keywords}
     assert (
         session.scalar(
-            select(func.count()).select_from(Keyword).where(Keyword.name == "Vegetarian")
+            select(func.count()).select_from(Keyword).where(Keyword.name == "vegetarian")
         )
-        == 1
+        == 0
     )
 
 
@@ -217,9 +219,7 @@ def test_apply_merges_skips_a_duplicate_with_no_row(session: Session) -> None:
 def test_deduplicate_keywords_end_to_end(session: Session, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "app.services.keyword_dedup.resolve_task",
-        lambda _session, _role: ResolvedTask(
-            _MapProvider({"Pasta": "Noodles"}), "test-model"
-        ),
+        lambda _session, _role: ResolvedTask(_MapProvider({"pasta": "italian"}), "test-model"),
     )
     recipe = _recipe_zero(session)
 
@@ -229,7 +229,7 @@ def test_deduplicate_keywords_end_to_end(session: Session, monkeypatch: pytest.M
     assert result.merges_applied == 1
     assert result.vocabulary_removed == 1
     assert result.vocabulary_in == 3  # Pasta, Quick, Italian
-    assert "Noodles" in {k.name for k in recipe.keywords}
+    assert "italian" in {k.name for k in recipe.keywords}
 
 
 def test_deduplicate_keywords_is_a_noop_without_a_provider(session: Session) -> None:
@@ -292,11 +292,11 @@ def test_propose_merges_drops_a_key_outside_the_candidate_window(
     monkeypatch.setattr("app.services.keyword_dedup.DEDUP_CANDIDATE_WINDOW", 1)
     # Sorted, the window is ["Aubergine"], so the Shrimp entry names a keyword the model
     # was only given as context — it must not be merged away.
-    provider = _MapProvider({"Aubergine": "Brinjal", "Shrimp": "Prawn"})
+    provider = _MapProvider({"Aubergine": "Prawn", "Shrimp": "Prawn"})
 
     merges, stats = propose_merges(provider, ["Shrimp", "Prawn", "Aubergine"])
 
-    assert merges == {"Aubergine": "Brinjal"}
+    assert merges == {"Aubergine": "Prawn"}
     assert stats.candidates == 1
 
 
@@ -338,14 +338,14 @@ def test_deduplicate_keywords_reports_both_stages(
     monkeypatch.setattr(
         "app.services.keyword_dedup.resolve_task",
         lambda _session, _role: ResolvedTask(
-            _MapProvider({"Quick": "Fast"}), "test-model"
+            _MapProvider({"quick": "italian"}), "test-model"
         ),
     )
 
     result = deduplicate_keywords(session)
     session.commit()
 
-    # "Pastas" folds into "Pasta" deterministically; "Quick" -> "Fast" is the AI's.
+    # "pastas" folds into "pasta" deterministically; "quick" -> "italian" is the AI's.
     assert result.pre_merges == 1
     assert result.ai_merges == 1
     assert result.merges_applied == result.pre_merges + result.ai_merges

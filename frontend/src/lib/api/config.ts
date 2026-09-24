@@ -14,6 +14,7 @@ export const modelRoleSchema = z.enum([
 	'one_recipe_per_file',
 	'blocks_of_files',
 	'book_keywords',
+	'keyword_classification',
 	'keyword_dedup',
 	'ingredient_dedup',
 	'assistant',

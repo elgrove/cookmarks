@@ -10,6 +10,7 @@ from app.schemas.tasks import BookKeywordTaskRequest, TaskRunAck
 from app.tasks.book_keywords import enqueue_backfill_book_keywords
 from app.tasks.calibre_sync import enqueue_calibre_sync
 from app.tasks.ingredient_dedup import enqueue_dedup_ingredients
+from app.tasks.keyword_classification import enqueue_classify_keywords
 from app.tasks.keyword_dedup import enqueue_dedup_keywords
 from app.tasks.runs import create_task_run
 
@@ -49,6 +50,24 @@ def trigger_dedup_keywords(session: SessionDep) -> TaskRunAck:
     run = create_task_run(session, TaskType.KEYWORD_DEDUP)
     enqueue_dedup_keywords(str(run.id))
     return TaskRunAck(task="keyword_dedup", status="queued", queued=vocabulary)
+
+
+@router.post(
+    "/classify-keywords",
+    response_model=TaskRunAck,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+def trigger_classify_keywords(session: SessionDep) -> TaskRunAck:
+    """Queue classification of every keyword not yet examined by the classifier."""
+    pending = (
+        session.scalar(
+            select(func.count()).select_from(Keyword).where(Keyword.classified_at.is_(None))
+        )
+        or 0
+    )
+    run = create_task_run(session, TaskType.KEYWORD_CLASSIFICATION)
+    enqueue_classify_keywords(str(run.id))
+    return TaskRunAck(task="keyword_classification", status="queued", queued=pending)
 
 
 @router.post(

@@ -3,6 +3,7 @@ count + dispatch) and the library-wide backfill sweep it runs on the worker."""
 
 import uuid
 from collections.abc import Iterator
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -12,9 +13,10 @@ from sqlalchemy import create_engine, event, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.db import configure_sqlite_connection
-from app.models import Base, Book, CanonicalIngredient, Recipe, TaskRun
+from app.models import Base, Book, CanonicalIngredient, Keyword, Recipe, TaskRun
 from app.models.enums import AIProvider, TaskStatus, TaskType
 from app.services.ai import upsert_provider_config
+from app.services.ai.registry import resolve_task
 from app.tasks.book_keywords import backfill_book_keywords
 
 
@@ -59,6 +61,26 @@ def test_trigger_dedup_reports_vocabulary_size_and_dispatches(
     run = _only_run(session)
     assert run.task_type == TaskType.KEYWORD_DEDUP
     assert dedup_dispatched == [(str(run.id),)]
+
+
+def test_trigger_classification_reports_pending_count_and_dispatches(
+    client: TestClient,
+    session: Session,
+    classification_dispatched: list[tuple[Any, ...]],
+) -> None:
+    # One examined-null keyword must not be selected again.
+    keyword = session.scalars(select(Keyword)).first()
+    assert keyword is not None
+    keyword.classified_at = datetime.now(UTC)
+    session.commit()
+
+    res = client.post("/api/tasks/classify-keywords")
+
+    assert res.status_code == 202
+    assert res.json() == {"task": "keyword_classification", "status": "queued", "queued": 2}
+    run = _only_run(session)
+    assert run.task_type == TaskType.KEYWORD_CLASSIFICATION
+    assert classification_dispatched == [(str(run.id),)]
 
 
 def test_trigger_ingredient_dedup_reports_vocabulary_size_and_dispatches(
@@ -110,6 +132,8 @@ def task_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[session
     monkeypatch.setattr("app.tasks.book_keywords.SessionLocal", factory)
     monkeypatch.setattr("app.tasks.runs.SessionLocal", factory)
     monkeypatch.setattr("app.tasks.calibre_sync.SessionLocal", factory)
+    monkeypatch.setattr("app.tasks.keyword_classification.SessionLocal", factory)
+    monkeypatch.setattr("app.services.keyword_classification.resolve_task", resolve_task)
     yield factory
     engine.dispose()
 
@@ -187,3 +211,36 @@ def test_calibre_sync_task_records_failure(
         assert run.status == TaskStatus.FAILED
         assert run.errors
         assert run.completed_at is not None
+
+
+def test_keyword_classification_task_completes_with_usage_and_counts(
+    task_db: sessionmaker[Session],
+) -> None:
+    from app.tasks.keyword_classification import classify_keywords_task
+
+    with task_db() as session:
+        upsert_provider_config(session, AIProvider.STUB, api_key="test-key")
+        session.add_all([Keyword(name="pasta"), Keyword(name="quick")])
+        session.commit()
+    run_id = _queued_run(task_db, TaskType.KEYWORD_CLASSIFICATION)
+
+    detail = classify_keywords_task(run_id)
+
+    assert detail == {
+        "pending": 2,
+        "examined": 2,
+        "classified_by_category": {
+            "cuisine_region": 0,
+            "course": 0,
+            "key_ingredient": 0,
+            "method": 0,
+        },
+        "no_category": 2,
+        "failed_batches": 0,
+    }
+    with task_db() as session:
+        run = session.get(TaskRun, uuid.UUID(run_id))
+        assert run is not None
+        assert run.status == TaskStatus.DONE
+        assert run.provider_name == "STUB"
+        assert run.model_name == "stub-keyword-classification"

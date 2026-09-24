@@ -25,6 +25,7 @@
 		one_recipe_per_file: 'File extraction, one recipe',
 		blocks_of_files: 'Block extraction',
 		book_keywords: 'Book keywords',
+		keyword_classification: 'Keyword classification',
 		keyword_dedup: 'Keyword clean-up',
 		ingredient_dedup: 'Ingredient clean-up',
 		assistant: 'Assistant chat',
@@ -51,7 +52,7 @@
 		},
 		{
 			title: 'Library',
-			roles: ['book_keywords', 'keyword_dedup', 'ingredient_dedup']
+			roles: ['book_keywords', 'keyword_classification', 'keyword_dedup', 'ingredient_dedup']
 		},
 		{ title: 'Assistant', roles: ['assistant'] }
 	];

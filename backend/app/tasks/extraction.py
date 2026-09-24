@@ -12,7 +12,7 @@ from app.epub import epub_path, has_epub, has_pdf, pdf_path
 from app.models.book import Book
 from app.models.enums import RecipeEnrichmentStatus, TaskStatus, TaskType
 from app.models.ingredient import RecipeIngredient
-from app.models.recipe import Recipe
+from app.models.recipe import Keyword, Recipe
 from app.models.recipe_enrichment import RecipeEnrichmentState
 from app.models.task_run import TaskRun
 from app.schemas.extraction import RecipeData
@@ -22,7 +22,8 @@ from app.services.book_keywords import generate_book_keywords
 from app.services.embeddings import embed_recipes
 from app.services.extraction.graph import get_extraction_graph
 from app.services.extraction.review import VALID_HUMAN_RESPONSES
-from app.services.keywords import get_or_create_keyword
+from app.services.keyword_classification import classify_keyword_rows
+from app.services.keywords import get_or_create_keywords
 from app.tasks.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
@@ -122,6 +123,21 @@ def _generate_book_keywords(session: Session, book: Book) -> None:
         logger.exception(f"Book-keyword generation failed for {book.title}")
 
 
+def _classify_new_keywords(session: Session, keywords: list[Keyword]) -> None:
+    """Classify only vocabulary rows created while this extraction saved recipes.
+
+    This is best-effort. A missing assignment, invalid reply, or provider failure leaves
+    every affected row pending for the tracked admin sweep.
+    """
+    if not keywords:
+        return
+    try:
+        classify_keyword_rows(session, keywords)
+    except Exception:
+        session.rollback()
+        logger.exception("Keyword classification failed after extraction")
+
+
 def _replace_ingredient_lines(session: Session, recipe: Recipe, source_text: list[str]) -> None:
     """Replace source lines while retaining facts on lines whose text still matches."""
     reusable: dict[str, list[RecipeIngredient]] = {}
@@ -155,7 +171,13 @@ def _replace_ingredient_lines(session: Session, recipe: Recipe, source_text: lis
     recipe.ingredients = replacement
 
 
-def _upsert_recipe(session: Session, book: Book, run: TaskRun, data: RecipeData) -> Recipe:
+def _upsert_recipe(
+    session: Session,
+    book: Book,
+    run: TaskRun,
+    data: RecipeData,
+    created_keywords: list[Keyword] | None = None,
+) -> Recipe:
     """Reconcile by normalised name within the book: update the existing recipe in
     place if one matches, else create it. Identity is stable across re-extraction so
     favourites and list membership survive a re-run."""
@@ -179,7 +201,7 @@ def _upsert_recipe(session: Session, book: Book, run: TaskRun, data: RecipeData)
     recipe.yields = data.yields
     recipe.image = data.image or None
     if "keywords" in data.model_fields_set:
-        recipe.keywords = [get_or_create_keyword(session, name) for name in data.keywords]
+        recipe.keywords = get_or_create_keywords(session, data.keywords, created=created_keywords)
     if fingerprint != previous_fingerprint:
         _replace_ingredient_lines(session, recipe, source_text)
         if recipe.enrichment_state is None:
@@ -219,7 +241,11 @@ def _source_fingerprint(data: RecipeData, ingredient_text: list[str]) -> str:
 
 
 def save_recipes_from_graph_state(
-    session: Session, book: Book, run: TaskRun, raw_recipes: list[dict]
+    session: Session,
+    book: Book,
+    run: TaskRun,
+    raw_recipes: list[dict],
+    created_keywords: list[Keyword] | None = None,
 ) -> int:
     logger.info(f"Saving {len(raw_recipes)} recipes for {book.title}")
 
@@ -230,7 +256,7 @@ def save_recipes_from_graph_state(
         except Exception as e:
             logger.error(f"Invalid recipe data: {e}")
             continue
-        saved.append(_upsert_recipe(session, book, run, recipe_data))
+        saved.append(_upsert_recipe(session, book, run, recipe_data, created_keywords))
 
     session.commit()
 
@@ -256,13 +282,19 @@ def _finalise_result(run_id: str, result: dict | None) -> str:
             if book is None:
                 return "Book not found"
             raw_recipes = (result or {}).get("raw_recipes", [])
-            created = save_recipes_from_graph_state(session, book, run, raw_recipes)
+            new_keywords: list[Keyword] = []
+            created = save_recipes_from_graph_state(
+                session, book, run, raw_recipes, created_keywords=new_keywords
+            )
             recipes = list(
                 session.scalars(select(Recipe).where(Recipe.extraction_run_id == run.id))
             )
             generate_recipe_embeddings(session, recipes)
             _generate_book_keywords(session, book)
+            # Preserve the existing embedding → book-keyword order and make both
+            # durable before the optional classifier runs in its own transaction.
             session.commit()
+            _classify_new_keywords(session, new_keywords)
             logger.info(f"Finished extraction for {book.title}. Processed {created} recipes.")
             return f"Extracted {created} recipes for {book.title}"
 

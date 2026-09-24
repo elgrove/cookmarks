@@ -4,6 +4,7 @@
 		TaskType,
 		ExtractionDetail,
 		BookKeywordsDetail,
+		KeywordClassificationDetail,
 		KeywordDedupDetail,
 		IngredientDedupDetail,
 		CalibreSyncDetail,
@@ -30,6 +31,7 @@
 	const TYPE_LABELS: Record<TaskType, string> = {
 		extraction: 'Extraction',
 		book_keywords: 'Book keywords',
+		keyword_classification: 'Keyword classification',
 		keyword_dedup: 'Keyword dedup',
 		ingredient_dedup: 'Ingredient dedup',
 		calibre_sync: 'Calibre import',
@@ -41,6 +43,7 @@
 	};
 	const TYPE_TITLES: Record<Exclude<TaskType, 'extraction'>, string> = {
 		book_keywords: 'Book-keyword tagging',
+		keyword_classification: 'Keyword vocabulary classification',
 		keyword_dedup: 'Keyword vocabulary dedup',
 		ingredient_dedup: 'Canonical ingredient dedup',
 		calibre_sync: 'Calibre library import',
@@ -129,6 +132,23 @@
 				return [
 					{ label: 'Books tagged', value: count(d.books_tagged) },
 					{ label: 'Regenerate', value: d.regenerate ? 'Yes' : 'No' }
+				];
+			}
+			case 'keyword_classification': {
+				const d = run.detail as unknown as KeywordClassificationDetail;
+				return [
+					{ label: 'Provider', value: run.provider_name ?? '—' },
+					{ label: 'Model', value: run.model_name ?? '—', wrap: true },
+					{ label: 'Pending', value: count(d.pending) },
+					{ label: 'Examined', value: count(d.examined) },
+					{ label: 'Cuisine / region', value: count(d.classified_by_category?.cuisine_region) },
+					{ label: 'Course', value: count(d.classified_by_category?.course) },
+					{ label: 'Key ingredient', value: count(d.classified_by_category?.key_ingredient) },
+					{ label: 'Method', value: count(d.classified_by_category?.method) },
+					{ label: 'No category', value: count(d.no_category) },
+					{ label: 'Failed batches', value: count(d.failed_batches) },
+					{ label: 'Cost', value: formatCost(run.cost_usd) },
+					{ label: 'Tokens', value: formatTokens(run.input_tokens, run.output_tokens) }
 				];
 			}
 			case 'keyword_dedup': {

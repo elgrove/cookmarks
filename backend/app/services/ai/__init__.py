@@ -1,5 +1,12 @@
 from app.services.ai.anthropic import AnthropicProvider
-from app.services.ai.base import AIProvider, AIResponseError, EmbedTask, ModelRole, Usage
+from app.services.ai.base import (
+    AIProvider,
+    AIResponseError,
+    EmbedTask,
+    KeywordClassification,
+    ModelRole,
+    Usage,
+)
 from app.services.ai.gemini import GeminiProvider
 from app.services.ai.openrouter import OpenRouterProvider
 from app.services.ai.registry import (
@@ -36,6 +43,7 @@ __all__ = [
     "AnthropicProvider",
     "EmbedTask",
     "GeminiProvider",
+    "KeywordClassification",
     "ModelRole",
     "OpenRouterProvider",
     "ResolvedTask",

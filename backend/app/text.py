@@ -34,6 +34,16 @@ def fold(value: str | None) -> str:
     return "".join(ch for ch in decomposed if not unicodedata.combining(ch)).casefold()
 
 
+def normalise_keyword(value: str) -> str:
+    """Return the stored identity for a keyword.
+
+    Keywords are functional tags rather than display titles. A single lower-case,
+    whitespace-normalised identity keeps extraction, filtering, and AI maintenance
+    work from creating spelling variants that differ only in presentation.
+    """
+    return " ".join(value.split()).casefold()
+
+
 def stem(term: str) -> str:
     """Trim a plural ending so "tomatoes" also finds "tomato". Matching is by
     substring, so a shorter term only ever widens the result set."""

@@ -21,6 +21,7 @@ class AnthropicProvider(AIProvider):
         ModelRole.ONE_RECIPE_PER_FILE: "claude-sonnet-5",
         ModelRole.BLOCKS_OF_FILES: "claude-sonnet-5",
         ModelRole.BOOK_KEYWORDS: "claude-sonnet-5",
+        ModelRole.KEYWORD_CLASSIFICATION: "claude-haiku-4-5-20251001",
         ModelRole.KEYWORD_DEDUP: "claude-sonnet-5",
         ModelRole.INGREDIENT_DEDUP: "claude-sonnet-5",
         ModelRole.ASSISTANT: "claude-sonnet-5",

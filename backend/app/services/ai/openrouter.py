@@ -57,6 +57,7 @@ class OpenRouterProvider(AIProvider):
         ModelRole.ONE_RECIPE_PER_FILE: "openai/gpt-oss-120b",
         ModelRole.BLOCKS_OF_FILES: "google/gemini-2.5-flash",
         ModelRole.BOOK_KEYWORDS: "google/gemini-2.5-flash",
+        ModelRole.KEYWORD_CLASSIFICATION: "google/gemini-2.5-flash-lite",
         ModelRole.KEYWORD_DEDUP: "google/gemini-2.5-flash",
         ModelRole.INGREDIENT_DEDUP: "google/gemini-2.5-flash",
         ModelRole.ASSISTANT: "google/gemini-2.5-flash",
