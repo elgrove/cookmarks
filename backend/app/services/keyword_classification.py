@@ -111,7 +111,7 @@ def _classify_batch(
 
 
 def classify_keyword_rows(session: Session, keywords: list[Keyword]) -> KeywordClassificationResult:
-    """Classify one explicit, bounded set in one provider call and commit it.
+    """Classify explicit rows in bounded calls and commit each valid batch.
 
     Extraction uses this for only the rows that it created. Existing or already
     classified rows are ignored so a re-extraction never reclassifies the vocabulary.
@@ -125,11 +125,14 @@ def classify_keyword_rows(session: Session, keywords: list[Keyword]) -> KeywordC
     resolved = resolve_task(session, ModelRole.KEYWORD_CLASSIFICATION)
     if resolved is None:
         raise RuntimeError("No usable AI provider is configured for keyword_classification")
-    batch = _classify_batch(session, pending, resolved)
-    session.commit()
     result.provider_name = resolved.provider.name
     result.model_name = resolved.model
-    result.add(batch)
+    for offset in range(0, len(pending), KEYWORD_CLASSIFICATION_BATCH_SIZE):
+        batch = _classify_batch(
+            session, pending[offset : offset + KEYWORD_CLASSIFICATION_BATCH_SIZE], resolved
+        )
+        session.commit()
+        result.add(batch)
     return result
 
 
@@ -147,7 +150,7 @@ def classify_pending_keywords(
     pending_ids = list(
         session.scalars(
             select(Keyword.id)
-            .where(Keyword.classified_at.is_(None))
+            .where(Keyword.classified_at.is_(None), Keyword.recipes.any())
             .order_by(Keyword.name, Keyword.id)
         )
     )
@@ -189,7 +192,9 @@ def classify_pending_keywords(
 def pending_keyword_count(session: Session) -> int:
     return (
         session.scalar(
-            select(func.count()).select_from(Keyword).where(Keyword.classified_at.is_(None))
+            select(func.count())
+            .select_from(Keyword)
+            .where(Keyword.classified_at.is_(None), Keyword.recipes.any())
         )
         or 0
     )

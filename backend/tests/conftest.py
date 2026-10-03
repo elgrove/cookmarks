@@ -18,6 +18,7 @@ from app.models.enums import AIProvider
 from app.services.ai import upsert_provider_config
 from app.services.auth import hash_password
 from app.services.embeddings import _clear_query_embed_cache
+from app.tasks.keyword_classification import classify_keywords_task
 
 # Where the two seeded books live inside a Calibre library root.
 SEEDED_BOOK_PATHS = ("Author One/With Recipes (1)", "Author Two/No Recipes Yet (2)")
@@ -104,8 +105,6 @@ def dedup_dispatched(monkeypatch: pytest.MonkeyPatch) -> list[tuple[Any, ...]]:
 @pytest.fixture(autouse=True)
 def classification_dispatched(monkeypatch: pytest.MonkeyPatch) -> list[tuple[Any, ...]]:
     """Keep keyword-classification dispatch off Redis during API tests."""
-    from app.tasks.keyword_classification import classify_keywords_task
-
     calls: list[tuple[Any, ...]] = []
 
     def _record(*args: Any, **_kwargs: Any) -> None:

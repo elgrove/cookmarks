@@ -18,6 +18,7 @@ from app.models.enums import AIProvider, TaskStatus, TaskType
 from app.services.ai import upsert_provider_config
 from app.services.ai.registry import resolve_task
 from app.tasks.book_keywords import backfill_book_keywords
+from app.tasks.keyword_classification import classify_keywords_task
 
 
 def _only_run(session: Session) -> TaskRun:
@@ -69,7 +70,7 @@ def test_trigger_classification_reports_pending_count_and_dispatches(
     classification_dispatched: list[tuple[Any, ...]],
 ) -> None:
     # One examined-null keyword must not be selected again.
-    keyword = session.scalars(select(Keyword)).first()
+    keyword = session.scalar(select(Keyword).where(Keyword.name == "pasta"))
     assert keyword is not None
     keyword.classified_at = datetime.now(UTC)
     session.commit()
@@ -77,7 +78,7 @@ def test_trigger_classification_reports_pending_count_and_dispatches(
     res = client.post("/api/tasks/classify-keywords")
 
     assert res.status_code == 202
-    assert res.json() == {"task": "keyword_classification", "status": "queued", "queued": 2}
+    assert res.json() == {"task": "keyword_classification", "status": "queued", "queued": 1}
     run = _only_run(session)
     assert run.task_type == TaskType.KEYWORD_CLASSIFICATION
     assert classification_dispatched == [(str(run.id),)]
@@ -216,11 +217,12 @@ def test_calibre_sync_task_records_failure(
 def test_keyword_classification_task_completes_with_usage_and_counts(
     task_db: sessionmaker[Session],
 ) -> None:
-    from app.tasks.keyword_classification import classify_keywords_task
-
     with task_db() as session:
         upsert_provider_config(session, AIProvider.STUB, api_key="test-key")
-        session.add_all([Keyword(name="pasta"), Keyword(name="quick")])
+        book = Book(calibre_id=2, title="Recipes", author="Author", path="A/Recipes (2)")
+        recipe = Recipe(book=book, order=0, name="Recipe")
+        recipe.keywords = [Keyword(name="pasta"), Keyword(name="quick")]
+        session.add(recipe)
         session.commit()
     run_id = _queued_run(task_db, TaskType.KEYWORD_CLASSIFICATION)
 

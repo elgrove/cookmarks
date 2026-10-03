@@ -7,6 +7,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.models import Book, Recipe
 from app.models.enums import KeywordCategory, ModelRole
 from app.models.recipe import Keyword
 from app.services.ai import AIProvider, AIResponseError, ResolvedTask, Usage
@@ -15,6 +16,7 @@ from app.services.keyword_classification import (
     KEYWORD_CLASSIFICATION_BATCH_SIZE,
     classify_keyword_rows,
     classify_pending_keywords,
+    pending_keyword_count,
 )
 from scripts.audit_keyword_candidates import build_report
 
@@ -110,6 +112,29 @@ def test_production_batch_size_is_small() -> None:
     assert KEYWORD_CLASSIFICATION_BATCH_SIZE == 10
 
 
+def test_explicit_rows_use_production_batch_size(
+    session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _clear_pending(session)
+    keywords = [Keyword(name=f"term {index:02}") for index in range(11)]
+    session.add_all(keywords)
+    session.commit()
+    provider = ReplyProvider(
+        [
+            [{"name": keyword.name, "category": None} for keyword in keywords[:10]],
+            [{"name": keywords[10].name, "category": None}],
+        ]
+    )
+    _resolve(monkeypatch, provider)
+
+    result = classify_keyword_rows(session, keywords)
+
+    assert provider.calls == 2
+    assert result.pending == 11
+    assert result.examined == 11
+    assert result.no_category == 11
+
+
 @pytest.mark.parametrize(
     "reply",
     [
@@ -165,7 +190,9 @@ def test_pending_sweep_uses_batch_boundaries_and_accumulates_usage(
 ) -> None:
     _clear_pending(session)
     keywords = [Keyword(name=name) for name in ["bake", "dinner", "grain"]]
-    session.add_all(keywords)
+    recipe = session.scalars(select(Recipe)).first()
+    assert recipe is not None
+    recipe.keywords.extend(keywords)
     session.commit()
     provider = ReplyProvider(
         [
@@ -198,7 +225,9 @@ def test_failed_batch_stays_pending_while_later_batch_commits(
 ) -> None:
     _clear_pending(session)
     keywords = [Keyword(name="first"), Keyword(name="second")]
-    session.add_all(keywords)
+    recipe = session.scalars(select(Recipe)).first()
+    assert recipe is not None
+    recipe.keywords.extend(keywords)
     session.commit()
     provider = ReplyProvider(
         [
@@ -218,6 +247,33 @@ def test_failed_batch_stays_pending_while_later_batch_commits(
     assert keywords[0].classified_at is None
     assert keywords[1].category == KeywordCategory.COURSE
     assert keywords[1].classified_at is not None
+
+
+def test_pending_sweep_ignores_book_only_and_unlinked_keywords(
+    session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _clear_pending(session)
+    recipe_keyword = Keyword(name="recipe keyword")
+    book_keyword = Keyword(name="book keyword")
+    unlinked_keyword = Keyword(name="unlinked keyword")
+    recipe = session.scalars(select(Recipe)).first()
+    book = session.scalars(select(Book)).first()
+    assert recipe is not None and book is not None
+    recipe.keywords.append(recipe_keyword)
+    book.keywords.append(book_keyword)
+    session.add(unlinked_keyword)
+    session.commit()
+    provider = ReplyProvider([[{"name": "recipe keyword", "category": None}]])
+    _resolve(monkeypatch, provider)
+
+    assert pending_keyword_count(session) == 1
+    result = classify_pending_keywords(session)
+
+    assert result.pending == 1
+    assert result.examined == 1
+    assert recipe_keyword.classified_at is not None
+    assert book_keyword.classified_at is None
+    assert unlinked_keyword.classified_at is None
 
 
 def test_audit_reports_exact_terms_and_seasonal_compound_risks(session: Session) -> None:
