@@ -10,7 +10,9 @@ from sqlalchemy.orm import Session
 from app.models.enums import KeywordCategory, ModelRole
 from app.models.recipe import Keyword
 from app.services.ai import AIProvider, AIResponseError, ResolvedTask, Usage
+from app.services.ai.base import KEYWORD_CLASSIFICATION_MAX_OUTPUT_TOKENS
 from app.services.keyword_classification import (
+    KEYWORD_CLASSIFICATION_BATCH_SIZE,
     classify_keyword_rows,
     classify_pending_keywords,
 )
@@ -27,6 +29,8 @@ class ReplyProvider(AIProvider):
         super().__init__("")
         self.replies = list(replies)
         self.calls = 0
+        self.last_schema: dict | None = None
+        self.last_max_output_tokens: int | None = None
 
     def _complete(
         self,
@@ -36,9 +40,12 @@ class ReplyProvider(AIProvider):
         schema: dict | None = None,
         temp: float = 0,
         system: str | None = None,
+        max_output_tokens: int | None = None,
     ) -> tuple[str, Usage]:
-        del prompt, model, schema, temp, system
+        del prompt, model, temp, system
         self.calls += 1
+        self.last_schema = schema
+        self.last_max_output_tokens = max_output_tokens
         reply = self.replies.pop(0)
         return json.dumps(reply), Usage(
             cost_usd=Decimal("0.01"), input_tokens=10, output_tokens=4
@@ -87,8 +94,20 @@ def test_provider_parses_categories_and_null_without_calling_for_empty_input() -
         ("quick", None),
     ]
     assert usage.input_tokens == 10
+    assert provider.last_max_output_tokens == KEYWORD_CLASSIFICATION_MAX_OUTPUT_TOKENS
+    assert provider.last_schema is not None
+    assert provider.last_schema["minItems"] == 2
+    assert provider.last_schema["maxItems"] == 2
+    assert provider.last_schema["items"]["properties"]["name"] == {
+        "type": "string",
+        "enum": ["thai", "quick"],
+    }
     assert provider.classify_keywords([])[0] == []
     assert provider.calls == 1
+
+
+def test_production_batch_size_is_small() -> None:
+    assert KEYWORD_CLASSIFICATION_BATCH_SIZE == 10
 
 
 @pytest.mark.parametrize(

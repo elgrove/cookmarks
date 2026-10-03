@@ -119,6 +119,43 @@ KEYWORD_CLASSIFICATION_SCHEMA = {
     },
 }
 
+KEYWORD_CLASSIFICATION_MAX_OUTPUT_TOKENS = 1_024
+
+
+def _keyword_classification_schema(candidates: list[str]) -> dict[str, object]:
+    """Constrain structured output to the exact candidate names and count.
+
+    The service still validates uniqueness and complete coverage after parsing. The
+    schema prevents a provider from changing spelling, accents, or capitalisation.
+    """
+    return {
+        "type": "array",
+        "minItems": len(candidates),
+        "maxItems": len(candidates),
+        "items": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string", "enum": candidates},
+                "category": {
+                    "anyOf": [
+                        {
+                            "type": "string",
+                            "enum": [
+                                "cuisine_region",
+                                "course",
+                                "key_ingredient",
+                                "method",
+                            ],
+                        },
+                        {"type": "null"},
+                    ]
+                },
+            },
+            "required": ["name", "category"],
+            "additionalProperties": False,
+        },
+    }
+
 
 class AIResponseError(RuntimeError):
     def __init__(self, message: str, usage: Usage) -> None:
@@ -264,9 +301,11 @@ class AIProvider(abc.ABC):
         schema: dict | None = None,
         temp: float = 0,
         system: str | None = None,
+        max_output_tokens: int | None = None,
     ) -> tuple[str, Usage]:
         """Run one completion and return (raw_text, usage). `schema` is a JSON schema
-        the provider may use to constrain output; `temp` is the sampling temperature."""
+        the provider may use to constrain output; `temp` is the sampling temperature.
+        `max_output_tokens` caps provider output for small, strict contracts."""
 
     def model_for(self, role: ModelRole) -> str:
         return self._model_overrides.get(role.value) or self.models[role]
@@ -442,7 +481,11 @@ class AIProvider(abc.ABC):
         model = model or self.model_for(ModelRole.KEYWORD_CLASSIFICATION)
         prompt = KEYWORD_CLASSIFICATION_PROMPT.format(candidates=json.dumps(candidates))
         response, usage = self._complete(
-            prompt, model, schema=KEYWORD_CLASSIFICATION_SCHEMA, temp=0
+            prompt,
+            model,
+            schema=_keyword_classification_schema(candidates),
+            temp=0,
+            max_output_tokens=KEYWORD_CLASSIFICATION_MAX_OUTPUT_TOKENS,
         )
         if not response:
             raise AIResponseError("Keyword classification returned an empty response", usage)

@@ -19,7 +19,7 @@ from app.services.ai.registry import resolve_task
 
 logger = logging.getLogger(__name__)
 
-KEYWORD_CLASSIFICATION_BATCH_SIZE = 100
+KEYWORD_CLASSIFICATION_BATCH_SIZE = 10
 
 
 def _empty_counts() -> dict[str, int]:

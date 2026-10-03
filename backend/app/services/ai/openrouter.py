@@ -75,6 +75,7 @@ class OpenRouterProvider(AIProvider):
         schema: dict | None = None,
         temp: float = 0,
         system: str | None = None,
+        max_output_tokens: int | None = None,
     ) -> tuple[str, Usage]:
         messages = [{"role": "system", "content": system}] if system else []
         messages.append({"role": "user", "content": prompt})
@@ -93,7 +94,7 @@ class OpenRouterProvider(AIProvider):
                 },
             }
             payload["provider"] = {"require_parameters": True}
-            payload["max_tokens"] = (
+            payload["max_tokens"] = max_output_tokens or (
                 _GEMMA_31B_ENRICHMENT_MAX_TOKENS
                 if model == _GEMMA_31B_MODEL and schema == ENRICHMENT_JSON_SCHEMA
                 else _DEFAULT_STRUCTURED_MAX_TOKENS

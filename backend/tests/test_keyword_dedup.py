@@ -47,7 +47,9 @@ class _MapProvider(AIProvider):
         schema: dict | None = None,
         temp: float = 0,
         system: str | None = None,
+        max_output_tokens: int | None = None,
     ) -> tuple[str, Usage]:
+        del max_output_tokens
         return json.dumps(self._mapping), Usage()
 
 
@@ -71,7 +73,9 @@ class _RawProvider(AIProvider):
         schema: dict | None = None,
         temp: float = 0,
         system: str | None = None,
+        max_output_tokens: int | None = None,
     ) -> tuple[str, Usage]:
+        del max_output_tokens
         return self._response, Usage()
 
 

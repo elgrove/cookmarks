@@ -91,3 +91,19 @@ def test_read_page_reports_usage_from_failed_retries() -> None:
         provider.read_page(b"jpeg", "image/jpeg")
     assert caught.value.usage.input_tokens == 20
     assert caught.value.usage.output_tokens == 40
+
+
+def test_complete_applies_explicit_output_and_thinking_limits() -> None:
+    provider = _provider_with_response("[]", "STOP")
+
+    provider._complete(
+        "Classify.",
+        "gemini-2.5-flash-lite",
+        schema={"type": "array"},
+        max_output_tokens=1_024,
+    )
+
+    generate = cast(MagicMock, provider.client.models.generate_content)
+    config = generate.call_args.kwargs["config"]
+    assert config["max_output_tokens"] == 1_024
+    assert config["thinking_config"] == {"thinking_budget": 0}

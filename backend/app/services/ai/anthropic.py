@@ -43,6 +43,7 @@ class AnthropicProvider(AIProvider):
         schema: dict | None = None,
         temp: float = 0,
         system: str | None = None,
+        max_output_tokens: int | None = None,
     ) -> tuple[str, Usage]:
         kwargs: dict[str, Any] = {}
         if system is not None:
@@ -60,7 +61,7 @@ class AnthropicProvider(AIProvider):
         extra_body: dict[str, Any] = {"temperature": temp}
         with self.client.messages.stream(
             model=model,
-            max_tokens=32_000,
+            max_tokens=max_output_tokens or 32_000,
             messages=[{"role": "user", "content": prompt}],
             extra_body=extra_body,
             **kwargs,

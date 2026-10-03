@@ -65,7 +65,9 @@ class StubProvider(AIProvider):
         schema: dict | None = None,
         temp: float = 0,
         system: str | None = None,
+        max_output_tokens: int | None = None,
     ) -> tuple[str, Usage]:
+        del max_output_tokens
         usage = Usage(cost_usd=Decimal("0"), input_tokens=0, output_tokens=0)
 
         if prompt.startswith(IMAGE_MATCH_CHECK_PROMPT[:40]):
