@@ -44,7 +44,7 @@ def test_recipe_to_text_includes_name_keywords_ingredients(session: Session) -> 
     assert recipe is not None
     rendered = embeddings.recipe_to_text(recipe)
     assert rendered.startswith("Recipe 0")
-    assert "Pasta" in rendered and "Quick" in rendered
+    assert "pasta" in rendered and "quick" in rendered
     assert "200g pasta" in rendered
 
 

@@ -26,7 +26,7 @@ from app.models.enums import (
     TaskType,
 )
 from app.models.ingredient import CanonicalIngredient
-from app.models.recipe import Recipe
+from app.models.recipe import Keyword, Recipe
 from app.models.recipe_fact import RecipeCuisine, RecipeFacet, RecipeFacetValue
 from app.models.task_run import TaskRun
 from app.schemas.extraction import RecipeData, RecipeIngredientData
@@ -44,6 +44,7 @@ from app.services.extraction.graph import get_extraction_graph
 from app.services.extraction.state import ExtractionState
 from app.services.extraction.utils import deduplicate_recipes_by_title, find_decorative_images
 from app.tasks.extraction import (
+    _classify_new_keywords,
     _finalise_result,
     extract_recipes_from_book,
     extract_recipes_from_book_task,
@@ -551,6 +552,74 @@ def test_save_creates_recipes_with_extracted_keywords(db: sessionmaker[Session])
         assert recipes[0].order == 1
 
 
+def test_save_records_each_new_shared_keyword_once(db: sessionmaker[Session]) -> None:
+    raw = [
+        {
+            "name": name,
+            "recipeIngredients": [{"text": "x"}],
+            "recipeInstructions": ["y"],
+            "keywords": ["Pasta", "Quick" if name == "One" else "Pasta"],
+        }
+        for name in ["One", "Two"]
+    ]
+    with db() as session:
+        book = _make_book(session)
+        run = _make_run(session, book)
+        created: list[Keyword] = []
+        save_recipes_from_graph_state(session, book, run, raw, created_keywords=created)
+
+        assert sorted(keyword.name for keyword in created) == ["pasta", "quick"]
+
+
+def test_save_with_only_existing_keywords_records_no_new_rows(db: sessionmaker[Session]) -> None:
+    with db() as session:
+        book = _make_book(session)
+        run = _make_run(session, book)
+        session.add(Keyword(name="pasta"))
+        session.commit()
+        created: list[Keyword] = []
+
+        save_recipes_from_graph_state(
+            session,
+            book,
+            run,
+            [
+                {
+                    "name": "One",
+                    "recipeIngredients": [{"text": "x"}],
+                    "recipeInstructions": ["y"],
+                    "keywords": ["Pasta"],
+                }
+            ],
+            created_keywords=created,
+        )
+
+        assert created == []
+
+
+def test_classification_finaliser_skips_empty_and_contains_failures(
+    db: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls = 0
+
+    def fail(_session: Session, _keywords: list[Keyword]) -> None:
+        nonlocal calls
+        calls += 1
+        raise RuntimeError("provider unavailable")
+
+    monkeypatch.setattr("app.tasks.extraction.classify_keyword_rows", fail)
+    with db() as session:
+        keyword = Keyword(name="new")
+        session.add(keyword)
+        session.commit()
+        _classify_new_keywords(session, [])
+        _classify_new_keywords(session, [keyword])
+        session.refresh(keyword)
+
+    assert calls == 1
+    assert keyword.classified_at is None
+
+
 def test_save_reconciles_by_name_in_place(db: sessionmaker[Session]) -> None:
     first = [
         {
@@ -673,8 +742,14 @@ def test_finalisation_preserves_extracted_keywords_then_embeds_and_tags(
         assert calls == ["embed"]
         calls.append("tag")
 
+    def classify(session: Session, keywords: list[Keyword]) -> None:
+        assert calls == ["embed", "tag"]
+        assert sorted(keyword.name for keyword in keywords) == ["italian", "quick"]
+        calls.append("classify")
+
     monkeypatch.setattr("app.tasks.extraction.generate_recipe_embeddings", embed)
     monkeypatch.setattr("app.tasks.extraction._generate_book_keywords", tag)
+    monkeypatch.setattr("app.tasks.extraction._classify_new_keywords", classify)
 
     message = _finalise_result(
         run_id,
@@ -691,7 +766,7 @@ def test_finalisation_preserves_extracted_keywords_then_embeds_and_tags(
     )
 
     assert message == "Extracted 1 recipes for Test Cookbook"
-    assert calls == ["embed", "tag"]
+    assert calls == ["embed", "tag", "classify"]
 
 
 def test_embedding_failure_does_not_stop_extraction(

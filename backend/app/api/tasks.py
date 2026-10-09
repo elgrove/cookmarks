@@ -7,9 +7,11 @@ from app.models.enums import TaskType
 from app.models.ingredient import CanonicalIngredient
 from app.models.recipe import Keyword
 from app.schemas.tasks import BookKeywordTaskRequest, TaskRunAck
+from app.services.keyword_classification import pending_keyword_count
 from app.tasks.book_keywords import enqueue_backfill_book_keywords
 from app.tasks.calibre_sync import enqueue_calibre_sync
 from app.tasks.ingredient_dedup import enqueue_dedup_ingredients
+from app.tasks.keyword_classification import enqueue_classify_keywords
 from app.tasks.keyword_dedup import enqueue_dedup_keywords
 from app.tasks.runs import create_task_run
 
@@ -49,6 +51,19 @@ def trigger_dedup_keywords(session: SessionDep) -> TaskRunAck:
     run = create_task_run(session, TaskType.KEYWORD_DEDUP)
     enqueue_dedup_keywords(str(run.id))
     return TaskRunAck(task="keyword_dedup", status="queued", queued=vocabulary)
+
+
+@router.post(
+    "/classify-keywords",
+    response_model=TaskRunAck,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+def trigger_classify_keywords(session: SessionDep) -> TaskRunAck:
+    """Queue classification of pending keywords attached to at least one recipe."""
+    pending = pending_keyword_count(session)
+    run = create_task_run(session, TaskType.KEYWORD_CLASSIFICATION)
+    enqueue_classify_keywords(str(run.id))
+    return TaskRunAck(task="keyword_classification", status="queued", queued=pending)
 
 
 @router.post(

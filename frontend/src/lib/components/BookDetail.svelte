@@ -618,6 +618,7 @@
 		font-weight: 500;
 		line-height: 1.2;
 		letter-spacing: 0.01em;
+		text-transform: uppercase;
 		padding: 0.18rem 0.5rem;
 		border-radius: 3px;
 		white-space: nowrap;

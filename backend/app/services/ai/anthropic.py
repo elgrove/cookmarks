@@ -21,6 +21,7 @@ class AnthropicProvider(AIProvider):
         ModelRole.ONE_RECIPE_PER_FILE: "claude-sonnet-5",
         ModelRole.BLOCKS_OF_FILES: "claude-sonnet-5",
         ModelRole.BOOK_KEYWORDS: "claude-sonnet-5",
+        ModelRole.KEYWORD_CLASSIFICATION: "claude-haiku-4-5-20251001",
         ModelRole.KEYWORD_DEDUP: "claude-sonnet-5",
         ModelRole.INGREDIENT_DEDUP: "claude-sonnet-5",
         ModelRole.ASSISTANT: "claude-sonnet-5",
@@ -42,6 +43,7 @@ class AnthropicProvider(AIProvider):
         schema: dict | None = None,
         temp: float = 0,
         system: str | None = None,
+        max_output_tokens: int | None = None,
     ) -> tuple[str, Usage]:
         kwargs: dict[str, Any] = {}
         if system is not None:
@@ -59,7 +61,7 @@ class AnthropicProvider(AIProvider):
         extra_body: dict[str, Any] = {"temperature": temp}
         with self.client.messages.stream(
             model=model,
-            max_tokens=32_000,
+            max_tokens=max_output_tokens or 32_000,
             messages=[{"role": "user", "content": prompt}],
             extra_body=extra_body,
             **kwargs,

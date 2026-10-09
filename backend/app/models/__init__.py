@@ -8,6 +8,7 @@ from app.models.config import Config
 from app.models.enums import (
     AIProvider,
     ExtractionMethod,
+    KeywordCategory,
     ModelRole,
     RecipeEnrichmentStatus,
     RecipeFacetKind,
@@ -40,6 +41,7 @@ __all__ = [
     "ExtractionMethod",
     "GameDismissal",
     "Keyword",
+    "KeywordCategory",
     "ModelRole",
     "ReadingQueueItem",
     "Recipe",

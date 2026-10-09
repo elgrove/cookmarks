@@ -18,6 +18,7 @@
 	} from '$lib/api/config';
 	import {
 		triggerBookKeywords,
+		triggerClassifyKeywords,
 		triggerDedupKeywords,
 		triggerDedupIngredients,
 		triggerCalibreSync
@@ -172,6 +173,7 @@
 	{:else if active === 'tasks'}
 		<TasksPanel
 			onRun={({ regenerate }) => triggerBookKeywords(regenerate)}
+			onClassify={() => triggerClassifyKeywords()}
 			onDedup={() => triggerDedupKeywords()}
 			onDedupIngredients={() => triggerDedupIngredients()}
 			onSync={() => triggerCalibreSync()}

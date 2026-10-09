@@ -6,6 +6,7 @@ type Props = TasksPanelProps;
 
 const RUN = '.run';
 const CHECK = '.regen-check';
+const CLASSIFY_RUN = '.classify-run';
 const DEDUP_RUN = '.dedup-run';
 const INGREDIENT_DEDUP_RUN = '.ingredient-dedup-run';
 
@@ -24,6 +25,11 @@ const fixedDedup =
 	(): Promise<TaskRunAck> =>
 		Promise.resolve({ task: 'keyword_dedup', status: 'queued', queued });
 
+const fixedClassification =
+	(queued: number) =>
+	(): Promise<TaskRunAck> =>
+		Promise.resolve({ task: 'keyword_classification', status: 'queued', queued });
+
 const fixedIngredientDedup =
 	(queued: number) =>
 	(): Promise<TaskRunAck> =>
@@ -33,7 +39,7 @@ const unit: VerifiableUnit<Props> = {
 	id: 'tasks-panel',
 	title: 'Tasks panel',
 	description:
-		'The admin Tasks tab: on-demand book keywords (with regenerate-all), keyword dedup, ingredient dedup and Calibre import — each driving idle → running → queued (fire-and-forget), or → error if the dispatch rejects.',
+		'The admin Tasks tab: on-demand book keywords, keyword classification, keyword and ingredient deduplication, and Calibre import — each driving idle → running → queued, or → error if dispatch rejects.',
 	kind: 'component',
 	component: TasksPanel,
 	fixtures: [
@@ -87,6 +93,34 @@ const unit: VerifiableUnit<Props> = {
 			props: { onRun: fixedRun(999999) },
 			act: async ({ click, wait }) => {
 				click(RUN);
+				await wait(0);
+			}
+		},
+		{
+			id: 'classification-run',
+			description: 'keyword classification reports the pending vocabulary count',
+			props: { onClassify: fixedClassification(83) },
+			act: async ({ click, wait }) => {
+				click(CLASSIFY_RUN);
+				await wait(0);
+			}
+		},
+		{
+			id: 'classification-zero',
+			description: 'zero pending keywords shows that all keywords were examined',
+			props: { onClassify: fixedClassification(0) },
+			act: async ({ click, wait }) => {
+				click(CLASSIFY_RUN);
+				await wait(0);
+			}
+		},
+		{
+			id: 'classification-reject',
+			description: 'probe: a rejected classification dispatch is visible as an error',
+			probe: true,
+			props: { onClassify: () => Promise.reject(new Error('broker down')) },
+			act: async ({ click, wait }) => {
+				click(CLASSIFY_RUN);
 				await wait(0);
 			}
 		},
@@ -206,6 +240,34 @@ const unit: VerifiableUnit<Props> = {
 					return `state=${contract.state} queued=${contract.queued}`;
 				return (root.textContent ?? '').includes('999999') || 'count not rendered in full';
 			}
+		},
+		{
+			id: 'classification-queues',
+			description: 'a successful classification dispatch reports the pending count',
+			onlyFixtures: ['classification-run'],
+			check: ({ contract }) =>
+				(contract['classification-state'] === 'done' &&
+					contract['classification-queued'] === '83') ||
+				`state=${contract['classification-state']} queued=${contract['classification-queued']}`
+		},
+		{
+			id: 'classification-zero-note',
+			description: 'zero pending keywords renders the complete-vocabulary note',
+			onlyFixtures: ['classification-zero'],
+			check: ({ contract, root }) =>
+				(contract['classification-state'] === 'done' &&
+					contract['classification-queued'] === '0' &&
+					(root.textContent ?? '').includes('every keyword has been examined')) ||
+				`state=${contract['classification-state']} queued=${contract['classification-queued']}`
+		},
+		{
+			id: 'classification-reject-errors',
+			description: 'a rejected classification dispatch cannot show queued work',
+			onlyFixtures: ['classification-reject'],
+			check: ({ contract }) =>
+				(contract['classification-state'] === 'error' &&
+					contract['classification-queued'] === '') ||
+				`state=${contract['classification-state']} queued=${contract['classification-queued']}`
 		},
 		{
 			id: 'dedup-queues',

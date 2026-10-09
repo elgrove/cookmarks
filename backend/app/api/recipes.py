@@ -40,7 +40,7 @@ from app.services import embeddings
 from app.services.reading import touch_reading
 from app.services.vector_store import VectorStore
 from app.services.views import forget_view, record_view
-from app.text import fold, stem
+from app.text import fold, normalise_keyword, stem
 
 router = APIRouter(tags=["recipes"])
 
@@ -193,7 +193,7 @@ def search_recipes(
     # filter. Filters count as a query, so a keyword/book/author alone returns
     # results; nothing set returns the resting (empty) state — unless the caller
     # explicitly asks for everything (`all=true`, the game's play-all deck source).
-    keywords = keyword or []
+    keywords = [normalise_keyword(name) for name in keyword or []]
     q = q.strip()
     if not (q or keywords or book_id or author or all_recipes):
         return RecipeSearchResults(total=0, items=[])

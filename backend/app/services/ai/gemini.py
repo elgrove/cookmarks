@@ -49,6 +49,7 @@ class GeminiProvider(AIProvider):
         ModelRole.ONE_RECIPE_PER_FILE: "gemini-2.5-flash-lite",
         ModelRole.BLOCKS_OF_FILES: "gemini-2.5-flash",
         ModelRole.BOOK_KEYWORDS: "gemini-2.5-flash",
+        ModelRole.KEYWORD_CLASSIFICATION: "gemini-2.5-flash-lite",
         ModelRole.KEYWORD_DEDUP: "gemini-2.5-flash",
         ModelRole.INGREDIENT_DEDUP: "gemini-2.5-flash",
         ModelRole.ASSISTANT: "gemini-2.5-flash",
@@ -86,6 +87,7 @@ class GeminiProvider(AIProvider):
         schema: dict | None = None,
         temp: float = 0,
         system: str | None = None,
+        max_output_tokens: int | None = None,
     ) -> tuple[str, Usage]:
         config: GenerateContentConfigDict = {
             "response_mime_type": "application/json",
@@ -93,6 +95,12 @@ class GeminiProvider(AIProvider):
         }
         if system:
             config["system_instruction"] = system
+        if max_output_tokens is not None:
+            config["max_output_tokens"] = max_output_tokens
+            # Classification needs a short deterministic label, not model reasoning.
+            # The explicit budget prevents a small batch consuming tens of thousands
+            # of hidden thinking tokens before it produces JSON.
+            config["thinking_config"] = {"thinking_budget": 0}
         if schema:
             if schema is ENRICHMENT_JSON_SCHEMA:
                 config["response_json_schema"] = GEMINI_ENRICHMENT_JSON_SCHEMA

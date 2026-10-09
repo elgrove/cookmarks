@@ -96,11 +96,11 @@ def test_apply_enrichment_replaces_all_derived_facts_atomically(session) -> None
     assert [item.canonical_name for item in recipe.ingredients if item.canonical_name] == ["olive oil"]
     assert [fact.facet_value.value_id for fact in recipe.facets] == ["bake"]
     assert {keyword.name for keyword in recipe.keywords} == {
-        "Cosy",
-        "Fresh",
-        "Outdoor",
-        "Party",
-        "Summer",
+        "cosy",
+        "fresh",
+        "outdoor",
+        "party",
+        "summer",
     }
 
 

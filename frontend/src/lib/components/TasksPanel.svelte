@@ -6,6 +6,8 @@
 		 *  to drive running → done, or → error if it rejects. Kept network-free for the
 		 *  verifiable unit, à la ExtractButton. */
 		onRun?: (opts: { regenerate: boolean }) => Promise<TaskRunAck | void>;
+		/** Wired to POST /api/tasks/classify-keywords. */
+		onClassify?: () => Promise<TaskRunAck | void>;
 		/** Wired to POST /api/tasks/dedup-keywords — the AI-assisted keyword merge. Same
 		 *  fire-and-forget lifecycle as `onRun`, with no options. */
 		onDedup?: () => Promise<TaskRunAck | void>;
@@ -29,6 +31,7 @@
 
 	let {
 		onRun,
+		onClassify,
 		onDedup,
 		onDedupIngredients,
 		onSync
@@ -36,6 +39,7 @@
 		$props();
 
 	let book = $state<Runner>({ state: 'idle', queued: null });
+	let classification = $state<Runner>({ state: 'idle', queued: null });
 	let dedup = $state<Runner>({ state: 'idle', queued: null });
 	let ingredientDedup = $state<Runner>({ state: 'idle', queued: null });
 	let calibre = $state<Runner>({ state: 'idle', queued: null });
@@ -62,6 +66,7 @@
 
 	onDestroy(() => {
 		clearTimeout(book.timer);
+		clearTimeout(classification.timer);
 		clearTimeout(dedup.timer);
 		clearTimeout(ingredientDedup.timer);
 		clearTimeout(calibre.timer);
@@ -98,6 +103,15 @@
 				? ERROR_NOTE
 				: ''
 	);
+	let classificationNote = $derived(
+		classification.state === 'done'
+			? classification.queued && classification.queued > 0
+				? `Queued ${classification.queued} pending keyword${classification.queued === 1 ? '' : 's'} for classification.`
+				: 'Nothing to classify: every keyword has been examined.'
+			: classification.state === 'error'
+				? ERROR_NOTE
+				: ''
+	);
 	let ingredientDedupNote = $derived(
 		ingredientDedup.state === 'done'
 			? ingredientDedup.queued && ingredientDedup.queued > 0
@@ -124,6 +138,10 @@
 	data-verify-state={book.state}
 	data-verify-regenerate={regenerate ? 'true' : 'false'}
 	data-verify-queued={book.queued === null ? '' : String(book.queued)}
+	data-verify-classification-state={classification.state}
+	data-verify-classification-queued={
+		classification.queued === null ? '' : String(classification.queued)
+	}
 	data-verify-dedup-state={dedup.state}
 	data-verify-dedup-queued={dedup.queued === null ? '' : String(dedup.queued)}
 	data-verify-ingredient-dedup-state={ingredientDedup.state}
@@ -170,6 +188,36 @@
 
 	{#if bookNote}
 		<p class="note" class:err={book.state === 'error'} role="status">{bookNote}</p>
+	{/if}
+
+	<article class="task">
+		<div class="copy">
+			<h2 class="name">Classify keywords</h2>
+			<p class="desc">
+				Use AI to assign each pending keyword to cuisine or region, course, key ingredient, or
+				method. Keywords that do not fit remain available in search without a category.
+			</p>
+		</div>
+
+		<div class="action">
+			<button
+				class="run classify-run"
+				class:done={classification.state === 'done'}
+				class:error={classification.state === 'error'}
+				type="button"
+				aria-busy={classification.state === 'running'}
+				disabled={classification.state === 'running'}
+				onclick={() => runTask(classification, () => onClassify?.())}
+			>
+				{label(classification.state)}
+			</button>
+		</div>
+	</article>
+
+	{#if classificationNote}
+		<p class="note" class:err={classification.state === 'error'} role="status">
+			{classificationNote}
+		</p>
 	{/if}
 
 	<article class="task">

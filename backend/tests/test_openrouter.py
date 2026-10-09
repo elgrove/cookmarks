@@ -66,3 +66,31 @@ def test_complete_uses_larger_bound_for_gemma_enrichment(monkeypatch: Any) -> No
     )
 
     assert captured["max_tokens"] == 8_192
+
+
+def test_complete_honours_explicit_structured_output_bound(monkeypatch: Any) -> None:
+    captured: dict[str, Any] = {}
+
+    def fake_post(*args: Any, **kwargs: Any) -> httpx.Response:
+        captured.update(kwargs["json"])
+        request = httpx.Request("POST", "https://openrouter.ai/api/v1/chat/completions")
+        return httpx.Response(
+            200,
+            request=request,
+            json={
+                "choices": [{"finish_reason": "stop", "message": {"content": "[]"}}],
+                "usage": {},
+            },
+        )
+
+    monkeypatch.setattr("app.services.ai.openrouter.httpx.post", fake_post)
+    provider = OpenRouterProvider(api_key="test-key")
+
+    provider._complete(
+        "Classify.",
+        "google/gemini-2.5-flash-lite",
+        schema={"type": "array"},
+        max_output_tokens=1_024,
+    )
+
+    assert captured["max_tokens"] == 1_024

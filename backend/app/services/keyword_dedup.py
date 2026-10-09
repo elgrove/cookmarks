@@ -14,7 +14,6 @@ from sqlalchemy.orm import Session, selectinload
 from app.models.book import book_keywords
 from app.models.recipe import Keyword, recipe_keywords
 from app.services.ai import AIProvider, ModelRole, resolve_task
-from app.services.keywords import get_or_create_keyword
 from app.services.vocabulary_dedup import (
     DEFAULT_CANDIDATE_WINDOW,
     VocabularyDedupResult,
@@ -51,7 +50,6 @@ def propose_merges(
         cursor,
         propose,
         candidate_window=DEDUP_CANDIDATE_WINDOW,
-        target_is_valid=lambda _target, _vocabulary: True,
     )
 
 
@@ -68,7 +66,14 @@ def apply_merges(session: Session, merges: dict[str, str]) -> int:
         if duplicate is None:
             continue
 
-        target = get_or_create_keyword(session, canonical)
+        target = session.scalar(select(Keyword).where(Keyword.name == canonical))
+        if target is None:
+            logger.warning(
+                "Ignored keyword merge %r into absent canonical target %r",
+                original,
+                canonical,
+            )
+            continue
         for recipe in list(duplicate.recipes):
             if target not in recipe.keywords:
                 recipe.keywords.append(target)

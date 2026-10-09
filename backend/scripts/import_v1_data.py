@@ -21,6 +21,7 @@ from app.models.enums import AIProvider
 from app.services.ai.anthropic import AnthropicProvider
 from app.services.ai.gemini import GeminiProvider
 from app.services.ai.openrouter import OpenRouterProvider
+from app.text import normalise_keyword
 
 V1_DEFAULT = Path.home() / "docker" / "cookmarks" / "data" / "db.sqlite3"
 EMBEDDING_DIM = 3072  # v1 Gemini embedding dimensions
@@ -30,11 +31,6 @@ V1_LIBRARY_ROOT = "/books/"  # absolute prefix on v1 book paths; stripped to sto
 # Each entry: (v2 table, v2 columns, SELECT against the v1 schema in the same order).
 # Books are copied by copy_books() (it rewrites `path` to be library-relative).
 COPIES: list[tuple[str, list[str], str]] = [
-    (
-        "keywords",
-        ["id", "created_at", "updated_at", "name"],
-        "SELECT id, created_at, updated_at, name FROM core_keyword",
-    ),
     (
         "recipe_lists",
         ["id", "created_at", "updated_at", "name", "is_default"],
@@ -93,11 +89,6 @@ COPIES: list[tuple[str, list[str], str]] = [
                   name, description, COALESCE(ingredients, '[]'),
                   COALESCE(instructions, '[]'), yields, image
            FROM core_recipe""",
-    ),
-    (
-        "recipe_keywords",
-        ["recipe_id", "keyword_id"],
-        "SELECT recipe_id, keyword_id FROM core_recipe_keywords",
     ),
 ]
 
@@ -171,6 +162,50 @@ def copy_books(src: sqlite3.Connection, tgt: sqlite3.Connection) -> int:
     )
     tgt.commit()
     return len(out)
+
+
+def copy_keywords(
+    src: sqlite3.Connection, tgt: sqlite3.Connection
+) -> tuple[int, dict[str, str]]:
+    """Copy one lower-case row per keyword identity and map every v1 id to it."""
+    rows = src.execute(
+        "SELECT id, created_at, updated_at, name FROM core_keyword ORDER BY created_at, id"
+    ).fetchall()
+    canonical_by_name: dict[str, str] = {}
+    keyword_ids: dict[str, str] = {}
+    out: list[tuple[str, str, str, str]] = []
+    for keyword_id, created_at, updated_at, name in rows:
+        normalised = normalise_keyword(name)
+        canonical_id = canonical_by_name.get(normalised)
+        if canonical_id is None:
+            canonical_id = keyword_id
+            canonical_by_name[normalised] = canonical_id
+            out.append((canonical_id, created_at, updated_at, normalised))
+        keyword_ids[keyword_id] = canonical_id
+    tgt.executemany(
+        """INSERT INTO keywords (id, created_at, updated_at, name)
+           VALUES (?, ?, ?, ?)""",
+        out,
+    )
+    tgt.commit()
+    return len(out), keyword_ids
+
+
+def copy_recipe_keywords(
+    src: sqlite3.Connection, tgt: sqlite3.Connection, keyword_ids: dict[str, str]
+) -> int:
+    rows = {
+        (recipe_id, keyword_ids[keyword_id])
+        for recipe_id, keyword_id in src.execute(
+            "SELECT recipe_id, keyword_id FROM core_recipe_keywords"
+        )
+    }
+    tgt.executemany(
+        "INSERT INTO recipe_keywords (recipe_id, keyword_id) VALUES (?, ?)",
+        sorted(rows),
+    )
+    tgt.commit()
+    return len(rows)
 
 
 def copy_list_items(src: sqlite3.Connection, tgt: sqlite3.Connection) -> int:
@@ -251,9 +286,12 @@ def main() -> None:
     try:
         clear_target(tgt)
         print(f"  {'books':20} {copy_books(src, tgt)}")
+        keyword_count, keyword_ids = copy_keywords(src, tgt)
+        print(f"  {'keywords':20} {keyword_count}")
         for table, cols, select in COPIES:
             n = copy_table(src, tgt, table, cols, select)
             print(f"  {table:20} {n}")
+        print(f"  {'recipe_keywords':20} {copy_recipe_keywords(src, tgt, keyword_ids)}")
         print(f"  {'recipe_list_items':20} {copy_list_items(src, tgt)}")
         print(f"  {'config':20} {copy_config(src, tgt)}")
         if not args.no_embeddings:

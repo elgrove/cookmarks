@@ -24,6 +24,7 @@ export type ReviewAnswer = 'has_images' | 'no_images';
 export const taskTypeSchema = z.enum([
 	'extraction',
 	'book_keywords',
+	'keyword_classification',
 	'keyword_dedup',
 	'ingredient_dedup',
 	'calibre_sync',
@@ -94,6 +95,13 @@ export interface KeywordDedupDetail {
 	ai_truncated?: boolean;
 	cursor_from?: string | null;
 	cursor_to?: string | null;
+}
+export interface KeywordClassificationDetail {
+	pending: number;
+	examined: number;
+	classified_by_category: Record<string, number>;
+	no_category: number;
+	failed_batches: number;
 }
 export interface IngredientDedupDetail {
 	ingredients_in: number;

@@ -78,8 +78,8 @@ def test_similar_keyword_fallback_when_no_embedding(
     client: TestClient, session: Session
 ) -> None:
     r0, r1, _ = _recipes(session)
-    # r0 carries "Pasta"; share it with r1 so the fallback links the two.
-    pasta = session.scalar(select(Keyword).where(Keyword.name == "Pasta"))
+    # r0 carries "pasta"; share it with r1 so the fallback links the two.
+    pasta = session.scalar(select(Keyword).where(Keyword.name == "pasta"))
     assert pasta is not None
     r1.keywords.append(pasta)
     session.commit()

@@ -23,6 +23,7 @@ class ModelRole(StrEnum):
     ONE_RECIPE_PER_FILE = "one_recipe_per_file"
     BLOCKS_OF_FILES = "blocks_of_files"
     BOOK_KEYWORDS = "book_keywords"
+    KEYWORD_CLASSIFICATION = "keyword_classification"
     KEYWORD_DEDUP = "keyword_dedup"
     INGREDIENT_DEDUP = "ingredient_dedup"
     ASSISTANT = "assistant"
@@ -43,6 +44,7 @@ class TaskType(StrEnum):
 
     EXTRACTION = "extraction"
     BOOK_KEYWORDS = "book_keywords"
+    KEYWORD_CLASSIFICATION = "keyword_classification"
     KEYWORD_DEDUP = "keyword_dedup"
     INGREDIENT_DEDUP = "ingredient_dedup"
     CALIBRE_SYNC = "calibre_sync"
@@ -84,6 +86,13 @@ class RecipeEnrichmentStatus(StrEnum):
 class RecipeFacetKind(StrEnum):
     METHOD = "method"
     COURSE = "course"
+
+
+class KeywordCategory(StrEnum):
+    CUISINE_REGION = "cuisine_region"
+    COURSE = "course"
+    KEY_INGREDIENT = "key_ingredient"
+    METHOD = "method"
 
 
 def enum_values(enum_cls: type[StrEnum]) -> list[str]:
