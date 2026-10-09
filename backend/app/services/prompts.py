@@ -83,15 +83,23 @@ Cookbook:
 
 Return ONLY a JSON array of keyword strings. No other text."""
 
-KEYWORD_CLASSIFICATION_PROMPT = """Classify each cookbook-recipe keyword into at most one browsing category.
+KEYWORD_CLASSIFICATION_PROMPT = """Conservatively classify cookbook-recipe keywords. Start with category=null for every keyword. Change it only if the complete phrase directly and unambiguously names something in one category below. Do not maximise the number of categorised keywords.
 
 Allowed categories:
-- cuisine_region: a cuisine, country, region, or established regional food tradition
-- course: the recipe's meal course or serving role
-- key_ingredient: a principal ingredient or ingredient family
-- method: a cooking method or preparation technique
+- cuisine_region: a specific named cuisine, country, region, or established regional food tradition. Generic words such as "regional" identify no specific cuisine and get null.
+- course: a specific meal course or serving role, not a dish name or occasion.
+- key_ingredient: a specific edible ingredient or ingredient family, not an adjective, dietary property, dish name, or ingredient state by itself.
+- method: an actual cooking action or preparation technique explicitly named by the phrase. Equipment, time, texture, mood, quality, and convenience do not name techniques, even if they suggest one.
 
 Rules:
+- Assign a category only when the complete keyword is a very strong, unambiguous fit for its definition. Precision matters more than coverage.
+- Leaving keywords uncategorised is a valid and expected result. Many keywords are ambiguous or nebulous. Return null rather than choosing the closest category or guessing a meaning.
+- Classify from the keyword alone. You have no recipe context: do not invent an ingredient use, cooking technique, course, or regional association.
+- If plausible meanings would put a keyword in different categories, return null: recipe context would be needed to choose.
+- Equipment, duration, convenience, storage suitability, and generic descriptions are not cooking methods. For example, "pestle and mortar", "30 minutes", "homemade", "keeps well", and "sauce-based" get null. "Tinned" alone describes an ingredient's state; "canning" names a method.
+- A dish or sauce name is not automatically an ingredient, method, or course. For example, "latke" and "salsa borracha" get null. A dish name may identify cuisine_region when it strongly and unambiguously identifies an established regional food tradition.
+- A course must identify a clear serving role, such as "starter", "side dish", or "dessert". "Weekday meal" and "weekend" describe occasions and get null.
+- Clear positive examples: "breakfast", "supper", and "drink" are course; "confit", "no-cook", and "pan-roasted" are method; "cornmeal" is key_ingredient; "thai" is cuisine_region. Do not reject clear matches merely to reduce coverage.
 - Return exactly one result for every candidate and no other results.
 - Copy each candidate name exactly. Do not rename, merge, split, or normalise it.
 - Use only the four category values above, or null when none applies.

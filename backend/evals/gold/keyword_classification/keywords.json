@@ -1,0 +1,327 @@
+[
+  {
+    "name": "thai",
+    "expected": "cuisine_region",
+    "prompt_example": true
+  },
+  {
+    "name": "tuscany",
+    "expected": "cuisine_region",
+    "prompt_example": false
+  },
+  {
+    "name": "galician",
+    "expected": "cuisine_region",
+    "prompt_example": false
+  },
+  {
+    "name": "sindhi",
+    "expected": "cuisine_region",
+    "prompt_example": false
+  },
+  {
+    "name": "new orleans",
+    "expected": "cuisine_region",
+    "prompt_example": false
+  },
+  {
+    "name": "andalusian",
+    "expected": "cuisine_region",
+    "prompt_example": false
+  },
+  {
+    "name": "bangladeshi",
+    "expected": "cuisine_region",
+    "prompt_example": false
+  },
+  {
+    "name": "southern thai",
+    "expected": "cuisine_region",
+    "prompt_example": false
+  },
+  {
+    "name": "starter",
+    "expected": "course",
+    "prompt_example": true
+  },
+  {
+    "name": "side dish",
+    "expected": "course",
+    "prompt_example": true
+  },
+  {
+    "name": "dessert",
+    "expected": "course",
+    "prompt_example": true
+  },
+  {
+    "name": "drink",
+    "expected": "course",
+    "prompt_example": true
+  },
+  {
+    "name": "breakfast",
+    "expected": "course",
+    "prompt_example": true
+  },
+  {
+    "name": "main course",
+    "expected": "course",
+    "prompt_example": false
+  },
+  {
+    "name": "appetiser",
+    "expected": "course",
+    "prompt_example": false
+  },
+  {
+    "name": "supper",
+    "expected": "course",
+    "prompt_example": true
+  },
+  {
+    "name": "cornmeal",
+    "expected": "key_ingredient",
+    "prompt_example": true
+  },
+  {
+    "name": "sea urchin",
+    "expected": "key_ingredient",
+    "prompt_example": false
+  },
+  {
+    "name": "black peppercorns",
+    "expected": "key_ingredient",
+    "prompt_example": false
+  },
+  {
+    "name": "spring onion",
+    "expected": "key_ingredient",
+    "prompt_example": true
+  },
+  {
+    "name": "winter squash",
+    "expected": "key_ingredient",
+    "prompt_example": true
+  },
+  {
+    "name": "summer squash",
+    "expected": "key_ingredient",
+    "prompt_example": true
+  },
+  {
+    "name": "wholemeal rye flour",
+    "expected": "key_ingredient",
+    "prompt_example": false
+  },
+  {
+    "name": "serrano ham",
+    "expected": "key_ingredient",
+    "prompt_example": false
+  },
+  {
+    "name": "confit",
+    "expected": "method",
+    "prompt_example": true
+  },
+  {
+    "name": "no-cook",
+    "expected": "method",
+    "prompt_example": true
+  },
+  {
+    "name": "pan-roasted",
+    "expected": "method",
+    "prompt_example": true
+  },
+  {
+    "name": "canning",
+    "expected": "method",
+    "prompt_example": true
+  },
+  {
+    "name": "pan-broil",
+    "expected": "method",
+    "prompt_example": false
+  },
+  {
+    "name": "slow roast",
+    "expected": "method",
+    "prompt_example": false
+  },
+  {
+    "name": "brine",
+    "expected": null,
+    "prompt_example": false
+  },
+  {
+    "name": "clarify",
+    "expected": "method",
+    "prompt_example": false
+  },
+  {
+    "name": "30 minutes",
+    "expected": null,
+    "prompt_example": true
+  },
+  {
+    "name": "pestle and mortar",
+    "expected": null,
+    "prompt_example": true
+  },
+  {
+    "name": "homemade",
+    "expected": null,
+    "prompt_example": true
+  },
+  {
+    "name": "keeps well",
+    "expected": null,
+    "prompt_example": true
+  },
+  {
+    "name": "sauce-based",
+    "expected": null,
+    "prompt_example": true
+  },
+  {
+    "name": "tinned",
+    "expected": null,
+    "prompt_example": true
+  },
+  {
+    "name": "latke",
+    "expected": null,
+    "prompt_example": true
+  },
+  {
+    "name": "salsa borracha",
+    "expected": null,
+    "prompt_example": true
+  },
+  {
+    "name": "weekday meal",
+    "expected": null,
+    "prompt_example": true
+  },
+  {
+    "name": "weekend",
+    "expected": null,
+    "prompt_example": true
+  },
+  {
+    "name": "quick",
+    "expected": null,
+    "prompt_example": false
+  },
+  {
+    "name": "easy",
+    "expected": null,
+    "prompt_example": false
+  },
+  {
+    "name": "freezer-friendly",
+    "expected": null,
+    "prompt_example": false
+  },
+  {
+    "name": "one hour",
+    "expected": null,
+    "prompt_example": false
+  },
+  {
+    "name": "food processor",
+    "expected": null,
+    "prompt_example": false
+  },
+  {
+    "name": "wooden spoon",
+    "expected": null,
+    "prompt_example": false
+  },
+  {
+    "name": "large saucepan",
+    "expected": null,
+    "prompt_example": false
+  },
+  {
+    "name": "family favourite",
+    "expected": null,
+    "prompt_example": false
+  },
+  {
+    "name": "comforting",
+    "expected": null,
+    "prompt_example": false
+  },
+  {
+    "name": "festive",
+    "expected": null,
+    "prompt_example": false
+  },
+  {
+    "name": "regional",
+    "expected": null,
+    "prompt_example": true
+  },
+  {
+    "name": "mixed",
+    "expected": null,
+    "prompt_example": false
+  },
+  {
+    "name": "clean",
+    "expected": null,
+    "prompt_example": false
+  },
+  {
+    "name": "historical",
+    "expected": null,
+    "prompt_example": false
+  },
+  {
+    "name": "medium-firm",
+    "expected": null,
+    "prompt_example": false
+  },
+  {
+    "name": "smooth",
+    "expected": null,
+    "prompt_example": false
+  },
+  {
+    "name": "fruity",
+    "expected": null,
+    "prompt_example": false
+  },
+  {
+    "name": "toddler food",
+    "expected": null,
+    "prompt_example": false
+  },
+  {
+    "name": "vegetarian",
+    "expected": null,
+    "prompt_example": false
+  },
+  {
+    "name": "dairy-free",
+    "expected": null,
+    "prompt_example": false
+  },
+  {
+    "name": "summer",
+    "expected": null,
+    "prompt_example": false
+  },
+  {
+    "name": "winter",
+    "expected": null,
+    "prompt_example": false
+  },
+  {
+    "name": "braising",
+    "expected": "method",
+    "prompt_example": false
+  }
+]

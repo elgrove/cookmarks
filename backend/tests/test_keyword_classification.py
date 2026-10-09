@@ -19,13 +19,12 @@ from app.services.keyword_classification import (
     pending_keyword_count,
 )
 from scripts.audit_keyword_candidates import build_report
+from scripts.eval_keyword_classification import GoldKeyword, evaluate
 
 
 class ReplyProvider(AIProvider):
     name = "REPLY"
-    models: ClassVar[dict[ModelRole, str]] = {
-        ModelRole.KEYWORD_CLASSIFICATION: "reply-model"
-    }
+    models: ClassVar[dict[ModelRole, str]] = {ModelRole.KEYWORD_CLASSIFICATION: "reply-model"}
 
     def __init__(self, replies: list[object]) -> None:
         super().__init__("")
@@ -49,9 +48,7 @@ class ReplyProvider(AIProvider):
         self.last_schema = schema
         self.last_max_output_tokens = max_output_tokens
         reply = self.replies.pop(0)
-        return json.dumps(reply), Usage(
-            cost_usd=Decimal("0.01"), input_tokens=10, output_tokens=4
-        )
+        return json.dumps(reply), Usage(cost_usd=Decimal("0.01"), input_tokens=10, output_tokens=4)
 
 
 def _resolve(monkeypatch: pytest.MonkeyPatch, provider: ReplyProvider) -> None:
@@ -110,6 +107,46 @@ def test_provider_parses_categories_and_null_without_calling_for_empty_input() -
 
 def test_production_batch_size_is_small() -> None:
     assert KEYWORD_CLASSIFICATION_BATCH_SIZE == 10
+
+
+def test_label_eval_fails_valid_json_with_wrong_or_overconfident_labels() -> None:
+    gold: list[GoldKeyword] = [
+        {"name": "keeps well", "expected": None, "prompt_example": False},
+        {"name": "thai", "expected": "cuisine_region", "prompt_example": False},
+        {"name": "cornmeal", "expected": "key_ingredient", "prompt_example": False},
+    ]
+    provider = ReplyProvider(
+        [
+            [
+                {"name": "keeps well", "category": "method"},
+                {"name": "thai", "category": None},
+                {"name": "cornmeal", "category": "key_ingredient"},
+            ]
+        ]
+    )
+
+    report = evaluate(ResolvedTask(provider, "reply-model"), gold, 1)
+
+    assert report["checks"] == 3
+    assert report["passed"] == 1
+    assert report["failed"] == 2
+    assert report["false_assignments"] == 1
+    assert report["held_out_failures"] == 2
+    assert report["cost_usd"] == "0.01"
+
+
+def test_label_eval_fails_incomplete_candidate_coverage() -> None:
+    gold: list[GoldKeyword] = [
+        {"name": "thai", "expected": "cuisine_region", "prompt_example": False},
+        {"name": "quick", "expected": None, "prompt_example": True},
+    ]
+    provider = ReplyProvider([[{"name": "thai", "category": "cuisine_region"}]])
+
+    report = evaluate(ResolvedTask(provider, "reply-model"), gold, 1)
+
+    assert report["passed"] == 0
+    assert report["failed"] == 2
+    assert report["cost_usd"] == "0.01"
 
 
 def test_explicit_rows_use_production_batch_size(
