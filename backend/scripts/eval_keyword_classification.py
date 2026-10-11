@@ -1,8 +1,8 @@
 """Read-only label-quality evaluation using the configured classification model.
 
 Run with ``uv run python -m scripts.eval_keyword_classification --output results.json``.
-Expected labels are reviewable in evals/gold/keyword_classification/keywords.json.
-Every label must match on every repeat; protocol validity alone does not pass.
+Expected labels are reviewable in evals/gold/keyword_classification/top100.json.
+Every label must be accepted on every repeat; protocol validity alone does not pass.
 """
 
 import argparse
@@ -10,7 +10,7 @@ import hashlib
 import json
 import random
 from pathlib import Path
-from typing import TypedDict
+from typing import NotRequired, TypedDict
 
 from sqlalchemy import text
 
@@ -26,6 +26,8 @@ class GoldKeyword(TypedDict):
     name: str
     expected: str | None
     prompt_example: bool
+    accepted: NotRequired[list[str | None]]
+    recipe_count: NotRequired[int]
 
 
 def evaluate(resolved: ResolvedTask, gold: list[GoldKeyword], repeats: int) -> dict[str, object]:
@@ -56,11 +58,14 @@ def evaluate(resolved: ResolvedTask, gold: list[GoldKeyword], repeats: int) -> d
                     **item,
                     "repeat": repeat + 1,
                     "actual": labels[item["name"]],
-                    "passed": labels[item["name"]] == item["expected"],
+                    "passed": labels[item["name"]] in item.get("accepted", [item["expected"]]),
                 }
                 for item in batch
             )
     failures = [item for item in results if not item["passed"]]
+    total_weight = sum(item.get("recipe_count", 1) for item in gold) * repeats
+    weights = {item["name"]: item.get("recipe_count", 1) for item in gold}
+    failed_weight = sum(weights[str(item["name"])] for item in failures)
     return {
         "provider": resolved.provider.name,
         "model": resolved.model,
@@ -70,8 +75,12 @@ def evaluate(resolved: ResolvedTask, gold: list[GoldKeyword], repeats: int) -> d
         "checks": len(results),
         "passed": len(results) - len(failures),
         "failed": len(failures),
+        "recipe_link_weighted_accuracy": (
+            (total_weight - failed_weight) / total_weight if total_weight else None
+        ),
         "false_assignments": sum(
-            item["expected"] is None and item.get("actual") is not None for item in failures
+            item["expected"] is None and item.get("actual") is not None and "error" not in item
+            for item in failures
         ),
         "held_out_failures": sum(not item["prompt_example"] for item in failures),
         "cost_usd": str(usage.cost_usd),
@@ -89,7 +98,7 @@ def main() -> None:
         "--gold",
         type=Path,
         default=Path(__file__).resolve().parents[1]
-        / "evals/gold/keyword_classification/keywords.json",
+        / "evals/gold/keyword_classification/top100.json",
     )
     parser.add_argument("--repeats", type=int, default=3)
     parser.add_argument(

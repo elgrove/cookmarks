@@ -149,6 +149,49 @@ def test_label_eval_fails_incomplete_candidate_coverage() -> None:
     assert report["cost_usd"] == "0.01"
 
 
+@pytest.mark.parametrize("equipment_category", [None, "method"])
+def test_label_eval_accepts_alternatives_and_weights_recipe_use(
+    equipment_category: str | None,
+) -> None:
+    gold: list[GoldKeyword] = [
+        {
+            "name": "food processor",
+            "expected": None,
+            "accepted": [None, "method"],
+            "prompt_example": False,
+            "recipe_count": 1,
+        },
+        {
+            "name": "main",
+            "expected": "course",
+            "prompt_example": False,
+            "recipe_count": 1000,
+        },
+        {
+            "name": "quick",
+            "expected": None,
+            "prompt_example": False,
+            "recipe_count": 500,
+        },
+    ]
+    provider = ReplyProvider(
+        [
+            [
+                {"name": "food processor", "category": equipment_category},
+                {"name": "main", "category": "course"},
+                {"name": "quick", "category": "method"},
+            ]
+        ]
+    )
+
+    report = evaluate(ResolvedTask(provider, "reply-model"), gold, 1)
+
+    assert report["passed"] == 2
+    assert report["failed"] == 1
+    assert report["false_assignments"] == 1
+    assert report["recipe_link_weighted_accuracy"] == pytest.approx(1001 / 1501)
+
+
 def test_explicit_rows_use_production_batch_size(
     session: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:

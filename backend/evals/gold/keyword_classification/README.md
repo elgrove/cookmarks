@@ -1,17 +1,24 @@
 # Keyword classification quality
 
-`keywords.json` contains 65 reference labels: 32 clear category matches and 33
-terms that must remain uncategorised. These are agent-authored expectations based
-on the category definitions and the user's requirement to classify only strong
-fits. Review the expectations before using them as a production release gate.
+The default sample, `top100.json`, contains the 100 keywords used by the most
+recipes in the production snapshot from 2026-10-11. Each has at least 348 recipe
+uses. Together they account for 58.5% of recipe-keyword links and appear on 28,903
+of 28,908 recipes. Counts are distinct recipes per keyword.
+
+Expected labels are agent-authored from the category definitions, independently
+of the current production labels. Some broad food terms have multiple acceptable
+labels in `accepted`. Review those expectations before using the sample as a
+production release gate. The report includes accuracy weighted by recipe use;
+that measures keyword links, not unique affected recipes, because recipes have
+several keywords.
+
+`keywords.json` is a secondary 65-keyword boundary sample. The user's accepted
+labels for `brine` are method only, and for `food processor` are method or null.
+These rare terms do not set the main evaluation priority.
 
 `prompt_example` identifies terms explicitly used as examples in the prompt.
-The report counts failures on the other terms separately. This sample tests
-specific category boundaries; it does not estimate accuracy across the library.
-
-Equipment, duration, convenience, vague descriptions, and occasions have no
-category. `brine` also has no category because the keyword alone does not tell us
-whether it names an ingredient or a technique. `braising` clearly names a method.
+The report counts failures on the other terms separately. Neither sample
+estimates accuracy across the full library.
 
 Run from `backend/`, with the usual application AI configuration:
 
@@ -26,5 +33,6 @@ sample hashes, all expected and actual labels, errors, tokens, and cost.
 
 The default run shuffles the same sample into ten-keyword batches on three
 repeats. Any wrong label, false category assignment, or response error makes the
-command exit with status 1. Exact-label agreement is a strict gate; false
-assignments and missed clear matches can also be reviewed separately.
+command exit with status 1. `accepted` labels are equally valid. The report keeps
+failures and use counts so review can prioritise frequent keywords rather than
+treat every disagreement as equally important.

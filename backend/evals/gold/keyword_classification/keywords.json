@@ -151,7 +151,7 @@
   },
   {
     "name": "brine",
-    "expected": null,
+    "expected": "method",
     "prompt_example": false
   },
   {
@@ -232,7 +232,11 @@
   {
     "name": "food processor",
     "expected": null,
-    "prompt_example": false
+    "prompt_example": false,
+    "accepted": [
+      null,
+      "method"
+    ]
   },
   {
     "name": "wooden spoon",
