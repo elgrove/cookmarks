@@ -1,12 +1,24 @@
 # Keyword classification quality
 
-The default sample, `top100.json`, contains the 100 keywords used by the most
+The default sample, `top1000-sample.json`, is a uniform random sample of 100
+keywords from the top 1,000 by distinct recipe use in production on 2026-10-11.
+The population cutoff is 22 recipes. Selection uses seed 20261011; ties in rank
+are sorted by keyword name. Stored recipe counts and ranks make the snapshot
+reviewable without querying production again.
+
+The sample expects curry, cake, kofta, roll, soup, and salad to be `dish_type`;
+homemade has no category, and Roman is cuisine/region. `dish_type` describes what
+a recipe makes; `course` describes its meal or serving role. Named sauces can
+be dish types, while familiar ingredient names remain ingredients. The sample
+allows either ingredient or dish type for mayonnaise, custard, and béchamel.
+
+`top100.json` is a secondary sample containing the 100 keywords used by the most
 recipes in the production snapshot from 2026-10-11. Each has at least 348 recipe
 uses. Together they account for 58.5% of recipe-keyword links and appear on 28,903
 of 28,908 recipes. Counts are distinct recipes per keyword.
 
-Expected labels are agent-authored from the category definitions, independently
-of the current production labels. Some broad food terms have multiple acceptable
+Expected labels incorporate the user's corrections. The remaining labels are
+agent-authored and need review. Some broad food terms have multiple acceptable
 labels in `accepted`. Review those expectations before using the sample as a
 production release gate. The report includes accuracy weighted by recipe use;
 that measures keyword links, not unique affected recipes, because recipes have

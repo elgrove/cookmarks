@@ -109,6 +109,30 @@ def test_production_batch_size_is_small() -> None:
     assert KEYWORD_CLASSIFICATION_BATCH_SIZE == 10
 
 
+def test_dish_type_is_accepted_by_provider_and_persisted(
+    session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    keyword = Keyword(name="kofta")
+    session.add(keyword)
+    session.commit()
+    provider = ReplyProvider([[{"name": "kofta", "category": "dish_type"}]])
+    _resolve(monkeypatch, provider)
+
+    result = classify_keyword_rows(session, [keyword])
+    session.expire_all()
+    saved = session.get(Keyword, keyword.id)
+
+    assert saved is not None
+    assert saved.category == KeywordCategory.DISH_TYPE
+    assert saved.classified_at is not None
+    assert result.classified_by_category["dish_type"] == 1
+    assert result.classified == 1
+    assert provider.last_schema is not None
+    assert provider.last_schema["items"]["properties"]["category"]["anyOf"][0]["enum"] == [
+        category.value for category in KeywordCategory
+    ]
+
+
 def test_label_eval_fails_valid_json_with_wrong_or_overconfident_labels() -> None:
     gold: list[GoldKeyword] = [
         {"name": "keeps well", "expected": None, "prompt_example": False},

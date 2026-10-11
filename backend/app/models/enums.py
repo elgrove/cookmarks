@@ -93,6 +93,7 @@ class KeywordCategory(StrEnum):
     COURSE = "course"
     KEY_INGREDIENT = "key_ingredient"
     METHOD = "method"
+    DISH_TYPE = "dish_type"
 
 
 def enum_values(enum_cls: type[StrEnum]) -> list[str]:

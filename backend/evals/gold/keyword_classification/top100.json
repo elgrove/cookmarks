@@ -157,8 +157,8 @@
   },
   {
     "name": "salad",
-    "expected": "course",
-    "prompt_example": false,
+    "expected": "dish_type",
+    "prompt_example": true,
     "recipe_count": 1386
   },
   {
@@ -229,13 +229,9 @@
   },
   {
     "name": "curry",
-    "expected": null,
-    "prompt_example": false,
-    "recipe_count": 1007,
-    "accepted": [
-      null,
-      "cuisine_region"
-    ]
+    "expected": "dish_type",
+    "prompt_example": true,
+    "recipe_count": 1007
   },
   {
     "name": "beef",
@@ -269,8 +265,8 @@
   },
   {
     "name": "soup",
-    "expected": "course",
-    "prompt_example": false,
+    "expected": "dish_type",
+    "prompt_example": true,
     "recipe_count": 863
   },
   {
@@ -434,13 +430,9 @@
   },
   {
     "name": "cake",
-    "expected": "course",
-    "prompt_example": false,
-    "recipe_count": 539,
-    "accepted": [
-      "course",
-      null
-    ]
+    "expected": "dish_type",
+    "prompt_example": true,
+    "recipe_count": 539
   },
   {
     "name": "almond",

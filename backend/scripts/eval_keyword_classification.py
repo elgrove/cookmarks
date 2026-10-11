@@ -1,7 +1,7 @@
 """Read-only label-quality evaluation using the configured classification model.
 
 Run with ``uv run python -m scripts.eval_keyword_classification --output results.json``.
-Expected labels are reviewable in evals/gold/keyword_classification/top100.json.
+Expected labels are reviewable in evals/gold/keyword_classification/top1000-sample.json.
 Every label must be accepted on every repeat; protocol validity alone does not pass.
 """
 
@@ -28,6 +28,7 @@ class GoldKeyword(TypedDict):
     prompt_example: bool
     accepted: NotRequired[list[str | None]]
     recipe_count: NotRequired[int]
+    usage_rank: NotRequired[int]
 
 
 def evaluate(resolved: ResolvedTask, gold: list[GoldKeyword], repeats: int) -> dict[str, object]:
@@ -101,7 +102,7 @@ def main() -> None:
         "--gold",
         type=Path,
         default=Path(__file__).resolve().parents[1]
-        / "evals/gold/keyword_classification/top100.json",
+        / "evals/gold/keyword_classification/top1000-sample.json",
     )
     parser.add_argument("--repeats", type=int, default=3)
     parser.add_argument(

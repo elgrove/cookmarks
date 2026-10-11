@@ -236,6 +236,7 @@ def test_keyword_classification_task_completes_with_usage_and_counts(
             "course": 0,
             "key_ingredient": 0,
             "method": 0,
+            "dish_type": 0,
         },
         "no_category": 2,
         "failed_batches": 0,

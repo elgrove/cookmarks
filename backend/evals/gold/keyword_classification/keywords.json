@@ -152,7 +152,7 @@
   {
     "name": "brine",
     "expected": "method",
-    "prompt_example": false
+    "prompt_example": true
   },
   {
     "name": "clarify",
@@ -191,12 +191,12 @@
   },
   {
     "name": "latke",
-    "expected": null,
+    "expected": "dish_type",
     "prompt_example": true
   },
   {
     "name": "salsa borracha",
-    "expected": null,
+    "expected": "dish_type",
     "prompt_example": true
   },
   {
