@@ -6,6 +6,13 @@ The population cutoff is 22 recipes. Selection uses seed 20261011; ties in rank
 are sorted by keyword name. Stored recipe counts and ranks make the snapshot
 reviewable without querying production again.
 
+`top1000-sample2.json` contains a second uniform random sample of 100 from that
+population, excluding every keyword in the first sample. Its seed is 20261012.
+Expected labels and accepted alternatives were set before model evaluation.
+Review notes explain boundaries checked against linked recipe titles. The
+prompt is unchanged for this sample, so it checks generalisation to new terms.
+Pass it with `--gold evals/gold/keyword_classification/top1000-sample2.json`.
+
 The sample expects curry, cake, kofta, roll, soup, and salad to be `dish_type`;
 homemade has no category, and Roman is cuisine/region. `dish_type` describes what
 a recipe makes; `course` describes its meal or serving role. Named sauces can
