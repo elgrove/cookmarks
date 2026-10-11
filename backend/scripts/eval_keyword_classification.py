@@ -15,7 +15,7 @@ from typing import NotRequired, TypedDict
 from sqlalchemy import text
 
 from app.db import SessionLocal
-from app.models.enums import ModelRole
+from app.models.enums import KeywordCategory, ModelRole
 from app.services.ai import AIResponseError, ResolvedTask, Usage
 from app.services.ai.registry import resolve_task
 from app.services.keyword_classification import KEYWORD_CLASSIFICATION_BATCH_SIZE
@@ -45,6 +45,9 @@ def evaluate(resolved: ResolvedTask, gold: list[GoldKeyword], repeats: int) -> d
                 labels = {item.name: item.category for item in response}
                 if len(response) != len(names) or set(labels) != set(names):
                     raise ValueError("Response did not cover candidates exactly once")
+                allowed = {category.value for category in KeywordCategory} | {None}
+                if any(label not in allowed for label in labels.values()):
+                    raise ValueError("Response contained an invalid category")
             except Exception as error:
                 if isinstance(error, AIResponseError):
                     usage += error.usage

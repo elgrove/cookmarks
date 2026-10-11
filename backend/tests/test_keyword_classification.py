@@ -135,12 +135,19 @@ def test_label_eval_fails_valid_json_with_wrong_or_overconfident_labels() -> Non
     assert report["cost_usd"] == "0.01"
 
 
-def test_label_eval_fails_incomplete_candidate_coverage() -> None:
+@pytest.mark.parametrize(
+    "invalid_reply",
+    [
+        [{"name": "thai", "category": "cuisine_region"}],
+        [{"name": "thai", "category": "cuisine_region"}, {"name": "quick", "category": "null"}],
+    ],
+)
+def test_label_eval_fails_invalid_batches(invalid_reply: list[dict[str, str]]) -> None:
     gold: list[GoldKeyword] = [
         {"name": "thai", "expected": "cuisine_region", "prompt_example": False},
         {"name": "quick", "expected": None, "prompt_example": True},
     ]
-    provider = ReplyProvider([[{"name": "thai", "category": "cuisine_region"}]])
+    provider = ReplyProvider([invalid_reply])
 
     report = evaluate(ResolvedTask(provider, "reply-model"), gold, 1)
 
