@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import com.cookmarks.app.api.Api
 import com.cookmarks.app.api.ReadingUpdate
 import com.cookmarks.app.ui.Feedback
+import com.cookmarks.app.ui.PagerPolicy
 import com.cookmarks.app.ui.components.Loaded
 import com.cookmarks.app.ui.components.MonoLabel
 import com.cookmarks.app.ui.components.rememberLoad
@@ -108,7 +109,7 @@ private fun Pager(
         HorizontalDivider(color = colors.line)
         HorizontalPager(
             state = pagerState,
-            beyondViewportPageCount = 1,
+            beyondViewportPageCount = PagerPolicy.BEYOND_VIEWPORT_PAGE_COUNT,
             modifier = Modifier.weight(1f),
         ) { page ->
             RecipePage(entries[page].first)
