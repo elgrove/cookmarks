@@ -103,6 +103,26 @@ def test_similar_unknown_recipe_404(client: TestClient) -> None:
     assert client.get(f"/api/recipes/{uuid.uuid4()}/similar").status_code == 404
 
 
+def test_similar_repeat_request_skips_the_vector_scan(
+    client: TestClient, session: Session, monkeypatch: Any
+) -> None:
+    """MY-178: neighbours are cached per recipe, so reopening a recipe (or asking
+    for another limit slice) must not re-run the ~250 ms KNN scan."""
+    r0, _, _ = _seed_embeddings(session)
+    scans: list[None] = []
+    original = VectorStore.search_excluding
+
+    def _counting(self: VectorStore, *args: Any, **kwargs: Any) -> Any:
+        scans.append(None)
+        return original(self, *args, **kwargs)
+
+    monkeypatch.setattr(VectorStore, "search_excluding", _counting)
+    full = client.get(f"/api/recipes/{r0.id}/similar").json()
+    one = client.get(f"/api/recipes/{r0.id}/similar", params={"limit": 1}).json()
+    assert one["items"] == full["items"][:1]
+    assert scans == [None]
+
+
 def test_similar_endpoint_keys_match_contract(client: TestClient, session: Session) -> None:
     example = _example()
     r0, _, _ = _seed_embeddings(session)

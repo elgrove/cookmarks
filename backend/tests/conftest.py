@@ -9,7 +9,7 @@ from sqlalchemy import create_engine, event, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.api.deps import current_user
-from app.api.recipes import _clear_keyword_cache, _clear_search_order_cache
+from app.api.recipes import _clear_keyword_cache, _clear_search_order_cache, _clear_similar_cache
 from app.config import settings
 from app.db import configure_sqlite_connection, get_session
 from app.main import app
@@ -151,10 +151,12 @@ def _reset_caches() -> Iterator[None]:
     _clear_search_order_cache()
     _clear_keyword_cache()
     _clear_query_embed_cache()
+    _clear_similar_cache()
     yield
     _clear_search_order_cache()
     _clear_keyword_cache()
     _clear_query_embed_cache()
+    _clear_similar_cache()
 
 
 # scrypt is deliberately slow; derive the seeded account's hash once for the whole
