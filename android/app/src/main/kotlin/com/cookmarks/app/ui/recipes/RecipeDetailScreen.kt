@@ -142,8 +142,8 @@ fun RecipeDetailScreen(
             modifier = Modifier.weight(1f),
         ) { page ->
             RecipeDetailPage(
-                ids[page],
-                onOpenRecipe,
+                recipeId = ids[page],
+                onOpenRecipe = onOpenRecipe,
                 loadSimilar = PagerPolicy.shouldLoadSimilar(page, pagerState.settledPage),
                 onLoaded = { recipe ->
                     if (recipe.id !in favourites) favourites[recipe.id] = recipe.is_favourite
