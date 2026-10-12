@@ -15,9 +15,15 @@
 		/** Every task run, newest first (the server's order is preserved). Network-free
 		 *  and verifiable in isolation; the admin route owns the fetch. */
 		runs: TaskRun[];
+		/** Controlled type filter. Absent, the panel filters its own rows client-side
+		 *  (the verify-harness shape). Set, the route owns the filter — e.g. to page
+		 *  the history per type from the server — and hears changes via onFilter. */
+		filter?: Filter;
+		onFilter?: (filter: Filter) => void;
 	};
 
 	type Filter = TaskType | 'all';
+	export type { Filter as TaskRunsFilter };
 
 	const FILTERS: { id: Filter; label: string }[] = [
 		{ id: 'all', label: 'All' },
@@ -98,9 +104,15 @@
 	import TaskRunDetail from './TaskRunDetail.svelte';
 	import { cleanTitle } from '$lib/title';
 
-	let { runs }: TaskRunsPanelProps = $props();
+	let { runs, filter: controlledFilter, onFilter }: TaskRunsPanelProps = $props();
 
-	let filter = $state<Filter>('all');
+	let internalFilter = $state<Filter>('all');
+	let filter = $derived(controlledFilter ?? internalFilter);
+
+	function selectFilter(next: Filter): void {
+		internalFilter = next;
+		onFilter?.(next);
+	}
 	let selectedId = $state<string | null>(null);
 
 	let filtered = $derived(filter === 'all' ? runs : runs.filter((r) => r.task_type === filter));
@@ -139,7 +151,7 @@
 					class:active={filter === f.id}
 					data-filter={f.id}
 					aria-pressed={filter === f.id}
-					onclick={() => (filter = f.id)}
+					onclick={() => selectFilter(f.id)}
 				>
 					{f.label}
 				</button>

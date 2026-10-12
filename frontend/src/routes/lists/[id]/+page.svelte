@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
+	import { untrack } from 'svelte';
 	import ListDetail, { type ListDetailData } from '$lib/components/ListDetail.svelte';
 	import {
 		bulkAddToList,
@@ -137,10 +138,15 @@
 		}
 	}
 
+	// Reload when the route id changes. Depend only on the id; run load()
+	// untracked so its reads and writes of `list`/`status` can't feed back and
+	// re-trigger the effect (an endless refetch loop — MY-178).
 	$effect(() => {
 		const id = $page.params.id;
-		if (id) load(id);
-		else status = 'error';
+		untrack(() => {
+			if (id) load(id);
+			else status = 'error';
+		});
 	});
 
 	$effect(() => {

@@ -501,11 +501,15 @@
 	{/if}
 	</div>
 
-	<div class="results">
+	<div class="results" aria-busy={status === 'loading'}>
 		{#if status === 'loading'}
+			<!-- Same geometry as the result view (count line + two-line rows) so the
+			     swap from resting/loading to results barely moves the page. MY-178: the
+			     desktop audit measured CLS 0.962 on this transition. -->
 			<ul class="skeleton" aria-hidden="true">
+				<li class="skel-count"></li>
 				{#each Array(6) as _, i (i)}
-					<li class="skel-row"></li>
+					<li class="skel-row"><span class="skel-title"></span><span class="skel-meta"></span></li>
 				{/each}
 			</ul>
 		{:else if status === 'error'}
@@ -881,6 +885,12 @@
 		padding: 0;
 	}
 
+	/* The region keeps its height across resting → loading → results, so the
+	   swap does not shove the page (desktop CLS 0.962 in the MY-178 audit). */
+	.results {
+		min-height: 22rem;
+	}
+
 	.state {
 		font-family: var(--f-grotesk);
 		font-size: 1.1rem;
@@ -895,15 +905,38 @@
 		list-style: none;
 		margin: 0;
 		padding: 0;
-		border-top: var(--border);
 	}
 
-	.skel-row {
-		height: 1.2rem;
-		margin: 1.4rem 0;
+	.skel-count {
+		height: 0.8rem;
+		width: 12rem;
+		margin: 0 0 0.55rem;
 		background: var(--bg-warm);
 		border-radius: 3px;
 		animation: pulse 1.4s var(--ease-out) infinite;
+	}
+
+	.skel-row {
+		padding: 1rem 0;
+		border-bottom: var(--border);
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		animation: pulse 1.4s var(--ease-out) infinite;
+	}
+	.skel-title {
+		display: block;
+		height: 1.1rem;
+		width: 62%;
+		background: var(--bg-warm);
+		border-radius: 3px;
+	}
+	.skel-meta {
+		display: block;
+		height: 0.8rem;
+		width: 38%;
+		background: var(--bg-warm);
+		border-radius: 3px;
 	}
 
 	.pager {
@@ -945,7 +978,8 @@
 	}
 
 	@media (prefers-reduced-motion: reduce) {
-		.skel-row {
+		.skel-row,
+		.skel-count {
 			animation: none;
 		}
 	}

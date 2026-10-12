@@ -234,23 +234,28 @@ def search_recipes(
 
     # Facets: the keywords most common among the matching recipes, so the chips
     # can re-rank to what narrows further. Already-selected keywords are dropped
-    # (every match carries them) — the frontend pins those separately.
-    facet_count = func.count(recipe_keywords.c.recipe_id)
-    facet_query = (
-        select(Keyword.name, facet_count)
-        .select_from(recipe_keywords)
-        .join(Keyword, Keyword.id == recipe_keywords.c.keyword_id)
-        .where(recipe_keywords.c.recipe_id.in_(filtered.scalar_subquery()))
-        .group_by(Keyword.id)
-        .order_by(facet_count.desc(), Keyword.name)
-        .limit(FACET_LIMIT)
-    )
-    if keywords:
-        facet_query = facet_query.where(Keyword.name.notin_(keywords))
-    facets = [
-        KeywordSummary(name=name, recipe_count=count)
-        for name, count in session.execute(facet_query).all()
-    ]
+    # (every match carries them) — the frontend pins those separately. Skipped for
+    # `all=true`: the Discover deck reads ids only and never renders chips, and
+    # the facet query repeats the whole filtered scan (~250 ms on production).
+    # MY-178 interim; MY-212 owns the dedicated deck endpoint.
+    facets: list[KeywordSummary] = []
+    if not all_recipes:
+        facet_count = func.count(recipe_keywords.c.recipe_id)
+        facet_query = (
+            select(Keyword.name, facet_count)
+            .select_from(recipe_keywords)
+            .join(Keyword, Keyword.id == recipe_keywords.c.keyword_id)
+            .where(recipe_keywords.c.recipe_id.in_(filtered.scalar_subquery()))
+            .group_by(Keyword.id)
+            .order_by(facet_count.desc(), Keyword.name)
+            .limit(FACET_LIMIT)
+        )
+        if keywords:
+            facet_query = facet_query.where(Keyword.name.notin_(keywords))
+        facets = [
+            KeywordSummary(name=name, recipe_count=count)
+            for name, count in session.execute(facet_query).all()
+        ]
 
     return RecipeSearchResults(total=total, items=items, facets=facets)
 
@@ -683,6 +688,49 @@ def recipe_image(recipe_id: uuid.UUID, session: SessionDep) -> Response:
 # for a small slice (limit=5) explicitly.
 SIMILAR_LIMIT_DEFAULT = 30
 
+# Neighbour ids per recipe, at full width (SIMILAR_LIMIT_MAX), so every limit slices
+# the same cached scan — the 3072-d KNN costs ~250 ms whatever the limit, and the
+# recipe page plus the browse page plus the Android pager all ask for one recipe in
+# quick succession. Bounded LRU like the search-order cache; a re-extraction can
+# leave an entry stale until eviction — the same accepted tradeoff. MY-178.
+SIMILAR_LIMIT_MAX = 50
+_SIMILAR_CACHE: OrderedDict[uuid.UUID, tuple[Literal["vector", "keyword"], list[uuid.UUID]]]
+_SIMILAR_CACHE = OrderedDict()
+_SIMILAR_CACHE_MAX = 256
+
+
+def _clear_similar_cache() -> None:
+    _SIMILAR_CACHE.clear()
+
+
+def _similar_neighbours(
+    session: Session, user_id: uuid.UUID, recipe: Recipe
+) -> tuple[Literal["vector", "keyword"], list[uuid.UUID]]:
+    """The (basis, neighbour ids) for a recipe, widest first — cached per recipe so
+    repeat opens skip the vector scan. Sliced to the request's limit by the caller.
+    Keyed on the recipe alone: neighbours are a shared corpus property, nothing
+    per-user goes into them (user_id only threads through to the loaders)."""
+    key = recipe.id
+    cached = _SIMILAR_CACHE.get(key)
+    if cached is not None:
+        _SIMILAR_CACHE.move_to_end(key)
+        return cached
+    store = VectorStore(session)
+    embedding = store.get_embedding(recipe.id)
+    if embedding is not None:
+        neighbours = store.search_excluding(embedding, recipe.id, limit=SIMILAR_LIMIT_MAX)
+        result = ("vector", [nid for nid, _ in neighbours])
+    else:
+        result = (
+            "keyword",
+            [item.id for item in _keyword_neighbours(session, user_id, recipe, SIMILAR_LIMIT_MAX)],
+        )
+    _SIMILAR_CACHE[key] = result
+    _SIMILAR_CACHE.move_to_end(key)
+    while len(_SIMILAR_CACHE) > _SIMILAR_CACHE_MAX:
+        _SIMILAR_CACHE.popitem(last=False)
+    return result
+
 
 def _load_ordered(
     session: Session, user_id: uuid.UUID, ids: list[uuid.UUID]
@@ -732,7 +780,7 @@ def similar_recipes(
     recipe_id: uuid.UUID,
     session: SessionDep,
     user: CurrentUser,
-    limit: Annotated[int, Query(ge=1, le=50)] = SIMILAR_LIMIT_DEFAULT,
+    limit: Annotated[int, Query(ge=1, le=SIMILAR_LIMIT_MAX)] = SIMILAR_LIMIT_DEFAULT,
 ) -> SimilarRecipes:
     recipe = session.scalar(
         select(Recipe).where(Recipe.id == recipe_id).options(selectinload(Recipe.keywords))
@@ -740,14 +788,8 @@ def similar_recipes(
     if recipe is None:
         raise HTTPException(status_code=404, detail="recipe not found")
 
-    store = VectorStore(session)
-    embedding = store.get_embedding(recipe_id)
-    if embedding is not None:
-        neighbours = store.search_excluding(embedding, recipe_id, limit=limit)
-        return SimilarRecipes(
-            basis="vector",
-            items=_load_ordered(session, user.id, [nid for nid, _ in neighbours]),
-        )
+    basis, ids = _similar_neighbours(session, user.id, recipe)
     return SimilarRecipes(
-        basis="keyword", items=_keyword_neighbours(session, user.id, recipe, limit)
+        basis=basis,
+        items=_load_ordered(session, user.id, ids[:limit]),
     )

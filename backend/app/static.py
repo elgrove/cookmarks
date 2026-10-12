@@ -20,5 +20,13 @@ def mount_spa(app: FastAPI, dist: Path) -> None:
     async def spa(full_path: str) -> FileResponse:
         candidate = (dist / full_path).resolve()
         if full_path and dist in candidate.parents and candidate.is_file():
-            return FileResponse(candidate)
-        return FileResponse(index)
+            # Hashed build output keeps its hash across deploys, so a client can
+            # cache it for a year. index.html itself carries no such header —
+            # it must revalidate, or clients would pin a stale bundle. MY-178.
+            if full_path.startswith("_app/immutable/"):
+                headers = {"Cache-Control": "public, max-age=31536000, immutable"}
+            else:
+                headers = {"Cache-Control": "no-cache"}
+            return FileResponse(candidate, headers=headers)
+        # Entry HTML revalidates every load so clients never pin a stale bundle.
+        return FileResponse(index, headers={"Cache-Control": "no-cache"})

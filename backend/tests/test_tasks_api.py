@@ -3,7 +3,7 @@ count + dispatch) and the library-wide backfill sweep it runs on the worker."""
 
 import uuid
 from collections.abc import Iterator
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -247,3 +247,37 @@ def test_keyword_classification_task_completes_with_usage_and_counts(
         assert run.status == TaskStatus.DONE
         assert run.provider_name == "STUB"
         assert run.model_name == "stub-keyword-classification"
+
+
+def test_task_run_history_pages_newest_first(
+    client: TestClient, session: Session
+) -> None:
+    """MY-178: the admin tab pages the run history instead of fetching it whole —
+    limit/offset pages must concatenate to the full newest-first list."""
+    base = datetime(2026, 1, 1, tzinfo=UTC)
+    for i in range(5):
+        session.add(
+            TaskRun(
+                task_type=TaskType.BOOK_KEYWORDS,
+                status=TaskStatus.DONE,
+                detail={},
+                created_at=base + timedelta(minutes=i),
+            )
+        )
+    session.commit()
+
+    full = client.get("/api/task-runs").json()
+    assert len(full) == 5
+    assert [run["created_at"] for run in full] == sorted(
+        (run["created_at"] for run in full), reverse=True
+    )
+
+    page1 = client.get("/api/task-runs?limit=2").json()
+    page2 = client.get("/api/task-runs?limit=2&offset=2").json()
+    page3 = client.get("/api/task-runs?limit=2&offset=4").json()
+    assert len(page1) == 2
+    assert len(page2) == 2
+    assert len(page3) == 1
+    assert [run["id"] for run in [*page1, *page2, *page3]] == [
+        run["id"] for run in full
+    ]

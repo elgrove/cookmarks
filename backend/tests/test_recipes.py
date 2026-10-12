@@ -228,6 +228,18 @@ def test_facets_respect_the_query(client: TestClient) -> None:
     ]
 
 
+def test_all_true_skips_facets_but_keeps_items(client: TestClient) -> None:
+    # MY-178: the Discover deck reads ids only, so all=true must not pay for the
+    # facet scan — while a normal query still returns facets.
+    deck = client.get("/api/recipes", params={"all": True}).json()
+    assert deck["total"] == 3
+    assert len(deck["items"]) == 3
+    assert deck["facets"] == []
+
+    normal = client.get("/api/recipes", params={"q": "recipe"}).json()
+    assert normal["facets"] != []
+
+
 def test_keywords_endpoint(client: TestClient) -> None:
     body = client.get("/api/keywords").json()
     assert body == [
