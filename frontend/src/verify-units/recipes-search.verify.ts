@@ -71,6 +71,11 @@ const unit: VerifiableUnit<Props> = {
 			act: ({ click }) => click('.rows .row .chip')
 		},
 		{
+			id: 'loading',
+			description: 'while searching: a result-shaped skeleton holds the layout steady',
+			props: { status: 'loading', keywords: chips }
+		},
+		{
 			id: 'no-results',
 			description: 'a query that matches nothing shows the calm no-results state',
 			props: {
@@ -230,6 +235,24 @@ const unit: VerifiableUnit<Props> = {
 				if (contract.shown !== '0' || contract.total !== '0')
 					return `shown=${contract.shown} total=${contract.total}`;
 				return root.querySelector('.rows') === null || 'resting should render no result rows';
+			}
+		},
+		{
+			id: 'loading-skeleton',
+			description: 'while loading: a result-shaped skeleton holds the region, no rows yet',
+			onlyFixtures: ['loading'],
+			check: ({ contract, root }) => {
+				if (contract.status !== 'loading') return `status=${contract.status}`;
+				if (root.querySelector('.rows')) return 'rows must not render while loading';
+				const skeleton = root.querySelector('.skeleton');
+				if (!skeleton) return 'skeleton missing';
+				if (!skeleton.querySelector('.skel-count')) return 'skeleton count line missing';
+				const bars = skeleton.querySelectorAll('.skel-row');
+				if (bars.length < 1) return 'skeleton rows missing';
+				const shaped = [...bars].every(
+					(r) => r.querySelector('.skel-title') && r.querySelector('.skel-meta')
+				);
+				return shaped || 'skeleton rows lack the two-line result shape';
 			}
 		},
 		{
