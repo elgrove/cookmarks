@@ -1,7 +1,6 @@
+from fastapi import FastAPI
 from starlette.middleware.gzip import GZipMiddleware
 from starlette.types import Receive, Scope, Send
-
-from fastapi import FastAPI
 
 from app.api.router import api_router
 from app.config import settings
