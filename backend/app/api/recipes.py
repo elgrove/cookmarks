@@ -234,23 +234,28 @@ def search_recipes(
 
     # Facets: the keywords most common among the matching recipes, so the chips
     # can re-rank to what narrows further. Already-selected keywords are dropped
-    # (every match carries them) — the frontend pins those separately.
-    facet_count = func.count(recipe_keywords.c.recipe_id)
-    facet_query = (
-        select(Keyword.name, facet_count)
-        .select_from(recipe_keywords)
-        .join(Keyword, Keyword.id == recipe_keywords.c.keyword_id)
-        .where(recipe_keywords.c.recipe_id.in_(filtered.scalar_subquery()))
-        .group_by(Keyword.id)
-        .order_by(facet_count.desc(), Keyword.name)
-        .limit(FACET_LIMIT)
-    )
-    if keywords:
-        facet_query = facet_query.where(Keyword.name.notin_(keywords))
-    facets = [
-        KeywordSummary(name=name, recipe_count=count)
-        for name, count in session.execute(facet_query).all()
-    ]
+    # (every match carries them) — the frontend pins those separately. Skipped for
+    # `all=true`: the Discover deck reads ids only and never renders chips, and
+    # the facet query repeats the whole filtered scan (~250 ms on production).
+    # MY-178 interim; MY-212 owns the dedicated deck endpoint.
+    facets: list[KeywordSummary] = []
+    if not all_recipes:
+        facet_count = func.count(recipe_keywords.c.recipe_id)
+        facet_query = (
+            select(Keyword.name, facet_count)
+            .select_from(recipe_keywords)
+            .join(Keyword, Keyword.id == recipe_keywords.c.keyword_id)
+            .where(recipe_keywords.c.recipe_id.in_(filtered.scalar_subquery()))
+            .group_by(Keyword.id)
+            .order_by(facet_count.desc(), Keyword.name)
+            .limit(FACET_LIMIT)
+        )
+        if keywords:
+            facet_query = facet_query.where(Keyword.name.notin_(keywords))
+        facets = [
+            KeywordSummary(name=name, recipe_count=count)
+            for name, count in session.execute(facet_query).all()
+        ]
 
     return RecipeSearchResults(total=total, items=items, facets=facets)
 
