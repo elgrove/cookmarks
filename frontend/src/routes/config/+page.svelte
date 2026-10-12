@@ -52,9 +52,14 @@
 	let readiness = $state<AiReadiness | null>(null);
 
 	// Task-run history loads lazily the first time its tab is opened, with its own state
-	// so a settings failure (or never opening this tab) never touches it.
+	// so a settings failure (or never opening this tab) never touches it. The full
+	// history is 1.6 MB on production, so the tab loads one bounded page and appends
+	// older runs on demand (MY-178).
+	const RUNS_PAGE = 50;
 	let runsStatus = $state<'idle' | 'loading' | 'error' | 'ready'>('idle');
 	let runs = $state<TaskRun[]>([]);
+	let runsExhausted = $state(false);
+	let moreRunsStatus = $state<'idle' | 'loading' | 'error'>('idle');
 
 	// Map the snake_case wire shape to the component's camelCase props. The Settings
 	// tab keeps user preferences and the extraction rate limit; AI providers, models
@@ -103,11 +108,25 @@
 	async function loadRuns() {
 		runsStatus = 'loading';
 		try {
-			runs = await fetchTaskRuns();
+			runs = await fetchTaskRuns(undefined, { limit: RUNS_PAGE });
+			runsExhausted = runs.length < RUNS_PAGE;
 			runsStatus = 'ready';
 		} catch (err) {
 			console.error('failed to load task runs', err);
 			runsStatus = 'error';
+		}
+	}
+
+	async function loadMoreRuns() {
+		moreRunsStatus = 'loading';
+		try {
+			const more = await fetchTaskRuns(undefined, { limit: RUNS_PAGE, offset: runs.length });
+			runs = [...runs, ...more];
+			if (more.length < RUNS_PAGE) runsExhausted = true;
+			moreRunsStatus = 'idle';
+		} catch (err) {
+			console.error('failed to load older task runs', err);
+			moreRunsStatus = 'error';
 		}
 	}
 
@@ -181,6 +200,20 @@
 	{:else if active === 'task-runs'}
 		{#if runsStatus === 'ready'}
 			<TaskRunsPanel {runs} />
+			{#if !runsExhausted}
+				<div class="more">
+					{#if moreRunsStatus === 'error'}
+						<p class="msg">Couldn’t load older runs.</p>
+					{/if}
+					<button
+						class="retry"
+						onclick={loadMoreRuns}
+						disabled={moreRunsStatus === 'loading'}
+					>
+						{moreRunsStatus === 'loading' ? 'Loading…' : 'Show older runs'}
+					</button>
+				</div>
+			{/if}
 		{:else if runsStatus === 'error'}
 			<p class="msg">Couldn’t load task-run history.</p>
 			<button class="retry" onclick={loadRuns}>Try again</button>
@@ -248,5 +281,11 @@
 	}
 	.retry:hover {
 		background: var(--accent-deep);
+	}
+	.more {
+		margin-top: 2rem;
+		display: flex;
+		align-items: center;
+		gap: 1rem;
 	}
 </style>

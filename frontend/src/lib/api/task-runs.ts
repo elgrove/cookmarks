@@ -148,12 +148,20 @@ export interface CalibreSyncDetail {
 
 /** Every task run, newest first — the unified admin reporting index. `type` filters to
  *  one task type (extraction / book_keywords / keyword_dedup / ingredient_dedup /
- *  calibre_sync / book_ingest). */
+ *  calibre_sync / book_ingest). `limit`/`offset` page the history so the admin tab
+ *  loads a bounded first page (the full history is 1.6 MB on production) and fetches
+ *  older runs on demand. */
 export async function fetchTaskRuns(
 	type?: TaskType,
-	fetchFn: typeof fetch = fetch
+	opts: { limit?: number; offset?: number; fetchFn?: typeof fetch } = {}
 ): Promise<TaskRun[]> {
-	const url = type ? `/api/task-runs?type=${type}` : '/api/task-runs';
+	const params = new URLSearchParams();
+	if (type) params.set('type', type);
+	if (opts.limit != null) params.set('limit', String(opts.limit));
+	if (opts.offset) params.set('offset', String(opts.offset));
+	const query = params.size > 0 ? `?${params}` : '';
+	const url = `/api/task-runs${query}`;
+	const fetchFn = opts.fetchFn ?? fetch;
 	const res = await fetchFn(url);
 	if (!res.ok) throw new Error(`GET ${url} → ${res.status}`);
 	return taskRunsSchema.parse(await res.json());
