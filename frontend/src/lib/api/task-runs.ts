@@ -153,8 +153,10 @@ export interface CalibreSyncDetail {
  *  older runs on demand. */
 export async function fetchTaskRuns(
 	type?: TaskType,
-	opts: { limit?: number; offset?: number; fetchFn?: typeof fetch } = {}
+	opts: { limit?: number; offset?: number; fetchFn?: typeof fetch } | typeof fetch = {}
 ): Promise<TaskRun[]> {
+	// Tolerate a fetch function passed positionally (the pre-pagination shape).
+	if (typeof opts === 'function') opts = { fetchFn: opts };
 	const params = new URLSearchParams();
 	if (type) params.set('type', type);
 	if (opts.limit != null) params.set('limit', String(opts.limit));

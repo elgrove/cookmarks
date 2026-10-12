@@ -6,7 +6,7 @@
 		type ConfigSettingsConfig
 	} from '$lib/components/ConfigSettings.svelte';
 	import TasksPanel from '$lib/components/TasksPanel.svelte';
-	import TaskRunsPanel from '$lib/components/TaskRunsPanel.svelte';
+	import TaskRunsPanel, { type TaskRunsFilter } from '$lib/components/TaskRunsPanel.svelte';
 	import UsersPanel from '$lib/components/UsersPanel.svelte';
 	import {
 		fetchAiReadiness,
@@ -23,7 +23,7 @@
 		triggerDedupIngredients,
 		triggerCalibreSync
 	} from '$lib/api/tasks';
-	import { fetchTaskRuns, type TaskRun } from '$lib/api/task-runs';
+	import { fetchTaskRuns, type TaskRun, type TaskType } from '$lib/api/task-runs';
 	import {
 		createUser,
 		deleteUser,
@@ -60,6 +60,13 @@
 	let runs = $state<TaskRun[]>([]);
 	let runsExhausted = $state(false);
 	let moreRunsStatus = $state<'idle' | 'loading' | 'error'>('idle');
+	// The type filter pages server-side, so "Extraction" sees all extraction runs,
+	// not just the ones inside the first unfiltered page.
+	let runsFilter = $state<TaskRunsFilter>('all');
+
+	function runsType(): TaskType | undefined {
+		return runsFilter === 'all' ? undefined : runsFilter;
+	}
 
 	// Map the snake_case wire shape to the component's camelCase props. The Settings
 	// tab keeps user preferences and the extraction rate limit; AI providers, models
@@ -108,7 +115,7 @@
 	async function loadRuns() {
 		runsStatus = 'loading';
 		try {
-			runs = await fetchTaskRuns(undefined, { limit: RUNS_PAGE });
+			runs = await fetchTaskRuns(runsType(), { limit: RUNS_PAGE });
 			runsExhausted = runs.length < RUNS_PAGE;
 			runsStatus = 'ready';
 		} catch (err) {
@@ -120,7 +127,10 @@
 	async function loadMoreRuns() {
 		moreRunsStatus = 'loading';
 		try {
-			const more = await fetchTaskRuns(undefined, { limit: RUNS_PAGE, offset: runs.length });
+			const more = await fetchTaskRuns(runsType(), {
+				limit: RUNS_PAGE,
+				offset: runs.length
+			});
 			runs = [...runs, ...more];
 			if (more.length < RUNS_PAGE) runsExhausted = true;
 			moreRunsStatus = 'idle';
@@ -128,6 +138,15 @@
 			console.error('failed to load older task runs', err);
 			moreRunsStatus = 'error';
 		}
+	}
+
+	// A filter change restarts the history in the new type — the panel keeps its
+	// own selection state, the route re-pages from the server.
+	function onRunsFilter(next: TaskRunsFilter): void {
+		if (next === runsFilter) return;
+		runsFilter = next;
+		moreRunsStatus = 'idle';
+		void loadRuns();
 	}
 
 	// Accounts load lazily on first open, the same shape as the task-run history.
@@ -199,7 +218,7 @@
 		/>
 	{:else if active === 'task-runs'}
 		{#if runsStatus === 'ready'}
-			<TaskRunsPanel {runs} />
+			<TaskRunsPanel {runs} filter={runsFilter} onFilter={onRunsFilter} />
 			{#if !runsExhausted}
 				<div class="more">
 					{#if moreRunsStatus === 'error'}

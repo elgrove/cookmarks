@@ -694,9 +694,8 @@ SIMILAR_LIMIT_DEFAULT = 30
 # quick succession. Bounded LRU like the search-order cache; a re-extraction can
 # leave an entry stale until eviction — the same accepted tradeoff. MY-178.
 SIMILAR_LIMIT_MAX = 50
-_SIMILAR_CACHE: OrderedDict[uuid.UUID, tuple[Literal["vector", "keyword"], list[uuid.UUID]]] = (
-    OrderedDict()
-)
+_SIMILAR_CACHE: OrderedDict[uuid.UUID, tuple[Literal["vector", "keyword"], list[uuid.UUID]]]
+_SIMILAR_CACHE = OrderedDict()
 _SIMILAR_CACHE_MAX = 256
 
 
@@ -708,7 +707,9 @@ def _similar_neighbours(
     session: Session, user_id: uuid.UUID, recipe: Recipe
 ) -> tuple[Literal["vector", "keyword"], list[uuid.UUID]]:
     """The (basis, neighbour ids) for a recipe, widest first — cached per recipe so
-    repeat opens skip the vector scan. Sliced to the request's limit by the caller."""
+    repeat opens skip the vector scan. Sliced to the request's limit by the caller.
+    Keyed on the recipe alone: neighbours are a shared corpus property, nothing
+    per-user goes into them (user_id only threads through to the loaders)."""
     key = recipe.id
     cached = _SIMILAR_CACHE.get(key)
     if cached is not None:

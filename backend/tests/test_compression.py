@@ -38,6 +38,12 @@ def test_binary_tails_skip_gzip(client: TestClient) -> None:
         )
         assert res.status_code == 404
         assert "content-encoding" not in res.headers
+    res = client.get(
+        "/api/recipes/00000000-0000-4000-8000-000000000000/image",
+        headers={"Accept-Encoding": "gzip"},
+    )
+    assert res.status_code == 404
+    assert "content-encoding" not in res.headers
 
 
 def test_spa_cache_headers(tmp_path: Path) -> None:

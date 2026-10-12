@@ -501,7 +501,7 @@
 	{/if}
 	</div>
 
-	<div class="results">
+	<div class="results" aria-busy={status === 'loading'}>
 		{#if status === 'loading'}
 			<!-- Same geometry as the result view (count line + two-line rows) so the
 			     swap from resting/loading to results barely moves the page. MY-178: the
@@ -905,21 +905,12 @@
 		list-style: none;
 		margin: 0;
 		padding: 0;
-		border-top: var(--border);
 	}
 
 	.skel-count {
 		height: 0.8rem;
 		width: 12rem;
 		margin: 0 0 0.55rem;
-		padding-top: 0.55rem;
-		background: transparent;
-		position: relative;
-	}
-	.skel-count::after {
-		content: '';
-		display: block;
-		height: 0.8rem;
 		background: var(--bg-warm);
 		border-radius: 3px;
 		animation: pulse 1.4s var(--ease-out) infinite;
@@ -988,7 +979,7 @@
 
 	@media (prefers-reduced-motion: reduce) {
 		.skel-row,
-		.skel-count::after {
+		.skel-count {
 			animation: none;
 		}
 	}
