@@ -145,6 +145,7 @@
 					{ label: 'Course', value: count(d.classified_by_category?.course) },
 					{ label: 'Key ingredient', value: count(d.classified_by_category?.key_ingredient) },
 					{ label: 'Method', value: count(d.classified_by_category?.method) },
+					{ label: 'Dish type', value: count(d.classified_by_category?.dish_type) },
 					{ label: 'No category', value: count(d.no_category) },
 					{ label: 'Failed batches', value: count(d.failed_batches) },
 					{ label: 'Cost', value: formatCost(run.cost_usd) },

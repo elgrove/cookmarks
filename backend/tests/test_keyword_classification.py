@@ -409,3 +409,51 @@ def test_audit_reports_exact_terms_and_seasonal_compound_risks(session: Session)
     assert "spring onion\t0" not in seasons
     assert "spring onion\t0" in compounds
     assert "winter squash\t0" in compounds
+
+
+def test_reclassification_replaces_old_categories_and_retries_only_failed_rows(
+    session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _clear_pending(session)
+    keywords = [
+        Keyword(name="cake", category=KeywordCategory.KEY_INGREDIENT),
+        Keyword(name="homemade", category=KeywordCategory.METHOD),
+        Keyword(name="roman", category=KeywordCategory.COURSE),
+    ]
+    recipe = session.scalars(select(Recipe)).first()
+    assert recipe is not None
+    recipe.keywords.extend(keywords)
+    session.commit()
+    provider = ReplyProvider(
+        [
+            [{"name": "cake", "category": "dish_type"}],
+            [{"name": "homemade", "category": None}],
+            [{"name": "wrong", "category": None}],
+            [{"name": "roman", "category": "cuisine_region"}],
+        ]
+    )
+    _resolve(monkeypatch, provider)
+
+    result = classify_pending_keywords(session, batch_size=1)
+    session.expire_all()
+
+    assert result.failed_batches == 1
+    assert result.classified_by_category["dish_type"] == 1
+    assert result.no_category == 1
+    assert keywords[0].category == KeywordCategory.DISH_TYPE
+    assert keywords[1].category is None
+    assert keywords[0].classified_at is not None
+    assert keywords[1].classified_at is not None
+    assert keywords[2].category == KeywordCategory.COURSE
+    assert keywords[2].classified_at is None
+    assert pending_keyword_count(session) == 1
+
+    retry = classify_pending_keywords(session, batch_size=1)
+    session.expire_all()
+
+    assert retry.pending == 1
+    assert retry.failed_batches == 0
+    assert keywords[2].category == KeywordCategory.CUISINE_REGION
+    assert keywords[2].classified_at is not None
+    assert pending_keyword_count(session) == 0
+    assert provider.calls == 4
