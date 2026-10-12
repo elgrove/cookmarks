@@ -139,9 +139,10 @@ const unit: VerifiableUnit<Props> = {
 							cuisine_region: 14,
 							course: 9,
 							key_ingredient: 31,
-							method: 18
+							method: 18,
+							dish_type: 7
 						},
-						no_category: 28,
+						no_category: 21,
 						failed_batches: 0
 					}
 				})
@@ -418,6 +419,11 @@ const unit: VerifiableUnit<Props> = {
 				return (
 					(text.includes('Keyword vocabulary classification') &&
 						text.includes('Cuisine / region') &&
+						Array.from(root.querySelectorAll('dl > div')).some(
+							(row) =>
+								row.querySelector('dt')?.textContent === 'Dish type' &&
+								row.querySelector('dd')?.textContent === '7'
+						) &&
 						text.includes('No category') &&
 						text.includes('Failed batches') &&
 						text.includes('gemini-2.5-flash-lite')) ||

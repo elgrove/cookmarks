@@ -92,3 +92,17 @@ def test_migration_merges_case_variants_and_preserves_links_and_state(tmp_path: 
     assert keywords == [("2" * 32, "spring onion", "key_ingredient", "2026-01-02")]
     assert recipe_links == [("a" * 32, "2" * 32), ("b" * 32, "2" * 32)]
     assert book_links == [("c" * 32, "2" * 32), ("d" * 32, "2" * 32)]
+
+
+def test_existing_sqlite_category_column_accepts_dish_type(tmp_path: Path) -> None:
+    database_path = tmp_path / "dish-type.sqlite3"
+    _upgrade(database_path, "head")
+    with sqlite3.connect(database_path) as connection:
+        connection.execute(
+            """INSERT INTO keywords (id, name, category, classified_at, created_at, updated_at)
+               VALUES (?, 'cake', 'dish_type', '2026-10-12', '2026-10-12', '2026-10-12')""",
+            ("5" * 32,),
+        )
+        assert connection.execute(
+            "SELECT category FROM keywords WHERE name = 'cake'"
+        ).fetchone() == ("dish_type",)

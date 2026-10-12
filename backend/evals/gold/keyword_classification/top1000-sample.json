@@ -1,0 +1,714 @@
+[
+  {
+    "name": "side",
+    "expected": "course",
+    "prompt_example": false,
+    "recipe_count": 4803,
+    "usage_rank": 4
+  },
+  {
+    "name": "japanese",
+    "expected": "cuisine_region",
+    "prompt_example": false,
+    "recipe_count": 2579,
+    "usage_rank": 15
+  },
+  {
+    "name": "chinese",
+    "expected": "cuisine_region",
+    "prompt_example": false,
+    "recipe_count": 2107,
+    "usage_rank": 17
+  },
+  {
+    "name": "salad",
+    "expected": "dish_type",
+    "prompt_example": true,
+    "recipe_count": 1386,
+    "usage_rank": 27
+  },
+  {
+    "name": "pork",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 1235,
+    "usage_rank": 32
+  },
+  {
+    "name": "curry",
+    "expected": "dish_type",
+    "prompt_example": true,
+    "recipe_count": 1007,
+    "usage_rank": 39
+  },
+  {
+    "name": "lemon",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 956,
+    "usage_rank": 41
+  },
+  {
+    "name": "pasta",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 782,
+    "usage_rank": 49
+  },
+  {
+    "name": "coconut",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 693,
+    "usage_rank": 57
+  },
+  {
+    "name": "cake",
+    "expected": "dish_type",
+    "prompt_example": true,
+    "recipe_count": 539,
+    "usage_rank": 71
+  },
+  {
+    "name": "marinate",
+    "expected": "method",
+    "prompt_example": false,
+    "recipe_count": 314,
+    "usage_rank": 111
+  },
+  {
+    "name": "cinnamon",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 294,
+    "usage_rank": 121
+  },
+  {
+    "name": "sesame seed",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 275,
+    "usage_rank": 132
+  },
+  {
+    "name": "fennel",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 243,
+    "usage_rank": 144
+  },
+  {
+    "name": "asparagus",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 228,
+    "usage_rank": 155
+  },
+  {
+    "name": "cherry tomato",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 211,
+    "usage_rank": 167
+  },
+  {
+    "name": "greek yoghurt",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 195,
+    "usage_rank": 184
+  },
+  {
+    "name": "artichoke",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 178,
+    "usage_rank": 200
+  },
+  {
+    "name": "mayonnaise",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 170,
+    "usage_rank": 207,
+    "accepted": [
+      "key_ingredient",
+      "dish_type"
+    ]
+  },
+  {
+    "name": "poach",
+    "expected": "method",
+    "prompt_example": false,
+    "recipe_count": 159,
+    "usage_rank": 222
+  },
+  {
+    "name": "puff pastry",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 159,
+    "usage_rank": 223
+  },
+  {
+    "name": "chorizo",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 157,
+    "usage_rank": 225
+  },
+  {
+    "name": "strawberry",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 157,
+    "usage_rank": 227
+  },
+  {
+    "name": "tuna",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 156,
+    "usage_rank": 228
+  },
+  {
+    "name": "custard",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 146,
+    "usage_rank": 236,
+    "accepted": [
+      "key_ingredient",
+      "dish_type"
+    ]
+  },
+  {
+    "name": "ukrainian",
+    "expected": "cuisine_region",
+    "prompt_example": false,
+    "recipe_count": 140,
+    "usage_rank": 248
+  },
+  {
+    "name": "date",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 138,
+    "usage_rank": 251
+  },
+  {
+    "name": "rice noodle",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 130,
+    "usage_rank": 264
+  },
+  {
+    "name": "red onion",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 128,
+    "usage_rank": 272
+  },
+  {
+    "name": "daikon",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 121,
+    "usage_rank": 286
+  },
+  {
+    "name": "apricot",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 119,
+    "usage_rank": 291
+  },
+  {
+    "name": "basic",
+    "expected": null,
+    "prompt_example": false,
+    "recipe_count": 116,
+    "usage_rank": 296
+  },
+  {
+    "name": "freezer-friendly",
+    "expected": null,
+    "prompt_example": false,
+    "recipe_count": 115,
+    "usage_rank": 300
+  },
+  {
+    "name": "sea bass",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 110,
+    "usage_rank": 310
+  },
+  {
+    "name": "bread crumb",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 109,
+    "usage_rank": 312
+  },
+  {
+    "name": "goat cheese",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 104,
+    "usage_rank": 328
+  },
+  {
+    "name": "soul food",
+    "expected": "cuisine_region",
+    "prompt_example": false,
+    "recipe_count": 103,
+    "usage_rank": 332
+  },
+  {
+    "name": "kerala",
+    "expected": "cuisine_region",
+    "prompt_example": false,
+    "recipe_count": 96,
+    "usage_rank": 347
+  },
+  {
+    "name": "south asia",
+    "expected": "cuisine_region",
+    "prompt_example": false,
+    "recipe_count": 96,
+    "usage_rank": 350
+  },
+  {
+    "name": "spring",
+    "expected": null,
+    "prompt_example": false,
+    "recipe_count": 96,
+    "usage_rank": 351
+  },
+  {
+    "name": "kombu",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 94,
+    "usage_rank": 354
+  },
+  {
+    "name": "hunan",
+    "expected": "cuisine_region",
+    "prompt_example": false,
+    "recipe_count": 93,
+    "usage_rank": 355
+  },
+  {
+    "name": "plantain",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 93,
+    "usage_rank": 359
+  },
+  {
+    "name": "harissa",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 92,
+    "usage_rank": 362
+  },
+  {
+    "name": "brandy",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 89,
+    "usage_rank": 365
+  },
+  {
+    "name": "homemade",
+    "expected": null,
+    "prompt_example": true,
+    "recipe_count": 89,
+    "usage_rank": 367
+  },
+  {
+    "name": "fava bean",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 87,
+    "usage_rank": 374
+  },
+  {
+    "name": "poultry",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 87,
+    "usage_rank": 376
+  },
+  {
+    "name": "israeli",
+    "expected": "cuisine_region",
+    "prompt_example": false,
+    "recipe_count": 86,
+    "usage_rank": 380
+  },
+  {
+    "name": "watercress",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 80,
+    "usage_rank": 409
+  },
+  {
+    "name": "taco",
+    "expected": "dish_type",
+    "prompt_example": false,
+    "recipe_count": 79,
+    "usage_rank": 413
+  },
+  {
+    "name": "buttermilk",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 76,
+    "usage_rank": 428
+  },
+  {
+    "name": "epazote",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 76,
+    "usage_rank": 430
+  },
+  {
+    "name": "tarragon",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 70,
+    "usage_rank": 462
+  },
+  {
+    "name": "chilled",
+    "expected": "method",
+    "prompt_example": false,
+    "recipe_count": 68,
+    "usage_rank": 466
+  },
+  {
+    "name": "dairy",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 66,
+    "usage_rank": 475
+  },
+  {
+    "name": "chilli oil",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 65,
+    "usage_rank": 484
+  },
+  {
+    "name": "corn tortilla",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 65,
+    "usage_rank": 485
+  },
+  {
+    "name": "deep-fried",
+    "expected": "method",
+    "prompt_example": false,
+    "recipe_count": 64,
+    "usage_rank": 492
+  },
+  {
+    "name": "salty",
+    "expected": null,
+    "prompt_example": false,
+    "recipe_count": 63,
+    "usage_rank": 504
+  },
+  {
+    "name": "salmon fillet",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 62,
+    "usage_rank": 508
+  },
+  {
+    "name": "jiangsu",
+    "expected": "cuisine_region",
+    "prompt_example": false,
+    "recipe_count": 61,
+    "usage_rank": 514
+  },
+  {
+    "name": "sour cream",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 60,
+    "usage_rank": 522
+  },
+  {
+    "name": "berry",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 56,
+    "usage_rank": 544
+  },
+  {
+    "name": "red wine vinegar",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 55,
+    "usage_rank": 554
+  },
+  {
+    "name": "rum",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 53,
+    "usage_rank": 574
+  },
+  {
+    "name": "goan",
+    "expected": "cuisine_region",
+    "prompt_example": false,
+    "recipe_count": 49,
+    "usage_rank": 606
+  },
+  {
+    "name": "roll",
+    "expected": "dish_type",
+    "prompt_example": true,
+    "recipe_count": 48,
+    "usage_rank": 620
+  },
+  {
+    "name": "vodka",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 48,
+    "usage_rank": 625
+  },
+  {
+    "name": "panko breadcrumb",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 46,
+    "usage_rank": 636
+  },
+  {
+    "name": "monkfish",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 44,
+    "usage_rank": 658
+  },
+  {
+    "name": "bay leaf",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 42,
+    "usage_rank": 675
+  },
+  {
+    "name": "glutinous rice",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 41,
+    "usage_rank": 688
+  },
+  {
+    "name": "béchamel",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 39,
+    "usage_rank": 705,
+    "accepted": [
+      "key_ingredient",
+      "dish_type"
+    ]
+  },
+  {
+    "name": "chilli flake",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 39,
+    "usage_rank": 706
+  },
+  {
+    "name": "kofta",
+    "expected": "dish_type",
+    "prompt_example": true,
+    "recipe_count": 39,
+    "usage_rank": 710
+  },
+  {
+    "name": "queso fresco",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 38,
+    "usage_rank": 723
+  },
+  {
+    "name": "andalusian",
+    "expected": "cuisine_region",
+    "prompt_example": false,
+    "recipe_count": 37,
+    "usage_rank": 730
+  },
+  {
+    "name": "truffle",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 37,
+    "usage_rank": 740
+  },
+  {
+    "name": "pandan leaf",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 36,
+    "usage_rank": 745
+  },
+  {
+    "name": "balsamic vinegar",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 35,
+    "usage_rank": 751
+  },
+  {
+    "name": "pomegranate seed",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 35,
+    "usage_rank": 766
+  },
+  {
+    "name": "stir fry",
+    "expected": "method",
+    "prompt_example": false,
+    "recipe_count": 34,
+    "usage_rank": 781
+  },
+  {
+    "name": "pistachio nut",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 33,
+    "usage_rank": 791
+  },
+  {
+    "name": "mint leaf",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 31,
+    "usage_rank": 821
+  },
+  {
+    "name": "sorrel",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 31,
+    "usage_rank": 828
+  },
+  {
+    "name": "tonkatsu sauce",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 31,
+    "usage_rank": 832
+  },
+  {
+    "name": "brown sugar",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 28,
+    "usage_rank": 870
+  },
+  {
+    "name": "roman",
+    "expected": "cuisine_region",
+    "prompt_example": true,
+    "recipe_count": 28,
+    "usage_rank": 880
+  },
+  {
+    "name": "veracruz",
+    "expected": "cuisine_region",
+    "prompt_example": false,
+    "recipe_count": 28,
+    "usage_rank": 887
+  },
+  {
+    "name": "extra-virgin olive oil",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 27,
+    "usage_rank": 892
+  },
+  {
+    "name": "galangal",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 27,
+    "usage_rank": 896
+  },
+  {
+    "name": "chicken drumstick",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 26,
+    "usage_rank": 911
+  },
+  {
+    "name": "hyderabadi",
+    "expected": "cuisine_region",
+    "prompt_example": false,
+    "recipe_count": 26,
+    "usage_rank": 919
+  },
+  {
+    "name": "chinese chive",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 25,
+    "usage_rank": 936
+  },
+  {
+    "name": "federal district",
+    "expected": "cuisine_region",
+    "prompt_example": false,
+    "recipe_count": 25,
+    "usage_rank": 940
+  },
+  {
+    "name": "streaky bacon",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 24,
+    "usage_rank": 972
+  },
+  {
+    "name": "central thai",
+    "expected": "cuisine_region",
+    "prompt_example": false,
+    "recipe_count": 23,
+    "usage_rank": 978
+  },
+  {
+    "name": "dried fruit",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 23,
+    "usage_rank": 982
+  },
+  {
+    "name": "maris piper potato",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 23,
+    "usage_rank": 990
+  }
+]

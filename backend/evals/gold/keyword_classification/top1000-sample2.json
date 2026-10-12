@@ -1,0 +1,775 @@
+[
+  {
+    "name": "simmer",
+    "expected": "method",
+    "prompt_example": false,
+    "recipe_count": 7299,
+    "usage_rank": 2
+  },
+  {
+    "name": "indian",
+    "expected": "cuisine_region",
+    "prompt_example": false,
+    "recipe_count": 3339,
+    "usage_rank": 7
+  },
+  {
+    "name": "starter",
+    "expected": "course",
+    "prompt_example": true,
+    "recipe_count": 3091,
+    "usage_rank": 10
+  },
+  {
+    "name": "korean",
+    "expected": "cuisine_region",
+    "prompt_example": false,
+    "recipe_count": 898,
+    "usage_rank": 42
+  },
+  {
+    "name": "cheese",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 768,
+    "usage_rank": 50
+  },
+  {
+    "name": "condiment",
+    "expected": "course",
+    "prompt_example": false,
+    "recipe_count": 759,
+    "usage_rank": 53,
+    "accepted": [
+      "course",
+      "dish_type",
+      "key_ingredient"
+    ],
+    "review_note": "Serving role or broad condiment family; avoid making this category boundary a hard quality failure."
+  },
+  {
+    "name": "braise",
+    "expected": "method",
+    "prompt_example": false,
+    "recipe_count": 655,
+    "usage_rank": 61
+  },
+  {
+    "name": "summer",
+    "expected": null,
+    "prompt_example": false,
+    "recipe_count": 515,
+    "usage_rank": 73
+  },
+  {
+    "name": "comfort food",
+    "expected": null,
+    "prompt_example": false,
+    "recipe_count": 508,
+    "usage_rank": 75
+  },
+  {
+    "name": "soy sauce",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 457,
+    "usage_rank": 81
+  },
+  {
+    "name": "lime",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 409,
+    "usage_rank": 84
+  },
+  {
+    "name": "caribbean",
+    "expected": "cuisine_region",
+    "prompt_example": false,
+    "recipe_count": 393,
+    "usage_rank": 87
+  },
+  {
+    "name": "fried",
+    "expected": "method",
+    "prompt_example": false,
+    "recipe_count": 379,
+    "usage_rank": 91
+  },
+  {
+    "name": "shrimp",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 376,
+    "usage_rank": 94
+  },
+  {
+    "name": "chocolate",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 360,
+    "usage_rank": 96
+  },
+  {
+    "name": "baking",
+    "expected": "method",
+    "prompt_example": false,
+    "recipe_count": 348,
+    "usage_rank": 99
+  },
+  {
+    "name": "stew",
+    "expected": "dish_type",
+    "prompt_example": false,
+    "recipe_count": 347,
+    "usage_rank": 101,
+    "review_note": "Linked examples are stews; dish type is the intended ordinary cookbook meaning."
+  },
+  {
+    "name": "baked",
+    "expected": "method",
+    "prompt_example": false,
+    "recipe_count": 328,
+    "usage_rank": 108
+  },
+  {
+    "name": "orange",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 295,
+    "usage_rank": 120
+  },
+  {
+    "name": "pork belly",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 276,
+    "usage_rank": 130
+  },
+  {
+    "name": "cocktail",
+    "expected": "dish_type",
+    "prompt_example": false,
+    "recipe_count": 249,
+    "usage_rank": 143,
+    "review_note": "Linked examples are named mixed drinks; this is a drink type rather than a serving course."
+  },
+  {
+    "name": "ferment",
+    "expected": "method",
+    "prompt_example": false,
+    "recipe_count": 243,
+    "usage_rank": 145
+  },
+  {
+    "name": "miso",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 208,
+    "usage_rank": 174
+  },
+  {
+    "name": "healthy",
+    "expected": null,
+    "prompt_example": false,
+    "recipe_count": 189,
+    "usage_rank": 190
+  },
+  {
+    "name": "side dish",
+    "expected": "course",
+    "prompt_example": true,
+    "recipe_count": 189,
+    "usage_rank": 192
+  },
+  {
+    "name": "ricotta",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 169,
+    "usage_rank": 209
+  },
+  {
+    "name": "feta cheese",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 165,
+    "usage_rank": 215
+  },
+  {
+    "name": "tamarind paste",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 162,
+    "usage_rank": 218
+  },
+  {
+    "name": "paneer",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 134,
+    "usage_rank": 255
+  },
+  {
+    "name": "pie",
+    "expected": "dish_type",
+    "prompt_example": false,
+    "recipe_count": 133,
+    "usage_rank": 258,
+    "review_note": "Linked examples are sweet and savoury pies; dish type fits both."
+  },
+  {
+    "name": "kale",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 130,
+    "usage_rank": 263
+  },
+  {
+    "name": "green",
+    "expected": null,
+    "prompt_example": false,
+    "recipe_count": 129,
+    "usage_rank": 267,
+    "review_note": "Colour or vague description alone; no category."
+  },
+  {
+    "name": "chicken stock",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 117,
+    "usage_rank": 293
+  },
+  {
+    "name": "egg noodle",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 107,
+    "usage_rank": 318
+  },
+  {
+    "name": "preserved lemon",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 101,
+    "usage_rank": 336
+  },
+  {
+    "name": "chile",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 100,
+    "usage_rank": 337,
+    "review_note": "Linked examples are Mexican recipes using chile peppers; no evidence of Chilean cuisine in this term usage."
+  },
+  {
+    "name": "peanut butter",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 100,
+    "usage_rank": 338
+  },
+  {
+    "name": "self-raising flour",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 89,
+    "usage_rank": 370
+  },
+  {
+    "name": "bun",
+    "expected": "dish_type",
+    "prompt_example": false,
+    "recipe_count": 88,
+    "usage_rank": 371,
+    "review_note": "Linked examples make buns and milk bread; not an ingredient family."
+  },
+  {
+    "name": "semolina",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 87,
+    "usage_rank": 377
+  },
+  {
+    "name": "nepali",
+    "expected": "cuisine_region",
+    "prompt_example": false,
+    "recipe_count": 83,
+    "usage_rank": 394
+  },
+  {
+    "name": "peach",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 82,
+    "usage_rank": 401
+  },
+  {
+    "name": "fish fillet",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 77,
+    "usage_rank": 423
+  },
+  {
+    "name": "no-bake",
+    "expected": "method",
+    "prompt_example": false,
+    "recipe_count": 72,
+    "usage_rank": 447
+  },
+  {
+    "name": "tortilla",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 71,
+    "usage_rank": 454,
+    "accepted": [
+      "key_ingredient",
+      "dish_type"
+    ],
+    "review_note": "Linked recipes use tortillas as components; the word also names the prepared food."
+  },
+  {
+    "name": "jalapeño",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 70,
+    "usage_rank": 457
+  },
+  {
+    "name": "cherry",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 68,
+    "usage_rank": 465
+  },
+  {
+    "name": "gruyère cheese",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 67,
+    "usage_rank": 471
+  },
+  {
+    "name": "porridge",
+    "expected": "dish_type",
+    "prompt_example": false,
+    "recipe_count": 67,
+    "usage_rank": 472,
+    "review_note": "Linked examples make porridge and congee; dish type rather than breakfast course."
+  },
+  {
+    "name": "gratin",
+    "expected": "dish_type",
+    "prompt_example": false,
+    "recipe_count": 66,
+    "usage_rank": 477,
+    "accepted": [
+      "dish_type",
+      "method"
+    ],
+    "review_note": "Linked recipes are gratins, and the word also identifies the preparation style."
+  },
+  {
+    "name": "no-cook",
+    "expected": "method",
+    "prompt_example": true,
+    "recipe_count": 66,
+    "usage_rank": 479
+  },
+  {
+    "name": "pesto",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 63,
+    "usage_rank": 501,
+    "accepted": [
+      "key_ingredient",
+      "dish_type"
+    ],
+    "review_note": "Linked recipes both make pesto and use it as an ingredient."
+  },
+  {
+    "name": "white bread",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 62,
+    "usage_rank": 509,
+    "accepted": [
+      "key_ingredient",
+      "dish_type"
+    ],
+    "review_note": "Linked examples use bread as an ingredient, but it is also a prepared food type."
+  },
+  {
+    "name": "orange juice",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 59,
+    "usage_rank": 525
+  },
+  {
+    "name": "ramen noodle",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 58,
+    "usage_rank": 532
+  },
+  {
+    "name": "syrup",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 57,
+    "usage_rank": 542,
+    "accepted": [
+      "key_ingredient",
+      "dish_type"
+    ],
+    "review_note": "Linked recipes include raspberry syrup itself and dishes that use syrup."
+  },
+  {
+    "name": "star anise",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 55,
+    "usage_rank": 555
+  },
+  {
+    "name": "chinese five-spice",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 54,
+    "usage_rank": 560
+  },
+  {
+    "name": "gochugaru",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 54,
+    "usage_rank": 561
+  },
+  {
+    "name": "lotus root",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 52,
+    "usage_rank": 580
+  },
+  {
+    "name": "garnish",
+    "expected": "course",
+    "prompt_example": false,
+    "recipe_count": 50,
+    "usage_rank": 599,
+    "accepted": [
+      "course",
+      "method"
+    ],
+    "review_note": "Linked recipes make garnishes; the same word also names an actual preparation action."
+  },
+  {
+    "name": "linguine",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 49,
+    "usage_rank": 609
+  },
+  {
+    "name": "picnic",
+    "expected": null,
+    "prompt_example": false,
+    "recipe_count": 49,
+    "usage_rank": 610
+  },
+  {
+    "name": "puree",
+    "expected": "method",
+    "prompt_example": false,
+    "recipe_count": 49,
+    "usage_rank": 611,
+    "accepted": [
+      "method",
+      "dish_type"
+    ],
+    "review_note": "Linked recipes include purees and dishes with pureed components; either named technique or prepared food is reasonable."
+  },
+  {
+    "name": "short-grain rice",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 48,
+    "usage_rank": 621
+  },
+  {
+    "name": "sherry",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 47,
+    "usage_rank": 629
+  },
+  {
+    "name": "gravy",
+    "expected": "dish_type",
+    "prompt_example": false,
+    "recipe_count": 46,
+    "usage_rank": 632,
+    "accepted": [
+      "dish_type",
+      "key_ingredient"
+    ],
+    "review_note": "Linked recipes both make gravy and use it in meat dishes."
+  },
+  {
+    "name": "wine",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 46,
+    "usage_rank": 640
+  },
+  {
+    "name": "frittata",
+    "expected": "dish_type",
+    "prompt_example": false,
+    "recipe_count": 45,
+    "usage_rank": 644,
+    "review_note": "Linked examples make frittatas; dish type."
+  },
+  {
+    "name": "halloumi cheese",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 45,
+    "usage_rank": 646
+  },
+  {
+    "name": "crumble",
+    "expected": "dish_type",
+    "prompt_example": false,
+    "recipe_count": 44,
+    "usage_rank": 653,
+    "review_note": "Linked examples predominantly make crumble desserts; not an ingredient or technique label."
+  },
+  {
+    "name": "oregano",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 44,
+    "usage_rank": 660
+  },
+  {
+    "name": "spice blend",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 44,
+    "usage_rank": 664
+  },
+  {
+    "name": "thai basil",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 42,
+    "usage_rank": 682
+  },
+  {
+    "name": "parmigiano-reggiano cheese",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 41,
+    "usage_rank": 692
+  },
+  {
+    "name": "sesame paste",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 41,
+    "usage_rank": 695
+  },
+  {
+    "name": "papaya",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 40,
+    "usage_rank": 701
+  },
+  {
+    "name": "mole",
+    "expected": "dish_type",
+    "prompt_example": false,
+    "recipe_count": 39,
+    "usage_rank": 711,
+    "accepted": [
+      "dish_type",
+      "key_ingredient"
+    ],
+    "review_note": "Linked recipes make mole sauces or use those sauces in other dishes."
+  },
+  {
+    "name": "sorbet",
+    "expected": "dish_type",
+    "prompt_example": false,
+    "recipe_count": 36,
+    "usage_rank": 749,
+    "review_note": "Linked examples make sorbets; dish type rather than dessert course."
+  },
+  {
+    "name": "brioche",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 35,
+    "usage_rank": 753,
+    "accepted": [
+      "key_ingredient",
+      "dish_type"
+    ],
+    "review_note": "Linked examples use brioche in French toast, sandwiches, and coulibiac; it is also a bread type."
+  },
+  {
+    "name": "rich",
+    "expected": null,
+    "prompt_example": false,
+    "recipe_count": 35,
+    "usage_rank": 767
+  },
+  {
+    "name": "tiger prawn",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 33,
+    "usage_rank": 796
+  },
+  {
+    "name": "goat",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 32,
+    "usage_rank": 804
+  },
+  {
+    "name": "health",
+    "expected": null,
+    "prompt_example": false,
+    "recipe_count": 32,
+    "usage_rank": 805
+  },
+  {
+    "name": "pork sausage",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 32,
+    "usage_rank": 809
+  },
+  {
+    "name": "puy lentil",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 32,
+    "usage_rank": 810
+  },
+  {
+    "name": "scottish",
+    "expected": "cuisine_region",
+    "prompt_example": false,
+    "recipe_count": 31,
+    "usage_rank": 827
+  },
+  {
+    "name": "chinkiang black vinegar",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 30,
+    "usage_rank": 838
+  },
+  {
+    "name": "fragrant",
+    "expected": null,
+    "prompt_example": false,
+    "recipe_count": 30,
+    "usage_rank": 841
+  },
+  {
+    "name": "griddle",
+    "expected": "method",
+    "prompt_example": false,
+    "recipe_count": 30,
+    "usage_rank": 844,
+    "accepted": [
+      "method",
+      null
+    ],
+    "review_note": "Names equipment and a recognised way of cooking; either method or abstention is acceptable."
+  },
+  {
+    "name": "worcestershire sauce",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 29,
+    "usage_rank": 866
+  },
+  {
+    "name": "rajasthani",
+    "expected": "cuisine_region",
+    "prompt_example": false,
+    "recipe_count": 27,
+    "usage_rank": 901
+  },
+  {
+    "name": "shallow fry",
+    "expected": "method",
+    "prompt_example": false,
+    "recipe_count": 26,
+    "usage_rank": 925
+  },
+  {
+    "name": "brown butter",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 25,
+    "usage_rank": 931,
+    "review_note": "Named ingredient in linked chicken, scallop, and cake recipes; not a cooking-method label."
+  },
+  {
+    "name": "medjool date",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 25,
+    "usage_rank": 945
+  },
+  {
+    "name": "raita",
+    "expected": "dish_type",
+    "prompt_example": false,
+    "recipe_count": 25,
+    "usage_rank": 947,
+    "review_note": "Linked examples make raitas; dish type rather than a meal course."
+  },
+  {
+    "name": "purple sprouting broccoli",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 24,
+    "usage_rank": 965
+  },
+  {
+    "name": "boiled",
+    "expected": "method",
+    "prompt_example": false,
+    "recipe_count": 23,
+    "usage_rank": 977
+  },
+  {
+    "name": "wonton wrapper",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 23,
+    "usage_rank": 997
+  },
+  {
+    "name": "asturian",
+    "expected": "cuisine_region",
+    "prompt_example": false,
+    "recipe_count": 22,
+    "usage_rank": 998
+  }
+]

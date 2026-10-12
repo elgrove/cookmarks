@@ -1,0 +1,615 @@
+[
+  {
+    "name": "main",
+    "expected": "course",
+    "prompt_example": false,
+    "recipe_count": 16162
+  },
+  {
+    "name": "simmer",
+    "expected": "method",
+    "prompt_example": false,
+    "recipe_count": 7299
+  },
+  {
+    "name": "fry",
+    "expected": "method",
+    "prompt_example": false,
+    "recipe_count": 5355
+  },
+  {
+    "name": "side",
+    "expected": "course",
+    "prompt_example": false,
+    "recipe_count": 4803
+  },
+  {
+    "name": "quick",
+    "expected": null,
+    "prompt_example": false,
+    "recipe_count": 4446
+  },
+  {
+    "name": "bake",
+    "expected": "method",
+    "prompt_example": false,
+    "recipe_count": 4071
+  },
+  {
+    "name": "indian",
+    "expected": "cuisine_region",
+    "prompt_example": false,
+    "recipe_count": 3339
+  },
+  {
+    "name": "dessert",
+    "expected": "course",
+    "prompt_example": true,
+    "recipe_count": 3323
+  },
+  {
+    "name": "british",
+    "expected": "cuisine_region",
+    "prompt_example": false,
+    "recipe_count": 3207
+  },
+  {
+    "name": "starter",
+    "expected": "course",
+    "prompt_example": true,
+    "recipe_count": 3091
+  },
+  {
+    "name": "component",
+    "expected": null,
+    "prompt_example": false,
+    "recipe_count": 3030
+  },
+  {
+    "name": "italian",
+    "expected": "cuisine_region",
+    "prompt_example": false,
+    "recipe_count": 2884
+  },
+  {
+    "name": "snack",
+    "expected": "course",
+    "prompt_example": false,
+    "recipe_count": 2729
+  },
+  {
+    "name": "vegetarian",
+    "expected": null,
+    "prompt_example": false,
+    "recipe_count": 2698
+  },
+  {
+    "name": "japanese",
+    "expected": "cuisine_region",
+    "prompt_example": false,
+    "recipe_count": 2579
+  },
+  {
+    "name": "egg",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 2305
+  },
+  {
+    "name": "chinese",
+    "expected": "cuisine_region",
+    "prompt_example": false,
+    "recipe_count": 2107
+  },
+  {
+    "name": "mexican",
+    "expected": "cuisine_region",
+    "prompt_example": false,
+    "recipe_count": 2000
+  },
+  {
+    "name": "roast",
+    "expected": "method",
+    "prompt_example": false,
+    "recipe_count": 1843
+  },
+  {
+    "name": "chicken",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 1728
+  },
+  {
+    "name": "boil",
+    "expected": "method",
+    "prompt_example": false,
+    "recipe_count": 1625
+  },
+  {
+    "name": "fish",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 1511
+  },
+  {
+    "name": "grill",
+    "expected": "method",
+    "prompt_example": false,
+    "recipe_count": 1474
+  },
+  {
+    "name": "deep-fry",
+    "expected": "method",
+    "prompt_example": false,
+    "recipe_count": 1465
+  },
+  {
+    "name": "chilli",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 1428
+  },
+  {
+    "name": "tomato",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 1417
+  },
+  {
+    "name": "salad",
+    "expected": "dish_type",
+    "prompt_example": true,
+    "recipe_count": 1386
+  },
+  {
+    "name": "american",
+    "expected": "cuisine_region",
+    "prompt_example": false,
+    "recipe_count": 1335
+  },
+  {
+    "name": "garlic",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 1326
+  },
+  {
+    "name": "potato",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 1288
+  },
+  {
+    "name": "thai",
+    "expected": "cuisine_region",
+    "prompt_example": true,
+    "recipe_count": 1278
+  },
+  {
+    "name": "pork",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 1235
+  },
+  {
+    "name": "stir-fry",
+    "expected": "method",
+    "prompt_example": false,
+    "recipe_count": 1167
+  },
+  {
+    "name": "levantine",
+    "expected": "cuisine_region",
+    "prompt_example": false,
+    "recipe_count": 1148
+  },
+  {
+    "name": "breakfast",
+    "expected": "course",
+    "prompt_example": true,
+    "recipe_count": 1105
+  },
+  {
+    "name": "butter",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 1094
+  },
+  {
+    "name": "spicy",
+    "expected": null,
+    "prompt_example": false,
+    "recipe_count": 1035
+  },
+  {
+    "name": "rice",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 1032
+  },
+  {
+    "name": "curry",
+    "expected": "dish_type",
+    "prompt_example": true,
+    "recipe_count": 1007
+  },
+  {
+    "name": "beef",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 985
+  },
+  {
+    "name": "lemon",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 956
+  },
+  {
+    "name": "korean",
+    "expected": "cuisine_region",
+    "prompt_example": false,
+    "recipe_count": 898
+  },
+  {
+    "name": "middle eastern",
+    "expected": "cuisine_region",
+    "prompt_example": false,
+    "recipe_count": 893
+  },
+  {
+    "name": "french",
+    "expected": "cuisine_region",
+    "prompt_example": false,
+    "recipe_count": 868
+  },
+  {
+    "name": "soup",
+    "expected": "dish_type",
+    "prompt_example": true,
+    "recipe_count": 863
+  },
+  {
+    "name": "drink",
+    "expected": "course",
+    "prompt_example": true,
+    "recipe_count": 841
+  },
+  {
+    "name": "seafood",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 821
+  },
+  {
+    "name": "ginger",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 796
+  },
+  {
+    "name": "pasta",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 782
+  },
+  {
+    "name": "cheese",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 768
+  },
+  {
+    "name": "sauce",
+    "expected": "course",
+    "prompt_example": false,
+    "recipe_count": 768,
+    "accepted": [
+      "course",
+      "key_ingredient",
+      null
+    ]
+  },
+  {
+    "name": "lamb",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 765
+  },
+  {
+    "name": "condiment",
+    "expected": "course",
+    "prompt_example": false,
+    "recipe_count": 759,
+    "accepted": [
+      "course",
+      "key_ingredient"
+    ]
+  },
+  {
+    "name": "turkish",
+    "expected": "cuisine_region",
+    "prompt_example": false,
+    "recipe_count": 737
+  },
+  {
+    "name": "spanish",
+    "expected": "cuisine_region",
+    "prompt_example": false,
+    "recipe_count": 710
+  },
+  {
+    "name": "aubergine",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 694
+  },
+  {
+    "name": "coconut",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 693
+  },
+  {
+    "name": "noodle",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 693
+  },
+  {
+    "name": "jewish",
+    "expected": "cuisine_region",
+    "prompt_example": false,
+    "recipe_count": 679
+  },
+  {
+    "name": "onion",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 662
+  },
+  {
+    "name": "braise",
+    "expected": "method",
+    "prompt_example": false,
+    "recipe_count": 655
+  },
+  {
+    "name": "fruit",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 651
+  },
+  {
+    "name": "steam",
+    "expected": "method",
+    "prompt_example": false,
+    "recipe_count": 649
+  },
+  {
+    "name": "carrot",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 646
+  },
+  {
+    "name": "mushroom",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 628
+  },
+  {
+    "name": "coconut milk",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 624
+  },
+  {
+    "name": "vegetable",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 606
+  },
+  {
+    "name": "bread",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 603
+  },
+  {
+    "name": "sweet",
+    "expected": null,
+    "prompt_example": false,
+    "recipe_count": 573
+  },
+  {
+    "name": "cream",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 554
+  },
+  {
+    "name": "cake",
+    "expected": "dish_type",
+    "prompt_example": true,
+    "recipe_count": 539
+  },
+  {
+    "name": "almond",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 521
+  },
+  {
+    "name": "summer",
+    "expected": null,
+    "prompt_example": false,
+    "recipe_count": 515
+  },
+  {
+    "name": "prawn",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 510
+  },
+  {
+    "name": "comfort food",
+    "expected": null,
+    "prompt_example": false,
+    "recipe_count": 508
+  },
+  {
+    "name": "bean",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 506
+  },
+  {
+    "name": "vietnamese",
+    "expected": "cuisine_region",
+    "prompt_example": false,
+    "recipe_count": 493
+  },
+  {
+    "name": "chicken thigh",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 483
+  },
+  {
+    "name": "coriander",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 474
+  },
+  {
+    "name": "pickle",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 473,
+    "accepted": [
+      "key_ingredient",
+      "method"
+    ]
+  },
+  {
+    "name": "soy sauce",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 457
+  },
+  {
+    "name": "spinach",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 448
+  },
+  {
+    "name": "chickpea",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 437
+  },
+  {
+    "name": "lime",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 409
+  },
+  {
+    "name": "mint",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 402
+  },
+  {
+    "name": "plain flour",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 402
+  },
+  {
+    "name": "caribbean",
+    "expected": "cuisine_region",
+    "prompt_example": false,
+    "recipe_count": 393
+  },
+  {
+    "name": "courgette",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 390
+  },
+  {
+    "name": "cucumber",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 388
+  },
+  {
+    "name": "tofu",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 383
+  },
+  {
+    "name": "fried",
+    "expected": "method",
+    "prompt_example": false,
+    "recipe_count": 379
+  },
+  {
+    "name": "milk",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 379
+  },
+  {
+    "name": "basmati rice",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 378
+  },
+  {
+    "name": "shrimp",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 376
+  },
+  {
+    "name": "anchovy",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 370
+  },
+  {
+    "name": "chocolate",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 360
+  },
+  {
+    "name": "vegan",
+    "expected": null,
+    "prompt_example": false,
+    "recipe_count": 354
+  },
+  {
+    "name": "honey",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 352
+  },
+  {
+    "name": "baking",
+    "expected": "method",
+    "prompt_example": false,
+    "recipe_count": 348
+  },
+  {
+    "name": "pea",
+    "expected": "key_ingredient",
+    "prompt_example": false,
+    "recipe_count": 348
+  }
+]

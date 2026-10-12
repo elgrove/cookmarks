@@ -19,13 +19,12 @@ from app.services.keyword_classification import (
     pending_keyword_count,
 )
 from scripts.audit_keyword_candidates import build_report
+from scripts.eval_keyword_classification import GoldKeyword, evaluate
 
 
 class ReplyProvider(AIProvider):
     name = "REPLY"
-    models: ClassVar[dict[ModelRole, str]] = {
-        ModelRole.KEYWORD_CLASSIFICATION: "reply-model"
-    }
+    models: ClassVar[dict[ModelRole, str]] = {ModelRole.KEYWORD_CLASSIFICATION: "reply-model"}
 
     def __init__(self, replies: list[object]) -> None:
         super().__init__("")
@@ -49,9 +48,7 @@ class ReplyProvider(AIProvider):
         self.last_schema = schema
         self.last_max_output_tokens = max_output_tokens
         reply = self.replies.pop(0)
-        return json.dumps(reply), Usage(
-            cost_usd=Decimal("0.01"), input_tokens=10, output_tokens=4
-        )
+        return json.dumps(reply), Usage(cost_usd=Decimal("0.01"), input_tokens=10, output_tokens=4)
 
 
 def _resolve(monkeypatch: pytest.MonkeyPatch, provider: ReplyProvider) -> None:
@@ -110,6 +107,120 @@ def test_provider_parses_categories_and_null_without_calling_for_empty_input() -
 
 def test_production_batch_size_is_small() -> None:
     assert KEYWORD_CLASSIFICATION_BATCH_SIZE == 10
+
+
+def test_dish_type_is_accepted_by_provider_and_persisted(
+    session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    keyword = Keyword(name="kofta")
+    session.add(keyword)
+    session.commit()
+    provider = ReplyProvider([[{"name": "kofta", "category": "dish_type"}]])
+    _resolve(monkeypatch, provider)
+
+    result = classify_keyword_rows(session, [keyword])
+    session.expire_all()
+    saved = session.get(Keyword, keyword.id)
+
+    assert saved is not None
+    assert saved.category == KeywordCategory.DISH_TYPE
+    assert saved.classified_at is not None
+    assert result.classified_by_category["dish_type"] == 1
+    assert result.classified == 1
+    assert provider.last_schema is not None
+    assert provider.last_schema["items"]["properties"]["category"]["anyOf"][0]["enum"] == [
+        category.value for category in KeywordCategory
+    ]
+
+
+def test_label_eval_fails_valid_json_with_wrong_or_overconfident_labels() -> None:
+    gold: list[GoldKeyword] = [
+        {"name": "keeps well", "expected": None, "prompt_example": False},
+        {"name": "thai", "expected": "cuisine_region", "prompt_example": False},
+        {"name": "cornmeal", "expected": "key_ingredient", "prompt_example": False},
+    ]
+    provider = ReplyProvider(
+        [
+            [
+                {"name": "keeps well", "category": "method"},
+                {"name": "thai", "category": None},
+                {"name": "cornmeal", "category": "key_ingredient"},
+            ]
+        ]
+    )
+
+    report = evaluate(ResolvedTask(provider, "reply-model"), gold, 1)
+
+    assert report["checks"] == 3
+    assert report["passed"] == 1
+    assert report["failed"] == 2
+    assert report["false_assignments"] == 1
+    assert report["held_out_failures"] == 2
+    assert report["cost_usd"] == "0.01"
+
+
+@pytest.mark.parametrize(
+    "invalid_reply",
+    [
+        [{"name": "thai", "category": "cuisine_region"}],
+        [{"name": "thai", "category": "cuisine_region"}, {"name": "quick", "category": "null"}],
+    ],
+)
+def test_label_eval_fails_invalid_batches(invalid_reply: list[dict[str, str]]) -> None:
+    gold: list[GoldKeyword] = [
+        {"name": "thai", "expected": "cuisine_region", "prompt_example": False},
+        {"name": "quick", "expected": None, "prompt_example": True},
+    ]
+    provider = ReplyProvider([invalid_reply])
+
+    report = evaluate(ResolvedTask(provider, "reply-model"), gold, 1)
+
+    assert report["passed"] == 0
+    assert report["failed"] == 2
+    assert report["cost_usd"] == "0.01"
+
+
+@pytest.mark.parametrize("equipment_category", [None, "method"])
+def test_label_eval_accepts_alternatives_and_weights_recipe_use(
+    equipment_category: str | None,
+) -> None:
+    gold: list[GoldKeyword] = [
+        {
+            "name": "food processor",
+            "expected": None,
+            "accepted": [None, "method"],
+            "prompt_example": False,
+            "recipe_count": 1,
+        },
+        {
+            "name": "main",
+            "expected": "course",
+            "prompt_example": False,
+            "recipe_count": 1000,
+        },
+        {
+            "name": "quick",
+            "expected": None,
+            "prompt_example": False,
+            "recipe_count": 500,
+        },
+    ]
+    provider = ReplyProvider(
+        [
+            [
+                {"name": "food processor", "category": equipment_category},
+                {"name": "main", "category": "course"},
+                {"name": "quick", "category": "method"},
+            ]
+        ]
+    )
+
+    report = evaluate(ResolvedTask(provider, "reply-model"), gold, 1)
+
+    assert report["passed"] == 2
+    assert report["failed"] == 1
+    assert report["false_assignments"] == 1
+    assert report["recipe_link_weighted_accuracy"] == pytest.approx(1001 / 1501)
 
 
 def test_explicit_rows_use_production_batch_size(
@@ -298,3 +409,51 @@ def test_audit_reports_exact_terms_and_seasonal_compound_risks(session: Session)
     assert "spring onion\t0" not in seasons
     assert "spring onion\t0" in compounds
     assert "winter squash\t0" in compounds
+
+
+def test_reclassification_replaces_old_categories_and_retries_only_failed_rows(
+    session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _clear_pending(session)
+    keywords = [
+        Keyword(name="cake", category=KeywordCategory.KEY_INGREDIENT),
+        Keyword(name="homemade", category=KeywordCategory.METHOD),
+        Keyword(name="roman", category=KeywordCategory.COURSE),
+    ]
+    recipe = session.scalars(select(Recipe)).first()
+    assert recipe is not None
+    recipe.keywords.extend(keywords)
+    session.commit()
+    provider = ReplyProvider(
+        [
+            [{"name": "cake", "category": "dish_type"}],
+            [{"name": "homemade", "category": None}],
+            [{"name": "wrong", "category": None}],
+            [{"name": "roman", "category": "cuisine_region"}],
+        ]
+    )
+    _resolve(monkeypatch, provider)
+
+    result = classify_pending_keywords(session, batch_size=1)
+    session.expire_all()
+
+    assert result.failed_batches == 1
+    assert result.classified_by_category["dish_type"] == 1
+    assert result.no_category == 1
+    assert keywords[0].category == KeywordCategory.DISH_TYPE
+    assert keywords[1].category is None
+    assert keywords[0].classified_at is not None
+    assert keywords[1].classified_at is not None
+    assert keywords[2].category == KeywordCategory.COURSE
+    assert keywords[2].classified_at is None
+    assert pending_keyword_count(session) == 1
+
+    retry = classify_pending_keywords(session, batch_size=1)
+    session.expire_all()
+
+    assert retry.pending == 1
+    assert retry.failed_batches == 0
+    assert keywords[2].category == KeywordCategory.CUISINE_REGION
+    assert keywords[2].classified_at is not None
+    assert pending_keyword_count(session) == 0
+    assert provider.calls == 4

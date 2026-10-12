@@ -10,7 +10,7 @@ from typing import ClassVar, TypeVar, cast
 
 from pydantic import ValidationError
 
-from app.models.enums import ModelRole
+from app.models.enums import KeywordCategory, ModelRole
 from app.schemas.extraction import RecipeData
 from app.services.prompts import (
     BOOK_KEYWORDS_PROMPT,
@@ -108,7 +108,7 @@ KEYWORD_CLASSIFICATION_SCHEMA = {
                 "anyOf": [
                     {
                         "type": "string",
-                        "enum": ["cuisine_region", "course", "key_ingredient", "method"],
+                        "enum": [category.value for category in KeywordCategory],
                     },
                     {"type": "null"},
                 ]
@@ -140,12 +140,7 @@ def _keyword_classification_schema(candidates: list[str]) -> dict[str, object]:
                     "anyOf": [
                         {
                             "type": "string",
-                            "enum": [
-                                "cuisine_region",
-                                "course",
-                                "key_ingredient",
-                                "method",
-                            ],
+                            "enum": [category.value for category in KeywordCategory],
                         },
                         {"type": "null"},
                     ]
