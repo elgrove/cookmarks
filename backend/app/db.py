@@ -15,6 +15,9 @@ engine = create_engine(
 
 
 def configure_sqlite_connection(dbapi_conn: Any, _record: Any = None) -> None:
+    dbapi_conn.create_function(
+        "cookmarks_casefold", 1, lambda value: str(value).casefold(), deterministic=True
+    )
     dbapi_conn.enable_load_extension(True)
     sqlite_vec.load(dbapi_conn)
     dbapi_conn.enable_load_extension(False)

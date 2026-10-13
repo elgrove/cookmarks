@@ -207,8 +207,8 @@ def test_facets_rank_cooccurring_keywords(client: TestClient) -> None:
     # are its keywords, counted over the matching set.
     body = client.get("/api/recipes", params={"q": "recipe"}).json()
     assert body["facets"] == [
-        {"name": "pasta", "recipe_count": 1},
-        {"name": "quick", "recipe_count": 1},
+        {"name": "pasta", "recipe_count": 1, "category": None},
+        {"name": "quick", "recipe_count": 1, "category": None},
     ]
 
 
@@ -216,15 +216,15 @@ def test_facets_exclude_selected_keywords(client: TestClient) -> None:
     # With Pasta selected, the facet list offers what narrows *further* — Quick —
     # and drops the already-chosen Pasta.
     body = client.get("/api/recipes", params={"keyword": "Pasta"}).json()
-    assert body["facets"] == [{"name": "quick", "recipe_count": 1}]
+    assert body["facets"] == [{"name": "quick", "recipe_count": 1, "category": None}]
 
 
 def test_facets_respect_the_query(client: TestClient) -> None:
     # "anchovy" narrows to Recipe 0 alone; the facets are that recipe's keywords.
     body = client.get("/api/recipes", params={"q": "anchovy"}).json()
     assert body["facets"] == [
-        {"name": "pasta", "recipe_count": 1},
-        {"name": "quick", "recipe_count": 1},
+        {"name": "pasta", "recipe_count": 1, "category": None},
+        {"name": "quick", "recipe_count": 1, "category": None},
     ]
 
 
@@ -243,8 +243,8 @@ def test_all_true_skips_facets_but_keeps_items(client: TestClient) -> None:
 def test_keywords_endpoint(client: TestClient) -> None:
     body = client.get("/api/keywords").json()
     assert body == [
-        {"name": "pasta", "recipe_count": 1},
-        {"name": "quick", "recipe_count": 1},
+        {"name": "pasta", "recipe_count": 1, "category": None},
+        {"name": "quick", "recipe_count": 1, "category": None},
     ]
 
 
@@ -252,7 +252,7 @@ def test_keywords_limit_caps_result(client: TestClient) -> None:
     # The client only renders the most-used keywords; the limit keeps the endpoint
     # from serialising the whole corpus. Ordered by count desc, name asc → Pasta.
     body = client.get("/api/keywords", params={"limit": 1}).json()
-    assert body == [{"name": "pasta", "recipe_count": 1}]
+    assert body == [{"name": "pasta", "recipe_count": 1, "category": None}]
 
 
 def test_keywords_endpoint_is_cached_until_cleared(client: TestClient, session: Session) -> None:

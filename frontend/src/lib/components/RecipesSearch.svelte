@@ -1,5 +1,10 @@
 <script module lang="ts">
-	import type { KeywordSummary, RecipeSearchResults, SearchCriteria, SortKey } from '$lib/api/recipes';
+	import type {
+		KeywordSummary,
+		RecipeSearchResults,
+		SearchCriteria,
+		SortKey
+	} from '$lib/api/recipes';
 	import type { ListMembership } from '$lib/api/lists';
 	import type { RowPickerHook } from './RecipeRow.svelte';
 
@@ -25,6 +30,11 @@
 		/** Result size the AI search ran with, so the recipe pager reproduces it. */
 		semanticLimit?: number;
 		keywords?: KeywordSummary[];
+		keywordMetadata?: KeywordSummary[];
+		lists?: { id: string; name: string }[];
+		lookupError?: string;
+		lookupLoading?: boolean;
+		searchError?: string;
 		books?: { id: string; title: string }[];
 		authors?: string[];
 		criteria?: SearchCriteria;
@@ -38,7 +48,16 @@
 </script>
 
 <script lang="ts">
+	import { tick } from 'svelte';
 	import RecipeRow from './RecipeRow.svelte';
+	import AdvancedRecipeSearch from './AdvancedRecipeSearch.svelte';
+	import {
+		emptyFilters,
+		ruleLabel,
+		keywordCategories,
+		categoryLabels,
+		type RecipeFilters
+	} from '$lib/api/recipe-filters';
 	import SelectionBar from './SelectionBar.svelte';
 	import { searchContextQuery } from '$lib/api/recipes';
 	import { cleanTitle } from '$lib/title';
@@ -50,6 +69,11 @@
 		semanticAvailable = true,
 		semanticLimit = 30,
 		keywords = [],
+		keywordMetadata = [],
+		lists = [],
+		lookupError = '',
+		lookupLoading = false,
+		searchError = '',
 		books = [],
 		authors = [],
 		criteria = {},
@@ -77,6 +101,25 @@
 	const limit = seed.limit ?? 30;
 	let query = $state(seed.q ?? '');
 	let selected = $state<string[]>(seed.keywords ?? []);
+	let advanced = $state<RecipeFilters>(seed.filters ?? emptyFilters());
+	let advancedOpen = $state(false);
+	let advancedTrigger = $state<HTMLButtonElement>();
+	async function closeAdvanced() {
+		advancedOpen = false;
+		await tick();
+		advancedTrigger?.focus();
+	}
+	function applyAdvanced(filters: RecipeFilters) {
+		advanced = filters;
+		closeAdvanced();
+		clearTimeout(debounce);
+		emitKeyword();
+	}
+	function removeRule(index: number) {
+		advanced = { ...advanced, rules: advanced.rules.filter((_, i) => i !== index) };
+		clearTimeout(debounce);
+		emitKeyword();
+	}
 	let bookId = $state(seed.bookId ?? '');
 	let author = $state(seed.author ?? '');
 	let sort = $state<SortKey>(seed.sort ?? 'relevance');
@@ -90,7 +133,9 @@
 	// fresh seed is minted each time a *new* search starts (not on prev/next).
 	let randomSeed = seed.seed ?? 0;
 
-	let active = $derived(Boolean(query.trim() || selected.length || bookId || author));
+	let active = $derived(
+		Boolean(query.trim() || selected.length || bookId || author || advanced.rules.length)
+	);
 	let isSemantic = $derived(searchMode === 'semantic');
 
 	// Selection mode: local to this surface, cleared whenever the row set changes
@@ -113,7 +158,7 @@
 	// while collapsed. Desktop shows everything and ignores `filtersOpen` (CSS).
 	let filtersOpen = $state(false);
 	let activeFilterCount = $derived(
-		(bookId ? 1 : 0) + (author ? 1 : 0) + selected.length
+		(bookId ? 1 : 0) + (author ? 1 : 0) + selected.length + advanced.rules.length
 	);
 
 	// A concise placeholder on narrow screens — the full prompt overflows the box
@@ -138,6 +183,7 @@
 		searchContextQuery({
 			q: query,
 			keywords: selected,
+			filters: advanced,
 			bookId: bookId || undefined,
 			author: author || undefined,
 			sort,
@@ -157,15 +203,20 @@
 	// even when they drop out of the facets), then the co-occurrence facets. A
 	// pinned chip has no count — it's already chosen, every result carries it.
 	const CHIP_CAP = 50;
-	type DisplayChip = { name: string; count: number | null };
+	type DisplayChip = { name: string; count: number | null; category?: KeywordSummary['category'] };
 	let chips = $derived.by<DisplayChip[]>(() => {
-		const pinned = selected
-			.filter((name) => !keywords.some((k) => k.name === name))
-			.map((name) => ({ name, count: null }));
+		const pinned = selected.map((name) => ({
+			name,
+			count: null,
+			category:
+				keywordMetadata.find((k) => k.name === name)?.category ??
+				keywords.find((k) => k.name === name)?.category
+		}));
 		const room = Math.max(0, CHIP_CAP - pinned.length);
 		const facets = keywords
+			.filter((k) => !selected.includes(k.name))
 			.slice(0, room)
-			.map((k) => ({ name: k.name, count: k.recipe_count }));
+			.map((k) => ({ name: k.name, count: k.recipe_count, category: k.category }));
 		return [...pinned, ...facets];
 	});
 
@@ -181,6 +232,13 @@
 		const ul = chipsEl;
 		if (!ul) return;
 		const lis = [...ul.querySelectorAll<HTMLLIElement>(':scope > li')];
+		if (selected.length) {
+			lis.forEach((li) => {
+				li.inert = false;
+			});
+			clampHeight = null;
+			return;
+		}
 		if (!lis.length) {
 			clampHeight = null;
 			return;
@@ -204,7 +262,10 @@
 			const hidden = i >= firstHidden;
 			li.inert = hidden;
 			if (!hidden) {
-				visibleBottom = Math.max(visibleBottom, Math.round(li.getBoundingClientRect().bottom - top));
+				visibleBottom = Math.max(
+					visibleBottom,
+					Math.round(li.getBoundingClientRect().bottom - top)
+				);
 			}
 		});
 		clampHeight = firstHidden < lis.length ? visibleBottom : null;
@@ -257,6 +318,7 @@
 		onSearch?.({
 			q: query,
 			keywords: selected,
+			filters: advanced,
 			bookId: bookId || undefined,
 			author: author || undefined,
 			sort,
@@ -300,9 +362,7 @@
 	}
 
 	function toggleKeyword(name: string): void {
-		selected = selected.includes(name)
-			? selected.filter((k) => k !== name)
-			: [...selected, name];
+		selected = selected.includes(name) ? selected.filter((k) => k !== name) : [...selected, name];
 		emitKeyword();
 	}
 
@@ -342,6 +402,9 @@
 	data-verify-total={results.total}
 	data-verify-shown={results.items.length}
 	data-verify-query={query}
+	data-verify-rules={JSON.stringify(advanced.rules)}
+	data-verify-match={advanced.match}
+	data-verify-modal-open={String(advancedOpen)}
 	data-verify-keywords={selected.join('|')}
 	data-verify-chips={chips.map((c) => c.name).join('|')}
 	data-verify-book={bookId}
@@ -374,7 +437,16 @@
 			title="Search"
 			onclick={() => emitKeyword()}
 		>
-			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7.5" /><line x1="16.8" y1="16.8" x2="21" y2="21" /></svg>
+			<svg
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="1.8"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+				><circle cx="11" cy="11" r="7.5" /><line x1="16.8" y1="16.8" x2="21" y2="21" /></svg
+			>
 			<span class="btn-text" aria-hidden="true">Search</span>
 		</button>
 		<button
@@ -384,7 +456,18 @@
 			title="Ask the library — describe a dish"
 			onclick={runSemantic}
 		>
-			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3-1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3L12 3Z" /></svg>
+			<svg
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="1.8"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+				><path
+					d="M12 3l1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3-1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3L12 3Z"
+				/></svg
+			>
 			<span class="btn-text" aria-hidden="true">Ask the library</span>
 		</button>
 	</div>
@@ -414,91 +497,126 @@
 		<div class="filters" class:dimmed={isSemantic}>
 			<label class="filter">
 				<span class="label">Book</span>
-			<select
-				class="select"
-				aria-label="Filter by book"
-				value={bookId}
-				oninput={(e) => {
-					bookId = e.currentTarget.value;
-					emitKeyword();
-				}}
-			>
-				<option value="">All books</option>
-				{#each books as b (b.id)}
-					<option value={b.id}>{cleanTitle(b.title)}</option>
-				{/each}
-			</select>
-		</label>
+				<select
+					class="select"
+					aria-label="Filter by book"
+					value={bookId}
+					oninput={(e) => {
+						bookId = e.currentTarget.value;
+						emitKeyword();
+					}}
+				>
+					<option value="">All books</option>
+					{#each books as b (b.id)}
+						<option value={b.id}>{cleanTitle(b.title)}</option>
+					{/each}
+				</select>
+			</label>
 
-		<label class="filter">
-			<span class="label">Author</span>
-			<select
-				class="select"
-				aria-label="Filter by author"
-				value={author}
-				oninput={(e) => {
-					author = e.currentTarget.value;
-					emitKeyword();
-				}}
-			>
-				<option value="">All authors</option>
-				{#each authors as a (a)}
-					<option value={a}>{a}</option>
-				{/each}
-			</select>
-		</label>
+			<label class="filter">
+				<span class="label">Author</span>
+				<select
+					class="select"
+					aria-label="Filter by author"
+					value={author}
+					oninput={(e) => {
+						author = e.currentTarget.value;
+						emitKeyword();
+					}}
+				>
+					<option value="">All authors</option>
+					{#each authors as a (a)}
+						<option value={a}>{a}</option>
+					{/each}
+				</select>
+			</label>
 
-		<label class="filter">
-			<span class="label">Sort</span>
-			<select
-				class="select"
-				aria-label="Sort recipes"
-				value={sort}
-				oninput={(e) => {
-					sort = e.currentTarget.value as SortKey;
-					emitKeyword();
-				}}
-			>
-				{#each sortOptions as opt (opt.key)}
-					<option value={opt.key}>{opt.label}</option>
-				{/each}
-			</select>
-		</label>
-	</div>
+			<label class="filter">
+				<span class="label">Sort</span>
+				<select
+					class="select"
+					aria-label="Sort recipes"
+					value={sort}
+					oninput={(e) => {
+						sort = e.currentTarget.value as SortKey;
+						emitKeyword();
+					}}
+				>
+					{#each sortOptions as opt (opt.key)}
+						<option value={opt.key}>{opt.label}</option>
+					{/each}
+				</select>
+			</label>
+		</div>
 
-	{#if chips.length}
-		<section class="keywords" class:dimmed={isSemantic}>
-			<div class="keywords-head">
-				<p class="label kw-label">Keywords</p>
-				{#if selected.length}
-					<button class="clear-kw" onclick={clearKeywords}>
-						Clear selection ({selected.length})
-					</button>
-				{/if}
-			</div>
-			<ul
-				class="chips"
-				class:clamped={clampHeight != null}
-				style:max-height={clampHeight != null ? `${clampHeight}px` : null}
-				bind:this={chipsEl}
-				aria-label="Filter by keyword"
+		<div class="advanced-controls">
+			{#if isSemantic && advanced.rules.length}<p class="label">
+					Advanced rules are paused during semantic search. Apply filters to use normal search.
+				</p>{/if}
+			<button
+				class="advanced-trigger"
+				type="button"
+				bind:this={advancedTrigger}
+				onclick={() => {
+					advancedOpen = true;
+				}}>Advanced search{advanced.rules.length ? ` (${advanced.rules.length})` : ''}</button
 			>
-				{#each chips as chip (chip.name)}
-					<li>
-						<button
-							class="chip"
-							class:on={selected.includes(chip.name)}
-							aria-pressed={selected.includes(chip.name)}
-							onclick={() => toggleKeyword(chip.name)}
-						>
-							{chip.name}{#if chip.count !== null}<span class="chip-count">{chip.count}</span
-								>{/if}
+			{#if advanced.rules.length}
+				<p class="label">
+					Match {advanced.match} advanced rules · also match search and keyword chips
+				</p>
+				<ul class="applied-rules" aria-label="Applied advanced filters">
+					{#each advanced.rules as rule, index}<li>
+							<span>{ruleLabel(rule, books, lists)}</span><button
+								type="button"
+								aria-label={`Remove advanced rule ${index + 1}`}
+								onclick={() => removeRule(index)}>×</button
+							>
+						</li>{/each}
+				</ul>
+			{/if}
+		</div>
+		{#if chips.length}
+			<section class="keywords" class:dimmed={isSemantic}>
+				<div class="keywords-head">
+					<p class="label kw-label">Keywords</p>
+					{#if selected.length}
+						<button class="clear-kw" onclick={clearKeywords}>
+							Clear selection ({selected.length})
 						</button>
-					</li>
-				{/each}
-			</ul>
-		</section>
-	{/if}
+					{/if}
+				</div>
+				<ul class="category-key" aria-label="Keyword category colours">
+					{#each keywordCategories as category}<li data-category={category}>
+							{categoryLabels[category]}
+						</li>{/each}
+					<li data-category="none">Other keywords</li>
+				</ul>
+				<ul
+					class="chips"
+					class:clamped={clampHeight != null}
+					style:max-height={clampHeight != null ? `${clampHeight}px` : null}
+					bind:this={chipsEl}
+					aria-label="Filter by keyword"
+				>
+					{#each chips as chip (chip.name)}
+						<li>
+							<button
+								class="chip"
+								class:on={selected.includes(chip.name)}
+								data-category={chip.category ?? 'none'}
+								aria-label={`${chip.name} · ${categoryLabels[chip.category ?? ''] ?? 'Other keywords'}${chip.count !== null ? ` · ${chip.count} recipes` : ''}`}
+								aria-pressed={selected.includes(chip.name)}
+								onclick={() => toggleKeyword(chip.name)}
+							>
+								{chip.name}{#if chip.count !== null}<span class="chip-count">{chip.count}</span
+									>{/if}
+							</button>
+						</li>
+					{/each}
+				</ul>
+			</section>
+		{/if}
 	</div>
 
 	<div class="results" aria-busy={status === 'loading'}>
@@ -513,7 +631,7 @@
 				{/each}
 			</ul>
 		{:else if status === 'error'}
-			<p class="state">Couldn’t run the search. Try again.</p>
+			<p class="state">{searchError || 'Couldn’t run the search. Try again.'}</p>
 		{:else if isSemantic && !semanticAvailable}
 			<p class="state">Semantic search needs an AI provider configured.</p>
 		{:else if status === 'resting'}
@@ -582,7 +700,96 @@
 	</div>
 </section>
 
+<AdvancedRecipeSearch
+	open={advancedOpen}
+	filters={advanced}
+	{books}
+	{lists}
+	{authors}
+	{keywords}
+	{lookupLoading}
+	{lookupError}
+	onApply={applyAdvanced}
+	onClose={closeAdvanced}
+/>
+
 <style>
+	.advanced-controls {
+		margin: 0 0 1.5rem;
+	}
+	.advanced-trigger {
+		font-family: var(--f-mono);
+		font-size: 0.72rem;
+		text-transform: uppercase;
+		border: 1px solid var(--ink);
+		background: var(--card);
+		color: var(--ink);
+		padding: 0.6rem 0.8rem;
+		cursor: pointer;
+	}
+	.applied-rules {
+		list-style: none;
+		padding: 0;
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+	}
+	.applied-rules li {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		border: 1px solid var(--line-strong);
+		padding: 0.35rem 0.5rem;
+		font-family: var(--f-mono);
+		font-size: 0.7rem;
+		max-width: 100%;
+		overflow-wrap: anywhere;
+	}
+	.applied-rules button {
+		border: 0;
+		color: var(--ink);
+		background: transparent;
+		cursor: pointer;
+		font-size: 1rem;
+	}
+	.category-key {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem 1rem;
+		list-style: none;
+		padding: 0;
+		margin: 0 0 0.85rem;
+		font-family: var(--f-mono);
+		font-size: 0.6rem;
+		text-transform: uppercase;
+	}
+	.category-key li {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		color: var(--muted);
+	}
+	.category-key li::before {
+		content: '';
+		width: 0.5rem;
+		height: 0.5rem;
+		background: var(--category-ink, var(--muted));
+	}
+	.chip[data-category] {
+		background: var(--category-bg, var(--card));
+		color: var(--category-ink, var(--ink));
+	}
+	.chip.on[data-category] {
+		background: var(--accent);
+		color: white;
+		border-color: var(--accent);
+	}
+	.advanced-trigger:focus-visible,
+	.applied-rules button:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 3px;
+	}
+
 	.search {
 		max-width: var(--max-w);
 		margin: 0 auto;

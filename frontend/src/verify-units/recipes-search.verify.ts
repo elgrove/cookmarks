@@ -11,7 +11,7 @@ function recipe(over: Partial<RecipeSummary> = {}): RecipeSummary {
 		book_id: over.book_id ?? 'b1',
 		book_title: over.book_title ?? 'Made in India',
 		book_author: over.book_author ?? 'Meera Sodha',
-		keywords: over.keywords ?? ['lentils', 'vegetarian'],
+		keywords: over.keywords ?? ['lentils', 'vegetarian']
 	};
 }
 
@@ -44,6 +44,49 @@ const unit: VerifiableUnit<Props> = {
 	kind: 'component',
 	component: RecipesSearch,
 	fixtures: [
+		{
+			id: 'category-pile',
+			description: 'Category colours preserve one pile',
+			props: {
+				keywords: [
+					{ name: 'italian', recipe_count: 10, category: 'cuisine_region' },
+					{ name: 'main', recipe_count: 9, category: 'course' },
+					{ name: 'curry', recipe_count: 8, category: 'dish_type' },
+					{ name: 'chicken', recipe_count: 7, category: 'key_ingredient' },
+					{ name: 'roast', recipe_count: 6, category: 'method' },
+					{ name: 'quick', recipe_count: 5, category: null }
+				]
+			}
+		},
+		{
+			id: 'advanced-only',
+			description: 'Rules alone activate a search',
+			props: {
+				criteria: {
+					filters: {
+						version: 1,
+						match: 'all',
+						rules: [{ field: 'has_image', operator: 'eq', value: true }]
+					}
+				}
+			}
+		},
+		{
+			id: 'pinned-category',
+			description: 'Probe: selected term absent from facet pool keeps its category',
+			probe: true,
+			props: {
+				criteria: { keywords: ['rare cuisine'] },
+				keywordMetadata: [{ name: 'rare cuisine', recipe_count: 1, category: 'cuisine_region' }]
+			}
+		},
+		{
+			id: 'invalid-shared-url',
+			description: 'Probe: invalid URL shows an error',
+			probe: true,
+			props: { status: 'error', searchError: 'Invalid advanced filters.' }
+		},
+
 		{
 			id: 'resting',
 			description: 'no query and no filters — the calm resting prompt, empty until a query',
@@ -144,7 +187,8 @@ const unit: VerifiableUnit<Props> = {
 		},
 		{
 			id: 'semantic-unavailable',
-			description: 'By idea with no embedding provider: a clear unavailable message, not "no matches"',
+			description:
+				'By idea with no embedding provider: a clear unavailable message, not "no matches"',
 			props: {
 				status: 'empty',
 				mode: 'semantic',
@@ -214,7 +258,8 @@ const unit: VerifiableUnit<Props> = {
 		},
 		{
 			id: 'contract-lie',
-			description: 'sentinel: a deliberately-failing invariant proves the harness reports truthfully',
+			description:
+				'sentinel: a deliberately-failing invariant proves the harness reports truthfully',
 			expectFail: true,
 			props: {
 				status: 'results',
@@ -224,6 +269,38 @@ const unit: VerifiableUnit<Props> = {
 		}
 	],
 	invariants: [
+		{
+			id: 'category-colours',
+			description: 'Each chip carries its stable category',
+			onlyFixtures: ['category-pile'],
+			check: ({ root }) =>
+				[...root.querySelectorAll('.keywords .chip')]
+					.map((c) => c.getAttribute('data-category'))
+					.join('|') === 'cuisine_region|course|dish_type|key_ingredient|method|none'
+		},
+		{
+			id: 'advanced-active',
+			description: 'An advanced-only search is active with a visible rule',
+			onlyFixtures: ['advanced-only'],
+			check: ({ contract, root }) =>
+				contract.active === 'true' && root.querySelectorAll('.applied-rules li').length === 1
+		},
+		{
+			id: 'pinned-category-kept',
+			description: 'Pinned keyword metadata survives outside facets',
+			onlyFixtures: ['pinned-category'],
+			check: ({ root }) =>
+				root.querySelector('.keywords .chip')?.getAttribute('data-category') === 'cuisine_region'
+		},
+		{
+			id: 'invalid-url-visible',
+			description: 'Invalid filters cannot appear as broad results',
+			onlyFixtures: ['invalid-shared-url'],
+			check: ({ root }) =>
+				(root.textContent ?? '').includes('Invalid advanced filters.') &&
+				!root.querySelector('.rows')
+		},
+
 		{
 			id: 'resting-empty',
 			description: 'the resting state is inactive and shows no results',
@@ -278,7 +355,8 @@ const unit: VerifiableUnit<Props> = {
 			check: ({ root }) => {
 				const chip = root.querySelector('.rows .row .chip');
 				if (!chip) return 'no result-row keyword chip rendered';
-				if (chip.tagName !== 'A') return `row chip is <${chip.tagName.toLowerCase()}>, expected <a>`;
+				if (chip.tagName !== 'A')
+					return `row chip is <${chip.tagName.toLowerCase()}>, expected <a>`;
 				const href = chip.getAttribute('href');
 				const want = keywordHref('lentils');
 				return href === want || `row chip href=${href} expected ${want}`;

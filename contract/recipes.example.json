@@ -18,11 +18,13 @@
   "facets": [
     {
       "name": "roast",
-      "recipe_count": 1
+      "recipe_count": 1,
+      "category": "method"
     },
     {
       "name": "dinner",
-      "recipe_count": 1
+      "recipe_count": 1,
+      "category": null
     }
   ]
 }
