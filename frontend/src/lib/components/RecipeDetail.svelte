@@ -199,7 +199,7 @@
 				<figure class="recipe-figure">
 					<img
 						class="recipe-image"
-						src={`/api/recipes/${recipe.id}/image`}
+						src={`/api/recipes/${recipe.id}/image/thumbnail`}
 						alt={`Image accompanying ${recipe.name}`}
 						onload={(e) => {
 							const img = e.currentTarget as HTMLImageElement;
@@ -256,7 +256,7 @@
 				{#if showCover}
 					<img
 						class="provcover"
-						src={`/api/books/${recipe.bookId}/cover`}
+						src={`/api/books/${recipe.bookId}/cover/thumbnail`}
 						alt={`Cover of ${bookTitle}`}
 						onerror={() => (coverFailed = true)}
 					/>

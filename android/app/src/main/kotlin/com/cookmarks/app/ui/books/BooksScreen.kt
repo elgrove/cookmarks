@@ -152,7 +152,7 @@ private fun BookCard(book: BookSummary, onClick: () -> Unit) {
         Box(modifier = Modifier.fillMaxWidth().aspectRatio(0.72f)) {
             if (book.has_cover) {
                 AsyncImage(
-                    model = Api.bookCoverUrl(book.id),
+                    model = Api.bookCoverThumbnailUrl(book.id),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),

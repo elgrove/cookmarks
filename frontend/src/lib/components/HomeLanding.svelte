@@ -69,7 +69,7 @@
 					{#if showCover}
 						<img
 							class="cover"
-							src={`/api/books/${bookOfTheDay.id}/cover`}
+							src={`/api/books/${bookOfTheDay.id}/cover/thumbnail`}
 							alt={`Cover of ${title}`}
 							onerror={() => (coverFailed = true)}
 						/>
