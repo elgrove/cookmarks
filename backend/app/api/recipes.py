@@ -41,6 +41,7 @@ from app.schemas.recipe_filters import RecipeFilters
 from app.services import embeddings
 from app.services.reading import touch_reading
 from app.services.recipe_filters import advanced_condition, parse_filters
+from app.services.thumbnails import recipe_image_thumbnail
 from app.services.vector_store import VectorStore
 from app.services.views import forget_view, record_view
 from app.text import fold, normalise_keyword, stem
@@ -702,8 +703,33 @@ def unmark_recipe_seen(recipe_id: uuid.UUID, session: SessionDep, user: CurrentU
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+_IMAGE_THUMBNAIL_CACHE_CONTROL = "private, max-age=604800"
+
+
+def _recipe_is_thumbnail_query(
+    thumbnail: bool,
+    thumb: bool,
+    size: str | None,
+    variant: str | None,
+) -> bool:
+    if thumbnail or thumb:
+        return True
+    return size in {"thumb", "thumbnail", "sm", "small"} or variant in {
+        "thumb",
+        "thumbnail",
+        "small",
+    }
+
+
 @router.get("/recipes/{recipe_id}/image")
-def recipe_image(recipe_id: uuid.UUID, session: SessionDep) -> Response:
+def recipe_image(
+    recipe_id: uuid.UUID,
+    session: SessionDep,
+    thumbnail: bool = Query(False),
+    thumb: bool = Query(False),
+    size: str | None = Query(None),
+    variant: str | None = Query(None),
+) -> Response:
     """Stream a recipe's image out of its book's EPUB. 404 when the recipe carries no
     recorded image, its EPUB is missing, or the recorded member isn't in the archive
     — the client only asks when `has_image` is true and otherwise keeps the no-image
@@ -712,12 +738,37 @@ def recipe_image(recipe_id: uuid.UUID, session: SessionDep) -> Response:
         select(Recipe).where(Recipe.id == recipe_id).options(joinedload(Recipe.book))
     )
     if recipe is None or not recipe.image:
-        raise HTTPException(status_code=404, detail="recipe image not found")
+        raise HTTPException(status_code=404, detail="recipe image not found") from None
+    if _recipe_is_thumbnail_query(thumbnail, thumb, size, variant):
+        data = recipe_image_thumbnail(recipe.book, recipe.image, recipe.id)
+        if data is None:
+            raise HTTPException(status_code=404, detail="recipe image not found") from None
+        return Response(
+            content=data, media_type="image/webp", headers={"Cache-Control": _IMAGE_THUMBNAIL_CACHE_CONTROL}
+        )
     result = read_epub_image(recipe.book, recipe.image)
     if result is None:
-        raise HTTPException(status_code=404, detail="recipe image not found")
+        raise HTTPException(status_code=404, detail="recipe image not found") from None
     data, media_type = result
     return Response(content=data, media_type=media_type)
+
+
+@router.get("/recipes/{recipe_id}/image/thumbnail")
+@router.get("/recipes/{recipe_id}/image/thumb")
+@router.get("/recipes/{recipe_id}/image-thumb")
+@router.get("/recipes/{recipe_id}/image-thumbnail")
+def recipe_image_thumbnail_endpoint(recipe_id: uuid.UUID, session: SessionDep) -> Response:
+    recipe = session.scalar(
+        select(Recipe).where(Recipe.id == recipe_id).options(joinedload(Recipe.book))
+    )
+    if recipe is None or not recipe.image:
+        raise HTTPException(status_code=404, detail="recipe image not found") from None
+    data = recipe_image_thumbnail(recipe.book, recipe.image, recipe.id)
+    if data is None:
+        raise HTTPException(status_code=404, detail="recipe image not found") from None
+    return Response(
+        content=data, media_type="image/webp", headers={"Cache-Control": _IMAGE_THUMBNAIL_CACHE_CONTROL}
+    )
 
 
 # Similar recipes: nearest by embedding, with a shared-keyword fallback for the ~1%

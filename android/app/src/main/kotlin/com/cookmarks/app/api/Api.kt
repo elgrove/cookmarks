@@ -83,6 +83,8 @@ object Api {
     }
 
     fun bookCoverUrl(bookId: String): String = "${BuildConfig.BASE_URL}/api/books/$bookId/cover"
+    fun bookCoverThumbnailUrl(bookId: String): String = "${BuildConfig.BASE_URL}/api/books/$bookId/cover/thumbnail"
 
     fun recipeImageUrl(recipeId: String): String = "${BuildConfig.BASE_URL}/api/recipes/$recipeId/image"
+    fun recipeImageThumbnailUrl(recipeId: String): String = "${BuildConfig.BASE_URL}/api/recipes/$recipeId/image/thumbnail"
 }

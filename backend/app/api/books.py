@@ -2,7 +2,7 @@ import hashlib
 import json
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from fastapi.responses import FileResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
@@ -43,6 +43,7 @@ from app.services.reading import (
     resume_recipe,
     touch_reading,
 )
+from app.services.thumbnails import cover_thumbnail
 from app.services.views import clear_book_views, mark_book_seen
 
 router = APIRouter(tags=["books"])
@@ -290,17 +291,66 @@ def delete_book(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+_THUMBNAIL_CACHE_CONTROL = "private, max-age=604800"
+
+
+def _cover_is_thumbnail_query(
+    thumbnail: bool,
+    thumb: bool,
+    size: str | None,
+    variant: str | None,
+) -> bool:
+    if thumbnail or thumb:
+        return True
+    return (
+        size in {"thumb", "thumbnail", "sm", "small", "cover-sm"}
+        or variant in {"thumb", "thumbnail", "small"}
+    )
+
+
 @router.get("/books/{book_id}/cover")
-def book_cover(book_id: uuid.UUID, session: SessionDep) -> FileResponse:
+def book_cover(
+    book_id: uuid.UUID,
+    session: SessionDep,
+    thumbnail: bool = Query(False),
+    thumb: bool = Query(False),
+    size: str | None = Query(None),
+    variant: str | None = Query(None),
+) -> Response:
     book = session.get(Book, book_id)
     if book is None:
         raise HTTPException(status_code=404, detail="book not found")
+    if _cover_is_thumbnail_query(thumbnail, thumb, size, variant):
+        try:
+            data = cover_thumbnail(book)
+        except FileNotFoundError:
+            raise HTTPException(status_code=404, detail="cover not found") from None
+        return Response(
+            content=data, media_type="image/webp", headers={"Cache-Control": _THUMBNAIL_CACHE_CONTROL}
+        )
     cover = cover_path(book).resolve()
     library = settings.calibre_library_path.resolve()
     # Guard against a crafted path escaping the library root before touching disk.
     if not cover.is_relative_to(library) or not cover.is_file():
-        raise HTTPException(status_code=404, detail="cover not found")
+        raise HTTPException(status_code=404, detail="cover not found") from None
     return FileResponse(cover, media_type="image/jpeg")
+
+
+@router.get("/books/{book_id}/cover/thumbnail")
+@router.get("/books/{book_id}/cover/thumb")
+@router.get("/books/{book_id}/cover-thumb")
+@router.get("/books/{book_id}/thumbnail")
+def book_cover_thumbnail(book_id: uuid.UUID, session: SessionDep) -> Response:
+    book = session.get(Book, book_id)
+    if book is None:
+        raise HTTPException(status_code=404, detail="book not found")
+    try:
+        data = cover_thumbnail(book)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="cover not found") from None
+    return Response(
+        content=data, media_type="image/webp", headers={"Cache-Control": _THUMBNAIL_CACHE_CONTROL}
+    )
 
 
 @router.get("/books/{book_id}/file")

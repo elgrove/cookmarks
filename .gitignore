@@ -54,3 +54,6 @@ staticfiles/
 # The append-only ledger backend/evals/index.jsonl is kept (committable history).
 backend/evals/runs/
 backend/evals/eval.sqlite3
+
+# Derived image thumbnails (generated on demand, cached on disk)
+backend/thumbnails/

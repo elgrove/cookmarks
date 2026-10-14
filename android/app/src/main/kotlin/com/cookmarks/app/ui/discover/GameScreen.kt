@@ -333,7 +333,7 @@ private fun CardFront(card: GameCard, source: GameSource, state: Result<RecipeDe
         }
         CardHeading(recipe, source)
         AsyncImage(
-            model = Api.recipeImageUrl(recipe.id),
+            model = Api.recipeImageThumbnailUrl(recipe.id),
             contentDescription = "Image of ${recipe.name}",
             contentScale = ContentScale.FillWidth,
             modifier = Modifier.fillMaxWidth(),

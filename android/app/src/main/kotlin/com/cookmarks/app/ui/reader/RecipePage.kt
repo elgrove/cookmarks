@@ -103,7 +103,7 @@ fun RecipeContent(
             }
             if (recipe.has_image) {
                 AsyncImage(
-                    model = Api.recipeImageUrl(recipe.id),
+                    model = Api.recipeImageThumbnailUrl(recipe.id),
                     contentDescription = "Image of ${recipe.name}",
                     contentScale = ContentScale.FillWidth,
                     modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),

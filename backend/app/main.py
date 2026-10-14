@@ -9,7 +9,7 @@ from app.static import mount_spa
 # Responses that are already compressed: gzipping them again only burns CPU.
 # Matched on the request path — the three binary API endpoints by their tail,
 # hashed SPA assets by file extension.
-_BINARY_PATH_TAILS = ("/cover", "/file", "/image")
+_BINARY_PATH_TAILS = ("/cover", "/file", "/image", "/thumb", "/thumbnail")
 _BINARY_EXTENSIONS = (
     ".png",
     ".jpg",

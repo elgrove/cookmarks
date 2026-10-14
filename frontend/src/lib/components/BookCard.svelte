@@ -61,7 +61,7 @@
 			{#if showCover}
 				<img
 					class="cover"
-					src={`/api/books/${id}/cover`}
+					src={`/api/books/${id}/cover/thumbnail`}
 					alt={`Cover of ${displayTitle}`}
 					loading="lazy"
 					onerror={() => (coverFailed = true)}
