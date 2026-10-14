@@ -740,8 +740,13 @@
 		font-size: 1rem;
 	}
 	.chip[data-category] {
-		background: var(--category-bg, var(--card));
-		color: var(--category-ink, var(--ink));
+		background: var(--category-bg, transparent);
+		color: var(--category-ink, var(--muted));
+		border-color: var(--category-bg, var(--line));
+	}
+	.chip[data-category] .chip-count {
+		color: inherit;
+		opacity: 0.8;
 	}
 	.chip.on[data-category] {
 		background: var(--accent);

@@ -6,8 +6,9 @@ The modal keeps a draft until Apply. Cancel, Escape, and backdrop dismissal disc
 Cuisine filters match flat keyword names without hierarchy expansion.
 
 The recipe filter chips stay in one frequency-ordered pile. Cuisine/region uses blue and
-course uses ochre. Dish type, key ingredient, method, and uncategorised keywords use
-neutral ink and surface. Accessible names identify every category. Selected chips use
+course uses ochre. Both use solid fills with white text and counts. Dish type, key
+ingredient, method, and uncategorised keywords use muted text, quiet borders, and
+transparent backgrounds. Accessible names identify every category. Selected chips use
 the forest-green fill with white text. Light and Midnight colour pairs are defined in
 `frontend/src/app.css`.
 
