@@ -9,7 +9,12 @@ from sqlalchemy import create_engine, event, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.api.deps import current_user
-from app.api.recipes import _clear_keyword_cache, _clear_search_order_cache, _clear_similar_cache
+from app.api.recipes import (
+    _clear_facet_cache,
+    _clear_keyword_cache,
+    _clear_search_order_cache,
+    _clear_similar_cache,
+)
 from app.config import settings
 from app.db import configure_sqlite_connection, get_session
 from app.main import app
@@ -18,6 +23,7 @@ from app.models.enums import AIProvider
 from app.services.ai import upsert_provider_config
 from app.services.auth import hash_password
 from app.services.embeddings import _clear_query_embed_cache
+from app.services.search_index import ensure_search_index
 from app.tasks.keyword_classification import classify_keywords_task
 
 # Where the two seeded books live inside a Calibre library root.
@@ -152,11 +158,13 @@ def _reset_caches() -> Iterator[None]:
     _clear_keyword_cache()
     _clear_query_embed_cache()
     _clear_similar_cache()
+    _clear_facet_cache()
     yield
     _clear_search_order_cache()
     _clear_keyword_cache()
     _clear_query_embed_cache()
     _clear_similar_cache()
+    _clear_facet_cache()
 
 
 # scrypt is deliberately slow; derive the seeded account's hash once for the whole
@@ -202,7 +210,7 @@ def _seed(session: Session) -> None:
     session.add_all([with_recipes, without_recipes])
     session.flush()
     # Recipe 0 carries keywords and an ingredient so the search/filter paths
-    # (keyword chip, ingredient substring) and the book-detail keyword join all
+    # (keyword chip, ingredient search) and the book-detail keyword join all
     # have something to match.
     pasta = Keyword(name="Pasta")
     quick = Keyword(name="Quick")
@@ -219,7 +227,7 @@ def _seed(session: Session) -> None:
             instructions=[],
         )
         # Recipe 0 carries full content + keywords so the search/filter paths
-        # (ingredient substring, keyword chip) and the detail reading view are
+        # (ingredient search, keyword chip) and the detail reading view are
         # all exercised.
         if i == 0:
             recipe.keywords = [pasta, quick]
@@ -250,6 +258,10 @@ def session(tmp_path: Path) -> Iterator[Session]:
     Base.metadata.create_all(engine)
     factory = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
     with factory() as session:
+        # The FTS5 search index is outside the ORM metadata (see search_index), so
+        # create_all doesn't make it; build it before seeding so the triggers index
+        # the seeded rows.
+        ensure_search_index(session)
         _seed(session)
         yield session
     engine.dispose()

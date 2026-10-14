@@ -5,8 +5,9 @@ from time import monotonic
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, HTTPException, Query, Response, status
-from sqlalchemy import case, func, literal_column, or_, over, select
+from sqlalchemy import String, case, column, func, literal_column, or_, over, select, table, text
 from sqlalchemy.orm import Session, joinedload, selectinload
+from sqlalchemy.sql import Select
 from sqlalchemy.sql.elements import ColumnElement
 
 from app.api.deps import CurrentUser
@@ -17,7 +18,7 @@ from app.epub import read_epub_image
 from app.models.base import as_utc, utcnow
 from app.models.book import Book
 from app.models.enums import ReadingMode, RecipeEnrichmentStatus, RecipeFacetKind
-from app.models.ingredient import CanonicalIngredient, RecipeIngredient
+from app.models.ingredient import RecipeIngredient
 from app.models.recipe import Keyword, Recipe, recipe_keywords
 from app.models.recipe_fact import RecipeFacet
 from app.models.recipe_list import RecipeListItem
@@ -41,6 +42,7 @@ from app.schemas.recipe_filters import RecipeFilters
 from app.services import embeddings
 from app.services.reading import touch_reading
 from app.services.recipe_filters import advanced_condition, parse_filters
+from app.services.search_index import match_query
 from app.services.thumbnails import recipe_image_thumbnail
 from app.services.vector_store import VectorStore
 from app.services.views import forget_view, record_view
@@ -65,6 +67,11 @@ _SHUFFLE_HASH = 2654435761
 # Navigation orderings the recipe page can be reached through; "list" arrives with
 # that page, so unknown contexts resolve to book.
 SUPPORTED_CONTEXTS = {"book", "search", "semantic"}
+
+# The FTS5 index over each recipe's searchable text (see app.services.search_index).
+# A lightweight table construct — the virtual table is not an ORM model — used only
+# to read matching recipe ids.
+_recipe_search = table("recipe_search", column("recipe_id", String))
 
 
 def _summary(recipe: Recipe, book: Book) -> RecipeSummary:
@@ -146,29 +153,20 @@ def _search_conditions(
     book_id: uuid.UUID | None,
     author: str | None,
 ) -> list:
-    """The AND-narrowing filter shared by the result rows, total and facets."""
+    """The AND-narrowing filter shared by the result rows, total and facets.
+
+    The free-text part is a single FTS5 lookup (MY-214): every term — name, book
+    title/author, ingredient text, canonical ingredient, keyword — is folded into the
+    ``recipe_search`` document, so there is no per-term scan of recipes or their
+    ingredients. Match is prefix-based; see ``search_index.match_query``.
+    """
     conditions = []
-    for term in _search_terms(q):
-        like = f"%{term}%"
-        conditions.append(
-            or_(
-                Recipe.name_folded.contains(term),
-                Book.title_folded.contains(term),
-                Book.author_folded.contains(term),
-                Recipe.id.in_(
-                    select(RecipeIngredient.recipe_id).where(RecipeIngredient.text.ilike(like))
-                ),
-                Recipe.id.in_(
-                    select(RecipeIngredient.recipe_id)
-                    .join(
-                        CanonicalIngredient,
-                        RecipeIngredient.canonical_ingredient_id == CanonicalIngredient.id,
-                    )
-                    .where(CanonicalIngredient.name_folded == term)
-                ),
-                _keyword_match(Keyword.name.ilike(like)),
-            )
+    terms = _search_terms(q)
+    if terms:
+        matched_ids = select(_recipe_search.c.recipe_id).where(
+            text("recipe_search MATCH :fts").bindparams(fts=match_query(terms))
         )
+        conditions.append(Recipe.id.in_(matched_ids))
     # Each chosen chip must be present (AND-narrowing).
     for kw in keywords:
         conditions.append(_keyword_match(Keyword.name == kw))
@@ -177,6 +175,71 @@ def _search_conditions(
     if author is not None:
         conditions.append(Book.author == author)
     return conditions
+
+
+# Facets are the expensive half of a search: a grouped join over the matching
+# recipes' keyword links (~90ms for a broad term even with the filter itself cheap).
+# A short-lived, bounded per-process cache keyed on the full criteria serves
+# pagination and search-as-you-type repeats without re-running it. Writes are not
+# hooked to invalidate it — the TTL bounds how long a facet can trail a write, the
+# same accepted tradeoff as the keyword and search-order caches. Keyed on the caller
+# because advanced filters read their lists/favourites. Cleared by the test suite.
+_FACET_CACHE: OrderedDict[tuple, tuple[float, list[KeywordSummary]]] = OrderedDict()
+_FACET_CACHE_MAX = 64
+_FACET_TTL_SECONDS = 60.0
+
+
+def _clear_facet_cache() -> None:
+    _FACET_CACHE.clear()
+
+
+def _search_facets(
+    session: Session,
+    filtered: Select,
+    keywords: list[str],
+    q: str,
+    book_id: uuid.UUID | None,
+    author: str | None,
+    filters: RecipeFilters | None,
+    user_id: uuid.UUID,
+) -> list[KeywordSummary]:
+    """The keywords most common among the matching recipes, ranked so the chips can
+    re-rank to what narrows further. Already-selected keywords are dropped (every
+    match carries them) — the frontend pins those separately. Cached on the criteria."""
+    key = (
+        user_id,
+        filters.model_dump_json() if filters else None,
+        q,
+        tuple(keywords),
+        str(book_id) if book_id else None,
+        author,
+    )
+    cached = _FACET_CACHE.get(key)
+    if cached is not None and monotonic() - cached[0] < _FACET_TTL_SECONDS:
+        _FACET_CACHE.move_to_end(key)
+        return cached[1]
+
+    facet_count = func.count(recipe_keywords.c.recipe_id)
+    facet_query = (
+        select(Keyword.name, Keyword.category, facet_count)
+        .select_from(recipe_keywords)
+        .join(Keyword, Keyword.id == recipe_keywords.c.keyword_id)
+        .where(recipe_keywords.c.recipe_id.in_(filtered.scalar_subquery()))
+        .group_by(Keyword.id)
+        .order_by(facet_count.desc(), Keyword.name)
+        .limit(FACET_LIMIT)
+    )
+    if keywords:
+        facet_query = facet_query.where(Keyword.name.notin_(keywords))
+    facets = [
+        KeywordSummary(name=name, recipe_count=count, category=category)
+        for name, category, count in session.execute(facet_query).all()
+    ]
+    _FACET_CACHE[key] = (monotonic(), facets)
+    _FACET_CACHE.move_to_end(key)
+    while len(_FACET_CACHE) > _FACET_CACHE_MAX:
+        _FACET_CACHE.popitem(last=False)
+    return facets
 
 
 @router.get("/recipes", response_model=RecipeSearchResults)
@@ -241,28 +304,15 @@ def search_recipes(
 
     # Facets: the keywords most common among the matching recipes, so the chips
     # can re-rank to what narrows further. Already-selected keywords are dropped
-    # (every match carries them) — the frontend pins those separately. Skipped for
-    # `all=true`: the Discover deck reads ids only and never renders chips, and
-    # the facet query repeats the whole filtered scan (~250 ms on production).
-    # MY-178 interim; MY-212 owns the dedicated deck endpoint.
+    # (every match carries them) — the frontend pins those separately, and the
+    # result is cached on the criteria (see _search_facets). Skipped for `all=true`:
+    # the Discover deck reads ids only and never renders chips. MY-212 owns the
+    # dedicated deck endpoint.
     facets: list[KeywordSummary] = []
     if not all_recipes:
-        facet_count = func.count(recipe_keywords.c.recipe_id)
-        facet_query = (
-            select(Keyword.name, Keyword.category, facet_count)
-            .select_from(recipe_keywords)
-            .join(Keyword, Keyword.id == recipe_keywords.c.keyword_id)
-            .where(recipe_keywords.c.recipe_id.in_(filtered.scalar_subquery()))
-            .group_by(Keyword.id)
-            .order_by(facet_count.desc(), Keyword.name)
-            .limit(FACET_LIMIT)
+        facets = _search_facets(
+            session, filtered, keywords, q, book_id, author, advanced, user.id
         )
-        if keywords:
-            facet_query = facet_query.where(Keyword.name.notin_(keywords))
-        facets = [
-            KeywordSummary(name=name, recipe_count=count, category=category)
-            for name, category, count in session.execute(facet_query).all()
-        ]
 
     return RecipeSearchResults(total=total, items=items, facets=facets)
 
@@ -324,8 +374,8 @@ def semantic_search(
 # so compute them once per process and serve from memory: the grouped count over
 # ~5k keywords against ~78k links is otherwise this endpoint's whole cost (~170ms).
 # Cache the top _CAP and slice per request — the ordering is fixed, so any limit up
-# to _CAP is a prefix of it. Module-global, so the test suite clears it (conftest)
-# the way it does the search-order cache; the extraction task clears it on write.
+# to _CAP is a prefix of it. Module-global; the test suite clears it (conftest), and
+# the 60s TTL below bounds how long a cached list can trail a write.
 _KEYWORD_CACHE_CAP = 500
 _top_keywords: list[KeywordSummary] | None = None
 _keyword_cache_at = 0.0
