@@ -319,7 +319,7 @@ main {
 }
 
 /* Stable category colours for the recipe search keyword pile. */
-[data-category='cuisine_region'] { --category-ink: #ffffff; --category-bg: #235f99; }
-[data-category='course'] { --category-ink: #ffffff; --category-bg: #94531a; }
-[data-theme='dark'] [data-category='cuisine_region'] { --category-ink: #ffffff; --category-bg: #2868a2; }
-[data-theme='dark'] [data-category='course'] { --category-ink: #ffffff; --category-bg: #995b1d; }
+[data-category='cuisine_region'] { --category-ink: #285f91; --category-bg: #e9f0f7; }
+[data-category='course'] { --category-ink: #1f6f50; --category-bg: #e5f2eb; }
+[data-theme='dark'] [data-category='cuisine_region'] { --category-ink: #9fc9ef; --category-bg: #213448; }
+[data-theme='dark'] [data-category='course'] { --category-ink: #a7d7ba; --category-bg: #20382b; }
