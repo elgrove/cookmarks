@@ -16,11 +16,13 @@ target_metadata = Base.metadata
 
 
 def include_name(name: str | None, type_: str, _parent_names: dict[str, str]) -> bool:
-    """Keep Alembic from reflecting vector tables owned by the application."""
+    """Keep Alembic from reflecting the application-owned virtual tables (the vec0
+    embeddings store and the FTS5 search index with its shadow tables)."""
     is_vector_table = name == "recipe_embeddings" or (
         name is not None and name.startswith("recipe_embeddings_")
     )
-    return not (type_ == "table" and is_vector_table)
+    is_search_table = name is not None and name.startswith("recipe_search")
+    return not (type_ == "table" and (is_vector_table or is_search_table))
 
 
 def run_migrations_offline() -> None:
