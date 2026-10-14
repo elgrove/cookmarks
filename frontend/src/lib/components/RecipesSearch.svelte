@@ -742,7 +742,7 @@
 	.chip[data-category] {
 		background: var(--category-bg, transparent);
 		color: var(--category-ink, var(--muted));
-		border-color: var(--category-ink, var(--line));
+		border-color: var(--line);
 	}
 	.chip[data-category] .chip-count {
 		color: inherit;

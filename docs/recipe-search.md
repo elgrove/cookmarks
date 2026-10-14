@@ -6,7 +6,7 @@ The modal keeps a draft until Apply. Cancel, Escape, and backdrop dismissal disc
 Cuisine filters match flat keyword names without hierarchy expansion.
 
 The recipe filter chips stay in one frequency-ordered pile. Cuisine/region uses pastel blue
-and course uses pastel green. Both use darker category text, matching counts, and a thin outline in the text colour. Dish type, key
+and course uses pastel green. Both use darker category text, matching counts, and the same quiet outline as uncategorised chips. Dish type, key
 ingredient, method, and uncategorised keywords use muted text, quiet borders, and
 transparent backgrounds. Accessible names identify every category. Selected chips use
 the forest-green fill with white text. Light and Midnight colour pairs are defined in
