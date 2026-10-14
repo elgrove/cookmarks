@@ -324,14 +324,26 @@ main {
 [data-theme='dark'] [data-category='cuisine_region'] { --category-ink: #9fc9ef; --category-bg: #213448; }
 [data-theme='dark'] [data-category='course'] { --category-ink: #a7d7ba; --category-bg: #20382b; }
 
-/* Yellow, red, purple, and orange complete the six-colour keyword palette. */
+/* Ten decorative pastels complement cuisine blue and course green. */
 [data-pastel] { --category-ink: #626054; }
-[data-pastel='0'] { --category-bg: #fbf2cc; }
-[data-pastel='1'] { --category-bg: #f8dfdf; }
-[data-pastel='2'] { --category-bg: #e9e0f5; }
-[data-pastel='3'] { --category-bg: #fae3cb; }
+[data-pastel='0'] { --category-bg: #faf0e8; }
+[data-pastel='1'] { --category-bg: #f7f0dc; }
+[data-pastel='2'] { --category-bg: #f8ebef; }
+[data-pastel='3'] { --category-bg: #f1ecf8; }
+[data-pastel='4'] { --category-bg: #f4edf4; }
+[data-pastel='5'] { --category-bg: #f8f4dc; }
+[data-pastel='6'] { --category-bg: #f7dedc; }
+[data-pastel='7'] { --category-bg: #e3e8f8; }
+[data-pastel='8'] { --category-bg: #e5f1ef; }
+[data-pastel='9'] { --category-bg: #e9efdd; }
 [data-theme='dark'] [data-pastel] { --category-ink: #b9b2a6; }
-[data-theme='dark'] [data-pastel='0'] { --category-bg: #3b3520; }
-[data-theme='dark'] [data-pastel='1'] { --category-bg: #3d282a; }
-[data-theme='dark'] [data-pastel='2'] { --category-bg: #33283e; }
-[data-theme='dark'] [data-pastel='3'] { --category-bg: #3c2e21; }
+[data-theme='dark'] [data-pastel='0'] { --category-bg: #352e2a; }
+[data-theme='dark'] [data-pastel='1'] { --category-bg: #343124; }
+[data-theme='dark'] [data-pastel='2'] { --category-bg: #352a30; }
+[data-theme='dark'] [data-pastel='3'] { --category-bg: #302d3c; }
+[data-theme='dark'] [data-pastel='4'] { --category-bg: #362c35; }
+[data-theme='dark'] [data-pastel='5'] { --category-bg: #343323; }
+[data-theme='dark'] [data-pastel='6'] { --category-bg: #3b2926; }
+[data-theme='dark'] [data-pastel='7'] { --category-bg: #282e40; }
+[data-theme='dark'] [data-pastel='8'] { --category-bg: #243633; }
+[data-theme='dark'] [data-pastel='9'] { --category-bg: #303623; }

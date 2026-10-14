@@ -207,7 +207,7 @@
 	function pastelFor(name: string): number {
 		let hash = 0;
 		for (const character of name) hash = (Math.imul(hash, 31) + character.codePointAt(0)!) | 0;
-		return (hash >>> 0) % 4;
+		return (hash >>> 0) % 10;
 	}
 	type DisplayChip = { name: string; count: number | null; category?: KeywordSummary['category'] };
 	let chips = $derived.by<DisplayChip[]>(() => {
