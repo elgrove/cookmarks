@@ -6,7 +6,8 @@ The modal keeps a draft until Apply. Cancel, Escape, and backdrop dismissal disc
 Cuisine filters match flat keyword names without hierarchy expansion.
 
 The recipe filter chips stay in one frequency-ordered pile. Cuisine/region uses pastel
-blue and course uses pastel green. Other keywords use ten decorative pastels: peach,
+blue, course uses pastel green, method uses lavender, and key ingredient uses peach.
+Dish type and uncategorised keywords use ten decorative pastels: peach,
 sand, rose, lavender, mauve, butter, coral, periwinkle, seafoam, and sage. The palette has
 12 colours in total. A keyword's name determines its decorative pastel so it stays stable
 across result ordering and page reloads. Decorative colours do not indicate categories.

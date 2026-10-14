@@ -324,7 +324,12 @@ main {
 [data-theme='dark'] [data-category='cuisine_region'] { --category-ink: #9fc9ef; --category-bg: #213448; }
 [data-theme='dark'] [data-category='course'] { --category-ink: #a7d7ba; --category-bg: #20382b; }
 
-/* Ten decorative pastels complement cuisine blue and course green. */
+[data-category='method'] { --category-ink: #626054; --category-bg: #f1ecf8; }
+[data-category='key_ingredient'] { --category-ink: #626054; --category-bg: #faf0e8; }
+[data-theme='dark'] [data-category='method'] { --category-ink: #b9b2a6; --category-bg: #302d3c; }
+[data-theme='dark'] [data-category='key_ingredient'] { --category-ink: #b9b2a6; --category-bg: #352e2a; }
+
+/* Decorative pastels for dish type and uncategorised keywords. */
 [data-pastel] { --category-ink: #626054; }
 [data-pastel='0'] { --category-bg: #faf0e8; }
 [data-pastel='1'] { --category-bg: #f7f0dc; }

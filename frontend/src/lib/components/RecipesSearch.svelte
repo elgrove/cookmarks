@@ -599,7 +599,9 @@
 								class="chip"
 								class:on={selected.includes(chip.name)}
 								data-category={chip.category ?? 'none'}
-								data-pastel={chip.category === 'cuisine_region' || chip.category === 'course'
+								data-pastel={['cuisine_region', 'course', 'method', 'key_ingredient'].includes(
+									chip.category ?? ''
+								)
 									? undefined
 									: pastelFor(chip.name)}
 								aria-label={`${chip.name} · ${categoryLabels[chip.category ?? ''] ?? 'Other keywords'}${chip.count !== null ? ` · ${chip.count} recipes` : ''}`}
