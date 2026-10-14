@@ -1,6 +1,7 @@
 import shlex
 import uuid
 from collections import OrderedDict
+from time import monotonic
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, HTTPException, Query, Response, status
@@ -36,8 +37,10 @@ from app.schemas.recipe import (
     SemanticSearchResults,
     SimilarRecipes,
 )
+from app.schemas.recipe_filters import RecipeFilters
 from app.services import embeddings
 from app.services.reading import touch_reading
+from app.services.recipe_filters import advanced_condition, parse_filters
 from app.services.thumbnails import recipe_image_thumbnail
 from app.services.vector_store import VectorStore
 from app.services.views import forget_view, record_view
@@ -189,17 +192,20 @@ def search_recipes(
     limit: Annotated[int, Query(ge=1, le=100)] = 30,
     offset: Annotated[int, Query(ge=0)] = 0,
     all_recipes: Annotated[bool, Query(alias="all")] = False,
+    filters: str | None = None,
 ) -> RecipeSearchResults:
     # The page is empty until *something* is asked for: a typed query or any
     # filter. Filters count as a query, so a keyword/book/author alone returns
     # results; nothing set returns the resting (empty) state — unless the caller
     # explicitly asks for everything (`all=true`, the game's play-all deck source).
+    advanced = parse_filters(filters)
     keywords = [normalise_keyword(name) for name in keyword or []]
     q = q.strip()
-    if not (q or keywords or book_id or author or all_recipes):
+    if not (q or keywords or book_id or author or all_recipes or (advanced and advanced.rules)):
         return RecipeSearchResults(total=0, items=[])
 
     conditions = _search_conditions(q, keywords, book_id, author)
+    conditions.append(advanced_condition(session, user.id, advanced))
 
     filtered = select(Recipe.id).join(Book, Recipe.book_id == Book.id).where(*conditions)
     order = [*_search_order(q, sort, seed), Recipe.id]
@@ -243,7 +249,7 @@ def search_recipes(
     if not all_recipes:
         facet_count = func.count(recipe_keywords.c.recipe_id)
         facet_query = (
-            select(Keyword.name, facet_count)
+            select(Keyword.name, Keyword.category, facet_count)
             .select_from(recipe_keywords)
             .join(Keyword, Keyword.id == recipe_keywords.c.keyword_id)
             .where(recipe_keywords.c.recipe_id.in_(filtered.scalar_subquery()))
@@ -254,8 +260,8 @@ def search_recipes(
         if keywords:
             facet_query = facet_query.where(Keyword.name.notin_(keywords))
         facets = [
-            KeywordSummary(name=name, recipe_count=count)
-            for name, count in session.execute(facet_query).all()
+            KeywordSummary(name=name, recipe_count=count, category=category)
+            for name, category, count in session.execute(facet_query).all()
         ]
 
     return RecipeSearchResults(total=total, items=items, facets=facets)
@@ -322,6 +328,7 @@ def semantic_search(
 # the way it does the search-order cache; the extraction task clears it on write.
 _KEYWORD_CACHE_CAP = 500
 _top_keywords: list[KeywordSummary] | None = None
+_keyword_cache_at = 0.0
 
 
 def _clear_keyword_cache() -> None:
@@ -334,25 +341,39 @@ def list_keywords(
     session: SessionDep,
     response: Response,
     limit: Annotated[int, Query(ge=1, le=_KEYWORD_CACHE_CAP)] = 50,
+    name: Annotated[list[str] | None, Query(max_length=100)] = None,
 ) -> list[KeywordSummary]:
     # Resting-state filter chips: the client renders only the most-used few. Served
     # from the per-process cache; `limit` is a prefix of the cached top-_CAP since
     # the ordering is fixed (count desc, then name).
-    global _top_keywords
-    if _top_keywords is None:
+    global _top_keywords, _keyword_cache_at
+    if name is not None:
+        rows = session.execute(
+            select(Keyword.name, Keyword.category, func.count(recipe_keywords.c.recipe_id))
+            .join(recipe_keywords, recipe_keywords.c.keyword_id == Keyword.id)
+            .where(Keyword.name.in_([normalise_keyword(value) for value in name]))
+            .group_by(Keyword.id)
+            .order_by(Keyword.name)
+        ).all()
+        response.headers["Cache-Control"] = "private, max-age=60"
+        return [KeywordSummary(name=n, category=c, recipe_count=count) for n, c, count in rows]
+    if _top_keywords is None or monotonic() - _keyword_cache_at >= 60:
         # Inner join, not outer: these are recipe filter chips, so a keyword used
         # only on books (the shared vocabulary now spans both) must not appear here.
         rows = session.execute(
-            select(Keyword.name, func.count(recipe_keywords.c.recipe_id))
+            select(Keyword.name, Keyword.category, func.count(recipe_keywords.c.recipe_id))
             .join(recipe_keywords, recipe_keywords.c.keyword_id == Keyword.id)
             .group_by(Keyword.id)
             .order_by(func.count(recipe_keywords.c.recipe_id).desc(), Keyword.name)
             .limit(_KEYWORD_CACHE_CAP)
         ).all()
-        _top_keywords = [KeywordSummary(name=name, recipe_count=count) for name, count in rows]
+        _top_keywords = [
+            KeywordSummary(name=n, category=c, recipe_count=count) for n, c, count in rows
+        ]
+        _keyword_cache_at = monotonic()
     # The chips only shift when a book is extracted, so let the mobile client's HTTP
     # cache answer this from disk instead of a round trip on every Discover open.
-    response.headers["Cache-Control"] = "private, max-age=600"
+    response.headers["Cache-Control"] = "private, max-age=60"
     return _top_keywords[:limit]
 
 
@@ -423,8 +444,13 @@ def _ordered_search_ids(
     author: str | None,
     sort: Sort,
     seed: int,
+    user_id: uuid.UUID,
+    filters: RecipeFilters | None = None,
 ) -> list[uuid.UUID]:
+    cacheable = not filters or not filters.rules
     key = (
+        user_id,
+        filters.model_dump_json() if filters else None,
         q,
         tuple(keywords),
         str(book_id) if book_id else None,
@@ -432,11 +458,12 @@ def _ordered_search_ids(
         sort,
         seed,
     )
-    cached = _SEARCH_ORDER_CACHE.get(key)
+    cached = _SEARCH_ORDER_CACHE.get(key) if cacheable else None
     if cached is not None:
         _SEARCH_ORDER_CACHE.move_to_end(key)
         return cached
     conditions = _search_conditions(q, keywords, book_id, author)
+    conditions.append(advanced_condition(session, user_id, filters))
     ids = list(
         session.scalars(
             select(Recipe.id)
@@ -445,8 +472,9 @@ def _ordered_search_ids(
             .order_by(*_search_order(q, sort, seed), Recipe.id)
         ).all()
     )
-    _SEARCH_ORDER_CACHE[key] = ids
-    _SEARCH_ORDER_CACHE.move_to_end(key)
+    if cacheable:
+        _SEARCH_ORDER_CACHE[key] = ids
+        _SEARCH_ORDER_CACHE.move_to_end(key)
     while len(_SEARCH_ORDER_CACHE) > _SEARCH_ORDER_CACHE_MAX:
         _SEARCH_ORDER_CACHE.popitem(last=False)
     return ids
@@ -492,10 +520,12 @@ def _search_neighbours(
     author: str | None,
     sort: Sort,
     seed: int,
+    user_id: uuid.UUID,
+    filters: RecipeFilters | None = None,
 ) -> tuple[RecipeNeighbour | None, RecipeNeighbour | None]:
     """Previous/next in the *search* ordering — the ordered ids (cached per search)
     indexed to this recipe."""
-    ids = _ordered_search_ids(session, q, keywords, book_id, author, sort, seed)
+    ids = _ordered_search_ids(session, q, keywords, book_id, author, sort, seed, user_id, filters)
     return _neighbours_in(session, ids, recipe.id)
 
 
@@ -512,15 +542,15 @@ def get_recipe(
     sort: Sort = "relevance",
     seed: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=100)] = 30,
+    filters: str | None = None,
 ) -> RecipeDetail:
+    advanced = parse_filters(filters)
     recipe = session.scalar(
         select(Recipe)
         .where(Recipe.id == recipe_id)
         .options(
             selectinload(Recipe.keywords),
-            selectinload(Recipe.ingredients).joinedload(
-                RecipeIngredient.canonical_ingredient
-            ),
+            selectinload(Recipe.ingredients).joinedload(RecipeIngredient.canonical_ingredient),
             selectinload(Recipe.facets).joinedload(RecipeFacet.facet_value),
             selectinload(Recipe.cuisines),
             joinedload(Recipe.enrichment_state),
@@ -536,7 +566,16 @@ def get_recipe(
         # the pager stays consistent as the reader walks it. If that entry has been
         # evicted the pager simply goes quiet.
         previous, next_ = _search_neighbours(
-            session, recipe, q.strip(), keyword or [], book_id, author, sort, seed
+            session,
+            recipe,
+            q.strip(),
+            [normalise_keyword(k) for k in keyword or []],
+            book_id,
+            author,
+            sort,
+            seed,
+            user.id,
+            advanced,
         )
     elif resolved_context == "semantic":
         # The AI search's ordering, recomputed (and cached) from the same query and

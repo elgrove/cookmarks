@@ -8,16 +8,12 @@
 	} from '$lib/components/RecipesSearch.svelte';
 	import SimilarBrowse, { type SimilarBrowseData } from '$lib/components/SimilarBrowse.svelte';
 	import { fetchBookFilters } from '$lib/api/books';
-	import {
-		bulkAddToList,
-		createList,
-		fetchLists,
-		type ListMembership
-	} from '$lib/api/lists';
+	import { bulkAddToList, createList, fetchLists, type ListMembership } from '$lib/api/lists';
 	import {
 		criteriaFromParams,
 		criteriaToParams,
 		fetchKeywords,
+		fetchKeywordMetadata,
 		fetchRecipeDetail,
 		fetchSimilarRecipes,
 		hasCriteria,
@@ -35,19 +31,33 @@
 	// would otherwise restore an empty search.
 	const initialSearch = typeof window !== 'undefined' ? window.location.search : $page.url.search;
 	const initialParams = new URLSearchParams(initialSearch);
-	const initialCriteria = criteriaFromParams(initialParams);
+	let initialFilterError = '';
+	function readInitialCriteria(): SearchCriteria {
+		try {
+			return criteriaFromParams(initialParams);
+		} catch {
+			initialFilterError =
+				'This link has invalid advanced filters. Open Advanced search to replace them, or clear the filters in the URL.';
+			return {};
+		}
+	}
+	const initialCriteria = readInitialCriteria();
 	// `?mode=ai` opens directly in AI-search mode (the spark), restored from a shared URL.
 	const initialMode: SearchMode = initialParams.get('mode') === 'ai' ? 'semantic' : 'keyword';
 	// AI search returns a single relevance-ranked page; keep it modest.
 	const SEMANTIC_LIMIT = 30;
 
-	let status = $state<SearchStatus>('resting');
+	let status = $state<SearchStatus>(initialFilterError ? 'error' : 'resting');
+	let searchError = $state(initialFilterError);
+	let lookupError = $state('');
+	let booksLoading = $state(true);
+	let listsLoading = $state(true);
+	let keywordMetadata = $state<KeywordSummary[]>([]);
 	let mode = $state<SearchMode>(initialMode);
 	let results = $state<RecipeSearchResults>({ total: 0, items: [], facets: [] });
 	let semanticAvailable = $state(true);
 	let keywords = $state<KeywordSummary[]>([]);
 	let books = $state<{ id: string; title: string }[]>([]);
-	let authors = $state<string[]>([]);
 
 	// The global most-used keywords, shown on the resting state. Cached on mount
 	// so we can restore them when the search is cleared back to resting.
@@ -67,7 +77,10 @@
 				contains: false
 			}));
 		} catch (err) {
+			lookupError = 'Could not load your lists. Reopen this page to retry.';
 			console.error('failed to load lists for selection', err);
+		} finally {
+			listsLoading = false;
 		}
 	}
 
@@ -172,13 +185,15 @@
 	// during mount, before SvelteKit's router (and thus replaceState) is ready.
 	async function execute(criteria: SearchCriteria): Promise<void> {
 		mode = 'keyword';
+		searchError = '';
+		const mine = ++seq;
+		void resolveKeywordMetadata(criteria.keywords ?? []);
 		if (!hasCriteria(criteria)) {
 			status = 'resting';
 			results = { total: 0, items: [], facets: [] };
 			keywords = globalKeywords;
 			return;
 		}
-		const mine = ++seq;
 		status = 'loading';
 		try {
 			const data = await searchRecipes(criteria);
@@ -199,6 +214,8 @@
 	// the resting set, since semantic results carry no co-occurrence facets.
 	async function executeSemantic(query: string): Promise<void> {
 		const q = query.trim();
+		const mine = ++seq;
+		searchError = '';
 		if (!q) {
 			mode = 'keyword';
 			status = 'resting';
@@ -207,7 +224,6 @@
 			return;
 		}
 		mode = 'semantic';
-		const mine = ++seq;
 		status = 'loading';
 		try {
 			const data = await searchSemantic(q, SEMANTIC_LIMIT);
@@ -234,6 +250,17 @@
 		return executeSemantic(query);
 	}
 
+	let metadataSeq = 0;
+	async function resolveKeywordMetadata(names: string[]) {
+		const mine = ++metadataSeq;
+		try {
+			const data = await fetchKeywordMetadata(names);
+			if (mine === metadataSeq) keywordMetadata = data;
+		} catch {
+			if (mine === metadataSeq)
+				lookupError = 'Could not load selected keyword colours. Your filters still apply.';
+		}
+	}
 	onMount(() => {
 		// These requests are independent — fire them concurrently. The search in
 		// particular depends on neither the books nor the keywords.
@@ -244,9 +271,14 @@
 				books = bs
 					.map((b) => ({ id: b.id, title: b.title }))
 					.sort((a, b) => a.title.localeCompare(b.title));
-				authors = [...new Set(bs.map((b) => b.author))].sort((a, b) => a.localeCompare(b));
 			})
-			.catch((err) => console.error('failed to load books for filters', err));
+			.catch((err) => {
+				lookupError = 'Could not load books. Reopen this page to retry.';
+				console.error('failed to load books for filters', err);
+			})
+			.finally(() => {
+				booksLoading = false;
+			});
 
 		// Show the most-used keywords as quick filter chips; once a search is active
 		// these give way to co-occurrence facets. The component clamps to a few lines.
@@ -259,6 +291,7 @@
 
 		// Restore the search the URL describes (if any). The URL already reflects
 		// these, so run without syncing back — replaceState would throw this early.
+		if (initialFilterError) return;
 		if (initialMode === 'semantic' && initialCriteria.q) {
 			executeSemantic(initialCriteria.q);
 		} else if (hasCriteria(initialCriteria)) {
@@ -287,8 +320,12 @@
 		{results}
 		{semanticAvailable}
 		{keywords}
+		{keywordMetadata}
+		{lookupError}
+		lookupLoading={booksLoading || listsLoading}
+		{searchError}
+		lists={barLists}
 		{books}
-		{authors}
 		criteria={initialCriteria}
 		onSearch={run}
 		onSemanticSearch={runSemantic}

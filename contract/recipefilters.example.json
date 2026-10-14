@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "match": "all",
+  "rules": [
+    {"field": "key_ingredient", "operator": "not_contains", "value": "chicken"},
+    {"field": "has_image", "operator": "eq", "value": true}
+  ]
+}

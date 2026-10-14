@@ -1,4 +1,10 @@
 import { z } from 'zod';
+import {
+	recipeFiltersSchema,
+	normaliseFilters,
+	keywordCategories,
+	type RecipeFilters
+} from './recipe-filters';
 
 // The adjacent recipe in the current navigation context (prev/next).
 export const recipeNeighbourSchema = z.object({
@@ -125,6 +131,7 @@ export const recipeSummarySchema = z.object({
 });
 
 export const keywordSummarySchema = z.object({
+	category: z.enum(keywordCategories).nullable().optional(),
 	name: z.string(),
 	recipe_count: z.number().int().nonnegative()
 });
@@ -187,6 +194,7 @@ export type SemanticSearchResults = z.infer<typeof semanticSearchResultsSchema>;
 export type SortKey = 'relevance' | 'random' | 'name' | 'recent' | 'book';
 
 export type SearchCriteria = {
+	filters?: RecipeFilters;
 	q?: string;
 	keywords?: string[];
 	bookId?: string;
@@ -201,11 +209,15 @@ export type SearchCriteria = {
 
 /** True when the criteria ask for anything at all — the page is empty otherwise. */
 export function hasCriteria(c: SearchCriteria): boolean {
-	return Boolean(c.q?.trim() || c.keywords?.length || c.bookId || c.author);
+	return Boolean(
+		c.q?.trim() || c.keywords?.length || c.bookId || c.author || c.filters?.rules.length
+	);
 }
 
 export function criteriaToParams(c: SearchCriteria): URLSearchParams {
 	const p = new URLSearchParams();
+	if (c.filters?.rules.length)
+		p.set('filters', JSON.stringify(normaliseFilters(recipeFiltersSchema.parse(c.filters))));
 	if (c.q?.trim()) p.set('q', c.q.trim());
 	for (const kw of c.keywords ?? []) p.append('keyword', kw);
 	if (c.bookId) p.set('book_id', c.bookId);
@@ -238,16 +250,27 @@ export function searchContextQuery(c: SearchCriteria): string {
  *  `criteriaToParams`, so a search survives a round-trip through the URL. */
 export function criteriaFromParams(p: URLSearchParams): SearchCriteria {
 	const c: SearchCriteria = {};
+	const filters = p.get('filters');
+	if (filters !== null)
+		c.filters = normaliseFilters(recipeFiltersSchema.parse(JSON.parse(filters)));
 	const q = p.get('q');
 	if (q) c.q = q;
-	const keywords = p.getAll('keyword');
+	const keywords = p
+		.getAll('keyword')
+		.map((name) => name.trim().replace(/\s+/g, ' ').toLowerCase());
 	if (keywords.length) c.keywords = keywords;
 	const bookId = p.get('book_id');
 	if (bookId) c.bookId = bookId;
 	const author = p.get('author');
 	if (author) c.author = author;
 	const sort = p.get('sort');
-	if (sort === 'relevance' || sort === 'name' || sort === 'recent' || sort === 'random' || sort === 'book')
+	if (
+		sort === 'relevance' ||
+		sort === 'name' ||
+		sort === 'recent' ||
+		sort === 'random' ||
+		sort === 'book'
+	)
 		c.sort = sort;
 	const seed = p.get('seed');
 	if (seed) c.seed = Number(seed);
@@ -289,4 +312,20 @@ export async function fetchKeywords(
 	const res = await fetchFn(`/api/keywords?limit=${limit}`);
 	if (!res.ok) throw new Error(`GET /api/keywords → ${res.status}`);
 	return keywordsResponseSchema.parse(await res.json());
+}
+
+/** Exact metadata lookup for selected keywords outside the popular pool. */
+export async function fetchKeywordMetadata(
+	names: string[],
+	fetchFn: typeof fetch = fetch
+): Promise<KeywordSummary[]> {
+	const out: KeywordSummary[] = [];
+	for (let i = 0; i < names.length; i += 100) {
+		const params = new URLSearchParams();
+		for (const name of names.slice(i, i + 100)) params.append('name', name);
+		const res = await fetchFn(`/api/keywords?${params}`);
+		if (!res.ok) throw new Error('Could not load keyword categories.');
+		out.push(...keywordsResponseSchema.parse(await res.json()));
+	}
+	return out;
 }

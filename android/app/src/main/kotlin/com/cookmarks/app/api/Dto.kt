@@ -193,7 +193,7 @@ data class RecipeSummary(
 )
 
 @Serializable
-data class KeywordSummary(val name: String, val recipe_count: Int)
+data class KeywordSummary(val name: String, val recipe_count: Int, val category: String? = null)
 
 @Serializable
 data class RecipeSearchResults(

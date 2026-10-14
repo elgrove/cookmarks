@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.enums import RecipeEnrichmentStatus
+from app.models.enums import KeywordCategory, RecipeEnrichmentStatus
 
 
 class RecipeRow(BaseModel):
@@ -45,6 +45,7 @@ class KeywordSummary(BaseModel):
 
     name: str
     recipe_count: int
+    category: KeywordCategory | None = None
 
 
 class RecipeSearchResults(BaseModel):

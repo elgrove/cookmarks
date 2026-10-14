@@ -1,4 +1,5 @@
 {
   "name": "chicken",
-  "recipe_count": 42
+  "recipe_count": 42,
+  "category": "key_ingredient"
 }

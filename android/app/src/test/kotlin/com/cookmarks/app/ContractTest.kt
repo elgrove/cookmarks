@@ -220,6 +220,7 @@ class ContractTest {
     @Test
     fun keyword_summary() {
         assertEquals(42, pin<KeywordSummary>("keywords").recipe_count)
+        assertEquals("key_ingredient", pin<KeywordSummary>("keywords").category)
     }
 
     @Test
