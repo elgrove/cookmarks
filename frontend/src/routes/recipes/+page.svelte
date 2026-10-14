@@ -58,7 +58,6 @@
 	let semanticAvailable = $state(true);
 	let keywords = $state<KeywordSummary[]>([]);
 	let books = $state<{ id: string; title: string }[]>([]);
-	let authors = $state<string[]>([]);
 
 	// The global most-used keywords, shown on the resting state. Cached on mount
 	// so we can restore them when the search is cleared back to resting.
@@ -272,10 +271,9 @@
 				books = bs
 					.map((b) => ({ id: b.id, title: b.title }))
 					.sort((a, b) => a.title.localeCompare(b.title));
-				authors = [...new Set(bs.map((b) => b.author))].sort((a, b) => a.localeCompare(b));
 			})
 			.catch((err) => {
-				lookupError = 'Could not load books and authors. Reopen this page to retry.';
+				lookupError = 'Could not load books. Reopen this page to retry.';
 				console.error('failed to load books for filters', err);
 			})
 			.finally(() => {
@@ -328,7 +326,6 @@
 		{searchError}
 		lists={barLists}
 		{books}
-		{authors}
 		criteria={initialCriteria}
 		onSearch={run}
 		onSemanticSearch={runSemantic}

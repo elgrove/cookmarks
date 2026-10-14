@@ -31,6 +31,41 @@ function setup() {
 	document.body.appendChild(target);
 }
 describe('advanced search draft', () => {
+	it.each(['author', 'keyword', 'key_ingredient'] as const)(
+		'accepts free text without autocomplete for %s',
+		(field) => {
+			setup();
+			const onApply = vi.fn();
+			instance = mount(AdvancedRecipeSearch, {
+				target,
+				props: {
+					open: true,
+					filters: {
+						version: 1,
+						match: 'all',
+						rules: [{ field, operator: 'contains', value: 'old' }]
+					},
+					onApply
+				}
+			});
+			flushSync();
+			const value = target.querySelector<HTMLInputElement>('input')!;
+			expect(value.getAttribute('list')).toBeNull();
+			expect(value.autocomplete).toBe('off');
+			expect(target.querySelector('datalist')).toBeNull();
+			input('input', 'unlisted term');
+			target
+				.querySelector('form')!
+				.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+			flushSync();
+			expect(onApply).toHaveBeenCalledWith({
+				version: 1,
+				match: 'all',
+				rules: [{ field, operator: 'contains', value: 'unlisted term' }]
+			});
+		}
+	);
+
 	it('does not apply changes until Apply and preserves applied props', () => {
 		setup();
 		const onApply = vi.fn();

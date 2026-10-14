@@ -36,7 +36,6 @@
 		lookupLoading?: boolean;
 		searchError?: string;
 		books?: { id: string; title: string }[];
-		authors?: string[];
 		criteria?: SearchCriteria;
 		onSearch?: (criteria: SearchCriteria) => void;
 		onSemanticSearch?: (query: string) => void;
@@ -74,7 +73,6 @@
 		lookupLoading = false,
 		searchError = '',
 		books = [],
-		authors = [],
 		criteria = {},
 		onSearch,
 		onSemanticSearch,
@@ -704,8 +702,6 @@
 	filters={advanced}
 	{books}
 	{lists}
-	{authors}
-	{keywords}
 	{lookupLoading}
 	{lookupError}
 	onApply={applyAdvanced}

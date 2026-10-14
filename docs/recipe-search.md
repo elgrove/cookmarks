@@ -28,3 +28,6 @@ to appear in a previously cached keyword pool.
 Advanced search is in the upper search row. Book and author selection is available in
 the modal. Older search links still apply their book and author filters and show removable
 summaries. The main page retains its sort control.
+
+Free-text rule values have no completion suggestions and disable browser autocomplete.
+Book and list selection controls still offer their available records.

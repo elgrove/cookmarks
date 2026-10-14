@@ -5,8 +5,6 @@
 		filters?: RecipeFilters;
 		books?: { id: string; title: string }[];
 		lists?: { id: string; name: string }[];
-		authors?: string[];
-		keywords?: { name: string; category?: string | null }[];
 		lookupLoading?: boolean;
 		lookupError?: string;
 		onApply?: (filters: RecipeFilters) => void;
@@ -32,8 +30,6 @@
 		filters = emptyFilters(),
 		books = [],
 		lists = [],
-		authors = [],
-		keywords = [],
 		lookupError = '',
 		lookupLoading = false,
 		onApply,
@@ -104,14 +100,6 @@
 		draft.rules[index].value =
 			pickerOptions(draft.rules[index]).find((o) => o.label === value)?.id ?? value;
 	}
-	function suggestionsFor(rule: FilterRule): string[] {
-		if (rule.field === 'author') return authors;
-		if (rule.field === 'keyword') return keywords.map((keyword) => keyword.name);
-		return keywords
-			.filter((keyword) => keyword.category === rule.field)
-			.map((keyword) => keyword.name);
-	}
-
 	function apply() {
 		const parsed = recipeFiltersSchema.safeParse(draft);
 		if (parsed.success) onApply?.(normaliseFilters(parsed.data));
@@ -174,7 +162,7 @@
 							matches flat keywords.
 						</p>
 						{#if lookupLoading}<p class="lookup-error" role="status">
-								Loading books, authors, and lists…
+								Loading books and lists…
 							</p>{/if}
 						{#if lookupError}<p class="lookup-error" role="status">
 								{lookupError} You can still use text rules.
@@ -226,6 +214,7 @@
 											{#if needsPicker(rule)}
 												<input
 													type="text"
+													autocomplete="off"
 													aria-label={`Value for rule ${index + 1}`}
 													list={`advanced-picker-${index}`}
 													value={pickerValue(rule)}
@@ -239,19 +228,15 @@
 											{:else}
 												<input
 													type="text"
+													autocomplete="off"
 													aria-label={`Value for rule ${index + 1}`}
 													maxlength="500"
-													list={`advanced-text-${index}`}
 													value={String(rule.value ?? '')}
 													placeholder="Enter text…"
 													oninput={(e) => {
 														rule.value = e.currentTarget.value;
 													}}
 												/>
-												<datalist id={`advanced-text-${index}`}
-													>{#each suggestionsFor(rule) as suggestion}<option value={suggestion}
-														></option>{/each}</datalist
-												>
 											{/if}
 										</label>
 									{/if}
