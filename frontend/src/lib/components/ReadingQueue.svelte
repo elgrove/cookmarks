@@ -57,7 +57,7 @@
 					{#if book.hasCover && !failedCovers.includes(book.id)}
 						<a class="thumb" href={`/books/${book.id}`} tabindex="-1" aria-hidden="true">
 							<img
-								src={`/api/books/${book.id}/cover`}
+								src={`/api/books/${book.id}/cover/thumbnail`}
 								alt=""
 								loading="lazy"
 								onerror={() => (failedCovers = [...failedCovers, book.id])}

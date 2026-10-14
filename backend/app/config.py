@@ -57,5 +57,10 @@ class Settings(BaseSettings):
     linear_team_id: str = ""
     linear_project_id: str = ""
 
+    # On-disk cache for derived book-cover and recipe-image thumbnails. Persisted
+    # (mounted) in prod so cold starts don't regenerate; regenerates when the
+    # source file changes. Overridable via COOKMARKS_THUMBNAIL_CACHE_PATH.
+    thumbnail_cache_path: Path = BACKEND_ROOT / "thumbnails"
+
 
 settings = Settings()

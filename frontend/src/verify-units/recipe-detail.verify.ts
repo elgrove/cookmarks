@@ -316,7 +316,7 @@ const unit: VerifiableUnit<Props> = {
 					return fig === null || 'a no-image recipe rendered an image figure';
 				if (!fig) return 'hasImage but no image figure rendered';
 				const img = fig.querySelector('img.recipe-image');
-				const want = `/api/recipes/${props.recipe.id}/image`;
+				const want = `/api/recipes/${props.recipe.id}/image/thumbnail`;
 				if (img?.getAttribute('src') !== want)
 					return `figure img src=${img?.getAttribute('src')} expected ${want}`;
 				return (img.getAttribute('alt')?.trim().length ?? 0) > 0 || 'recipe image has empty alt';

@@ -14,6 +14,7 @@ services:
       - ${COOKMARKS_CALIBRE_LIBRARY:-./calibre-library}:/library:ro
     environment:
       - COOKMARKS_CALIBRE_LIBRARY_PATH=/library
+      - COOKMARKS_THUMBNAIL_CACHE_PATH=/data/thumbnails
       # "session" (the default): username + password login. "none" disables accounts
       # entirely — every request runs as one implicit user and no cookie is checked.
       - COOKMARKS_AUTH_MODE=${COOKMARKS_AUTH_MODE:-session}
