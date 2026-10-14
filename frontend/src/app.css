@@ -321,11 +321,5 @@ main {
 /* Stable category colours for the recipe search keyword pile. */
 [data-category='cuisine_region'] { --category-ink: #285f91; --category-bg: #e9f0f7; }
 [data-category='course'] { --category-ink: #89501c; --category-bg: #faf0e1; }
-[data-category='dish_type'] { --category-ink: #9a3e4c; --category-bg: #f8eaf0; }
-[data-category='key_ingredient'] { --category-ink: #426627; --category-bg: #edf3e5; }
-[data-category='method'] { --category-ink: #1d6863; --category-bg: #e5f2ef; }
 [data-theme='dark'] [data-category='cuisine_region'] { --category-ink: #9fc9ef; --category-bg: #213448; }
 [data-theme='dark'] [data-category='course'] { --category-ink: #e6bc88; --category-bg: #392d20; }
-[data-theme='dark'] [data-category='dish_type'] { --category-ink: #efa6b3; --category-bg: #3b2730; }
-[data-theme='dark'] [data-category='key_ingredient'] { --category-ink: #b3d492; --category-bg: #293621; }
-[data-theme='dark'] [data-category='method'] { --category-ink: #91d0c8; --category-bg: #203735; }

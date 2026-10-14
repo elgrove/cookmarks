@@ -54,7 +54,6 @@
 	import {
 		emptyFilters,
 		ruleLabel,
-		keywordCategories,
 		categoryLabels,
 		type RecipeFilters
 	} from '$lib/api/recipe-filters';
@@ -153,7 +152,7 @@
 		selectedRows = on ? [...selectedRows, id] : selectedRows.filter((r) => r !== id);
 	}
 
-	// Mobile collapses the book/author/sort/keyword controls behind a "Filters"
+	// Mobile collapses the sort/keyword controls behind a "Filters"
 	// disclosure to save vertical space; the count keeps applied filters visible
 	// while collapsed. Desktop shows everything and ignores `filtersOpen` (CSS).
 	let filtersOpen = $state(false);
@@ -470,6 +469,14 @@
 			>
 			<span class="btn-text" aria-hidden="true">Ask the library</span>
 		</button>
+		<button
+			class="advanced-trigger"
+			type="button"
+			bind:this={advancedTrigger}
+			onclick={() => {
+				advancedOpen = true;
+			}}>Advanced search{advanced.rules.length ? ` (${advanced.rules.length})` : ''}</button
+		>
 	</div>
 
 	<button
@@ -496,42 +503,6 @@
 	<div class="filter-panel" class:open={filtersOpen}>
 		<div class="filters" class:dimmed={isSemantic}>
 			<label class="filter">
-				<span class="label">Book</span>
-				<select
-					class="select"
-					aria-label="Filter by book"
-					value={bookId}
-					oninput={(e) => {
-						bookId = e.currentTarget.value;
-						emitKeyword();
-					}}
-				>
-					<option value="">All books</option>
-					{#each books as b (b.id)}
-						<option value={b.id}>{cleanTitle(b.title)}</option>
-					{/each}
-				</select>
-			</label>
-
-			<label class="filter">
-				<span class="label">Author</span>
-				<select
-					class="select"
-					aria-label="Filter by author"
-					value={author}
-					oninput={(e) => {
-						author = e.currentTarget.value;
-						emitKeyword();
-					}}
-				>
-					<option value="">All authors</option>
-					{#each authors as a (a)}
-						<option value={a}>{a}</option>
-					{/each}
-				</select>
-			</label>
-
-			<label class="filter">
 				<span class="label">Sort</span>
 				<select
 					class="select"
@@ -549,33 +520,55 @@
 			</label>
 		</div>
 
-		<div class="advanced-controls">
-			{#if isSemantic && advanced.rules.length}<p class="label">
-					Advanced rules are paused during semantic search. Apply filters to use normal search.
-				</p>{/if}
-			<button
-				class="advanced-trigger"
-				type="button"
-				bind:this={advancedTrigger}
-				onclick={() => {
-					advancedOpen = true;
-				}}>Advanced search{advanced.rules.length ? ` (${advanced.rules.length})` : ''}</button
-			>
-			{#if advanced.rules.length}
-				<p class="label">
-					Match {advanced.match} advanced rules · also match search and keyword chips
-				</p>
-				<ul class="applied-rules" aria-label="Applied advanced filters">
-					{#each advanced.rules as rule, index}<li>
-							<span>{ruleLabel(rule, books, lists)}</span><button
-								type="button"
-								aria-label={`Remove advanced rule ${index + 1}`}
-								onclick={() => removeRule(index)}>×</button
-							>
-						</li>{/each}
-				</ul>
-			{/if}
-		</div>
+		{#if advanced.rules.length || bookId || author}
+			<div class="advanced-controls">
+				{#if isSemantic && advanced.rules.length}<p class="label">
+						Advanced rules are paused during semantic search. Apply filters to use normal search.
+					</p>{/if}
+				{#if bookId || author}
+					<ul class="applied-rules" aria-label="Filters from this search link">
+						{#if bookId}<li>
+								<span
+									>Book: {cleanTitle(
+										books.find((book) => book.id === bookId)?.title ?? 'Unavailable book'
+									)}</span
+								><button
+									type="button"
+									aria-label="Remove book filter"
+									onclick={() => {
+										bookId = '';
+										emitKeyword();
+									}}>×</button
+								>
+							</li>{/if}
+						{#if author}<li>
+								<span>Author: {author}</span><button
+									type="button"
+									aria-label="Remove author filter"
+									onclick={() => {
+										author = '';
+										emitKeyword();
+									}}>×</button
+								>
+							</li>{/if}
+					</ul>
+				{/if}
+				{#if advanced.rules.length}
+					<p class="label">
+						Match {advanced.match} advanced rules · also match search and keyword chips
+					</p>
+					<ul class="applied-rules" aria-label="Applied advanced filters">
+						{#each advanced.rules as rule, index}<li>
+								<span>{ruleLabel(rule, books, lists)}</span><button
+									type="button"
+									aria-label={`Remove advanced rule ${index + 1}`}
+									onclick={() => removeRule(index)}>×</button
+								>
+							</li>{/each}
+					</ul>
+				{/if}
+			</div>
+		{/if}
 		{#if chips.length}
 			<section class="keywords" class:dimmed={isSemantic}>
 				<div class="keywords-head">
@@ -586,12 +579,6 @@
 						</button>
 					{/if}
 				</div>
-				<ul class="category-key" aria-label="Keyword category colours">
-					{#each keywordCategories as category}<li data-category={category}>
-							{categoryLabels[category]}
-						</li>{/each}
-					<li data-category="none">Other keywords</li>
-				</ul>
 				<ul
 					class="chips"
 					class:clamped={clampHeight != null}
@@ -752,29 +739,6 @@
 		cursor: pointer;
 		font-size: 1rem;
 	}
-	.category-key {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.5rem 1rem;
-		list-style: none;
-		padding: 0;
-		margin: 0 0 0.85rem;
-		font-family: var(--f-mono);
-		font-size: 0.6rem;
-		text-transform: uppercase;
-	}
-	.category-key li {
-		display: flex;
-		align-items: center;
-		gap: 0.4rem;
-		color: var(--muted);
-	}
-	.category-key li::before {
-		content: '';
-		width: 0.5rem;
-		height: 0.5rem;
-		background: var(--category-ink, var(--muted));
-	}
 	.chip[data-category] {
 		background: var(--category-bg, var(--card));
 		color: var(--category-ink, var(--ink));
@@ -813,6 +777,7 @@
 	.searchrow {
 		display: flex;
 		align-items: stretch;
+		flex-wrap: wrap;
 		gap: 0.65rem;
 		margin-bottom: 1.4rem;
 	}
@@ -1202,6 +1167,9 @@
 		}
 		.searchrow {
 			gap: 0.4rem;
+		}
+		.searchrow .advanced-trigger {
+			flex-basis: 100%;
 		}
 		/* Icon-only triggers on a phone — the labels don't fit beside the box. */
 		.iconbtn {

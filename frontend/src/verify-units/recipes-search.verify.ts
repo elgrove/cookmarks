@@ -270,6 +270,19 @@ const unit: VerifiableUnit<Props> = {
 	],
 	invariants: [
 		{
+			id: 'compact-search-controls',
+			description:
+				'Advanced search sits beside search; category key and quick book/author selects are absent',
+			onlyFixtures: ['category-pile', 'resting'],
+			check: ({ root }) =>
+				Boolean(root.querySelector('.searchrow .advanced-trigger')) &&
+				!root.querySelector('.category-key') &&
+				!root.querySelector(
+					'select[aria-label="Filter by book"], select[aria-label="Filter by author"]'
+				)
+		},
+
+		{
 			id: 'category-colours',
 			description: 'Each chip carries its stable category',
 			onlyFixtures: ['category-pile'],
