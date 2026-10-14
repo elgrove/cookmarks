@@ -5,12 +5,14 @@ the resulting condition must also match the main text query and selected keyword
 The modal keeps a draft until Apply. Cancel, Escape, and backdrop dismissal discard it.
 Cuisine filters match flat keyword names without hierarchy expansion.
 
-The recipe filter chips stay in one frequency-ordered pile. Cuisine/region uses pastel blue
-and course uses pastel green. Both use darker category text, matching counts, and the same quiet outline as uncategorised chips. Dish type, key
-ingredient, method, and uncategorised keywords use muted text, quiet borders, and
-transparent backgrounds. Accessible names identify every category. Selected chips use
-the forest-green fill with white text. Light and Midnight colour pairs are defined in
-`frontend/src/app.css`.
+The recipe filter chips stay in one frequency-ordered pile. Cuisine/region uses pastel
+blue and course uses pastel green. Other keywords use six decorative pastels: peach,
+sand, rose, lavender, mauve, and butter. A keyword's name determines its pastel so it
+stays stable across result ordering and page reloads. These six colours do not indicate
+categories. All unselected chips use the same quiet outline. Cuisine and course use
+darker category text; other keywords use grey text. Accessible names identify every
+category. Selected chips use the forest-green fill with white text. Light and Midnight
+colour pairs are defined in `frontend/src/app.css`.
 
 The modal follows the editorial-ledger design: warm paper, Space Grotesk / IBM Plex Mono,
 square controls, ink rules, compact spacing, and stacked controls on mobile.

@@ -202,6 +202,13 @@
 	// even when they drop out of the facets), then the co-occurrence facets. A
 	// pinned chip has no count — it's already chosen, every result carries it.
 	const CHIP_CAP = 50;
+
+	// Keep each keyword's pastel stable across result ordering and page reloads.
+	function pastelFor(name: string): number {
+		let hash = 0;
+		for (const character of name) hash = (Math.imul(hash, 31) + character.codePointAt(0)!) | 0;
+		return (hash >>> 0) % 6;
+	}
 	type DisplayChip = { name: string; count: number | null; category?: KeywordSummary['category'] };
 	let chips = $derived.by<DisplayChip[]>(() => {
 		const pinned = selected.map((name) => ({
@@ -592,6 +599,9 @@
 								class="chip"
 								class:on={selected.includes(chip.name)}
 								data-category={chip.category ?? 'none'}
+								data-pastel={chip.category === 'cuisine_region' || chip.category === 'course'
+									? undefined
+									: pastelFor(chip.name)}
 								aria-label={`${chip.name} · ${categoryLabels[chip.category ?? ''] ?? 'Other keywords'}${chip.count !== null ? ` · ${chip.count} recipes` : ''}`}
 								aria-pressed={selected.includes(chip.name)}
 								onclick={() => toggleKeyword(chip.name)}
