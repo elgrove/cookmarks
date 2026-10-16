@@ -88,7 +88,7 @@ def _drop_checkpoint(run_id: str) -> None:
     try:
         delete_run_checkpoint(run_id)
     except Exception:
-        logger.exception(f"Failed to delete checkpoint thread for run {run_id}")
+        logger.exception("Failed to delete checkpoint thread for run %s", run_id)
 
 
 def _mark_run_failed(extraction_id: str, exc: Exception) -> None:
@@ -98,15 +98,15 @@ def _mark_run_failed(extraction_id: str, exc: Exception) -> None:
     try:
         with SessionLocal() as session:
             run = session.get(TaskRun, uuid.UUID(extraction_id))
-            if run is None:
-                return
-            run.status = TaskStatus.FAILED
-            run.errors = [*run.errors, str(exc)]
-            run.completed_at = datetime.now(UTC)
-            session.commit()
+            if run is not None:
+                run.status = TaskStatus.FAILED
+                run.errors = [*run.errors, str(exc)]
+                run.completed_at = datetime.now(UTC)
+                session.commit()
     except Exception:
-        logger.exception(f"Failed to mark run {extraction_id} as failed")
+        logger.exception("Failed to mark run %s as failed", extraction_id)
     # A failed run can never resume, so its checkpoint thread is dead weight.
+    # Dropping by thread id needs no run row, so orphan threads clear here too.
     _drop_checkpoint(extraction_id)
 
 
@@ -292,23 +292,24 @@ def _finalise_result(run_id: str, result: dict | None) -> str:
         if run.status == TaskStatus.DONE:
             book = session.get(Book, run.book_id)
             if book is None:
-                return "Book not found"
-            raw_recipes = (result or {}).get("raw_recipes", [])
-            new_keywords: list[Keyword] = []
-            created = save_recipes_from_graph_state(
-                session, book, run, raw_recipes, created_keywords=new_keywords
-            )
-            recipes = list(
-                session.scalars(select(Recipe).where(Recipe.extraction_run_id == run.id))
-            )
-            generate_recipe_embeddings(session, recipes)
-            _generate_book_keywords(session, book)
-            # Preserve the existing embedding → book-keyword order and make both
-            # durable before the optional classifier runs in its own transaction.
-            session.commit()
-            _classify_new_keywords(session, new_keywords)
-            logger.info(f"Finished extraction for {book.title}. Processed {created} recipes.")
-            message = f"Extracted {created} recipes for {book.title}"
+                message = "Book not found"
+            else:
+                raw_recipes = (result or {}).get("raw_recipes", [])
+                new_keywords: list[Keyword] = []
+                created = save_recipes_from_graph_state(
+                    session, book, run, raw_recipes, created_keywords=new_keywords
+                )
+                recipes = list(
+                    session.scalars(select(Recipe).where(Recipe.extraction_run_id == run.id))
+                )
+                generate_recipe_embeddings(session, recipes)
+                _generate_book_keywords(session, book)
+                # Preserve the existing embedding → book-keyword order and make both
+                # durable before the optional classifier runs in its own transaction.
+                session.commit()
+                _classify_new_keywords(session, new_keywords)
+                logger.info(f"Finished extraction for {book.title}. Processed {created} recipes.")
+                message = f"Extracted {created} recipes for {book.title}"
         else:
             return "Extraction completed with unknown status"
 

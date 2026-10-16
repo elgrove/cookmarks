@@ -20,7 +20,6 @@ against the production volume.
 
 import argparse
 import logging
-from pathlib import Path
 
 from app.config import settings
 from app.db import SessionLocal
@@ -50,16 +49,10 @@ def main() -> None:
         action="store_true",
         help="keep threads with no matching TaskRun row",
     )
-    parser.add_argument(
-        "--db-path",
-        type=Path,
-        default=None,
-        help="database file to prune (defaults to the configured one)",
-    )
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(message)s")
 
-    db_path = args.db_path or settings.db_path
+    db_path = settings.db_path
     before = db_size_stats(db_path)
     logger.info(
         f"Before: {_format_mib(before['size_bytes'])} file, "
@@ -68,9 +61,6 @@ def main() -> None:
     )
 
     with SessionLocal() as session:
-        # A custom --db-path still resolves the app session; rebind the session
-        # only when the default path is in use is beyond this script's scope —
-        # the flag exists for offline copies that share the same ORM.
         report = prune_completed_checkpoints(
             session,
             db_path=db_path,

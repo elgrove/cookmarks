@@ -2,6 +2,7 @@
 
 import sqlite3
 import uuid
+import zipfile
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -17,7 +18,6 @@ from app.models.enums import AIProvider as AIProviderEnum
 from app.models.enums import TaskStatus, TaskType
 from app.models.task_run import TaskRun
 from app.services.ai import upsert_provider_config
-from app.services.extraction import graph
 from app.services.extraction.checkpoints import (
     delete_run_checkpoint,
     delete_thread,
@@ -159,8 +159,6 @@ def test_prune_deletes_terminal_runs_but_keeps_review_and_active(
         failed = _make_run(session, TaskStatus.FAILED)
         review = _make_run(session, TaskStatus.REVIEW)
         running = _make_run(session, TaskStatus.RUNNING)
-        done_id, failed_id = str(done.id), str(review.id)
-        _ = failed_id
         threads = [
             thread_id_for_run(done.id),
             thread_id_for_run(failed.id),
@@ -186,7 +184,6 @@ def test_prune_deletes_terminal_runs_but_keeps_review_and_active(
     with db() as session:
         assert session.get(TaskRun, review.id) is not None
         assert session.scalar(select(TaskRun).where(TaskRun.id == review.id)) is not None
-    _ = done_id
 
 
 def test_prune_dry_run_and_filters(
@@ -282,8 +279,6 @@ _CONTAINERS = {
 
 
 def _write_epub(path: Path) -> None:
-    import zipfile
-
     chapter = (
         "<html><body><h1>Soup</h1><p>Just water.</p></body></html>",
         "<html><body><h1>Stew</h1><p>Just fire.</p></body></html>",
@@ -309,7 +304,6 @@ def e2e(
     factory = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
     monkeypatch.setattr("app.services.extraction.graph.SessionLocal", factory)
     monkeypatch.setattr("app.tasks.extraction.SessionLocal", factory)
-    graph.SessionLocal = factory
     get_extraction_graph.cache_clear()
     yield factory, library
     get_extraction_graph.cache_clear()

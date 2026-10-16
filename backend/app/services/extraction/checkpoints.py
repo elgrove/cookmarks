@@ -7,6 +7,10 @@ need that state afterwards — a later resume reads it back. Completed and faile
 runs can never resume, so their threads are dead weight (about 231 MiB on the
 production volume when this was measured).
 
+The ``run_`` thread prefix is reserved for extraction runs: any thread carrying
+it with no matching TaskRun row is an orphan the maintenance pass reaps.
+Anything else (eval threads, future tools) is left alone.
+
 This module is the single place that maps threads to runs and deletes them.
 The worker calls it automatically when a run reaches DONE or FAILED; the
 ``prune_checkpoints`` script reaps older threads as a maintenance pass.
@@ -31,10 +35,9 @@ logger = logging.getLogger(__name__)
 RUN_THREAD_PREFIX = "run_"
 
 TERMINAL_STATUSES = frozenset({TaskStatus.DONE, TaskStatus.FAILED})
-KEPT_STATUSES = frozenset(
-    {TaskStatus.QUEUED, TaskStatus.RUNNING, TaskStatus.WAITING, TaskStatus.REVIEW}
-)
 
+# Mirrors the installed SqliteSaver schema (checkpoints + writes, no blob table).
+# Re-check against langgraph's setup() when bumping the dependency.
 CHECKPOINT_TABLES = ("checkpoints", "writes")
 
 
@@ -109,8 +112,8 @@ def delete_thread(thread_id: str, db_path: Path | None = None) -> tuple[int, int
         writes = conn.execute("DELETE FROM writes WHERE thread_id = ?", (thread_id,)).rowcount
         conn.commit()
         return (checkpoints or 0, writes or 0)
-    except sqlite3.OperationalError:
-        logger.exception(f"Checkpoint delete failed for thread {thread_id}")
+    except sqlite3.Error:
+        logger.exception("Checkpoint delete failed for thread %s", thread_id)
         return (0, 0)
     finally:
         conn.close()
