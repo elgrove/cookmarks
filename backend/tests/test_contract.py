@@ -17,7 +17,7 @@ from app.schemas.auth import AuthMe, UserRead
 from app.schemas.book import BookDetail, BookFilter, BookReadState, BookSummary, RecipeIndexEntry
 from app.schemas.config import AIReadiness, ConfigRead
 from app.schemas.extraction import ReviewQuestion
-from app.schemas.game import DismissState, GameRecipeIds
+from app.schemas.game import DismissState, GameDeckPage, GameRecipeIds
 from app.schemas.home import HomeData
 from app.schemas.reading_queue import QueuedBook, QueueState
 from app.schemas.recipe import (
@@ -374,6 +374,19 @@ def test_dismiss_endpoint_keys_match_contract(client: TestClient) -> None:
     example = _example("dismissstate.example.json")
     body = client.put(f"/api/game/dismissals/{_a_recipe_id(client)}").json()
     assert set(body.keys()) == set(example.keys())
+
+
+def test_game_deck_model_matches_contract() -> None:
+    example = _example("gamedeck.example.json")
+    dumped = GameDeckPage.model_validate(example).model_dump(mode="json")
+    assert dumped == example
+
+
+def test_game_deck_endpoint_keys_match_contract(client: TestClient) -> None:
+    example = _example("gamedeck.example.json")
+    body = client.get("/api/game/deck").json()
+    assert set(body.keys()) == set(example.keys())
+    assert set(body["items"][0].keys()) == set(example["items"][0].keys())
 
 
 def test_assistant_conversation_summary_model_matches_contract() -> None:

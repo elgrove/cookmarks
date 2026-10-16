@@ -118,15 +118,20 @@ class DeckController(private val source: GameSource, private val scope: Coroutin
     }
 
     private suspend fun nextBatch(): List<GameCard> = when (source) {
-        is GameSource.All, is GameSource.Search -> {
-            val search = source as? GameSource.Search
+        is GameSource.All -> {
+            // MY-212: the slim deck endpoint — ids + names only, no search
+            // total/facets/keyword payload.
+            val r = Api.service.gameDeck(seed = seed, limit = GameDeck.PAGE_SIZE, offset = offset)
+            offset += r.items.size
+            r.items.map { GameCard(it.id, it.name) }
+        }
+        is GameSource.Search -> {
             val r = Api.service.searchRecipes(
-                q = search?.q.orEmpty(),
-                keywords = search?.keywords.orEmpty(),
+                q = source.q,
+                keywords = source.keywords,
                 seed = seed,
                 limit = GameDeck.PAGE_SIZE,
                 offset = offset,
-                all = source is GameSource.All,
             )
             offset += r.items.size
             r.items.map { GameCard(it.id, it.name) }

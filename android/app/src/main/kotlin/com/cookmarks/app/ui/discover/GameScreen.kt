@@ -214,7 +214,15 @@ private fun GameCardFace(card: GameCard, source: GameSource, flippable: Boolean)
     val colors = CmTheme.colors
     var flipped by remember { mutableStateOf(false) }
     val angle by animateFloatAsState(if (flipped) 180f else 0f, tween(350), label = "flip")
-    val state by rememberLoad(card.id) { Api.service.recipe(card.id) }
+    // MY-212: only the visible card fetches its detail — the two cards stacked
+    // behind show the name placeholder until swiped to the top. Before, every
+    // refill fetched 3 details (+ images) up front.
+    val state = if (flippable) {
+        val loaded by rememberLoad(card.id) { Api.service.recipe(card.id) }
+        loaded
+    } else {
+        null
+    }
 
     Box(
         modifier = Modifier

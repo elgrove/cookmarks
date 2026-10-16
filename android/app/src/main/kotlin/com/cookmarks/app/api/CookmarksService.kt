@@ -131,6 +131,13 @@ interface CookmarksService {
     @DELETE("api/lists/{listId}/recipes/{recipeId}")
     suspend fun removeFromList(@Path("listId") listId: String, @Path("recipeId") recipeId: String)
 
+    @GET("api/game/deck")
+    suspend fun gameDeck(
+        @Query("seed") seed: Int = 0,
+        @Query("limit") limit: Int = 30,
+        @Query("offset") offset: Int = 0,
+    ): GameDeckPage
+
     @POST("api/game/eligible")
     suspend fun gameEligible(@Body body: GameRecipeIds): GameRecipeIds
 
