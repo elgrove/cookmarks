@@ -22,7 +22,7 @@ export type DownloadedBook = {
 	contentType: string | null;
 };
 
-/** MiB with one decimal — the unit the ticket's file-size evidence uses. */
+/** MiB with one decimal. */
 export function formatMiB(bytes: number): string {
 	return `${(bytes / 1024 / 1024).toFixed(1)} MiB`;
 }
@@ -102,6 +102,10 @@ export type FileProbe = {
 	etag: string | null;
 	contentType: string | null;
 	acceptsRanges: boolean;
+	/** HTTP status of the probe response, or null when the server was unreachable.
+	 *  A stored copy is only trusted on a true network failure — a 404/500 means
+	 *  the book is gone, not that the cache is fresh. */
+	status: number | null;
 };
 
 const RANGE_TOTAL = /bytes \d+-\d+\/(\d+)/;
@@ -115,6 +119,13 @@ export async function probeFile(
 	url: string,
 	fetchFn: typeof fetch = fetch
 ): Promise<FileProbe> {
+	const unknown = (status: number | null): FileProbe => ({
+		size: null,
+		etag: null,
+		contentType: null,
+		acceptsRanges: false,
+		status
+	});
 	try {
 		const res = await fetchFn(url, { headers: { Range: 'bytes=0-0' } });
 		if (res.status === 206) {
@@ -124,7 +135,8 @@ export async function probeFile(
 				size: match ? Number(match[1]) : null,
 				etag: res.headers.get('etag'),
 				contentType: res.headers.get('content-type'),
-				acceptsRanges: true
+				acceptsRanges: true,
+				status: 206
 			};
 		}
 		const length = res.headers.get('content-length');
@@ -134,9 +146,11 @@ export async function probeFile(
 				size: length !== null && length !== '' ? Number(length) : null,
 				etag: res.headers.get('etag'),
 				contentType: res.headers.get('content-type'),
-				acceptsRanges: false
+				acceptsRanges: false,
+				status: res.status
 			};
 		}
+		return unknown(res.status);
 	} catch {
 		// Fall through to the HEAD probe below.
 	}
@@ -148,13 +162,15 @@ export async function probeFile(
 				size: length !== null && length !== '' ? Number(length) : null,
 				etag: head.headers.get('etag'),
 				contentType: head.headers.get('content-type'),
-				acceptsRanges: (head.headers.get('accept-ranges') ?? '').includes('bytes')
+				acceptsRanges: (head.headers.get('accept-ranges') ?? '').includes('bytes'),
+				status: head.status
 			};
 		}
+		return unknown(head.status);
 	} catch {
 		// Unreachable — report unknown rather than throwing.
+		return unknown(null);
 	}
-	return { size: null, etag: null, contentType: null, acceptsRanges: false };
 }
 
 /** Fetch a whole book file, reporting bytes as they arrive for the progress UI. */
@@ -176,6 +192,16 @@ export async function downloadWithProgress(
 		return { blob, total: total ?? blob.size, etag, contentType };
 	}
 	const reader = res.body.getReader();
+	const abort = options.signal;
+	if (abort) {
+		abort.addEventListener(
+			'abort',
+			() => {
+				reader.cancel().catch(() => undefined);
+			},
+			{ once: true }
+		);
+	}
 	const chunks: BlobPart[] = [];
 	let loaded = 0;
 	for (;;) {
@@ -185,6 +211,7 @@ export async function downloadWithProgress(
 		loaded += value.byteLength;
 		onProgress({ loaded, total });
 	}
+	if (abort?.aborted) throw new DOMException('Aborted', 'AbortError');
 	const blob = new Blob(chunks, { type: contentType ?? '' });
 	return { blob, total: total ?? blob.size, etag, contentType };
 }
@@ -211,13 +238,19 @@ export function makeRangeBackedFile(
 	options: { contentType?: string | null; fetchFn?: typeof fetch } = {}
 ): RangeBackedFile {
 	const fetchFn = options.fetchFn ?? fetch;
+	// When the server ignores a range, every slice would otherwise re-fetch the
+	// whole file — share the first full body across slices instead.
+	let fullBody: Promise<ArrayBuffer> | null = null;
 	const slice = (begin: number, end?: number) => ({
 		async arrayBuffer(): Promise<ArrayBuffer> {
 			const stop = end ?? size;
 			const res = await fetchFn(url, { headers: { Range: `bytes=${begin}-${stop - 1}` } });
 			if (res.status === 206) return res.arrayBuffer();
+			// An error page is not book data — surface it rather than slicing it.
+			if (!res.ok) throw new Error(`GET ${url} → ${res.status}`);
 			// The server ignored the range — slice the full body down instead.
-			const full = await res.arrayBuffer();
+			fullBody ??= res.arrayBuffer();
+			const full = await fullBody;
 			return full.slice(begin, stop);
 		}
 	});

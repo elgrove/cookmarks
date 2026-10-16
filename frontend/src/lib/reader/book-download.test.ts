@@ -40,7 +40,8 @@ describe('probeFile', () => {
 			size: 57671680,
 			etag: '"abc123"',
 			contentType: 'application/epub+zip',
-			acceptsRanges: true
+			acceptsRanges: true,
+			status: 206
 		});
 	});
 
@@ -56,6 +57,7 @@ describe('probeFile', () => {
 		const probe = await probeFile('/api/books/1/file', fetchFn);
 		expect(probe.acceptsRanges).toBe(false);
 		expect(probe.size).toBe(5);
+		expect(probe.status).toBe(200);
 	});
 
 	it('falls back to HEAD when ranges fail', async () => {
@@ -76,7 +78,19 @@ describe('probeFile', () => {
 			size: 50331648,
 			etag: '"pdf-etag"',
 			contentType: 'application/pdf',
-			acceptsRanges: true
+			acceptsRanges: true,
+			status: 200
+		});
+	});
+
+	it('reports the HTTP status when the book is gone, so a stale cache is not trusted', async () => {
+		const fetchFn = (async () => new Response(null, { status: 404 })) as unknown as typeof fetch;
+		await expect(probeFile('/api/books/1/file', fetchFn)).resolves.toEqual({
+			size: null,
+			etag: null,
+			contentType: null,
+			acceptsRanges: false,
+			status: 404
 		});
 	});
 
@@ -88,7 +102,8 @@ describe('probeFile', () => {
 			size: null,
 			etag: null,
 			contentType: null,
-			acceptsRanges: false
+			acceptsRanges: false,
+			status: null
 		});
 	});
 });
@@ -145,6 +160,12 @@ describe('makeRangeBackedFile', () => {
 		const file = makeRangeBackedFile('/api/books/1/file', full.length, { fetchFn });
 		const bytes = new Uint8Array(await file.slice(2, 5).arrayBuffer());
 		expect(bytes).toEqual(new Uint8Array([3, 4, 5]));
+	});
+
+	it('throws rather than slicing an error page', async () => {
+		const fetchFn = stubFetch(new Response('no such book', { status: 404 }));
+		const file = makeRangeBackedFile('/api/books/1/file', 100, { fetchFn });
+		await expect(file.slice(0, 5).arrayBuffer()).rejects.toThrow('404');
 	});
 });
 

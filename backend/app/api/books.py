@@ -387,7 +387,10 @@ def book_file(
     file_stat = path.stat()
     etag_base = f"{file_stat.st_mtime}-{file_stat.st_size}"
     etag = f'"{hashlib.md5(etag_base.encode(), usedforsecurity=False).hexdigest()}"'
-    headers = {"ETag": etag, "Cache-Control": "public, max-age=3153600"}
+    # Private: every /api route (bar health and auth) hangs off the session gate,
+    # so shared caches must not store library content. The browser cache and the
+    # reader's own Cache Storage copy still apply.
+    headers = {"ETag": etag, "Cache-Control": "private, max-age=31536000"}
     if request.headers.get("if-none-match") == etag:
         return Response(status_code=status.HTTP_304_NOT_MODIFIED, headers=headers)
     return FileResponse(path, media_type=media_type, headers=headers)

@@ -374,8 +374,10 @@
 			fromCache = true;
 			return new File([cached.blob], 'book', { type: cached.blob.type });
 		}
-		if (cached && probe.size === null && probe.etag === null) {
-			// Unreachable server (offline): trust the stored copy.
+		if (cached && probe.status === null) {
+			// Unreachable server (offline): trust the stored copy. A definitive HTTP
+			// status means the book itself is gone, so it downloads (and errors)
+			// instead of opening stale bytes.
 			fromCache = true;
 			return new File([cached.blob], 'book', { type: cached.blob.type });
 		}
@@ -437,7 +439,23 @@
 					// whole book. Anything failing here falls back to the full download.
 					try {
 						const probe = await probeFile(url);
-						if (!cancelled && probe.acceptsRanges && probe.size) {
+						if (cancelled || !host) return;
+						// A stored copy the server confirms as current opens with no
+						// network at all — this is also what hover-prefetch warms.
+						const cached = await readCachedBook(url);
+						if (cancelled || !host) return;
+						if (cached && cached.etag && probe.etag && cached.etag === probe.etag) {
+							fromCache = true;
+							totalBytes = cached.blob.size;
+							host.append(el);
+							view = el;
+							// Ready before open() renders the first section, so its
+							// headings get matched too.
+							recipeIndex = await indexPromise;
+							await el.open(
+								new File([cached.blob], 'book', { type: cached.blob.type })
+							);
+						} else if (probe.acceptsRanges && probe.size) {
 							totalBytes = probe.size;
 							const shim = makeRangeBackedFile(url, probe.size, {
 								contentType: probe.contentType ?? 'application/pdf'
@@ -526,7 +544,7 @@
 				reportOpenTiming(ranged);
 			} catch (err) {
 				if (!cancelled) {
-					console.error('failed to open epub', err);
+					console.error('failed to open book', err);
 					status = 'error';
 				}
 			}

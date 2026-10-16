@@ -161,10 +161,10 @@
 	// Warm the reader's file cache when the Read action is clearly about to be used
 	// (hover or keyboard focus) — MY-213. warmBookCache itself stays off metered
 	// connections, so this never spends data the user didn't ask to spend.
-	let prefetched = false;
+	let prefetchedFor: string | null = null;
 	function prefetchBookFile() {
-		if (prefetched || !readable) return;
-		prefetched = true;
+		if (!readable || prefetchedFor === book.id) return;
+		prefetchedFor = book.id;
 		void warmBookCache(bookFileUrl(book.id));
 	}
 </script>
@@ -279,8 +279,8 @@
 				{/if}
 			</div>
 
-			<div class="actions">
-				<!-- Two ways to read a book, one shared position; the mode last read leads. -->
+		<div class="actions">
+			<!-- Two ways to read a book, one shared position; the mode last read leads. -->
 			{#if readable}
 				<a
 					class="btn read-epub"
@@ -291,10 +291,10 @@
 					onmouseenter={prefetchBookFile}
 					onfocus={prefetchBookFile}
 				>
-						{started ? 'Continue book' : 'Read book'}
-						<span class="ar" aria-hidden="true">›</span>
-					</a>
-				{/if}
+					{started ? 'Continue book' : 'Read book'}
+					<span class="ar" aria-hidden="true">›</span>
+				</a>
+			{/if}
 				{#if book.resumeRecipe}
 					<a
 						class="btn read-recipes"

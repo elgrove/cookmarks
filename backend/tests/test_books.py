@@ -428,7 +428,7 @@ def test_file_etag_revalidation(client: TestClient, library_with_epub: Path) -> 
     first = client.get(f"/api/books/{book_id}/file")
     assert first.status_code == 200
     etag = first.headers["ETag"]
-    assert first.headers["Cache-Control"] == "public, max-age=3153600"
+    assert first.headers["Cache-Control"] == "private, max-age=31536000"
 
     not_modified = client.get(f"/api/books/{book_id}/file", headers={"If-None-Match": etag})
     assert not_modified.status_code == 304
