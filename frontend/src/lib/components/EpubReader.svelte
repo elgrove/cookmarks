@@ -14,6 +14,14 @@
 		type ReadingState,
 		type RecipeIndexEntry
 	} from '$lib/api/books';
+	import {
+		downloadWithProgress,
+		formatMiB,
+		makeRangeBackedFile,
+		probeFile,
+		readCachedBook,
+		storeCachedBook
+	} from '$lib/reader/book-download';
 	import { toggleFavourite } from '$lib/api/lists';
 	import { reportEpubLocation } from '$lib/api/recipes';
 	import {
@@ -32,12 +40,17 @@
 		bookId: string;
 		title: string;
 		author: string;
+		/** Which format the reader serves — the backend prefers EPUB when a book holds
+		 *  both, so the read page passes has_epub ? 'epub' : 'pdf'. PDFs stream over
+		 *  HTTP ranges; EPUBs need the whole file first (MY-213). */
+		format?: 'epub' | 'pdf';
 		/** How far the book has been read, either way, if it has been opened before. */
 		resume?: ReadingState | null;
 		/** Open at this recipe instead of the resume position — a targeted jump from its page. */
 		startRecipeId?: string | null;
 	};
-	let { bookId, title, author, resume = null, startRecipeId = null }: Props = $props();
+	let { bookId, title, author, format = 'epub', resume = null, startRecipeId = null }: Props =
+		$props();
 
 	let host = $state<HTMLDivElement>();
 	let view: FoliateView | null = null;
@@ -48,6 +61,14 @@
 	let rawIndex: RecipeIndexEntry[] | null = null;
 
 	let status = $state<'loading' | 'error' | 'ready' | 'not-found'>('loading');
+	// Full-download progress for the EPUB path (MY-213): bytes so far and the total
+	// when the server reported one. `fromCache` when the stored copy opened instead.
+	let downloadedBytes = $state(0);
+	let totalBytes = $state<number | null>(null);
+	let fromCache = $state(false);
+	let downloadPct = $derived(
+		totalBytes ? Math.min(100, Math.round((downloadedBytes / totalBytes) * 100)) : null
+	);
 	// The name behind a failed targeted jump (null when the id wasn't in the index at all).
 	let missedName = $state<string | null>(null);
 	let toc = $state<TocEntry[]>([]);
@@ -322,11 +343,66 @@
 		else if (e.key === 'ArrowRight') view?.next();
 	}
 
+	const FETCH_START_MARK = 'cookmarks:reader-fetch-start';
+
+	/** Log usable-reader time: fetch start to the first readable page (MY-213). */
+	function reportOpenTiming(ranged: boolean) {
+		try {
+			performance.mark('cookmarks:reader-ready');
+			performance.measure('cookmarks:reader-open', FETCH_START_MARK, 'cookmarks:reader-ready');
+			const entry = performance.getEntriesByName('cookmarks:reader-open').at(-1);
+			if (entry) {
+				const via = fromCache ? 'cache' : ranged ? 'pdf ranges' : 'network';
+				console.info(`reader opened in ${Math.round(entry.duration)} ms (from ${via})`);
+			}
+		} catch {
+			// Timing only — never break the reader.
+		}
+	}
+
+	/**
+	 * Fetch the whole book file with byte progress, preferring the stored copy when
+	 * the server confirms it is still current. EPUBs must arrive whole — the ZIP
+	 * loader reads the central directory out of a complete Blob — so this is the
+	 * only path that renders them, and the fallback when ranges are unavailable.
+	 */
+	async function fetchWholeBook(url: string, signal: AbortSignal): Promise<File> {
+		const cached = await readCachedBook(url);
+		const probe = await probeFile(url);
+		totalBytes = probe.size;
+		if (cached && cached.etag && probe.etag && cached.etag === probe.etag) {
+			fromCache = true;
+			return new File([cached.blob], 'book', { type: cached.blob.type });
+		}
+		if (cached && probe.size === null && probe.etag === null) {
+			// Unreachable server (offline): trust the stored copy.
+			fromCache = true;
+			return new File([cached.blob], 'book', { type: cached.blob.type });
+		}
+		const { blob, total, etag, contentType } = await downloadWithProgress(
+			url,
+			(p) => {
+				downloadedBytes = p.loaded;
+				totalBytes = p.total;
+			},
+			{ signal }
+		);
+		if (!signal.aborted) {
+			void storeCachedBook(url, blob, {
+				etag: etag ?? probe.etag,
+				contentType: contentType ?? probe.contentType
+			});
+		}
+		return new File([blob], 'book', { type: blob.type });
+	}
+
 	onMount(() => {
 		let cancelled = false;
+		const loader = new AbortController();
 
 		(async () => {
 			try {
+				performance.mark(FETCH_START_MARK);
 				await ensureFoliateView(); // registers the <foliate-view> custom element
 				// Fetch the book's recipe index alongside the EPUB; failure just disables matching.
 				const indexPromise = fetchRecipeIndex(bookId)
@@ -338,20 +414,11 @@
 						console.warn('recipe index unavailable; matching disabled', e);
 						return null;
 					});
-				const res = await fetch(bookFileUrl(bookId));
-				if (!res.ok) throw new Error(`GET book file → ${res.status}`);
-				const blob = await res.blob();
-				if (cancelled || !host) return;
-
-				// foliate's loader sniffs the filename (e.g. .cbz), so a named File is required —
-				// a bare Blob would throw in makeBook.
-				const file = new File([blob], 'book', { type: blob.type });
+				const url = bookFileUrl(bookId);
 				const el = document.createElement('foliate-view') as unknown as FoliateView;
-				host.append(el);
-				view = el;
-
 				el.addEventListener('relocate', (e: Event) => {
-					const detail = (e as CustomEvent<FoliateRelocateDetail>).detail ?? ({} as FoliateRelocateDetail);
+					const detail =
+						(e as CustomEvent<FoliateRelocateDetail>).detail ?? ({} as FoliateRelocateDetail);
 					if (typeof detail.fraction === 'number') progress = detail.fraction;
 					currentHref = detail.tocItem?.href ?? currentHref;
 					panel = null; // a page turn leaves the popover's anchor stale
@@ -363,9 +430,45 @@
 					injectControls(detail.doc);
 				});
 
-				// Ready before open() renders the first section, so its headings get matched too.
-				recipeIndex = await indexPromise;
-				await el.open(file);
+				let ranged = false;
+				if (format === 'pdf') {
+					// pdf.js reads through file.slice(), so a range-backed file streams
+					// pages over 206 responses — the first page renders without the
+					// whole book. Anything failing here falls back to the full download.
+					try {
+						const probe = await probeFile(url);
+						if (!cancelled && probe.acceptsRanges && probe.size) {
+							totalBytes = probe.size;
+							const shim = makeRangeBackedFile(url, probe.size, {
+								contentType: probe.contentType ?? 'application/pdf'
+							});
+							if (cancelled || !host) return;
+							host.append(el);
+							view = el;
+							// Ready before open() renders the first section, so its
+							// headings get matched too.
+							recipeIndex = await indexPromise;
+							await el.open(shim as unknown as File);
+							ranged = true;
+						}
+					} catch (e) {
+						console.warn('range streaming unavailable; downloading the whole file', e);
+						el.remove();
+						view = null;
+					}
+				}
+				if (!ranged) {
+					const file = await fetchWholeBook(url, loader.signal);
+					if (cancelled || !host) return;
+
+					// foliate's loader sniffs the filename (e.g. .cbz), so a named File is required —
+					// a bare Blob would throw in makeBook.
+					host.append(el);
+					view = el;
+					// Ready before open() renders the first section, so its headings get matched too.
+					recipeIndex = await indexPromise;
+					await el.open(file);
+				}
 				if (cancelled) return;
 
 				// Only genuine reading movement records the position — the same reasons foliate
@@ -420,6 +523,7 @@
 					else el.renderer.next(); // render the first page
 				}
 				status = 'ready';
+				reportOpenTiming(ranged);
 			} catch (err) {
 				if (!cancelled) {
 					console.error('failed to open epub', err);
@@ -432,6 +536,7 @@
 		window.addEventListener('pagehide', flushPosition);
 		return () => {
 			cancelled = true;
+			loader.abort();
 			flushPosition();
 			window.removeEventListener('keydown', onKeydown);
 			window.removeEventListener('pagehide', flushPosition);
@@ -462,7 +567,25 @@
 	{#if status !== 'ready'}
 		<div class="overlay" class:error={status === 'error'}>
 			{#if status === 'loading'}
-				<p class="msg">Opening the book…</p>
+				{#if fromCache}
+					<p class="msg">Opening your saved copy…</p>
+				{:else if totalBytes !== null && downloadedBytes > 0}
+					<p class="msg">
+						Downloading the book… {formatMiB(downloadedBytes)} of {formatMiB(totalBytes)}{downloadPct !== null
+							? ` (${downloadPct}%)`
+							: ''}
+					</p>
+					<progress
+						class="dl"
+						max={totalBytes}
+						value={downloadedBytes}
+						aria-label="Book download progress"
+					>
+						{downloadPct !== null ? `${downloadPct}%` : 'Downloading…'}
+					</progress>
+				{:else}
+					<p class="msg">Opening the book…</p>
+				{/if}
 			{:else if status === 'not-found'}
 				<ReaderNotFound
 					recipeName={missedName}
@@ -524,6 +647,27 @@
 		font-size: 1.3rem;
 		color: var(--muted);
 		margin: 0;
+	}
+	.dl {
+		width: min(22rem, 70vw);
+		height: 0.35rem;
+		appearance: none;
+		border: none;
+		border-radius: 999px;
+		background: var(--line);
+		color: var(--accent);
+	}
+	.dl::-webkit-progress-bar {
+		background: var(--line);
+		border-radius: 999px;
+	}
+	.dl::-webkit-progress-value {
+		background: var(--accent);
+		border-radius: 999px;
+	}
+	.dl::-moz-progress-bar {
+		background: var(--accent);
+		border-radius: 999px;
 	}
 	.overlay.error .msg {
 		color: var(--ink);

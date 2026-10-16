@@ -53,6 +53,8 @@
 	import { plainText } from '$lib/html';
 	import { cleanTitle, titleSubtitle } from '$lib/title';
 	import { keywordHref } from '$lib/api/recipes';
+	import { bookFileUrl } from '$lib/api/books';
+	import { warmBookCache } from '$lib/reader/book-download';
 	import type { BookMetadataUpdate } from '$lib/api/books';
 	import ExtractButton from '$lib/components/ExtractButton.svelte';
 	import BookMetadataEditor from '$lib/components/BookMetadataEditor.svelte';
@@ -156,6 +158,15 @@
 					? 'needs-gemini-ocr'
 					: null
 	);
+	// Warm the reader's file cache when the Read action is clearly about to be used
+	// (hover or keyboard focus) — MY-213. warmBookCache itself stays off metered
+	// connections, so this never spends data the user didn't ask to spend.
+	let prefetched = false;
+	function prefetchBookFile() {
+		if (prefetched || !readable) return;
+		prefetched = true;
+		void warmBookCache(bookFileUrl(book.id));
+	}
 </script>
 
 <article
@@ -270,14 +281,16 @@
 
 			<div class="actions">
 				<!-- Two ways to read a book, one shared position; the mode last read leads. -->
-				{#if readable}
-					<a
-						class="btn read-epub"
-						class:primary={mode !== 'recipes'}
-						class:ghost={mode === 'recipes'}
-						style:order={mode === 'recipes' ? 2 : 1}
-						href={`/books/${book.id}/read`}
-					>
+			{#if readable}
+				<a
+					class="btn read-epub"
+					class:primary={mode !== 'recipes'}
+					class:ghost={mode === 'recipes'}
+					style:order={mode === 'recipes' ? 2 : 1}
+					href={`/books/${book.id}/read`}
+					onmouseenter={prefetchBookFile}
+					onfocus={prefetchBookFile}
+				>
 						{started ? 'Continue book' : 'Read book'}
 						<span class="ar" aria-hidden="true">›</span>
 					</a>

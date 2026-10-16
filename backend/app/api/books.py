@@ -354,10 +354,18 @@ def book_cover_thumbnail(book_id: uuid.UUID, session: SessionDep) -> Response:
 
 
 @router.get("/books/{book_id}/file")
-def book_file(book_id: uuid.UUID, session: SessionDep) -> FileResponse:
+def book_file(
+    book_id: uuid.UUID, request: Request, session: SessionDep
+) -> Response:
     """The book's own file for the in-app reader, whichever format it is held in. A book
     holding both reads as its EPUB — the richer of the two. The reader sniffs the bytes,
-    so the caller needs no say in the choice."""
+    so the caller needs no say in the choice.
+
+    Range requests are served by Starlette's FileResponse (206 + Content-Range), which
+    is what lets the PDF reader stream pages without downloading the whole book. The
+    file is immutable in practice (the Calibre import is append-only), so responses
+    carry a long-lived public Cache-Control alongside the ETag/Last-Modified
+    FileResponse already emits."""
     book = session.get(Book, book_id)
     if book is None:
         raise HTTPException(status_code=404, detail="book not found")
@@ -372,7 +380,17 @@ def book_file(book_id: uuid.UUID, session: SessionDep) -> FileResponse:
     # Same traversal guard as the cover endpoint, before streaming bytes off disk.
     if not path.is_relative_to(library) or not path.is_file():
         raise HTTPException(status_code=404, detail="no readable file for this book")
-    return FileResponse(path, media_type=media_type)
+    # Conditional request support, mirroring the ETag FileResponse itself emits
+    # (md5 of mtime + size) so a revalidation round-trips as a tiny 304. The
+    # long-lived Cache-Control makes repeat opens — and the reader's range
+    # requests — cache hits.
+    file_stat = path.stat()
+    etag_base = f"{file_stat.st_mtime}-{file_stat.st_size}"
+    etag = f'"{hashlib.md5(etag_base.encode(), usedforsecurity=False).hexdigest()}"'
+    headers = {"ETag": etag, "Cache-Control": "public, max-age=3153600"}
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=status.HTTP_304_NOT_MODIFIED, headers=headers)
+    return FileResponse(path, media_type=media_type, headers=headers)
 
 
 @router.get("/books/{book_id}/recipe-index", response_model=list[RecipeIndexEntry])
