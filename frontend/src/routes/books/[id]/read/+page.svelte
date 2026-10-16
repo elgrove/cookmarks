@@ -10,6 +10,7 @@
 		id: string;
 		title: string;
 		author: string;
+		format: 'epub' | 'pdf';
 		reading: ReadingState | null;
 	} | null>(null);
 
@@ -22,7 +23,14 @@
 		}
 		try {
 			const b = await fetchBookDetail(id);
-			book = { id: b.id, title: cleanTitle(b.title), author: b.author, reading: b.reading };
+			book = {
+				id: b.id,
+				title: cleanTitle(b.title),
+				author: b.author,
+				// The file endpoint prefers EPUB when a book holds both — match it.
+				format: b.has_epub ? 'epub' : 'pdf',
+				reading: b.reading
+			};
 			status = b.has_epub || b.has_pdf ? 'ready' : 'no-file';
 		} catch (err) {
 			console.error('failed to load book for reader', err);
@@ -44,6 +52,7 @@
 		bookId={book.id}
 		title={book.title}
 		author={book.author}
+		format={book.format}
 		resume={book.reading}
 		startRecipeId={$page.url.searchParams.get('at')}
 	/>

@@ -406,6 +406,35 @@ def test_file_404_for_unknown_book(client: TestClient) -> None:
     assert client.get(f"/api/books/{uuid.uuid4()}/file").status_code == 404
 
 
+def test_file_supports_range_requests(client: TestClient, library_with_epub: Path) -> None:
+    """MY-213: the PDF reader streams pages over HTTP ranges, so the file endpoint
+    must answer 206 with a Content-Range for a byte-range request."""
+    book_id = _book_id(client, "With Recipes")
+    full = client.get(f"/api/books/{book_id}/file")
+    assert full.status_code == 200
+    assert full.headers["accept-ranges"] == "bytes"
+    size = int(full.headers["content-length"])
+
+    partial = client.get(f"/api/books/{book_id}/file", headers={"Range": "bytes=0-9"})
+    assert partial.status_code == 206
+    assert partial.headers["content-range"] == f"bytes 0-9/{size}"
+    assert len(partial.content) == 10
+    assert partial.content == full.content[:10]
+
+
+def test_file_etag_revalidation(client: TestClient, library_with_epub: Path) -> None:
+    """MY-213: repeat opens revalidate cheaply — a matching If-None-Match is a 304."""
+    book_id = _book_id(client, "With Recipes")
+    first = client.get(f"/api/books/{book_id}/file")
+    assert first.status_code == 200
+    etag = first.headers["ETag"]
+    assert first.headers["Cache-Control"] == "private, max-age=31536000"
+
+    not_modified = client.get(f"/api/books/{book_id}/file", headers={"If-None-Match": etag})
+    assert not_modified.status_code == 304
+    assert not_modified.headers["ETag"] == etag
+
+
 def test_recipe_index_lists_all_in_order(client: TestClient) -> None:
     book_id = _book_id(client, "With Recipes")
     idx = client.get(f"/api/books/{book_id}/recipe-index").json()
