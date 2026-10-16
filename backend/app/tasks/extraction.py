@@ -20,6 +20,7 @@ from app.services.ai import ai_ready, get_ai_provider
 from app.services.ai.registry import ocr_ready
 from app.services.book_keywords import generate_book_keywords
 from app.services.embeddings import embed_recipes
+from app.services.extraction.checkpoints import delete_run_checkpoint, thread_id_for_run
 from app.services.extraction.graph import get_extraction_graph
 from app.services.extraction.review import VALID_HUMAN_RESPONSES
 from app.services.keyword_classification import classify_keyword_rows
@@ -81,6 +82,15 @@ def enqueue_resume_extraction(run_id: str, human_response: str) -> None:
     resume_extraction_task.delay(run_id, human_response)
 
 
+def _drop_checkpoint(run_id: str) -> None:
+    """Best-effort removal of a run's checkpoint thread. Cleanup must never fail
+    an extraction that already succeeded, so every error is logged, not raised."""
+    try:
+        delete_run_checkpoint(run_id)
+    except Exception:
+        logger.exception("Failed to delete checkpoint thread for run %s", run_id)
+
+
 def _mark_run_failed(extraction_id: str, exc: Exception) -> None:
     """Record a crashed run on its row: status FAILED, the error appended, completed
     stamped — so a worker exception leaves an honest record instead of a run wedged
@@ -88,20 +98,22 @@ def _mark_run_failed(extraction_id: str, exc: Exception) -> None:
     try:
         with SessionLocal() as session:
             run = session.get(TaskRun, uuid.UUID(extraction_id))
-            if run is None:
-                return
-            run.status = TaskStatus.FAILED
-            run.errors = [*run.errors, str(exc)]
-            run.completed_at = datetime.now(UTC)
-            session.commit()
+            if run is not None:
+                run.status = TaskStatus.FAILED
+                run.errors = [*run.errors, str(exc)]
+                run.completed_at = datetime.now(UTC)
+                session.commit()
     except Exception:
-        logger.exception(f"Failed to mark run {extraction_id} as failed")
+        logger.exception("Failed to mark run %s as failed", extraction_id)
+    # A failed run can never resume, so its checkpoint thread is dead weight.
+    # Dropping by thread id needs no run row, so orphan threads clear here too.
+    _drop_checkpoint(extraction_id)
 
 
 def _thread_id(run_id: str) -> str:
     """Deterministic LangGraph checkpoint thread id for a run, so a later resume
     finds the saved state without persisting the id on the row."""
-    return f"run_{run_id}"
+    return thread_id_for_run(run_id)
 
 
 def generate_recipe_embeddings(session: Session, recipes: list[Recipe]) -> None:
@@ -280,25 +292,31 @@ def _finalise_result(run_id: str, result: dict | None) -> str:
         if run.status == TaskStatus.DONE:
             book = session.get(Book, run.book_id)
             if book is None:
-                return "Book not found"
-            raw_recipes = (result or {}).get("raw_recipes", [])
-            new_keywords: list[Keyword] = []
-            created = save_recipes_from_graph_state(
-                session, book, run, raw_recipes, created_keywords=new_keywords
-            )
-            recipes = list(
-                session.scalars(select(Recipe).where(Recipe.extraction_run_id == run.id))
-            )
-            generate_recipe_embeddings(session, recipes)
-            _generate_book_keywords(session, book)
-            # Preserve the existing embedding → book-keyword order and make both
-            # durable before the optional classifier runs in its own transaction.
-            session.commit()
-            _classify_new_keywords(session, new_keywords)
-            logger.info(f"Finished extraction for {book.title}. Processed {created} recipes.")
-            return f"Extracted {created} recipes for {book.title}"
+                message = "Book not found"
+            else:
+                raw_recipes = (result or {}).get("raw_recipes", [])
+                new_keywords: list[Keyword] = []
+                created = save_recipes_from_graph_state(
+                    session, book, run, raw_recipes, created_keywords=new_keywords
+                )
+                recipes = list(
+                    session.scalars(select(Recipe).where(Recipe.extraction_run_id == run.id))
+                )
+                generate_recipe_embeddings(session, recipes)
+                _generate_book_keywords(session, book)
+                # Preserve the existing embedding → book-keyword order and make both
+                # durable before the optional classifier runs in its own transaction.
+                session.commit()
+                _classify_new_keywords(session, new_keywords)
+                logger.info(f"Finished extraction for {book.title}. Processed {created} recipes.")
+                message = f"Extracted {created} recipes for {book.title}"
+        else:
+            return "Extraction completed with unknown status"
 
-    return "Extraction completed with unknown status"
+    # A completed run can never resume, so its checkpoint thread is dead weight.
+    # REVIEW returns above with the thread intact; this only runs after DONE.
+    _drop_checkpoint(run_id)
+    return message
 
 
 def extract_recipes_from_book(book_id: str, extraction_id: str | None = None) -> str:
