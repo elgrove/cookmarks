@@ -8,6 +8,7 @@ import com.cookmarks.app.api.BookSummary
 import com.cookmarks.app.api.ConfigRead
 import com.cookmarks.app.api.ConfigUpdate
 import com.cookmarks.app.api.DismissState
+import com.cookmarks.app.api.GameDeckPage
 import com.cookmarks.app.api.GameRecipeIds
 import com.cookmarks.app.api.KeywordSummary
 import com.cookmarks.app.api.ListDetail
@@ -255,6 +256,11 @@ class ContractTest {
     @Test
     fun dismiss_state() {
         assertTrue(pin<DismissState>("dismissstate").dismissed)
+    }
+
+    @Test
+    fun game_deck() {
+        assertEquals(1, pin<GameDeckPage>("gamedeck").items.size)
     }
 
     @Test

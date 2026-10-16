@@ -306,8 +306,8 @@ def search_recipes(
     # can re-rank to what narrows further. Already-selected keywords are dropped
     # (every match carries them) — the frontend pins those separately, and the
     # result is cached on the criteria (see _search_facets). Skipped for `all=true`:
-    # the Discover deck reads ids only and never renders chips. MY-212 owns the
-    # dedicated deck endpoint.
+    # the Discover deck reads ids only and never renders chips (its dedicated
+    # endpoint is GET /game/deck, which skips the summary/facet/total work too).
     facets: list[KeywordSummary] = []
     if not all_recipes:
         facets = _search_facets(

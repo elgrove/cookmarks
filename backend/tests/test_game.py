@@ -78,3 +78,35 @@ def test_all_param_pages_stably(client: TestClient) -> None:
     ids = [r["id"] for r in first + second]
     assert len(ids) == 3
     assert len(set(ids)) == 3
+
+
+def test_deck_returns_slim_cards_without_search_overhead(client: TestClient) -> None:
+    # MY-212: the play-all deck reads ids only — no total to count, no facets to
+    # scan, no keywords/books to serialise.
+    body = client.get("/api/game/deck", params={"seed": 1}).json()
+    assert set(body.keys()) == {"items"}
+    assert len(body["items"]) == 3
+    for card in body["items"]:
+        assert set(card.keys()) == {"id", "name"}
+
+
+def test_deck_matches_search_order_for_the_same_seed(client: TestClient) -> None:
+    # Same seeded shuffle as `all=true`, so the deck pages exactly what the
+    # search would have shown — minus the payload the game ignores.
+    deck = [c["id"] for c in client.get("/api/game/deck", params={"seed": 5}).json()["items"]]
+    search = [
+        r["id"]
+        for r in client.get("/api/recipes", params={"all": "true", "seed": 5}).json()["items"]
+    ]
+    assert deck == search
+
+
+def test_deck_pages_stably(client: TestClient) -> None:
+    params = {"seed": 5, "limit": 2}
+    first = client.get("/api/game/deck", params=params).json()["items"]
+    second = client.get("/api/game/deck", params={**params, "offset": 2}).json()["items"]
+    third = client.get("/api/game/deck", params={**params, "offset": 4}).json()["items"]
+    ids = [c["id"] for c in first + second]
+    assert len(ids) == 3
+    assert len(set(ids)) == 3
+    assert third == []

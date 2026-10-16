@@ -310,6 +310,12 @@ data class QueueState(val queued: Boolean)
 data class GameRecipeIds(val recipe_ids: List<String>)
 
 @Serializable
+data class GameDeckCard(val id: String, val name: String)
+
+@Serializable
+data class GameDeckPage(val items: List<GameDeckCard>)
+
+@Serializable
 data class DismissState(val dismissed: Boolean)
 
 @Serializable
